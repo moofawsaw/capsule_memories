@@ -1,0 +1,64 @@
+name: capsule_memories
+description: A new Flutter project.
+version: 1.0.0+1
+environment: 
+  sdk: ^3.6.0
+dependencies: 
+  flutter:   # 🚨 CRITICAL: Required for every Flutter project - DO NOT REMOVE
+    sdk: flutter # 🚨 CRITICAL: Required for every Flutter project - DO NOT REMOVE
+  flutter_localizations: 
+    sdk: flutter
+  flutter_svg: ^2.0.12
+  cached_network_image: ^3.4.1
+  shared_preferences: ^2.3.3
+  connectivity_plus: ^6.1.0
+  gradient_borders: ^1.0.2
+  file_picker: ^8.1.7
+  image_picker: ^1.0.4
+  permission_handler: ^11.1.0
+  mobile_scanner: ^6.0.11
+  camera: ^0.10.5+5
+  share_plus: ^7.2.2
+  qr_flutter: ^4.1.0
+  path_provider: ^2.1.2
+  flutter_riverpod: ^2.5.1
+  equatable: ^2.0.5
+dev_dependencies: 
+  flutter_test:    # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
+    sdk: flutter    # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
+flutter: 
+  uses-material-design: true # 🚨 CRITICAL: Required for Material icon font - DO NOT REMOVE
+  assets: 
+    - assets/
+    - assets/images/
+  fonts: 
+    - family: Plus Jakarta Sans
+      fonts: 
+        - asset: assets/fonts/PlusJakartaSansRegular.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSansBold.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSansExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/PlusJakartaSansMedium.ttf
+          weight: 500
+    - family: Roboto
+      fonts: 
+        - asset: assets/fonts/RobotoSemiBold.ttf
+          weight: 600
+    - family: Playfair Display
+      fonts: 
+        - asset: assets/fonts/PlayfairDisplayBold.ttf
+          weight: 700
+    - family: Courier Prime
+      fonts: 
+        - asset: assets/fonts/CourierPrimeRegular.ttf
+          weight: 400
+
+  # 🚨 CRITICAL ASSET MANAGEMENT RULES:
+  # - DO NOT ADD NEW ASSET DIRECTORIES (assets/svg/, assets/icons/, etc.)
+  # - ONLY USE EXISTING AND ITEMS AVAILABLE IN THE DIRECTORIES LISTED ABOVE (assets/, assets/images/)
+
+  # 🚨 CRITICAL FONTS RULE:
+  # - DO NOT ADD NEW LOCAL FONTS TO assets/fonts/ 
+  # - ONLY USE EXISTING LOCAL FONTS FROM assets/fonts/
