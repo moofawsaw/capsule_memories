@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_profile_display.dart';
 import '../../widgets/custom_stat_card.dart';
+import '../user_menu_screen/user_menu_screen.dart';
+import './widgets/story_grid_item.dart';
 import 'notifier/user_profile_notifier.dart';
-import 'widgets/story_grid_item.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
   UserProfileScreen({Key? key}) : super(key: key);
@@ -48,9 +50,6 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       showIconButton: true,
       iconButtonImagePath: ImageConstant.imgFrame19,
       iconButtonBackgroundColor: appTheme.color3BD81E,
-      onIconButtonTap: () {
-        // Handle icon button tap
-      },
       actionIcons: [
         ImageConstant.imgIconGray50,
         ImageConstant.imgIconGray5032x32
@@ -58,9 +57,6 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       showProfileImage: true,
       profileImagePath: ImageConstant.imgEllipse8DeepOrange100,
       isProfileCircular: true,
-      onProfileTap: () {
-        // Handle profile tap
-      },
       customHeight: 99.h,
     );
   }
@@ -279,5 +275,31 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
   void onTapNotification(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+  }
+
+  /// Opens user menu as a side drawer
+  void _openUserMenuDrawer(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            UserMenuScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(-1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+
+          var tween =
+              Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          var offsetAnimation = animation.drive(tween);
+
+          return SlideTransition(
+            position: offsetAnimation,
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+        opaque: false,
+      ),
+    );
   }
 }

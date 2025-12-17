@@ -161,7 +161,7 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
       final updatedFriendsList = [
         ...(state.friendsManagementModel?.friendsList ?? []),
         newFriend,
-      ];
+      ].cast<FriendModel>();
 
       // Remove from incoming requests
       final updatedIncomingList = state

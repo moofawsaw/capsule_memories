@@ -50,7 +50,6 @@ class FollowersManagementScreenState
       showIconButton: true,
       iconButtonImagePath: ImageConstant.imgFrame19,
       iconButtonBackgroundColor: appTheme.color3BD81E,
-      onIconButtonTap: () => onTapCreateContent(context),
       actionIcons: [
         ImageConstant.imgIconGray50,
         ImageConstant.imgIconGray5032x32,
@@ -58,8 +57,6 @@ class FollowersManagementScreenState
       showProfileImage: true,
       profileImagePath: ImageConstant.imgEllipse8,
       isProfileCircular: true,
-      onProfileTap: () => onTapProfile(context),
-      showBottomBorder: true,
       customHeight: 101.h,
     );
   }
@@ -209,7 +206,7 @@ class FollowersManagementScreenState
 
   /// Navigates to create content screen
   void onTapCreateContent(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
+    NavigatorService.pushNamed(AppRoutes.postScreen);
   }
 
   /// Navigates to notifications screen
@@ -219,17 +216,17 @@ class FollowersManagementScreenState
 
   /// Navigates to profile screen
   void onTapProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Navigates to following screen
   void onTapFollowing(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.followingListScreen);
+    NavigatorService.pushNamed(AppRoutes.followingScreen);
   }
 
   /// Navigates to follower profile
   void onTapFollower(BuildContext context, FollowerItemModel follower) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Blocks the selected follower

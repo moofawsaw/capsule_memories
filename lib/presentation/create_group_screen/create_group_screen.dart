@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_header_section.dart';
-import '../../widgets/custom_edit_text.dart';
-import '../../widgets/custom_search_view.dart';
-import '../../widgets/custom_user_info_row.dart';
-import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_edit_text.dart';
+import './widgets/friend_list_item.dart';
 import 'notifier/create_group_notifier.dart';
-import 'widgets/friend_list_item.dart';
 
 class CreateGroupScreen extends ConsumerStatefulWidget {
   CreateGroupScreen({Key? key}) : super(key: key);
@@ -21,62 +18,52 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-        child: Scaffold(
-            backgroundColor: Color(0xFF5B000000),
-            body: Form(
-                key: _formKey,
-                child: SizedBox(
-                    width: double.maxFinite,
-                    child: SingleChildScrollView(
-                        child: Container(
-                            width: double.maxFinite,
-                            height: 848.h,
-                            child:
-                                Stack(alignment: Alignment.center, children: [
-                              Align(
-                                  alignment: Alignment.bottomCenter,
-                                  child: Container(
-                                      width: double.maxFinite,
-                                      height: 654.h,
-                                      decoration: BoxDecoration(
-                                          color: appTheme.gray_900_02,
-                                          borderRadius: BorderRadius.vertical(
-                                              top: Radius.circular(26.h))))),
-                              Container(
-                                  width: double.maxFinite,
-                                  height: double.maxFinite,
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 22.h, vertical: 26.h),
-                                  child: Column(children: [
-                                    SizedBox(height: 190.h),
-                                    Container(
-                                        width: 116.h,
-                                        height: 12.h,
-                                        decoration: BoxDecoration(
-                                            color: appTheme.color3BD81E,
-                                            borderRadius:
-                                                BorderRadius.circular(6.h))),
-                                    CustomHeaderSection(
-                                        title: 'Create Group',
-                                        description:
-                                            'Manage your friends. See where they think the scene is.',
-                                        margin: EdgeInsets.only(
-                                            top: 32.h,
-                                            left: 30.h,
-                                            right: 30.h)),
-                                    _buildGroupNameSection(context),
-                                    _buildMembersSection(context),
-                                    _buildSelectedMembersList(context),
-                                    _buildFriendsSection(context),
-                                    _buildFriendsList(context),
-                                    _buildActionButtons(context),
-                                  ])),
-                            ])))))));
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 48.h,
+            height: 5.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context),
+                  SizedBox(height: 24.h),
+                  _buildFriendsList(context),
+                  SizedBox(height: 24.h),
+                  _buildActionButtons(context),
+                  SizedBox(height: 20.h),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Section Widget
-  Widget _buildGroupNameSection(BuildContext context) {
+  Widget _buildHeader(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(createGroupNotifier);
 
@@ -97,78 +84,6 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             }),
       ]);
     });
-  }
-
-  /// Section Widget
-  Widget _buildMembersSection(BuildContext context) {
-    return Consumer(builder: (context, ref, _) {
-      final state = ref.watch(createGroupNotifier);
-
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-            padding: EdgeInsets.only(top: 20.h),
-            child: Text('Members',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300))),
-        CustomSearchView(
-            controller: state.searchController,
-            placeholder: 'Search by name...',
-            margin: EdgeInsets.only(top: 12.h),
-            onChanged: (value) {
-              ref.read(createGroupNotifier.notifier).searchFriends(value ?? '');
-            }),
-      ]);
-    });
-  }
-
-  /// Section Widget
-  Widget _buildSelectedMembersList(BuildContext context) {
-    return Consumer(builder: (context, ref, _) {
-      final state = ref.watch(createGroupNotifier);
-
-      if (state.createGroupModel?.selectedMembers?.isEmpty ?? true) {
-        return SizedBox();
-      }
-
-      return Column(
-          children: state.createGroupModel?.selectedMembers?.map((member) {
-                return CustomUserInfoRow(
-                    profileImagePath: member.profileImage,
-                    userName: member.name,
-                    actionIconPath: ImageConstant.imgIconGray5020x20,
-                    margin: EdgeInsets.only(top: 16.h),
-                    onActionTap: () {
-                      ref
-                          .read(createGroupNotifier.notifier)
-                          .removeMember(member);
-                    });
-              }).toList() ??
-              []);
-    });
-  }
-
-  /// Section Widget
-  Widget _buildFriendsSection(BuildContext context) {
-    return Container(
-        margin: EdgeInsets.only(top: 20.h),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Your Friends',
-              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300)),
-          Row(children: [
-            Text('scan a friend',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300)),
-            CustomIconButton(
-                iconPath: ImageConstant.imgButtonsGray50,
-                backgroundColor: appTheme.gray_900_03,
-                margin: EdgeInsets.only(left: 8.h),
-                onTap: () {
-                  onTapScanFriend(context);
-                }),
-          ]),
-        ]));
   }
 
   /// Section Widget
@@ -212,7 +127,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text('Group created successfully!'),
               backgroundColor: appTheme.colorFF52D1));
-          NavigatorService.pushNamed(AppRoutes.hangoutCallScreen);
+          NavigatorService.pushNamed(AppRoutes.homeScreen);
         }
       });
 
@@ -242,7 +157,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
   /// Navigates back to the previous screen
   void onTapCancel(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.hangoutCallScreen);
+    NavigatorService.pushNamed(AppRoutes.homeScreen);
   }
 
   /// Creates the group after validation

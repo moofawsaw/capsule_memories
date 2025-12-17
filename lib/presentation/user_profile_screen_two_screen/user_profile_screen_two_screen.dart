@@ -57,9 +57,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       showIconButton: true,
       iconButtonImagePath: ImageConstant.imgFrame19,
       iconButtonBackgroundColor: appTheme.color3BD81E,
-      onIconButtonTap: () {
-        // Add content functionality
-      },
       actionIcons: [
         ImageConstant.imgIconGray50,
         ImageConstant.imgIconGray5032x32
@@ -67,9 +64,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       showProfileImage: true,
       profileImagePath: ImageConstant.imgEllipse8DeepOrange100,
       isProfileCircular: true,
-      onProfileTap: () {
-        // Profile tap functionality
-      },
     );
   }
 

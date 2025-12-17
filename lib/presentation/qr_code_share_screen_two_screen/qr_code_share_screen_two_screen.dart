@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_edit_text.dart';
+import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_qr_info_card.dart';
 import 'notifier/qr_code_share_screen_two_notifier.dart';
 
@@ -16,76 +17,72 @@ class QRCodeShareScreenTwo extends ConsumerStatefulWidget {
 class QRCodeShareScreenTwoState extends ConsumerState<QRCodeShareScreenTwo> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.black_900,
-        body: Container(
-          width: double.infinity,
-          child: SingleChildScrollView(
-            child: Container(
-              width: double.infinity,
-              height: 848.h,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: double.infinity,
-                      height: 572.h,
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_900_02,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(26.h),
-                          topRight: Radius.circular(26.h),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 26.h,
-                      vertical: 20.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.color5B0000,
-                    ),
-                    child: Column(
-                      children: [
-                        SizedBox(height: 276.h),
-                        Container(
-                          width: 116.h,
-                          height: 12.h,
-                          decoration: BoxDecoration(
-                            color: appTheme.color3BD81E,
-                            borderRadius: BorderRadius.circular(6.h),
-                          ),
-                        ),
-                        SizedBox(height: 20.h),
-                        CustomQrInfoCard(
-                          title: "Share QR code",
-                          description:
-                              "Share this QR code to become friends with other Memry users",
-                          textAlign: TextAlign.center,
-                          margin: EdgeInsets.symmetric(horizontal: 26.h),
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildQRCodeSection(context),
-                        SizedBox(height: 20.h),
-                        _buildUrlSection(context),
-                        SizedBox(height: 20.h),
-                        _buildDescriptionText(context),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
         ),
       ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 48.h,
+            height: 5.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: _buildContent(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(qrCodeShareScreenTwoNotifier);
+
+        return Column(
+          children: [
+            Container(
+              width: 116.h,
+              height: 12.h,
+              decoration: BoxDecoration(
+                color: appTheme.color3BD81E,
+                borderRadius: BorderRadius.circular(6.h),
+              ),
+            ),
+            SizedBox(height: 20.h),
+            CustomQrInfoCard(
+              title: "Share QR code",
+              description:
+                  "Share this QR code to become friends with other Memry users",
+              textAlign: TextAlign.center,
+              margin: EdgeInsets.symmetric(horizontal: 26.h),
+            ),
+            SizedBox(height: 16.h),
+            _buildQRCodeSection(context),
+            SizedBox(height: 20.h),
+            _buildUrlSection(context),
+            SizedBox(height: 20.h),
+            _buildDescriptionText(context),
+          ],
+        );
+      },
     );
   }
 

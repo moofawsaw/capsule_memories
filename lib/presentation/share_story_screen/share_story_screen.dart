@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_search_view.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../widgets/custom_search_view.dart';
+import './widgets/contact_item_widget.dart';
 import 'notifier/share_story_notifier.dart';
-import 'widgets/contact_item_widget.dart';
 
 class ShareStoryScreen extends ConsumerStatefulWidget {
   ShareStoryScreen({Key? key}) : super(key: key);
@@ -19,7 +20,7 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
     return Container(
       width: double.maxFinite,
       decoration: BoxDecoration(
-        color: appTheme.gray_900,
+        color: appTheme.gray_900_02,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(20.h),
           topRight: Radius.circular(20.h),
@@ -28,10 +29,33 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildHeader(context),
-          _buildSearchSection(context),
-          _buildContactsList(context),
-          _buildActionButtons(context),
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 48.h,
+            height: 5.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context),
+                  SizedBox(height: 24.h),
+                  _buildSearchSection(context),
+                  SizedBox(height: 24.h),
+                  _buildContactsList(context),
+                  SizedBox(height: 20.h),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -111,41 +135,35 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
 
   /// Contacts grid section
   Widget _buildContactsList(BuildContext context) {
-    return Expanded(
-      child: Container(
-        width: double.maxFinite,
-        padding: EdgeInsets.symmetric(horizontal: 22.h),
-        child: Consumer(
-          builder: (context, ref, _) {
-            final state = ref.watch(shareStoryNotifier);
-            final filteredContacts =
-                state.shareStoryModel?.filteredContacts ?? [];
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(shareStoryNotifier);
+        final filteredContacts = state.shareStoryModel?.filteredContacts ?? [];
 
-            return GridView.builder(
-              padding: EdgeInsets.zero,
-              shrinkWrap: true,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 20.h,
-                mainAxisSpacing: 24.h,
-                childAspectRatio: 0.8,
-              ),
-              itemCount: filteredContacts.length,
-              itemBuilder: (context, index) {
-                final contact = filteredContacts[index];
-                return ContactItemWidget(
-                  contact: contact,
-                  onTap: () {
-                    ref
-                        .read(shareStoryNotifier.notifier)
-                        .toggleContactSelection(index);
-                  },
-                );
+        return GridView.builder(
+          padding: EdgeInsets.zero,
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 20.h,
+            mainAxisSpacing: 24.h,
+            childAspectRatio: 0.8,
+          ),
+          itemCount: filteredContacts.length,
+          itemBuilder: (context, index) {
+            final contact = filteredContacts[index];
+            return ContactItemWidget(
+              contact: contact,
+              onTap: () {
+                ref
+                    .read(shareStoryNotifier.notifier)
+                    .toggleContactSelection(index);
               },
             );
           },
-        ),
-      ),
+        );
+      },
     );
   }
 

@@ -223,4 +223,12 @@ class TextStyleHelper {
         fontWeight: FontWeight.w800,
         fontFamily: 'Plus Jakarta Sans',
       );
+
+  // Body text styles
+  TextStyle get body10BoldPlusJakartaSans => TextStyle(
+        fontFamily: 'Plus Jakarta Sans',
+        fontSize: 10.fSize,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
+      );
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomPublicMemories - A horizontal scrolling component that displays public memory cards
@@ -99,7 +100,13 @@ class CustomPublicMemories extends StatelessWidget {
   Widget _buildMemoryHeader(BuildContext context, CustomMemoryItem memory) {
     return Container(
         padding: EdgeInsets.all(18.h),
-        decoration: BoxDecoration(color: Color(0xFFD81E29).withAlpha(59)),
+        decoration: BoxDecoration(
+          color: Color(0xFFD81E29).withAlpha(59),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20.h),
+            topRight: Radius.circular(20.h),
+          ),
+        ),
         child: Row(children: [
           Container(
               height: 36.h,
@@ -160,47 +167,39 @@ class CustomPublicMemories extends StatelessWidget {
 
   Widget _buildMemoryTimeline(BuildContext context, CustomMemoryItem memory) {
     return Container(
-        margin: EdgeInsets.symmetric(horizontal: 4.h),
-        child: Stack(children: [
-          _buildTimelineContent(context, memory),
-          _buildTimelineConnectors(context, memory),
+        padding: EdgeInsets.symmetric(horizontal: 18.h),
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_01,
+        ),
+        child: Column(children: [
+          SizedBox(height: 28.h),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            if (memory.mediaItems != null && memory.mediaItems!.isNotEmpty)
+              ...memory.mediaItems!
+                  .map((item) => _buildMediaPreview(context, item))
+                  .toList(),
+          ]),
+          SizedBox(height: 29.h),
+          Container(
+              height: 4.h,
+              width: double.infinity,
+              color: appTheme.deep_purple_A100),
+          SizedBox(height: 15.h),
+          _buildTimelinePoints(context, memory.profileImages ?? []),
+          SizedBox(height: 15.h),
         ]));
   }
 
-  Widget _buildTimelineContent(BuildContext context, CustomMemoryItem memory) {
-    return Column(children: [
-      SizedBox(height: 28.h),
-      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-        if (memory.mediaItems != null && memory.mediaItems!.isNotEmpty)
-          ...memory.mediaItems!
-              .map((item) => _buildMediaPreview(context, item))
-              .toList(),
-      ]),
-      SizedBox(height: 29.h),
-      Row(children: [
-        Text('now',
-            style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-                .copyWith(color: appTheme.black_900)),
-      ]),
-      SizedBox(height: 18.h),
-      Container(
-          height: 4.h,
-          width: double.infinity,
-          color: appTheme.deep_purple_A100),
-      SizedBox(height: 15.h),
+  Widget _buildTimelinePoints(
+      BuildContext context, List<String> profileImages) {
+    if (profileImages.isEmpty || profileImages.length < 2) {
+      return SizedBox.shrink();
+    }
+
+    return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+      _buildTimelinePoint(context, profileImages[0]),
+      _buildTimelinePoint(context, profileImages[1]),
     ]);
-  }
-
-  Widget _buildTimelineConnectors(
-      BuildContext context, CustomMemoryItem memory) {
-    return Positioned(
-        bottom: 15.h,
-        left: 0,
-        right: 0,
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          _buildTimelinePoint(context, memory.profileImages?[0]),
-          _buildTimelinePoint(context, memory.profileImages?[1]),
-        ]));
   }
 
   Widget _buildTimelinePoint(BuildContext context, String? profileImage) {
@@ -264,6 +263,13 @@ class CustomPublicMemories extends StatelessWidget {
   Widget _buildMemoryFooter(BuildContext context, CustomMemoryItem memory) {
     return Container(
         padding: EdgeInsets.all(12.h),
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_01,
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(20.h),
+            bottomRight: Radius.circular(20.h),
+          ),
+        ),
         child:
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -303,6 +309,7 @@ class CustomPublicMemories extends StatelessWidget {
 /// Data model for memory items
 class CustomMemoryItem {
   CustomMemoryItem({
+    this.id,
     this.title,
     this.date,
     this.iconPath,
@@ -314,40 +321,22 @@ class CustomMemoryItem {
     this.endTime,
     this.location,
     this.distance,
+    this.isLiked,
   });
 
-  /// Memory title
+  final String? id;
   final String? title;
-
-  /// Memory date
   final String? date;
-
-  /// Icon path for the memory
   final String? iconPath;
-
-  /// List of profile image paths
   final List<String>? profileImages;
-
-  /// List of media items in the timeline
   final List<CustomMediaItem>? mediaItems;
-
-  /// Start date text
   final String? startDate;
-
-  /// Start time text
   final String? startTime;
-
-  /// End date text
   final String? endDate;
-
-  /// End time text
   final String? endTime;
-
-  /// Location text
   final String? location;
-
-  /// Distance text
   final String? distance;
+  final bool? isLiked;
 }
 
 /// Data model for media items in the timeline
@@ -357,9 +346,6 @@ class CustomMediaItem {
     this.hasPlayButton = false,
   });
 
-  /// Path to the media image
   final String? imagePath;
-
-  /// Whether this media item has a play button overlay
   final bool hasPlayButton;
 }

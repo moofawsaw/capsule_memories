@@ -1,5 +1,5 @@
-import '../models/notifications_model.dart';
 import '../../../core/app_export.dart';
+import '../models/notifications_model.dart';
 
 part 'notifications_state.dart';
 
@@ -66,6 +66,41 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     );
   }
 
+  void toggleMarkAllNotifications() {
+    final notifications = state.notificationsModel?.notificationsList;
+    if (notifications == null || notifications.isEmpty) return;
+
+    // Check if there are any unread notifications
+    final hasUnread =
+        notifications.any((notification) => !(notification.isRead ?? false));
+
+    // If there are unread notifications, mark all as read
+    // Otherwise, mark all as unread
+    final updatedNotifications = notifications.map((notification) {
+      return notification.copyWith(
+        isRead: hasUnread ? true : false,
+        iconPath: hasUnread
+            ? ImageConstant.imgButtonsBlueGray300
+            : ImageConstant.imgButton,
+      );
+    }).toList();
+
+    state = state.copyWith(
+      notificationsModel: state.notificationsModel?.copyWith(
+        notificationsList: updatedNotifications,
+      ),
+      isMarkAsReadSuccess: true,
+      toggleMessage: hasUnread
+          ? 'All notifications marked as read'
+          : 'All notifications marked as unread',
+    );
+
+    // Reset success flag after a short delay
+    Future.delayed(Duration(milliseconds: 100), () {
+      state = state.copyWith(isMarkAsReadSuccess: false, toggleMessage: null);
+    });
+  }
+
   void markAllAsRead() {
     final updatedNotifications =
         state.notificationsModel?.notificationsList?.map((notification) {
@@ -93,12 +128,14 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     if (notifications != null && index < notifications.length) {
       final notification = notifications[index];
 
-      // Mark individual notification as read
+      // Toggle notification read status
       final updatedNotifications =
           List<NotificationItemModel>.from(notifications);
       updatedNotifications[index] = notification.copyWith(
-        isRead: true,
-        iconPath: ImageConstant.imgButtonsBlueGray300,
+        isRead: !(notification.isRead ?? false),
+        iconPath: !(notification.isRead ?? false)
+            ? ImageConstant.imgButtonsBlueGray300
+            : ImageConstant.imgButton,
       );
 
       state = state.copyWith(

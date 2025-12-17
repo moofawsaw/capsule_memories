@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
+import '../../widgets/custom_app_bar.dart';
+import '../../widgets/custom_icon_button_row.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
-import '../../widgets/custom_icon_button_row.dart';
-import '../../widgets/custom_icon_button.dart';
+import '../qr_code_share_screen_two_screen/qr_code_share_screen_two_screen.dart';
+import './widgets/friends_section_widget.dart';
+import './widgets/incoming_requests_section_widget.dart';
+import './widgets/sent_requests_section_widget.dart';
 import 'notifier/friends_management_notifier.dart';
-import 'widgets/friends_section_widget.dart';
-import 'widgets/sent_requests_section_widget.dart';
-import 'widgets/incoming_requests_section_widget.dart';
 
 class FriendsManagementScreen extends ConsumerStatefulWidget {
   const FriendsManagementScreen({Key? key}) : super(key: key);
@@ -31,76 +33,28 @@ class FriendsManagementScreenState
     return SafeArea(
         child: Scaffold(
             backgroundColor: appTheme.gray_900_02,
+            appBar: CustomAppBar(
+              logoImagePath: ImageConstant.imgLogo,
+              showIconButton: true,
+              iconButtonImagePath: ImageConstant.imgFrame19,
+              iconButtonBackgroundColor: appTheme.color3BD81E,
+              actionIcons: [
+                ImageConstant.imgIconGray50,
+                ImageConstant.imgIconGray5032x32,
+              ],
+              showProfileImage: true,
+              profileImagePath: ImageConstant.imgEllipse8,
+              isProfileCircular: true,
+            ),
             body: Container(
                 width: double.infinity,
                 child: Column(children: [
                   Expanded(
                       child: SingleChildScrollView(
                           child: Column(spacing: 24.h, children: [
-                    _buildHeaderSection(context),
                     _buildMainContentSection(context),
                   ]))),
                 ]))));
-  }
-
-  /// Header section with logo, actions and profile
-  Widget _buildHeaderSection(BuildContext context) {
-    return Container(
-        padding:
-            EdgeInsets.only(top: 26.h, left: 22.h, right: 22.h, bottom: 24.h),
-        decoration: BoxDecoration(
-            border: Border(
-                bottom: BorderSide(color: appTheme.blue_gray_900, width: 1.h))),
-        child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                  width: 130.h,
-                  height: 26.h,
-                  margin: EdgeInsets.only(bottom: 10.h),
-                  child: CustomImageView(
-                      imagePath: ImageConstant.imgLogo, fit: BoxFit.contain)),
-              SizedBox(width: 18.h),
-              CustomIconButton(
-                  iconPath: ImageConstant.imgFrame19,
-                  backgroundColor: appTheme.color3BD81E,
-                  borderRadius: 22.h,
-                  height: 46.h,
-                  width: 46.h,
-                  padding: EdgeInsets.all(6.h),
-                  onTap: () => onTapAddButton(context)),
-              SizedBox(width: 18.h),
-              GestureDetector(
-                  onTap: () => onTapNotificationIcon(context),
-                  child: Container(
-                      width: 32.h,
-                      height: 32.h,
-                      margin: EdgeInsets.only(bottom: 8.h),
-                      child: CustomImageView(
-                          imagePath: ImageConstant.imgIconGray50,
-                          fit: BoxFit.contain))),
-              SizedBox(width: 6.h),
-              GestureDetector(
-                  onTap: () => onTapNotificationBell(context),
-                  child: Container(
-                      width: 32.h,
-                      height: 32.h,
-                      margin: EdgeInsets.only(bottom: 8.h),
-                      child: CustomImageView(
-                          imagePath: ImageConstant.imgIconGray5032x32,
-                          fit: BoxFit.contain))),
-              SizedBox(width: 8.h),
-              GestureDetector(
-                  onTap: () => onTapProfileImage(context),
-                  child: Container(
-                      width: 50.h,
-                      height: 50.h,
-                      margin: EdgeInsets.only(top: 22.h),
-                      child: CustomImageView(
-                          imagePath: ImageConstant.imgEllipse8,
-                          fit: BoxFit.cover))),
-            ]));
   }
 
   /// Main content section with friends management
@@ -144,9 +98,19 @@ class FriendsManagementScreenState
                   child: CustomIconButtonRow(
                       firstIconPath: ImageConstant.imgButtons,
                       secondIconPath: ImageConstant.imgButtonsGray50,
-                      onFirstIconTap: () => onTapQRScanButton(context),
+                      onFirstIconTap: () => _openQRShareBottomSheet(context),
                       onSecondIconTap: () => onTapCameraButton(context)))),
         ]));
+  }
+
+  /// Open QR share bottom sheet
+  void _openQRShareBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => QRCodeShareScreenTwo(),
+    );
   }
 
   /// Search section
@@ -169,7 +133,7 @@ class FriendsManagementScreenState
 
   /// Navigate to add content
   void onTapAddButton(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
+    NavigatorService.pushNamed(AppRoutes.postScreen);
   }
 
   /// Navigate to notifications
@@ -184,7 +148,7 @@ class FriendsManagementScreenState
 
   /// Navigate to profile
   void onTapProfileImage(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Handle QR scan action

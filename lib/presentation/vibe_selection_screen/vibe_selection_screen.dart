@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_music_list.dart';
@@ -32,57 +33,48 @@ class VibeSelectionScreenState extends ConsumerState<VibeSelectionScreen>
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.transparentCustom,
-        body: Container(
-          width: double.infinity,
-          height: double.infinity,
-          child: SingleChildScrollView(
-            child: Container(
-              width: double.infinity,
-              height: 848.h,
-              child: Stack(
-                alignment: Alignment.center,
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 48.h,
+            height: 5.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: Column(
                 children: [
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: double.infinity,
-                      height: 604.h,
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_900_02,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(26.h),
-                          topRight: Radius.circular(26.h),
-                        ),
-                      ),
-                    ),
+                  _buildHeaderSection(context),
+                  SizedBox(height: 30.h),
+                  _buildVibeTabSection(context),
+                  SizedBox(height: 50.h),
+                  SizedBox(
+                    height: 300.h,
+                    child: _buildMusicListSection(context),
                   ),
-                  Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    decoration: BoxDecoration(
-                      color: appTheme.color5B0000,
-                    ),
-                    child: Column(
-                      children: [
-                        SizedBox(height: 294.h),
-                        _buildHeaderSection(context),
-                        SizedBox(height: 30.h),
-                        _buildVibeTabSection(context),
-                        SizedBox(height: 50.h),
-                        Expanded(
-                          child: _buildMusicListSection(context),
-                        ),
-                      ],
-                    ),
-                  ),
+                  SizedBox(height: 20.h),
                 ],
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

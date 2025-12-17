@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_switch.dart';
+import './custom_image_view.dart';
+import './custom_switch.dart';
 
 /**
  * CustomSettingsRow - A reusable settings row component that displays an icon, title, description, and toggle switch.
@@ -20,21 +21,27 @@ import 'custom_switch.dart';
  * @param onSwitchChanged - Callback function when switch state changes
  * @param margin - Optional margin around the entire component
  * @param isEnabled - Whether the setting row is interactive
+ * @param iconColor - Optional color to apply to the icon
+ * @param useIconData - Whether to use IconData instead of image path
+ * @param iconData - IconData to use when useIconData is true
  */
 class CustomSettingsRow extends StatelessWidget {
   const CustomSettingsRow({
     Key? key,
-    required this.iconPath,
+    this.iconPath,
     required this.title,
     required this.description,
     required this.switchValue,
     required this.onSwitchChanged,
     this.margin,
     this.isEnabled = true,
+    this.iconColor,
+    this.useIconData = false,
+    this.iconData,
   }) : super(key: key);
 
   /// Path to the icon image displayed on the left
-  final String iconPath;
+  final String? iconPath;
 
   /// Main title text for the setting
   final String title;
@@ -54,6 +61,15 @@ class CustomSettingsRow extends StatelessWidget {
   /// Whether the setting row is interactive
   final bool isEnabled;
 
+  /// Optional color to apply to the icon
+  final Color? iconColor;
+
+  /// Whether to use IconData instead of image path
+  final bool useIconData;
+
+  /// IconData to use when useIconData is true
+  final IconData? iconData;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -69,11 +85,19 @@ class CustomSettingsRow extends StatelessWidget {
       child: Row(
         children: [
           // Left icon
-          CustomImageView(
-            imagePath: iconPath,
-            height: 28.h,
-            width: 28.h,
-          ),
+          if (useIconData && iconData != null)
+            Icon(
+              iconData,
+              size: 28.h,
+              color: iconColor ?? appTheme.gray_50,
+            )
+          else
+            CustomImageView(
+              imagePath: iconPath ?? '',
+              height: 28.h,
+              width: 28.h,
+              color: iconColor,
+            ),
 
           SizedBox(width: 12.h),
 
@@ -101,8 +125,6 @@ class CustomSettingsRow extends StatelessWidget {
           CustomSwitch(
             value: switchValue,
             onChanged: isEnabled ? onSwitchChanged : (value) {},
-            activeColor: appTheme.colorFF52D1,
-            inactiveTrackColor: appTheme.colorFFE0E0,
             isEnabled: isEnabled,
           ),
         ],

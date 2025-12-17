@@ -1,32 +1,28 @@
 part of 'vibe_selection_screen_two_notifier.dart';
 
 class VibeSelectionScreenTwoState extends Equatable {
-  final List<VibeItem> vibes;
-  final int? selectedVibeIndex;
-  final VibeItem? selectedVibe;
-
   VibeSelectionScreenTwoState({
-    this.vibes = const [],
-    this.selectedVibeIndex,
-    this.selectedVibe,
+    this.vibeSelectionScreenTwoModel,
+    this.selectedCategory,
   });
+
+  VibeSelectionScreenTwoModel? vibeSelectionScreenTwoModel;
+  String? selectedCategory;
 
   @override
   List<Object?> get props => [
-        vibes,
-        selectedVibeIndex,
-        selectedVibe,
+        vibeSelectionScreenTwoModel,
+        selectedCategory,
       ];
 
   VibeSelectionScreenTwoState copyWith({
-    List<VibeItem>? vibes,
-    int? selectedVibeIndex,
-    VibeItem? selectedVibe,
+    VibeSelectionScreenTwoModel? vibeSelectionScreenTwoModel,
+    String? selectedCategory,
   }) {
     return VibeSelectionScreenTwoState(
-      vibes: vibes ?? this.vibes,
-      selectedVibeIndex: selectedVibeIndex ?? this.selectedVibeIndex,
-      selectedVibe: selectedVibe ?? this.selectedVibe,
+      vibeSelectionScreenTwoModel:
+          vibeSelectionScreenTwoModel ?? this.vibeSelectionScreenTwoModel,
+      selectedCategory: selectedCategory ?? this.selectedCategory,
     );
   }
 }

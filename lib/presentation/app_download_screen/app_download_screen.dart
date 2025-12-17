@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_qr_info_card.dart';
@@ -17,57 +18,33 @@ class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        backgroundColor: Color(0xFF5B000000),
+        backgroundColor: appTheme.gray_900_02,
         body: Container(
           width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Container(
-              width: double.maxFinite,
-              height: 848.h,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: double.maxFinite,
-                      height: 550.h,
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_900_02,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(26.h),
-                          topRight: Radius.circular(26.h),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: double.maxFinite,
-                    height: double.maxFinite,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 26.h,
-                      vertical: 30.h,
-                    ),
-                    child: Column(
-                      children: [
-                        SizedBox(height: 290.h),
-                        Container(
-                          width: 116.h,
-                          height: 12.h,
-                          decoration: BoxDecoration(
-                            color: appTheme.color3BD81E,
-                            borderRadius: BorderRadius.circular(6.h),
-                          ),
-                        ),
-                        _buildAppInfoSection(context),
-                        _buildQRCodeSection(context),
-                        _buildShareButton(context),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(26.h),
+              topRight: Radius.circular(26.h),
             ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: 12.h),
+              Container(
+                width: 116.h,
+                height: 12.h,
+                decoration: BoxDecoration(
+                  color: appTheme.background_transparent,
+                  borderRadius: BorderRadius.circular(6.h),
+                ),
+              ),
+              _buildAppInfoSection(context),
+              _buildQRCodeSection(context),
+              _buildShareButton(context),
+              SizedBox(height: 30.h),
+            ],
           ),
         ),
       ),
@@ -165,7 +142,11 @@ class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
           },
           buttonStyle: CustomButtonStyle.fillPrimary,
           buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-          margin: EdgeInsets.only(top: 20.h),
+          margin: EdgeInsets.only(
+            top: 20.h,
+            left: 24.h,
+            right: 24.h,
+          ),
         );
       },
     );

@@ -1,32 +1,37 @@
 part of 'notifications_notifier.dart';
 
 class NotificationsState extends Equatable {
-  final bool? isLoading;
-  final bool? isMarkAsReadSuccess;
-  final NotificationsModel? notificationsModel;
-
   NotificationsState({
-    this.isLoading = false,
-    this.isMarkAsReadSuccess = false,
     this.notificationsModel,
+    this.isLoading,
+    this.isMarkAsReadSuccess,
+    this.toggleMessage,
   });
+
+  NotificationsModel? notificationsModel;
+  bool? isLoading;
+  bool? isMarkAsReadSuccess;
+  String? toggleMessage;
 
   @override
   List<Object?> get props => [
+        notificationsModel,
         isLoading,
         isMarkAsReadSuccess,
-        notificationsModel,
+        toggleMessage,
       ];
 
   NotificationsState copyWith({
+    NotificationsModel? notificationsModel,
     bool? isLoading,
     bool? isMarkAsReadSuccess,
-    NotificationsModel? notificationsModel,
+    String? toggleMessage,
   }) {
     return NotificationsState(
+      notificationsModel: notificationsModel ?? this.notificationsModel,
       isLoading: isLoading ?? this.isLoading,
       isMarkAsReadSuccess: isMarkAsReadSuccess ?? this.isMarkAsReadSuccess,
-      notificationsModel: notificationsModel ?? this.notificationsModel,
+      toggleMessage: toggleMessage ?? this.toggleMessage,
     );
   }
 }

@@ -1,33 +1,27 @@
-import '../../../core/app_export.dart';
 
 /// This class is used in the [CreateMemoryScreen] screen.
 
 // ignore_for_file: must_be_immutable
-class CreateMemoryModel extends Equatable {
+class CreateMemoryModel {
+  String? memoryName;
+  bool isPublic;
+  String? selectedGroup;
+
   CreateMemoryModel({
     this.memoryName,
-    this.isPublic,
-  }) {
-    memoryName = memoryName ?? "";
-    isPublic = isPublic ?? true;
-  }
-
-  String? memoryName;
-  bool? isPublic;
+    this.isPublic = true,
+    this.selectedGroup,
+  });
 
   CreateMemoryModel copyWith({
     String? memoryName,
     bool? isPublic,
+    String? selectedGroup,
   }) {
     return CreateMemoryModel(
       memoryName: memoryName ?? this.memoryName,
       isPublic: isPublic ?? this.isPublic,
+      selectedGroup: selectedGroup ?? this.selectedGroup,
     );
   }
-
-  @override
-  List<Object?> get props => [
-        memoryName,
-        isPublic,
-      ];
 }

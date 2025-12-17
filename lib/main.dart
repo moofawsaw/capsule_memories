@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+
+import './services/supabase_service.dart';
 import 'core/app_export.dart';
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
-void main() {
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 🚨 CRITICAL: Device orientation lock - DO NOT REMOVE
+
+  // Initialize Supabase asynchronously (non-blocking)
+  SupabaseService.initialize().catchError((error) {
+    print('Supabase initialization error (non-blocking): $error');
+  });
+
+  // Continue with app initialization
   Future.wait([
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
   ]).then((value) {
@@ -25,9 +34,9 @@ class MyApp extends ConsumerWidget {
           // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
           builder: (context, child) {
             return MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(1.0)),
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(1.0),
+              ),
               child: child!,
             );
           },

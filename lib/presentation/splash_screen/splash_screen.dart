@@ -26,7 +26,7 @@ class SplashScreenState extends ConsumerState<SplashScreen> {
       (previous, current) {
         if (current.shouldNavigate ?? false) {
           NavigatorService.pushNamedAndRemoveUntil(
-              AppRoutes.memoryFeedDashboardScreen);
+              AppRoutes.feedScreen);
         }
       },
     );

@@ -1,5 +1,6 @@
-import '../models/vibe_selection_screen_two_model.dart';
 import '../../../core/app_export.dart';
+import '../../../core/utils/navigator_service.dart';
+import '../models/vibe_selection_screen_two_model.dart';
 
 part 'vibe_selection_screen_two_state.dart';
 
@@ -15,94 +16,16 @@ class VibeSelectionScreenTwoNotifier
   VibeSelectionScreenTwoNotifier(VibeSelectionScreenTwoState state)
       : super(state);
 
-  void initializeVibes() {
-    final vibes = [
-      // Top row
-      VibeItem(
-        id: 'fun',
-        label: 'Fun',
-        image: '😎',
-        isEmoji: true,
-        backgroundColor: appTheme.deep_purple_A100,
-        textColor: appTheme.white_A700,
-      ),
-      VibeItem(
-        id: 'crazy',
-        label: 'Crazy',
-        image: '🤪',
-        isEmoji: true,
-        backgroundColor: appTheme.colorFF2A2A,
-        textColor: appTheme.white_A700,
-      ),
-      VibeItem(
-        id: 'sexy',
-        label: 'Sexy',
-        image: '😍',
-        isEmoji: true,
-        backgroundColor: appTheme.colorFF2A2A,
-        textColor: appTheme.white_A700,
-      ),
-      // Middle row
-      VibeItem(
-        id: 'cute',
-        label: 'Cute',
-        image: '😘',
-        isEmoji: true,
-        backgroundColor: appTheme.colorFF2A2A,
-        textColor: appTheme.white_A700,
-      ),
-      VibeItem(
-        id: 'pug',
-        label: '',
-        image: ImageConstant.imgPugDog,
-        isEmoji: false,
-        backgroundColor: appTheme.colorFF2A2A,
-        textColor: appTheme.white_A700,
-      ),
-      VibeItem(
-        id: 'doge',
-        label: '',
-        image: ImageConstant.imgDogeMeme,
-        isEmoji: false,
-        backgroundColor: appTheme.colorFF2A2A,
-        textColor: appTheme.white_A700,
-      ),
-      // Bottom row
-      VibeItem(
-        id: 'cat',
-        label: '',
-        image: ImageConstant.imgWhiteCat,
-        isEmoji: false,
-        backgroundColor: appTheme.colorFF2A2A,
-        textColor: appTheme.white_A700,
-      ),
-      VibeItem(
-        id: 'lol_bird',
-        label: 'LOL',
-        image: ImageConstant.imgBirdLol,
-        isEmoji: false,
-        backgroundColor: appTheme.colorFF2A2A,
-        textColor: appTheme.white_A700,
-      ),
-      VibeItem(
-        id: 'lol_emoji',
-        label: '😂',
-        image: '😂',
-        isEmoji: true,
-        backgroundColor: appTheme.colorFF2A2A,
-        textColor: appTheme.white_A700,
-      ),
-    ];
-
-    state = state.copyWith(vibes: vibes);
+  onTapArrowleft(BuildContext context) {
+    NavigatorService.goBack();
   }
 
-  void selectVibe(int index) {
-    if (index >= 0 && index < state.vibes.length) {
-      state = state.copyWith(
-        selectedVibeIndex: index,
-        selectedVibe: state.vibes[index],
-      );
-    }
+  void selectCategory(String categoryName) {
+    state = state.copyWith(selectedCategory: categoryName);
+  }
+
+  void onContinuePressed() {
+    // Navigate to next screen or handle category selection
+    // You can add navigation logic here
   }
 }

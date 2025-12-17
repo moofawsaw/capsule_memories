@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/custom_image_view.dart';
 import 'notifier/color_selection_notifier.dart';
 
 class ColorSelectionScreen extends ConsumerStatefulWidget {
@@ -18,17 +19,19 @@ class ColorSelectionScreenState extends ConsumerState<ColorSelectionScreen> {
       child: Scaffold(
         backgroundColor: appTheme.color5B0000,
         appBar: _buildAppBar(context),
-        body: Container(
-          width: double.maxFinite,
-          padding: EdgeInsets.symmetric(vertical: 18.h),
-          child: Column(
-            children: [
-              _buildColorSelection(context),
-              Spacer(),
-              _buildTypePrompt(context),
-              Spacer(),
-              _buildThemeSelection(context),
-            ],
+        body: SingleChildScrollView(
+          child: Container(
+            width: double.maxFinite,
+            padding: EdgeInsets.symmetric(vertical: 18.h),
+            child: Column(
+              children: [
+                _buildColorSelection(context),
+                SizedBox(height: 10.h),
+                _buildTypePrompt(context),
+                SizedBox(height: 10.h),
+                _buildThemeSelection(context),
+              ],
+            ),
           ),
         ),
       ),

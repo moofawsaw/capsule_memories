@@ -1,30 +1,35 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart';
-import 'models/memory_item_model.dart';
+import '../create_memory_screen/create_memory_screen.dart';
+import './models/memory_item_model.dart';
+import './widgets/memory_card_widget.dart';
 import 'notifier/memories_dashboard_notifier.dart';
-import 'widgets/memory_card_widget.dart';
-import '../event_stories_view_screen/event_stories_view_screen.dart';
 
 class MemoriesDashboardScreen extends ConsumerStatefulWidget {
-  MemoriesDashboardScreen({Key? key}) : super(key: key);
+  const MemoriesDashboardScreen({Key? key}) : super(key: key);
 
   @override
-  MemoriesDashboardScreenState createState() => MemoriesDashboardScreenState();
+  ConsumerState<MemoriesDashboardScreen> createState() =>
+      _MemoriesDashboardScreenState();
 }
 
-class MemoriesDashboardScreenState
+class _MemoriesDashboardScreenState
     extends ConsumerState<MemoriesDashboardScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late TabController tabController;
 
   @override
   void initState() {
     super.initState();
     tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(memoriesDashboardNotifier.notifier).initialize();
+    });
   }
 
   @override
@@ -35,26 +40,22 @@ class MemoriesDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(memoriesDashboardNotifier);
+
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(context),
+        appBar: _buildAppBar(),
         body: Container(
           width: double.maxFinite,
           child: Column(
             children: [
+              _buildMemoriesHeader(context),
+              _buildLatestStoriesSection(context),
+              _buildViewAllButton(context),
+              _buildTabSection(context),
               Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildMemoriesHeader(context),
-                      _buildLatestStoriesSection(context),
-                      _buildViewAllButton(context),
-                      _buildTabSection(context),
-                      _buildMemoriesContent(context),
-                    ],
-                  ),
-                ),
+                child: _buildMemoriesContent(context),
               ),
             ],
           ),
@@ -63,20 +64,19 @@ class MemoriesDashboardScreenState
     );
   }
 
-  /// Section Widget - App Bar
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar() {
     return CustomAppBar(
       logoImagePath: ImageConstant.imgLogo,
       showIconButton: true,
       iconButtonImagePath: ImageConstant.imgFrame19,
       iconButtonBackgroundColor: appTheme.color3BD81E,
-      onIconButtonTap: () => _onCreateContentTap(context),
-      actionIcons: [ImageConstant.imgIcon9, ImageConstant.imgIconGray5032x32],
+      actionIcons: [
+        ImageConstant.imgIconGray50,
+        ImageConstant.imgIconGray5032x32,
+      ],
       showProfileImage: true,
       profileImagePath: ImageConstant.imgEllipse8,
       isProfileCircular: true,
-      onProfileTap: () => _onProfileTap(context),
-      showBottomBorder: true,
     );
   }
 
@@ -181,30 +181,40 @@ class MemoriesDashboardScreenState
 
         return Container(
           margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
-          padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 8.h),
+          padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 4.h),
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02.withAlpha(128),
+            borderRadius: BorderRadius.circular(24.h),
+            border: Border.all(
+              color: appTheme.blue_gray_300.withAlpha(51),
+              width: 1.0,
+            ),
+          ),
           child: TabBar(
             controller: tabController,
             labelColor: appTheme.gray_900_02,
-            unselectedLabelColor: appTheme.gray_50,
+            unselectedLabelColor: appTheme.gray_50.withAlpha(179),
             labelStyle: TextStyleHelper.instance.body14BoldPlusJakartaSans,
             unselectedLabelStyle:
                 TextStyleHelper.instance.body14RegularPlusJakartaSans,
             indicator: BoxDecoration(
-              color: appTheme.gray_50,
+              color: appTheme.deep_purple_A100,
               borderRadius: BorderRadius.circular(20.h),
             ),
             indicatorSize: TabBarIndicatorSize.tab,
+            indicatorPadding:
+                EdgeInsets.symmetric(horizontal: 2.h, vertical: 2.h),
             dividerColor: appTheme.transparentCustom,
             tabs: [
               Tab(
                 child: Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+                      EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('All'),
-                      SizedBox(width: 6.h),
+                      SizedBox(width: 4.h),
                       Text('${state.memoriesDashboardModel?.allCount ?? 1}'),
                     ],
                   ),
@@ -213,12 +223,12 @@ class MemoriesDashboardScreenState
               Tab(
                 child: Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+                      EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('Live'),
-                      SizedBox(width: 6.h),
+                      SizedBox(width: 4.h),
                       Text('${state.memoriesDashboardModel?.liveCount ?? 1}'),
                     ],
                   ),
@@ -227,12 +237,12 @@ class MemoriesDashboardScreenState
               Tab(
                 child: Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+                      EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text('Sealed'),
-                      SizedBox(width: 6.h),
+                      SizedBox(width: 4.h),
                       Text('${state.memoriesDashboardModel?.sealedCount ?? 1}'),
                     ],
                   ),
@@ -268,7 +278,6 @@ class MemoriesDashboardScreenState
 
         if (state.isLoading ?? false) {
           return Container(
-            height: 300.h,
             child: Center(
               child: CircularProgressIndicator(
                 color: appTheme.deep_purple_A100,
@@ -279,7 +288,6 @@ class MemoriesDashboardScreenState
 
         return Container(
           margin: EdgeInsets.fromLTRB(16.h, 20.h, 0, 0),
-          height: 400.h,
           child: TabBarView(
             controller: tabController,
             children: [
@@ -339,15 +347,21 @@ class MemoriesDashboardScreenState
 
   /// Navigation Functions
   void _onCreateContentTap(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
-  }
-
-  void _onProfileTap(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: appTheme.transparentCustom,
+      builder: (context) => CreateMemoryScreen(),
+    );
   }
 
   void _onCreateMemoryTap(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: appTheme.transparentCustom,
+      builder: (context) => CreateMemoryScreen(),
+    );
   }
 
   void _onStoryTap(BuildContext context, int index) {
@@ -365,12 +379,14 @@ class MemoriesDashboardScreenState
   }
 
   void _onMemoryTap(BuildContext context, MemoryItemModel memoryItem) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: appTheme.transparentCustom,
-      builder: (context) => EventStoriesViewScreen(),
-    );
+    // Conditional navigation based on memory status
+    if (memoryItem.isSealed == true) {
+      // Navigate to detail view screen for sealed memories
+      NavigatorService.pushNamed(AppRoutes.timelineSealed);
+    } else {
+      // Navigate to timeline screen for open memories
+      NavigatorService.pushNamed(AppRoutes.timelineScreen);
+    }
   }
 
   void _onNotificationTap(BuildContext context) {

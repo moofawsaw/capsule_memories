@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../core/app_export.dart';
 
-import '../video_call_interface_screen/video_call_interface_screen.dart';
+import '../../core/app_export.dart';
 import '../event_stories_view_screen/event_stories_view_screen.dart';
 import '../share_story_screen/share_story_screen.dart';
-import '../vibe_selection_screen_two_screen/vibe_selection_screen_two_screen.dart';
+import '../video_call_interface_screen/video_call_interface_screen.dart';
 
 class AppNavigationScreen extends ConsumerStatefulWidget {
   const AppNavigationScreen({Key? key}) : super(key: key);
@@ -31,43 +30,43 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                         context,
                         screenTitle: "BottomSheet/Memory/AddUsers",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.invitePeopleScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Memory/InviteCard",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.memoryInvitationScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Modal/RequestFeature One",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.groupJoinConfirmationScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.joinScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Memory/Create",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.createMemoryScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Group/Create One",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.createGroupScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Group/Create",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.addMemoryUploadScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Auth/Signup",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.accountRegistrationScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.registerScreen),
                       ),
                       _buildScreenTitle(
                         context,
@@ -78,8 +77,8 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Auth/ForgotPassword",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.passwordResetScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.resetScreen),
                       ),
                       _buildScreenTitle(
                         context,
@@ -90,8 +89,8 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Home",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.memoryFeedDashboardScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.feedScreen),
                       ),
                       _buildScreenTitle(
                         context,
@@ -103,61 +102,61 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                         context,
                         screenTitle: "Drawer/UserAccount",
                         onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.userMenuScreen),
+                            onTapScreenTitle(context, AppRoutes.menuScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/User",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.userProfileScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.profileScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Profile",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.userProfileScreenTwo),
+                            context, AppRoutes.profileTwoScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Memories",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.memoriesDashboardScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.memoriesScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Memories/Details",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.eventTimelineViewScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.timelineScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Memories/Details(sealed)",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.memoryDetailsViewScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.timelineSealed),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Groups",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.groupsManagementScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.groupsScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Friends",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.friendsManagementScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.friendsScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Following One",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.followingListScreen),
+                            context, AppRoutes.followingScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Followers",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.followersManagementScreen),
+                            context, AppRoutes.followersScreen),
                       ),
                       _buildScreenTitle(
                         context,
@@ -168,8 +167,8 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Profile/Settings",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.notificationSettingsScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.settingsScreen),
                       ),
                       _buildScreenTitle(
                         context,
@@ -180,26 +179,26 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                       _buildScreenTitle(
                         context,
                         screenTitle: "Modal/RequestFeature",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.featureRequestScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.feedbackScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Modal/ReportStory",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.reportStoryScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.reportScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Story/Editor",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.postStoryScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.postScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "Screen/Story/Record",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.hangoutCallScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.homeScreen),
                       ),
                       _buildScreenTitle(
                         context,
@@ -210,14 +209,14 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                       _buildScreenTitle(
                         context,
                         screenTitle: "Overlay/StoryEditor/AddText",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.colorSelectionScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.colorsScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/StoryEditor/Music",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.vibeSelectionScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
@@ -228,44 +227,44 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/StoryEditor/Stickers",
-                        onTapScreenTitle: () => onTapBottomSheetTitle(
-                            context, VibeSelectionScreenTwo()),
+                        onTapScreenTitle: () => onTapScreenTitle(
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Memory/Members",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.memoryMembersScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Memory/Edit",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.memoryDetailsScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Share/Invite",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.qRCodeShareScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Share/Group",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.groupQRInviteScreen),
+                            context, AppRoutes.navigationScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/ShareApp",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.appDownloadScreen),
+                        onTapScreenTitle: () =>
+                            onTapScreenTitle(context, AppRoutes.downloadScreen),
                       ),
                       _buildScreenTitle(
                         context,
                         screenTitle: "BottomSheet/Share/UserQR",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.qRCodeShareScreenTwo),
+                            context, AppRoutes.navigationScreen),
                       ),
                     ],
                   ),

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_icon_button.dart';
-import 'custom_button.dart';
+import './custom_icon_button.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomEventCard - A reusable event card component that displays event information
@@ -68,7 +68,7 @@ class CustomEventCard extends StatelessWidget {
             ),
           ),
         ),
-        padding: EdgeInsets.fromLTRB(12.h, 22.h, 12.h, 20.h),
+        padding: EdgeInsets.fromLTRB(12.h, 12.h, 12.h, 12.h),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -146,14 +146,33 @@ class CustomEventCard extends StatelessWidget {
 
   Widget _buildPrivacyButton() {
     final bool isEventPrivate = isPrivate ?? true;
-    return CustomButton(
-      text: isEventPrivate ? 'PRIVATE' : 'PUBLIC',
-      leftIcon: isEventPrivate
-          ? ImageConstant.imgIconDeepPurpleA10014x14
-          : ImageConstant.imgIcon14x14,
-      buttonStyle: CustomButtonStyle.fillDark,
-      buttonTextStyle: CustomButtonTextStyle.bodySmallPrimary,
-      padding: EdgeInsets.fromLTRB(8.h, 2.h, 8.h, 2.h),
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 8.h,
+        vertical: 2.h,
+      ),
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_03,
+        borderRadius: BorderRadius.circular(6.h),
+      ),
+      child: Row(
+        spacing: 4.h,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CustomImageView(
+            imagePath: isEventPrivate
+                ? ImageConstant.imgIconDeepPurpleA10014x14
+                : ImageConstant.imgIcon14x14,
+            height: 14.h,
+            width: 14.h,
+          ),
+          Text(
+            isEventPrivate ? 'PRIVATE' : 'PUBLIC',
+            style: TextStyleHelper.instance.body12BoldPlusJakartaSans
+                .copyWith(color: appTheme.deep_purple_A100),
+          ),
+        ],
+      ),
     );
   }
 

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../models/memory_details_model.dart';
+
 import '../../../core/app_export.dart';
+import '../models/memory_details_model.dart';
 
 part 'memory_details_state.dart';
 
@@ -92,6 +93,68 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         title: title,
       ),
     );
+  }
+
+  Future<void> saveMemory() async {
+    state = state.copyWith(isSaving: true);
+
+    try {
+      // Simulate save operation
+      await Future.delayed(Duration(seconds: 1));
+
+      state = state.copyWith(
+        isSaving: false,
+        showSuccessMessage: true,
+        successMessage: 'Memory saved successfully',
+      );
+
+      // Reset success message after showing
+      Future.delayed(Duration(milliseconds: 2000), () {
+        if (mounted) {
+          state = state.copyWith(
+            showSuccessMessage: false,
+            successMessage: null,
+          );
+        }
+      });
+    } catch (e) {
+      state = state.copyWith(
+        isSaving: false,
+        showSuccessMessage: true,
+        successMessage: 'Failed to save memory',
+      );
+    }
+  }
+
+  Future<void> shareMemory() async {
+    state = state.copyWith(isSharing: true);
+
+    try {
+      // Simulate share operation
+      await Future.delayed(Duration(seconds: 1));
+
+      state = state.copyWith(
+        isSharing: false,
+        showSuccessMessage: true,
+        successMessage: 'Memory shared successfully',
+      );
+
+      // Reset success message after showing
+      Future.delayed(Duration(milliseconds: 2000), () {
+        if (mounted) {
+          state = state.copyWith(
+            showSuccessMessage: false,
+            successMessage: null,
+          );
+        }
+      });
+    } catch (e) {
+      state = state.copyWith(
+        isSharing: false,
+        showSuccessMessage: true,
+        successMessage: 'Failed to share memory',
+      );
+    }
   }
 
   @override

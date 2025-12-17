@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
-import '../../core/utils/image_constant.dart';
-import '../../core/utils/navigator_service.dart';
-import '../../routes/app_routes.dart';
-import '../../theme/text_style_helper.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart'
     show CustomStoryList, CustomStoryItem;
-import '../../widgets/custom_story_viewer.dart' show CustomStoryViewer;
+import '../../widgets/custom_story_viewer.dart' as story_viewer
+    show CustomStoryViewer, CustomStoryItem;
 import 'notifier/memory_details_view_notifier.dart';
-
-// Modified: Added alias to resolve CustomStoryItem ambiguity
 
 class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
   MemoryDetailsViewScreen({Key? key}) : super(key: key);
@@ -30,30 +25,29 @@ class MemoryDetailsViewScreenState
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
         appBar: _buildAppBar(),
-        body: Container(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                SizedBox(height: 18.h),
-                _buildEventCard(context),
-                SizedBox(height: 18.h),
-                _buildTimelineSection(context),
-                SizedBox(height: 38.h),
-                _buildTimelineDetails(context),
-                SizedBox(height: 20.h),
-                _buildStoriesSection(context),
-                SizedBox(height: 19.h),
-                _buildStoriesList(context),
-                SizedBox(height: 21.h),
-                _buildMemoryStatus(context),
-                SizedBox(height: 23.h),
-                _buildActionButtons(context),
-                SizedBox(height: 24.h),
-                _buildFooterMessage(context),
-              ],
+        body: Column(
+          children: [
+            SizedBox(height: 18.h),
+            _buildEventCard(context),
+            SizedBox(height: 18.h),
+            Expanded(
+              child: Column(
+                children: [
+                  _buildTimelineSection(context),
+                  SizedBox(height: 20.h),
+                  _buildStoriesSection(context),
+                  SizedBox(height: 19.h),
+                  Expanded(
+                    child: _buildStoriesList(context),
+                  ),
+                  SizedBox(height: 23.h),
+                  _buildActionButtons(context),
+                  SizedBox(height: 24.h),
+                  _buildFooterMessage(context),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -66,9 +60,6 @@ class MemoryDetailsViewScreenState
       showIconButton: true,
       iconButtonImagePath: ImageConstant.imgFrame19,
       iconButtonBackgroundColor: appTheme.color3BD81E,
-      onIconButtonTap: () {
-        ref.read(memoryDetailsViewNotifier.notifier).onAddContentTap();
-      },
       actionIcons: [
         ImageConstant.imgIcon9,
         ImageConstant.imgIconGray5032x32,
@@ -76,9 +67,6 @@ class MemoryDetailsViewScreenState
       showProfileImage: true,
       profileImagePath: ImageConstant.imgEllipse8,
       isProfileCircular: true,
-      onProfileTap: () {
-        NavigatorService.pushNamed(AppRoutes.userProfileScreen);
-      },
     );
   }
 
@@ -238,15 +226,13 @@ class MemoryDetailsViewScreenState
         spacing: 38.h,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CustomStoryViewer(
+          story_viewer.CustomStoryViewer(
             storyItems: [
               story_viewer.CustomStoryItem(
-                // Modified: Used aliased class to resolve ambiguity
                 imagePath: ImageConstant.imgImage9,
                 showPlayButton: true,
               ),
               story_viewer.CustomStoryItem(
-                // Modified: Used aliased class to resolve ambiguity
                 imagePath: ImageConstant.imgImage8,
                 showPlayButton: true,
               ),
@@ -384,34 +370,6 @@ class MemoryDetailsViewScreenState
       onStoryTap: (index) {
         NavigatorService.pushNamed(AppRoutes.videoCallScreen);
       },
-    );
-  }
-
-  /// Section Widget
-  Widget _buildMemoryStatus(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 22.h),
-      child: Row(
-        children: [
-          CustomImageView(
-            imagePath: ImageConstant.imgIconDeepPurpleA10014x14,
-            height: 18.h,
-            width: 18.h,
-          ),
-          SizedBox(width: 6.h),
-          Text(
-            'This memory is sealed',
-            style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
-          ),
-          Spacer(),
-          Text(
-            'Closed Dec 4, 2025',
-            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
-          ),
-        ],
-      ),
     );
   }
 

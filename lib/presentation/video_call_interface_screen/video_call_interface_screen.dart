@@ -370,7 +370,7 @@ class VideoCallInterfaceScreenState
   }
 
   void onTapUserProfile() {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   void onTapHangoutButton() {

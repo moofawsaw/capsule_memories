@@ -12,17 +12,17 @@ class MemoryFeedDashboardModel extends Equatable {
     happeningNowStories =
         happeningNowStories ?? _getDefaultHappeningNowStories();
     publicMemories = publicMemories ?? _getDefaultPublicMemories();
-    trendingStories = trendingStories ?? [];
+    trendingStories = trendingStories ?? _getDefaultTrendingStories();
   }
 
   List<HappeningNowStoryData>? happeningNowStories;
   List<CustomMemoryItem>? publicMemories;
-  List<String>? trendingStories;
+  List<HappeningNowStoryData>? trendingStories;
 
   MemoryFeedDashboardModel copyWith({
     List<HappeningNowStoryData>? happeningNowStories,
     List<CustomMemoryItem>? publicMemories,
-    List<String>? trendingStories,
+    List<HappeningNowStoryData>? trendingStories,
   }) {
     return MemoryFeedDashboardModel(
       happeningNowStories: happeningNowStories ?? this.happeningNowStories,
@@ -81,17 +81,19 @@ class MemoryFeedDashboardModel extends Equatable {
         date: 'Dec 4, 2025',
         iconPath: ImageConstant.imgFrame13Red600,
         profileImages: [
-          ImageConstant.imgFrame2,
-          ImageConstant.imgFrame1,
-          ImageConstant.imgEllipse81,
+          'https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&w=200&h=200',
+          'https://images.pexels.com/photos/1516680/pexels-photo-1516680.jpeg?auto=compress&cs=tinysrgb&w=200&h=200',
+          'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=200&h=200',
         ],
         mediaItems: [
           CustomMediaItem(
-            imagePath: ImageConstant.imgImage9,
+            imagePath:
+                'https://images.unsplash.com/photo-1519741497674-611481863552?w=400&h=600&fit=crop',
             hasPlayButton: true,
           ),
           CustomMediaItem(
-            imagePath: ImageConstant.imgImage8,
+            imagePath:
+                'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=400&h=600&fit=crop',
             hasPlayButton: true,
           ),
         ],
@@ -102,6 +104,81 @@ class MemoryFeedDashboardModel extends Equatable {
         location: 'Tillsonburg, ON',
         distance: '21km',
         isLiked: false,
+      ),
+      CustomMemoryItem(
+        id: 'memory_2',
+        title: 'Summer Beach Trip',
+        date: 'Aug 15, 2025',
+        iconPath: ImageConstant.imgVector,
+        profileImages: [
+          'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=200&h=200',
+          'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=200&h=200',
+          'https://images.pexels.com/photos/1193942/pexels-photo-1193942.jpeg?auto=compress&cs=tinysrgb&w=200&h=200',
+        ],
+        mediaItems: [
+          CustomMediaItem(
+            imagePath:
+                'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=600&fit=crop',
+            hasPlayButton: false,
+          ),
+          CustomMediaItem(
+            imagePath:
+                'https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?w=400&h=600&fit=crop',
+            hasPlayButton: false,
+          ),
+        ],
+        startDate: 'Aug 15',
+        startTime: '10:30am',
+        endDate: 'Aug 15',
+        endTime: '6:45pm',
+        location: 'Santa Monica, CA',
+        distance: '45km',
+        isLiked: false,
+      ),
+    ];
+  }
+
+  static List<HappeningNowStoryData> _getDefaultTrendingStories() {
+    return [
+      HappeningNowStoryData(
+        id: 'trending_1',
+        backgroundImage: ImageConstant.imgImage8542x342,
+        profileImage: ImageConstant.imgEllipse842x42,
+        userName: 'Sarah Mitchell',
+        categoryName: 'Birthday Party',
+        categoryIcon: ImageConstant.imgFrame13,
+        timestamp: '15 mins ago',
+        isViewed: false,
+      ),
+      HappeningNowStoryData(
+        id: 'trending_2',
+        backgroundImage: ImageConstant.imgImage8120x90,
+        profileImage: ImageConstant.imgEllipse8DeepOrange10001,
+        userName: 'Mike Johnson',
+        categoryName: 'Adventure',
+        categoryIcon: ImageConstant.imgVector,
+        timestamp: '1 hour ago',
+        isViewed: false,
+      ),
+      HappeningNowStoryData(
+        id: 'trending_3',
+        backgroundImage: ImageConstant.imgImage81,
+        profileImage: ImageConstant.imgEllipse826x26,
+        userName: 'Emma Davis',
+        categoryName: 'Celebration',
+        categoryIcon: ImageConstant.imgEmojiMemorycategory,
+        timestamp: '2 hours ago',
+        isViewed: false,
+      ),
+      HappeningNowStoryData(
+        id: 'trending_4',
+        backgroundImage: ImageConstant.imgImage9,
+        profileImage: ImageConstant.imgEllipse852x52,
+        userName: 'David Chen',
+        categoryName: 'Concert',
+        categoryIcon: ImageConstant.imgFrame13,
+        timestamp: '3 hours ago',
+        isViewed: false,
       ),
     ];
   }

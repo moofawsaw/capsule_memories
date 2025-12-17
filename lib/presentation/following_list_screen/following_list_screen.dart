@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
+import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_icon_button.dart';
+import './widgets/following_user_item_widget.dart';
 import 'models/following_list_model.dart';
 import 'notifier/following_list_notifier.dart';
-import 'widgets/following_user_item_widget.dart';
 
 class FollowingListScreen extends ConsumerStatefulWidget {
   FollowingListScreen({Key? key}) : super(key: key);
@@ -19,12 +20,23 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
+        appBar: CustomAppBar(
+          logoImagePath: ImageConstant.imgLogo,
+          showIconButton: true,
+          iconButtonImagePath: ImageConstant.imgFrame19,
+          iconButtonBackgroundColor: appTheme.color3BD81E,
+          actionIcons: [
+            ImageConstant.imgIconGray50,
+            ImageConstant.imgIconGray5032x32,
+          ],
+          showProfileImage: true,
+          profileImagePath: ImageConstant.imgEllipse8,
+          isProfileCircular: true,
+        ),
         body: Container(
           width: double.maxFinite,
           child: Column(
             children: [
-              SizedBox(height: 24.h),
-              _buildAppBarSection(context),
               SizedBox(height: 24.h),
               Expanded(
                 child: Container(
@@ -41,88 +53,6 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  /// Section Widget - App Bar
-  Widget _buildAppBarSection(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
-      padding: EdgeInsets.fromLTRB(22.h, 26.h, 22.h, 24.h),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: appTheme.blue_gray_900,
-            width: 1.h,
-          ),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Container(
-            margin: EdgeInsets.only(bottom: 10.h),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgLogo,
-              height: 26.h,
-              width: 130.h,
-            ),
-          ),
-          CustomIconButton(
-            iconPath: ImageConstant.imgFrame19,
-            backgroundColor: appTheme.color3BD81E,
-            borderRadius: 22.h,
-            height: 46.h,
-            width: 46.h,
-            padding: EdgeInsets.all(6.h),
-            margin: EdgeInsets.only(left: 18.h),
-            onTap: () {
-              onTapCreateContent(context);
-            },
-          ),
-          GestureDetector(
-            onTap: () {
-              onTapGalleryIcon(context);
-            },
-            child: Container(
-              margin: EdgeInsets.fromLTRB(18.h, 0, 0, 8.h),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgIconGray50,
-                height: 32.h,
-                width: 32.h,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              onTapNotificationIcon(context);
-            },
-            child: Container(
-              margin: EdgeInsets.fromLTRB(6.h, 0, 0, 8.h),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgIconGray5032x32,
-                height: 32.h,
-                width: 32.h,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              onTapProfileAvatar(context);
-            },
-            child: Container(
-              margin: EdgeInsets.fromLTRB(8.h, 22.h, 0, 0),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgEllipse8,
-                height: 50.h,
-                width: 50.h,
-                radius: BorderRadius.circular(24.h),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -217,7 +147,7 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
 
   /// Navigates to create content screen
   void onTapCreateContent(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
+    NavigatorService.pushNamed(AppRoutes.postScreen);
   }
 
   /// Navigates to gallery screen
@@ -232,17 +162,17 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
 
   /// Navigates to profile screen
   void onTapProfileAvatar(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Navigates to followers screen
   void onTapFollowersTab(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.followersManagementScreen);
+    NavigatorService.pushNamed(AppRoutes.followersScreen);
   }
 
   /// Navigates to user profile screen
   void onTapFollowingUser(BuildContext context, FollowingUserModel? user) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Handles user action (more options)

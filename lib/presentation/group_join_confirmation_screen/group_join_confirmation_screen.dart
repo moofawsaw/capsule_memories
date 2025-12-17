@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
+import '../../widgets/custom_button.dart';
+import '../../widgets/custom_header_row.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../widgets/custom_notification_card.dart';
 import '../../widgets/custom_user_card.dart';
 import '../../widgets/custom_user_profile_item.dart';
-import '../../widgets/custom_header_row.dart';
-import '../../widgets/custom_notification_card.dart';
-import '../../widgets/custom_button.dart';
 import 'notifier/group_join_confirmation_notifier.dart';
-// Modified: Removed non-existent import 'widgets/member_list_item_widget.dart'
 
 class GroupJoinConfirmationScreen extends ConsumerStatefulWidget {
   GroupJoinConfirmationScreen({Key? key}) : super(key: key);
@@ -21,49 +21,62 @@ class GroupJoinConfirmationScreenState
     extends ConsumerState<GroupJoinConfirmationScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-        child: Scaffold(
-            backgroundColor: appTheme.black_900,
-            body: Container(
-                width: double.maxFinite,
-                child: SingleChildScrollView(
-                    child: Container(
-                        width: double.infinity,
-                        height: 848.h,
-                        child: Stack(alignment: Alignment.center, children: [
-                          Container(
-                              width: 356.h,
-                              height: 756.h,
-                              margin: EdgeInsets.only(top: 47.h),
-                              decoration: BoxDecoration(
-                                  color: appTheme.gray_900_02,
-                                  borderRadius: BorderRadius.circular(30.h))),
-                          Container(
-                              width: double.infinity,
-                              height: double.infinity,
-                              padding: EdgeInsets.all(40.h),
-                              decoration:
-                                  BoxDecoration(color: appTheme.color5B0000),
-                              child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _buildHeaderSection(context),
-                                    SizedBox(height: 38.h),
-                                    _buildNotificationCard(context),
-                                    SizedBox(height: 14.h),
-                                    _buildMembersSection(context),
-                                    SizedBox(height: 12.h),
-                                    _buildMembersList(context),
-                                    SizedBox(height: 20.h),
-                                    _buildInfoText(context),
-                                    SizedBox(height: 90.h),
-                                    _buildActionButtons(context),
-                                  ])),
-                        ]))))));
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 40.h,
+            height: 4.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.h),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: _buildContent(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(groupJoinConfirmationNotifier);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildConfirmationHeader(context),
+            SizedBox(height: 16.h),
+            _buildGroupDetails(context),
+            SizedBox(height: 16.h),
+            _buildActionButtons(context),
+            SizedBox(height: 20.h),
+          ],
+        );
+      },
+    );
   }
 
   /// Section Widget
-  Widget _buildHeaderSection(BuildContext context) {
+  Widget _buildConfirmationHeader(BuildContext context) {
     return CustomHeaderRow(
         title: "You're in!",
         textAlignment: TextAlign.left,
@@ -74,7 +87,7 @@ class GroupJoinConfirmationScreenState
   }
 
   /// Section Widget
-  Widget _buildNotificationCard(BuildContext context) {
+  Widget _buildGroupDetails(BuildContext context) {
     return CustomNotificationCard(
         iconPath: ImageConstant.imgFrameDeepOrangeA700,
         title: 'Fmaily Xmas 2025',
@@ -149,10 +162,10 @@ class GroupJoinConfirmationScreenState
 
       ref.listen(groupJoinConfirmationNotifier, (previous, current) {
         if (current.shouldNavigateToCreateMemory ?? false) {
-          NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
+          NavigatorService.pushNamed(AppRoutes.postScreen);
         }
         if (current.shouldClose ?? false) {
-          NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
+          NavigatorService.pushNamed(AppRoutes.postScreen);
         }
       });
 
@@ -179,7 +192,7 @@ class GroupJoinConfirmationScreenState
 
   /// Navigates to the user profile screen
   void onTapUserProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Handles close button tap

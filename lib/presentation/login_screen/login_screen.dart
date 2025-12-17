@@ -84,7 +84,7 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
             if (current.isSuccess ?? false) {
               _clearForm();
               NavigatorService.pushNamedAndRemoveUntil(
-                  AppRoutes.memoryFeedDashboardScreen);
+                  AppRoutes.feedScreen);
             }
             if (current.errorMessage != null) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -231,12 +231,12 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// Handle forgot password tap
   void _onForgotPasswordTap() {
-    NavigatorService.pushNamed(AppRoutes.passwordResetScreen);
+    NavigatorService.pushNamed(AppRoutes.resetScreen);
   }
 
   /// Handle sign up tap
   void _onSignUpTap() {
-    NavigatorService.pushNamed(AppRoutes.accountRegistrationScreen);
+    NavigatorService.pushNamed(AppRoutes.registerScreen);
   }
 
   /// Clear form after successful login

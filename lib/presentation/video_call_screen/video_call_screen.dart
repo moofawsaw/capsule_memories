@@ -469,12 +469,12 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
 
   /// Navigates to user profile screen when the user profile is tapped
   void onTapUserProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Handles hangout button tap
   void onTapHangoutButton(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.hangoutCallScreen);
+    NavigatorService.pushNamed(AppRoutes.homeScreen);
   }
 
   /// Handles volume/audio button tap

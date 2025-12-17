@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_icon_button.dart';
+import './custom_icon_button.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomStoryViewer - A reusable story viewer component that displays multiple story items with play buttons, 
@@ -145,14 +146,6 @@ class CustomStoryViewer extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Timestamp
-        if (showTimestamp)
-          Text(
-            timestamp,
-            style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-                .copyWith(color: appTheme.black_900),
-          ),
-
         // Spacer and profiles section
         Expanded(
           child: Container(

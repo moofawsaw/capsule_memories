@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomIconButton - A flexible and reusable icon button widget with customizable styling
@@ -65,18 +66,18 @@ class CustomIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: height ?? 48.h,
-      width: width ?? 48.h,
-      margin: margin,
-      decoration: BoxDecoration(
-        color: backgroundColor ?? appTheme.transparentCustom,
-        borderRadius: BorderRadius.circular(borderRadius ?? 24.h),
-      ),
-      child: IconButton(
-        onPressed: onTap,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: height ?? 48.h,
+        width: width ?? 48.h,
+        margin: margin,
         padding: padding ?? EdgeInsets.all(12.h),
-        icon: CustomImageView(
+        decoration: BoxDecoration(
+          color: backgroundColor ?? appTheme.transparentCustom,
+          borderRadius: BorderRadius.circular(borderRadius ?? 24.h),
+        ),
+        child: CustomImageView(
           imagePath: iconPath,
           height: iconSize ?? 24.h,
           width: iconSize ?? 24.h,

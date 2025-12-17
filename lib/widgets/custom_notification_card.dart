@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_icon_button.dart';
+import './custom_icon_button.dart';
 
 /**
  * CustomNotificationCard - A reusable card component for displaying notifications, invitations, or memory-related content.
@@ -14,6 +15,8 @@ import 'custom_icon_button.dart';
  * - Configurable text alignment and font sizes
  * - Responsive margins and spacing
  * - Optional tap callback for icon interaction
+ * - Optional tap callback for entire card interaction
+ * - Customizable background color for read/unread states
  * 
  * @param iconPath - Path to the icon image (required)
  * @param title - Main heading text (required)
@@ -22,6 +25,8 @@ import 'custom_icon_button.dart';
  * @param descriptionAlignment - Text alignment for description
  * @param margin - Custom margin around the card
  * @param onIconTap - Callback function for icon button interaction
+ * @param onTap - Callback function for entire card interaction
+ * @param backgroundColor - Background color for the notification card
  */
 class CustomNotificationCard extends StatelessWidget {
   const CustomNotificationCard({
@@ -33,6 +38,8 @@ class CustomNotificationCard extends StatelessWidget {
     this.descriptionAlignment,
     this.margin,
     this.onIconTap,
+    this.onTap,
+    this.backgroundColor,
   }) : super(key: key);
 
   /// Path to the icon image displayed in the button
@@ -56,37 +63,63 @@ class CustomNotificationCard extends StatelessWidget {
   /// Callback function triggered when icon button is tapped
   final VoidCallback? onIconTap;
 
+  /// Callback function triggered when entire card is tapped
+  final VoidCallback? onTap;
+
+  /// Background color for the notification card
+  final Color? backgroundColor;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: margin ?? EdgeInsets.symmetric(horizontal: 46.h, vertical: 20.h),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CustomIconButton(
-            iconPath: iconPath,
-            height: 48.h,
-            width: 48.h,
-            backgroundColor: appTheme.color41C124,
-            borderRadius: 24.h,
-            padding: EdgeInsets.all(12.h),
-            onTap: onIconTap,
-          ),
-          SizedBox(height: 12.h),
-          Text(
-            title,
-            style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-                .copyWith(
-                    color: appTheme.gray_50, fontSize: (titleFontSize ?? 24.0)),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            description,
-            textAlign: descriptionAlignment ?? TextAlign.center,
-            style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
-          ),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: margin ?? EdgeInsets.symmetric(horizontal: 20.h),
+        padding: EdgeInsets.all(16.h),
+        decoration: BoxDecoration(
+          color: backgroundColor ?? Colors.transparent,
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyleHelper
+                            .instance.title18BoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50, height: 1.22),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        description,
+                        style: TextStyleHelper
+                            .instance.body14RegularPlusJakartaSans
+                            .copyWith(
+                                color: appTheme.blue_gray_300, height: 1.29),
+                      ),
+                    ],
+                  ),
+                ),
+                CustomIconButton(
+                  iconPath: iconPath,
+                  onTap: onIconTap,
+                  height: 48.h,
+                  width: 48.h,
+                  backgroundColor: appTheme.blue_gray_900_02,
+                  borderRadius: 24.h,
+                  padding: EdgeInsets.all(12.h),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

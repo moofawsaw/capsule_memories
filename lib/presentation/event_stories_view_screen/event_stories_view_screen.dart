@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_button.dart';
-import 'models/contributor_item_model.dart';
-import 'models/story_item_model.dart';
+import '../../widgets/custom_icon_button.dart';
+import '../../widgets/custom_image_view.dart';
+import './models/contributor_item_model.dart';
+import './models/story_item_model.dart';
+import './widgets/contributor_item_widget.dart';
+import './widgets/story_item_widget.dart';
 import 'notifier/event_stories_view_notifier.dart';
-import 'widgets/contributor_item_widget.dart';
-import 'widgets/story_item_widget.dart';
 
 class EventStoriesViewScreen extends ConsumerStatefulWidget {
   EventStoriesViewScreen({Key? key}) : super(key: key);
@@ -23,7 +24,7 @@ class EventStoriesViewScreenState
     return Container(
       width: double.maxFinite,
       decoration: BoxDecoration(
-        color: appTheme.colorFF1A1A,
+        color: appTheme.gray_900_02,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(20.h),
           topRight: Radius.circular(20.h),
@@ -33,12 +34,13 @@ class EventStoriesViewScreenState
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(height: 12.h),
+          // Drag handle indicator
           Container(
-            width: 40.h,
-            height: 4.h,
+            width: 48.h,
+            height: 5.h,
             decoration: BoxDecoration(
               color: appTheme.colorFF3A3A,
-              borderRadius: BorderRadius.circular(2.h),
+              borderRadius: BorderRadius.circular(2.5),
             ),
           ),
           SizedBox(height: 20.h),
@@ -227,7 +229,7 @@ class EventStoriesViewScreenState
   /// Handles contributor tap
   void onTapContributor(
       BuildContext context, ContributorItemModel contributor) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Handles story tap

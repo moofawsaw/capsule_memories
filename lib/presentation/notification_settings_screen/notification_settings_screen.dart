@@ -26,9 +26,6 @@ class NotificationSettingsScreenState
           showIconButton: true,
           iconButtonImagePath: ImageConstant.imgFrame19,
           iconButtonBackgroundColor: appTheme.color3BD81E,
-          onIconButtonTap: () {
-            // Handle plus button tap
-          },
           actionIcons: [
             ImageConstant.imgIconGray50,
             ImageConstant.imgIconGray5032x32
@@ -36,9 +33,6 @@ class NotificationSettingsScreenState
           showProfileImage: true,
           profileImagePath: ImageConstant.imgEllipse8DeepOrange100,
           isProfileCircular: true,
-          onProfileTap: () {
-            // Handle profile tap
-          },
           customHeight: 100.h,
           backgroundColor: appTheme.gray_900_02,
           showBottomBorder: true,

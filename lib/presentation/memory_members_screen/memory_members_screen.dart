@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_user_card.dart';
 import '../../widgets/custom_user_status_row.dart';
@@ -14,62 +15,59 @@ class MemoryMembersScreen extends ConsumerStatefulWidget {
 class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-        child: Scaffold(
-            backgroundColor: Color(0xFF5B000000),
-            body: Container(
-                width: double.maxFinite,
-                height: SizeUtils.height,
-                child: Column(children: [
-                  Expanded(
-                      child: SingleChildScrollView(
-                          child: Container(
-                              width: double.maxFinite,
-                              height: 848.h,
-                              child: Stack(
-                                  alignment: Alignment.bottomCenter,
-                                  children: [
-                                    Container(
-                                        width: double.maxFinite,
-                                        height: 318.h,
-                                        margin: EdgeInsets.only(top: 531.h),
-                                        decoration: BoxDecoration(
-                                            color: appTheme.gray_900_02,
-                                            borderRadius: BorderRadius.only(
-                                                topLeft: Radius.circular(26.h),
-                                                topRight:
-                                                    Radius.circular(26.h)))),
-                                    Container(
-                                        width: double.maxFinite,
-                                        height: double.maxFinite,
-                                        padding: EdgeInsets.fromLTRB(
-                                            32.h, 26.h, 32.h, 26.h),
-                                        decoration: BoxDecoration(
-                                            color: appTheme.color5B0000),
-                                        child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.end,
-                                            children: [
-                                              Spacer(),
-                                              Container(
-                                                  width: 116.h,
-                                                  height: 12.h,
-                                                  decoration: BoxDecoration(
-                                                      color:
-                                                          appTheme.color3BD81E,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              6.h))),
-                                              SizedBox(height: 32.h),
-                                              _buildMemoryMembersSection(
-                                                  context),
-                                            ])),
-                                  ])))),
-                ]))));
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 48.h,
+            height: 5.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: _buildContent(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryMembersNotifier);
+
+        return Column(
+          children: [
+            _buildHeaderSection(context),
+            SizedBox(height: 16.h),
+            SizedBox(height: 16.h),
+            SizedBox(height: 20.h),
+          ],
+        );
+      },
+    );
   }
 
   /// Section Widget
-  Widget _buildMemoryMembersSection(BuildContext context) {
+  Widget _buildHeaderSection(BuildContext context) {
     return Container(
         width: double.maxFinite,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

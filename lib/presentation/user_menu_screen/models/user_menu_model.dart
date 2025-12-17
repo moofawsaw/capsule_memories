@@ -1,5 +1,5 @@
+
 import '../../../core/app_export.dart';
-import 'package:flutter/material.dart';
 
 /// This class is used in the [UserMenuScreen] screen.
 
@@ -49,16 +49,4 @@ class UserMenuModel extends Equatable {
         isDarkModeEnabled,
         id,
       ];
-}
-
-class CustomNavigationDrawerItem {
-  final String iconPath;
-  final String label;
-  final VoidCallback? onTap;
-
-  CustomNavigationDrawerItem({
-    required this.iconPath,
-    required this.label,
-    this.onTap,
-  });
 }

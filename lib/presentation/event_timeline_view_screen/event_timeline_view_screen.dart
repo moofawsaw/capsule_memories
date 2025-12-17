@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
+import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
+import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/custom_story_progress.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_icon_button.dart';
+import '../qr_code_share_screen/qr_code_share_screen.dart';
+import './widgets/timeline_detail_widget.dart';
 import 'notifier/event_timeline_view_notifier.dart';
-import 'widgets/timeline_detail_widget.dart';
 
 class EventTimelineViewScreen extends ConsumerStatefulWidget {
   EventTimelineViewScreen({Key? key}) : super(key: key);
@@ -23,28 +25,36 @@ class EventTimelineViewScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        body: Container(
-          width: double.maxFinite,
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildAppBar(context),
-                      _buildEventCard(context),
-                      _buildTimelineSection(context),
-                      SizedBox(height: 18.h),
-                      _buildStoriesSection(context),
-                      SizedBox(height: 18.h),
-                      _buildActionButtons(context),
-                      SizedBox(height: 20.h),
-                    ],
+        body: Column(
+          children: [
+            _buildAppBar(context),
+            Expanded(
+              child: Column(
+                children: [
+                  _buildEventCard(context),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildTimelineSection(context),
+                        SizedBox(height: 18.h),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _buildStoriesSection(context),
+                              SizedBox(height: 18.h),
+                              Expanded(child: SizedBox()),
+                              _buildActionButtons(context),
+                              SizedBox(height: 20.h),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -57,16 +67,10 @@ class EventTimelineViewScreenState
       showIconButton: true,
       iconButtonImagePath: ImageConstant.imgFrame19,
       iconButtonBackgroundColor: appTheme.color3BD81E,
-      onIconButtonTap: () {
-        onTapIconButton(context);
-      },
       actionIcons: [ImageConstant.imgIcon9, ImageConstant.imgIconGray5032x32],
       showProfileImage: true,
       profileImagePath: ImageConstant.imgEllipse8,
       isProfileCircular: true,
-      onProfileTap: () {
-        onTapProfile(context);
-      },
     );
   }
 
@@ -96,7 +100,7 @@ class EventTimelineViewScreenState
   /// Section Widget
   Widget _buildTimelineSection(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(top: 12.h),
+      margin: EdgeInsets.only(top: 6.h),
       child: Stack(
         children: [
           Container(
@@ -215,7 +219,7 @@ class EventTimelineViewScreenState
   /// Section Widget
   Widget _buildActionButtons(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 18.h),
+      margin: EdgeInsets.symmetric(horizontal: 24.h),
       child: Column(
         children: [
           CustomButton(
@@ -254,7 +258,7 @@ class EventTimelineViewScreenState
 
   /// Handles profile tap
   void onTapProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
+    NavigatorService.pushNamed(AppRoutes.profileScreen);
   }
 
   /// Handles event options tap
@@ -264,12 +268,17 @@ class EventTimelineViewScreenState
 
   /// Handles timeline options tap
   void onTapTimelineOptions(BuildContext context) {
-    // Handle timeline options
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => QRCodeShareScreen(),
+    );
   }
 
   /// Navigates to hangout call
   void onTapHangoutCall(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.hangoutCallScreen);
+    NavigatorService.pushNamed(AppRoutes.homeScreen);
   }
 
   /// Handles story item tap

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_icon_button.dart';
+import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_group_card.dart';
 import '../../widgets/custom_group_invitation_card.dart';
+import '../../widgets/custom_image_view.dart';
+import '../create_group_screen/create_group_screen.dart';
+import '../group_qr_invite_screen/group_qr_invite_screen.dart';
 import 'notifier/groups_management_notifier.dart';
 
 class GroupsManagementScreen extends ConsumerStatefulWidget {
@@ -21,12 +24,24 @@ class GroupsManagementScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
+        appBar: CustomAppBar(
+          logoImagePath: ImageConstant.imgLogo,
+          showIconButton: true,
+          iconButtonImagePath: ImageConstant.imgFrame19,
+          iconButtonBackgroundColor: appTheme.color3BD81E,
+          actionIcons: [
+            ImageConstant.imgIconGray50,
+            ImageConstant.imgIconGray5032x32,
+          ],
+          showProfileImage: true,
+          profileImagePath: ImageConstant.imgEllipse8,
+          isProfileCircular: true,
+        ),
         body: Container(
           width: double.maxFinite,
           height: double.maxFinite,
           child: Column(
             children: [
-              _buildHeader(context),
               Expanded(
                 child: Column(
                   children: [
@@ -40,70 +55,6 @@ class GroupsManagementScreenState
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  /// Section Widget - Header with logo and navigation icons
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(22.h, 26.h, 22.h, 24.h),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: appTheme.blue_gray_900, width: 1.h),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Container(
-            width: 130.h,
-            margin: EdgeInsets.only(bottom: 10.h),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgLogo,
-              height: 26.h,
-              width: 130.h,
-            ),
-          ),
-          CustomIconButton(
-            iconPath: ImageConstant.imgFrame19,
-            backgroundColor: appTheme.color3BD81E,
-            borderRadius: 22.h,
-            height: 46.h,
-            width: 46.h,
-            padding: EdgeInsets.all(6.h),
-            margin: EdgeInsets.only(left: 18.h),
-          ),
-          Container(
-            margin: EdgeInsets.fromLTRB(18.h, 0, 0, 8.h),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIconGray50,
-              height: 32.h,
-              width: 32.h,
-            ),
-          ),
-          GestureDetector(
-            onTap: () => onTapNotificationIcon(context),
-            child: Container(
-              margin: EdgeInsets.fromLTRB(6.h, 0, 0, 8.h),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgIconGray5032x32,
-                height: 32.h,
-                width: 32.h,
-              ),
-            ),
-          ),
-          Container(
-            margin: EdgeInsets.fromLTRB(8.h, 22.h, 0, 0),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgEllipse8,
-              height: 50.h,
-              width: 50.h,
-              radius: BorderRadius.circular(24.h),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -232,12 +183,22 @@ class GroupsManagementScreenState
 
   /// Navigates to create group screen
   void onTapNewGroup(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.createGroupScreen);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: appTheme.transparentCustom,
+      builder: (context) => CreateGroupScreen(),
+    );
   }
 
   /// Handles group QR code action
   void onTapGroupQR(BuildContext context, String groupName) {
-    ref.read(groupsManagementNotifier.notifier).showGroupQR(groupName);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: appTheme.transparentCustom,
+      builder: (context) => GroupQRInviteScreen(),
+    );
   }
 
   /// Handles group deletion

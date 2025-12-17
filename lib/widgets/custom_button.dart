@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomButton - A versatile button component that supports multiple styles and configurations
@@ -75,7 +76,7 @@ class CustomButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: width,
-      height: height ?? 48.h,
+      height: height ?? 56.h,
       margin: margin,
       alignment: alignment,
       child: _buildButton(context),
@@ -112,8 +113,8 @@ class CustomButton extends StatelessWidget {
         ),
         padding: padding ??
             EdgeInsets.symmetric(
-              horizontal: 30.h,
-              vertical: 20.h,
+              horizontal: 16.h,
+              vertical: 12.h,
             ),
         minimumSize: Size(0, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -139,8 +140,8 @@ class CustomButton extends StatelessWidget {
         ),
         padding: padding ??
             EdgeInsets.symmetric(
-              horizontal: 30.h,
-              vertical: 20.h,
+              horizontal: 16.h,
+              vertical: 12.h,
             ),
         minimumSize: Size(0, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -161,8 +162,8 @@ class CustomButton extends StatelessWidget {
         ),
         padding: padding ??
             EdgeInsets.symmetric(
-              horizontal: 30.h,
-              vertical: 20.h,
+              horizontal: 16.h,
+              vertical: 12.h,
             ),
         minimumSize: Size(0, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -179,6 +180,9 @@ class CustomButton extends StatelessWidget {
     if (!hasLeftIcon && !hasRightIcon && hasText) {
       return Text(
         text!,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 2,
+        textAlign: TextAlign.center,
         style: TextStyleHelper.instance.bodyTextPlusJakartaSans
             .copyWith(color: textStyle.color),
       );
@@ -196,10 +200,15 @@ class CustomButton extends StatelessWidget {
           if (hasText) SizedBox(width: 8.h),
         ],
         if (hasText)
-          Text(
-            text!,
-            style: TextStyleHelper.instance.bodyTextPlusJakartaSans
-                .copyWith(color: textStyle.color),
+          Flexible(
+            child: Text(
+              text!,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              style: TextStyleHelper.instance.bodyTextPlusJakartaSans
+                  .copyWith(color: textStyle.color),
+            ),
           ),
         if (hasRightIcon) ...[
           if (hasText) SizedBox(width: 8.h),
@@ -260,7 +269,6 @@ class CustomButtonStyle {
           width: 2,
         ),
         variant: CustomButtonVariant.outline,
-        borderRadius: 22,
       );
 
   static CustomButtonStyle get outlinePrimary => CustomButtonStyle(

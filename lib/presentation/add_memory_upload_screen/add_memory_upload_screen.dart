@@ -1,14 +1,16 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_header_section.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_header_section.dart';
 import '../../widgets/custom_icon_button.dart';
+import '../../widgets/custom_image_view.dart';
 import 'notifier/add_memory_upload_notifier.dart';
 
 class AddMemoryUploadScreen extends ConsumerStatefulWidget {
@@ -23,65 +25,66 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.color5B0000,
-        body: Container(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Container(
-              width: double.infinity,
-              height: 848.h,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: double.infinity,
-                      height: 462.h,
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_900_02,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(26.h),
-                          topRight: Radius.circular(26.h),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    padding: EdgeInsets.all(22.h),
-                    child: Column(
-                      children: [
-                        SizedBox(height: 367.h),
-                        Container(
-                          width: 116.h,
-                          height: 12.h,
-                          decoration: BoxDecoration(
-                            color: appTheme.color3BD81E,
-                            borderRadius: BorderRadius.circular(6.h),
-                          ),
-                        ),
-                        CustomHeaderSection(
-                          title: 'Add to Memory',
-                          description:
-                              'Upload a photo or video from your device to add to "memory name"',
-                          margin: EdgeInsets.only(
-                              top: 32.h, left: 42.h, right: 42.h),
-                        ),
-                        _buildUploadSection(context),
-                        _buildActionButtons(context),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
         ),
       ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 48.h,
+            height: 5.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: _buildContent(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(addMemoryUploadNotifier);
+
+        return Column(
+          children: [
+            Container(
+              width: 116.h,
+              height: 12.h,
+              decoration: BoxDecoration(
+                color: appTheme.color3BD81E,
+                borderRadius: BorderRadius.circular(6.h),
+              ),
+            ),
+            CustomHeaderSection(
+              title: 'Add to Memory',
+              description:
+                  'Upload a photo or video from your device to add to "memory name"',
+              margin: EdgeInsets.only(top: 32.h, left: 42.h, right: 42.h),
+            ),
+            _buildUploadSection(context),
+            _buildActionButtons(context),
+          ],
+        );
+      },
     );
   }
 
@@ -517,7 +520,7 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
     }
 
     ref.read(addMemoryUploadNotifier.notifier).uploadFile().then((_) {
-      NavigatorService.pushNamed(AppRoutes.hangoutCallScreen);
+      NavigatorService.pushNamed(AppRoutes.homeScreen);
     });
   }
 }

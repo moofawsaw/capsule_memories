@@ -55,7 +55,7 @@ class LightCodeColors {
   Color get white_A700 => Color(0xFFFFFFFF);
   Color get gray_900_01 => Color(0xFF151319);
   Color get blue_gray_900 => Color(0xFF1E293B);
-  Color get gray_900_02 => Color(0xFF12151D);
+  Color get gray_900_02 => Color(0xFF0c0d13);
   Color get gray_900_03 => Color(0xFF221730);
   Color get blue_gray_900_01 => Color(0xFF242F41);
   Color get green_500 => Color(0xFF34B456);
@@ -106,26 +106,27 @@ class LightCodeColors {
   Color get transparentCustom => Colors.transparent;
   Color get redCustom => Colors.red;
   Color get greyCustom => Colors.grey;
+  Color get background_transparent => Color(0xFF1D2636);
   Color get colorFF52D1 => Color(0xFF52D1C6);
   Color get colorFFD81E => Color(0xFFD81E29);
-  Color get color3BD81E => Color(0x3BD81E29);
+  Color get color3BD81E => Color(0xFF1D2636);
   Color get colorDF0782 => Color(0xDF078249);
-  Color get color41C124 => Color(0x41C1242F);
+  Color get color41C124 => Color(0xFF1D2636);
   Color get color5B0000 => Color(0x5B000000);
-  Color get colorF716A8 => Color(0xF716A855);
+  Color get colorF716A8 => Color(0xFF110f1a);
   Color get colorFF1A1A => Color(0xFF1A1A1A);
   Color get colorFF3A3A => Color(0xFF3A3A3A);
   Color get colorFF2A2A => Color(0xFF2A2A2A);
   Color get color800000 => Color(0x80000000);
-  Color get color418724 => Color(0x4187242F);
+  Color get color418724 => Color(0xFF1D2636);
   Color get color4D0000 => Color(0x4D000000);
   Color get colorFF2A27 => Color(0xFF2A2731);
   Color get colorFF8B5C => Color(0xFF8B5CF6);
   Color get colorFF1E1E => Color(0xFF1E1E1E);
-  Color get color3B8E1E => Color(0x3B8E1E29);
+  Color get color3B8E1E => Color(0xFF1D2636);
   Color get colorFFC124 => Color(0xFFC1242F);
   Color get colorFFE0E0 => Color(0xFFE0E0E0);
-  Color get color3B8724 => Color(0x3B87242F);
+  Color get color3B8724 => Color(0xFF1D2636);
 
   // Color Shades - Each shade has its own dedicated constant
   Color get grey200 => Colors.grey.shade200;

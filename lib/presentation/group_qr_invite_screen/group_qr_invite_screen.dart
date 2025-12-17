@@ -1,14 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_qr_info_card.dart';
+import 'notifier/group_qr_invite_notifier.dart';
 
 class GroupQRInviteScreen extends ConsumerStatefulWidget {
   GroupQRInviteScreen({Key? key}) : super(key: key);
@@ -19,14 +22,9 @@ class GroupQRInviteScreen extends ConsumerStatefulWidget {
 
 class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   final GlobalKey _qrKey = GlobalKey();
-  final TextEditingController _urlController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _urlController.text =
-        ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08;
-  }
+  final TextEditingController _urlController = TextEditingController(
+    text: 'https://capsule.app/group/jones-family-invite',
+  );
 
   @override
   void dispose() {
@@ -36,76 +34,72 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.black_900,
-        body: Container(
-          width: double.maxFinite,
-          height: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Container(
-              width: double.maxFinite,
-              height: 848.h,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: double.maxFinite,
-                      height: 618.h,
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_900_02,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(26.h),
-                          topRight: Radius.circular(26.h),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: double.maxFinite,
-                      height: double.maxFinite,
-                      padding: EdgeInsets.all(22.h),
-                      decoration: BoxDecoration(
-                        color: appTheme.color5B0000,
-                      ),
-                      child: Column(
-                        children: [
-                          SizedBox(height: 228.h),
-                          Container(
-                            width: 116.h,
-                            height: 12.h,
-                            decoration: BoxDecoration(
-                              color: appTheme.color3BD81E,
-                              borderRadius: BorderRadius.circular(6.h),
-                            ),
-                          ),
-                          SizedBox(height: 20.h),
-                          CustomQrInfoCard(
-                            title: "Jones Family",
-                            description: "Scan to join the group",
-                          ),
-                          SizedBox(height: 16.h),
-                          _buildQRCodeSection(),
-                          SizedBox(height: 20.h),
-                          _buildUrlSection(),
-                          SizedBox(height: 20.h),
-                          _buildActionButtons(),
-                          SizedBox(height: 20.h),
-                          _buildInfoText(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
         ),
       ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 48.h,
+            height: 5.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: _buildContent(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(groupQRInviteNotifier);
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 116.h,
+              height: 12.h,
+              decoration: BoxDecoration(
+                color: appTheme.color3BD81E,
+                borderRadius: BorderRadius.circular(6.h),
+              ),
+            ),
+            SizedBox(height: 20.h),
+            CustomQrInfoCard(
+              title: "Jones Family",
+              description: "Scan to join the group",
+            ),
+            SizedBox(height: 16.h),
+            _buildQRCodeSection(),
+            SizedBox(height: 20.h),
+            _buildUrlSection(),
+            SizedBox(height: 20.h),
+            _buildActionButtons(),
+            SizedBox(height: 20.h),
+            _buildInfoText(),
+          ],
+        );
+      },
     );
   }
 
@@ -269,7 +263,7 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   /// Download QR code as image
   Future<void> _downloadQR() async {
     try {
-      RenderRepaintBoundary boundary =
+      final boundary =
           _qrKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       ByteData? byteData =

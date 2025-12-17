@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../core/app_export.dart';
+import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_notification_card.dart';
-import '../../widgets/custom_button.dart';
 import 'notifier/qr_code_share_notifier.dart';
 
 class QRCodeShareScreen extends ConsumerStatefulWidget {
@@ -16,76 +17,76 @@ class QRCodeShareScreen extends ConsumerStatefulWidget {
 class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: Color(0xFF5B000000),
-        body: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Container(
-              width: double.maxFinite,
-              height: 848.h,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      width: double.maxFinite,
-                      height: 616.h,
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_900_02,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(26.h),
-                          topRight: Radius.circular(26.h),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    width: double.maxFinite,
-                    height: double.maxFinite,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 22.h,
-                      vertical: 20.h,
-                    ),
-                    child: Column(
-                      children: [
-                        SizedBox(height: 234.h),
-                        Container(
-                          width: 116.h,
-                          height: 12.h,
-                          decoration: BoxDecoration(
-                            color: appTheme.color3BD81E,
-                            borderRadius: BorderRadius.circular(6.h),
-                          ),
-                        ),
-                        SizedBox(height: 20.h),
-                        CustomNotificationCard(
-                          iconPath: ImageConstant.imgFrameDeepOrangeA700,
-                          title: 'Family Xmas 2025',
-                          description: 'Scan to join memory',
-                          titleFontSize: 20.0,
-                          descriptionAlignment: TextAlign.center,
-                          margin: EdgeInsets.zero,
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildQRCodeSection(context),
-                        SizedBox(height: 20.h),
-                        _buildUrlSection(context),
-                        SizedBox(height: 20.h),
-                        _buildActionButtons(context),
-                        SizedBox(height: 20.h),
-                        _buildInfoText(context),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
         ),
       ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 12.h),
+          // Drag handle indicator
+          Container(
+            width: 48.h,
+            height: 5.h,
+            decoration: BoxDecoration(
+              color: appTheme.colorFF3A3A,
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              child: _buildContent(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(qrCodeShareNotifier);
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 116.h,
+              height: 12.h,
+              decoration: BoxDecoration(
+                color: appTheme.color3BD81E,
+                borderRadius: BorderRadius.circular(6.h),
+              ),
+            ),
+            SizedBox(height: 20.h),
+            CustomNotificationCard(
+              iconPath: ImageConstant.imgFrameDeepOrangeA700,
+              title: 'Family Xmas 2025',
+              description: 'Scan to join memory',
+              titleFontSize: 20.0,
+              descriptionAlignment: TextAlign.center,
+              margin: EdgeInsets.zero,
+            ),
+            SizedBox(height: 16.h),
+            _buildQRCodeSection(context),
+            SizedBox(height: 20.h),
+            _buildUrlSection(context),
+            SizedBox(height: 20.h),
+            _buildActionButtons(context),
+            SizedBox(height: 20.h),
+            _buildInfoText(context),
+          ],
+        );
+      },
     );
   }
 

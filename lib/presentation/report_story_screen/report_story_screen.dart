@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_header_row.dart';
-import '../../widgets/custom_user_list_item.dart';
-import '../../widgets/custom_radio_group.dart';
-import '../../widgets/custom_edit_text.dart';
 import '../../widgets/custom_button.dart';
-import 'notifier/report_story_notifier.dart';
+import '../../widgets/custom_edit_text.dart';
+import '../../widgets/custom_header_row.dart';
+import '../../widgets/custom_radio_group.dart';
+import '../../widgets/custom_user_list_item.dart';
+import './notifier/report_story_notifier.dart';
 
 class ReportStoryScreen extends ConsumerStatefulWidget {
   ReportStoryScreen({Key? key}) : super(key: key);
@@ -21,29 +22,30 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        backgroundColor: appTheme.color4D0000,
+        backgroundColor: appTheme.gray_900_02,
         body: Container(
           width: double.maxFinite,
-          height: double.maxFinite,
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(30.h),
+              topRight: Radius.circular(30.h),
+            ),
+          ),
           child: SingleChildScrollView(
-            child: Container(
-              width: double.maxFinite,
-              height: 848.h,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 356.h,
-                    height: 756.h,
-                    margin: EdgeInsets.only(top: 47.h),
-                    decoration: BoxDecoration(
-                      color: appTheme.gray_900_02,
-                      borderRadius: BorderRadius.circular(30.h),
-                    ),
-                  ),
-                  _buildMainContent(context),
-                ],
-              ),
+            padding: EdgeInsets.all(40.h),
+            child: Column(
+              children: [
+                _buildHeaderSection(context),
+                SizedBox(height: 38.h),
+                _buildUserInfoSection(context),
+                SizedBox(height: 28.h),
+                _buildReportOptionsSection(context),
+                SizedBox(height: 28.h),
+                _buildAdditionalDetailsSection(context),
+                SizedBox(height: 16.h),
+                _buildSubmitButton(context),
+              ],
             ),
           ),
         ),

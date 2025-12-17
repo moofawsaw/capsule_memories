@@ -22,11 +22,13 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     state = state.copyWith(
       memoryNameController: TextEditingController(),
       isLoading: false,
+      currentStep: 1,
       shouldNavigateToInvite: false,
       shouldNavigateBack: false,
       createMemoryModel: CreateMemoryModel(
         isPublic: true,
         memoryName: null,
+        selectedGroup: null,
       ),
     );
   }
@@ -49,27 +51,68 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     );
   }
 
-  void onNextPressed() {
+  void moveToStep2() {
     if (state.memoryNameController?.text.trim().isEmpty ?? true) {
       return;
     }
 
-    state = state.copyWith(
-      isLoading: true,
-    );
-
-    // Update model with current form data
+    // Update model with current form data and move to step 2
     state = state.copyWith(
       createMemoryModel: state.createMemoryModel?.copyWith(
         memoryName: state.memoryNameController?.text.trim(),
       ),
-      isLoading: false,
-      shouldNavigateToInvite: true,
+      currentStep: 2,
     );
+  }
 
-    // Reset navigation flag
-    Future.delayed(Duration.zero, () {
-      state = state.copyWith(shouldNavigateToInvite: false);
+  void backToStep1() {
+    state = state.copyWith(
+      currentStep: 1,
+    );
+  }
+
+  void updateSelectedGroup(String? groupValue) {
+    state = state.copyWith(
+      createMemoryModel: state.createMemoryModel?.copyWith(
+        selectedGroup: groupValue,
+      ),
+    );
+  }
+
+  void handleQRCodeTap() {
+    // Handle QR code functionality
+    // Navigate to QR code screen or show QR scanner
+  }
+
+  void handleCameraTap() {
+    // Handle camera functionality
+    // Open camera or image picker
+  }
+
+  void createMemory() {
+    // Set loading state
+    state = state.copyWith(isLoading: true);
+
+    // Simulate memory creation
+    Future.delayed(Duration(seconds: 1), () {
+      // Reset state and close bottom sheet
+      state.memoryNameController?.clear();
+
+      state = state.copyWith(
+        isLoading: false,
+        shouldNavigateBack: true,
+        currentStep: 1,
+        createMemoryModel: CreateMemoryModel(
+          isPublic: true,
+          memoryName: null,
+          selectedGroup: null,
+        ),
+      );
+
+      // Reset navigation flag
+      Future.delayed(Duration.zero, () {
+        state = state.copyWith(shouldNavigateBack: false);
+      });
     });
   }
 
@@ -79,9 +122,11 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
     state = state.copyWith(
       shouldNavigateBack: true,
+      currentStep: 1,
       createMemoryModel: CreateMemoryModel(
         isPublic: true,
         memoryName: null,
+        selectedGroup: null,
       ),
     );
 

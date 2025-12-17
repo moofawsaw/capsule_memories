@@ -1,27 +1,40 @@
 import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
+import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_happening_now_section.dart';
+import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_public_memories.dart';
-import '../../widgets/custom_section_header.dart';
+import '../create_memory_screen/create_memory_screen.dart';
+import './widgets/happening_now_story_card.dart';
 import 'notifier/memory_feed_dashboard_notifier.dart';
 
 class MemoryFeedDashboardScreen extends ConsumerStatefulWidget {
-  MemoryFeedDashboardScreen({Key? key}) : super(key: key);
+  const MemoryFeedDashboardScreen({Key? key}) : super(key: key);
 
   @override
-  MemoryFeedDashboardScreenState createState() =>
-      MemoryFeedDashboardScreenState();
+  ConsumerState<MemoryFeedDashboardScreen> createState() =>
+      _MemoryFeedDashboardScreenState();
 }
 
-class MemoryFeedDashboardScreenState
+class _MemoryFeedDashboardScreenState
     extends ConsumerState<MemoryFeedDashboardScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(memoryFeedDashboardNotifier.notifier).initialize();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = ref.watch(memoryFeedDashboardNotifier);
+
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
+        appBar: _buildAppBar(),
         body: Container(
           width: double.maxFinite,
           child: SingleChildScrollView(
@@ -31,14 +44,13 @@ class MemoryFeedDashboardScreenState
                 color: appTheme.gray_900_02,
               ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildAppBar(context),
+                  SizedBox(height: 20.h),
                   _buildCreateMemoryButton(context),
+                  SizedBox(height: 22.h),
                   _buildHappeningNowSection(context),
                   _buildPublicMemoriesSection(context),
-                  _buildTrendingStoriesHeader(context),
+                  _buildTrendingStoriesSection(context),
                   SizedBox(height: 30.h),
                 ],
               ),
@@ -49,186 +61,183 @@ class MemoryFeedDashboardScreenState
     );
   }
 
-  /// Section Widget
-  Widget _buildAppBar(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
-      padding: EdgeInsets.fromLTRB(22.h, 26.h, 22.h, 24.h),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: appTheme.blue_gray_900,
-            width: 1.h,
-          ),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          CustomImageView(
-            imagePath: ImageConstant.imgLogo,
-            height: 26.h,
-            width: 130.h,
-            margin: EdgeInsets.only(bottom: 10.h),
-          ),
-          Spacer(),
-          GestureDetector(
-            onTap: () => onTapPlusButton(context),
-            child: Container(
-              height: 46.h,
-              width: 46.h,
-              padding: EdgeInsets.all(6.h),
-              decoration: BoxDecoration(
-                color: appTheme.color3BD81E,
-                borderRadius: BorderRadius.circular(22.h),
-              ),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgFrame19,
-                height: 34.h,
-                width: 34.h,
-              ),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => onTapGalleryIcon(context),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIconGray50,
-              height: 32.h,
-              width: 32.h,
-              margin: EdgeInsets.only(left: 18.h, bottom: 8.h),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => onTapNotificationIcon(context),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIconGray5032x32,
-              height: 32.h,
-              width: 32.h,
-              margin: EdgeInsets.only(left: 6.h, bottom: 8.h),
-            ),
-          ),
-          GestureDetector(
-            onTap: () => onTapProfileImage(context),
-            child: Container(
-              height: 50.h,
-              width: 50.h,
-              margin: EdgeInsets.only(left: 8.h, top: 22.h),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24.h),
-              ),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgEllipse8DeepOrange100,
-                height: 50.h,
-                width: 50.h,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-        ],
-      ),
+  PreferredSizeWidget _buildAppBar() {
+    return CustomAppBar(
+      logoImagePath: ImageConstant.imgLogo,
+      showIconButton: true,
+      iconButtonImagePath: ImageConstant.imgFrame19,
+      iconButtonBackgroundColor: appTheme.color3BD81E,
+      actionIcons: [
+        ImageConstant.imgIconGray50,
+        ImageConstant.imgIconGray5032x32,
+      ],
+      showProfileImage: true,
+      profileImagePath: ImageConstant.imgEllipse8,
+      isProfileCircular: true,
     );
   }
 
-  /// Section Widget
   Widget _buildCreateMemoryButton(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final notifier = ref.read(memoryFeedDashboardNotifier.notifier);
-
-        return CustomButton(
-          text: 'Create Memory',
-          width: double.infinity,
-          leftIcon: ImageConstant.imgIcon20x20,
-          onPressed: () => onTapCreateMemory(context),
-          buttonStyle: CustomButtonStyle.fillPrimary,
-          buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-          margin: EdgeInsets.fromLTRB(20.h, 16.h, 20.h, 0.h),
-        );
-      },
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 20.h),
+      child: CustomButton(
+        text: 'Create Memory',
+        width: double.infinity,
+        leftIcon: ImageConstant.imgIcon20x20,
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => CreateMemoryScreen(),
+          );
+        },
+        buttonStyle: CustomButtonStyle.fillPrimary,
+        buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+      ),
     );
   }
 
-  /// Section Widget
   Widget _buildHappeningNowSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardNotifier);
+        final stories =
+            state.memoryFeedDashboardModel?.happeningNowStories ?? [];
 
-        return CustomHappeningNowSection(
-          sectionTitle: 'Happening Now',
-          sectionIcon: ImageConstant.imgIconDeepPurpleA10022x22,
-          stories: state.memoryFeedDashboardModel?.happeningNowStories
-                  ?.cast<HappeningNowStoryData>() ??
-              [], // Modified: Cast to proper type
-          onStoryTap: (story) => onTapHappeningNowStory(context, story),
-          margin: EdgeInsets.only(top: 22.h, left: 24.h),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.h),
+              child: Row(
+                children: [
+                  CustomImageView(
+                    imagePath: ImageConstant.imgIconDeepPurpleA10022x22,
+                    height: 22.h,
+                    width: 22.h,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    'Happening Now',
+                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+            SizedBox(
+              height: 240.h,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () =>
+                        NavigatorService.pushNamed(AppRoutes.videoCallScreen),
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
   }
 
-  /// Section Widget
   Widget _buildPublicMemoriesSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardNotifier);
+        final memories = state.memoryFeedDashboardModel?.publicMemories ?? [];
+
+        // Convert memory_feed_dashboard_model.CustomMemoryItem to custom_public_memories.CustomMemoryItem
+        final convertedMemories = memories.map((memory) {
+          return CustomMemoryItem(
+            id: memory.id,
+            title: memory.title,
+            date: memory.date,
+            iconPath: memory.iconPath,
+            profileImages: memory.profileImages,
+            mediaItems: memory.mediaItems?.map((item) {
+              return CustomMediaItem(
+                imagePath: item.imagePath,
+                hasPlayButton: item.hasPlayButton ?? false,
+              );
+            }).toList(),
+            startDate: memory.startDate,
+            startTime: memory.startTime,
+            endDate: memory.endDate,
+            endTime: memory.endTime,
+            location: memory.location,
+            distance: memory.distance,
+            isLiked: memory.isLiked,
+          );
+        }).toList();
 
         return CustomPublicMemories(
           sectionTitle: 'Public Memories',
           sectionIcon: ImageConstant.imgIcon22x22,
-          memories: state.memoryFeedDashboardModel?.publicMemories
-                  ?.cast<CustomMemoryItem>() ??
-              [], // Modified: Cast to proper type
-          onMemoryTap: (memory) => onTapPublicMemory(context, memory),
-          margin: EdgeInsets.only(top: 30.h, left: 24.h),
+          memories: convertedMemories,
+          onMemoryTap: (memory) =>
+              NavigatorService.pushNamed(AppRoutes.reelsScreen),
+          margin: EdgeInsets.only(top: 30.h, left: 0),
         );
       },
     );
   }
 
-  /// Section Widget
-  Widget _buildTrendingStoriesHeader(BuildContext context) {
-    return CustomSectionHeader(
-      iconPath: ImageConstant.imgIconBlueA700,
-      text: 'Trending Stories',
-      margin: EdgeInsets.fromLTRB(24.h, 30.h, 24.h, 0.h),
+  Widget _buildTrendingStoriesSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryFeedDashboardNotifier);
+        final stories = state.memoryFeedDashboardModel?.trendingStories ?? [];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.h),
+              child: Row(
+                children: [
+                  CustomImageView(
+                    imagePath: ImageConstant.imgIconBlueA700,
+                    height: 22.h,
+                    width: 22.h,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    'Trending Stories',
+                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+            SizedBox(
+              height: 240.h,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () =>
+                        NavigatorService.pushNamed(AppRoutes.videoCallScreen),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
-  }
-
-  /// Navigates to the create memory screen
-  void onTapCreateMemory(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
-  }
-
-  /// Handles plus button tap
-  void onTapPlusButton(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.createMemoryScreen);
-  }
-
-  /// Handles gallery icon tap
-  void onTapGalleryIcon(BuildContext context) {
-    // Navigate to gallery or media selection
-    NavigatorService.pushNamed(AppRoutes.addMemoryUploadScreen);
-  }
-
-  /// Handles notification icon tap
-  void onTapNotificationIcon(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
-  }
-
-  /// Handles profile image tap
-  void onTapProfileImage(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.userProfileScreen);
-  }
-
-  /// Handles happening now story tap
-  void onTapHappeningNowStory(BuildContext context, dynamic story) {
-    NavigatorService.pushNamed(AppRoutes.videoCallScreen);
-  }
-
-  /// Handles public memory tap
-  void onTapPublicMemory(BuildContext context, dynamic memory) {
-    NavigatorService.pushNamed(AppRoutes.eventStoriesViewScreen);
   }
 }
