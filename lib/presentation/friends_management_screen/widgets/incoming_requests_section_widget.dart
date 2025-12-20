@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_friend_request_card.dart';
 import '../notifier/friends_management_notifier.dart';

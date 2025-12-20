@@ -13,8 +13,25 @@ final notificationsNotifier = StateNotifierProvider.autoDispose<
 );
 
 class NotificationsNotifier extends StateNotifier<NotificationsState> {
-  NotificationsNotifier(NotificationsState state) : super(state) {
-    initialize();
+  NotificationsNotifier(super.state);
+
+  void setNotifications(List<Map<String, dynamic>> notifications) {
+    final unreadCount =
+        notifications.where((n) => !(n['is_read'] as bool)).length;
+    state = state.copyWith(
+      notificationsModel: state.notificationsModel?.copyWith(
+        notifications: notifications,
+        unreadCount: unreadCount,
+      ),
+    );
+  }
+
+  void updateUnreadCount(int count) {
+    state = state.copyWith(
+      notificationsModel: state.notificationsModel?.copyWith(
+        unreadCount: count,
+      ),
+    );
   }
 
   void initialize() {
@@ -59,35 +76,42 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     ];
 
     state = state.copyWith(
-      notificationsModel: state.notificationsModel?.copyWith(
-        notificationsList: notifications,
+      notificationsModel: NotificationsModel(
+        notifications: notifications.map((item) => {
+          'title': item.title,
+          'subtitle': item.subtitle,
+          'timestamp': item.timestamp,
+          'icon_path': item.iconPath,
+          'is_read': item.isRead,
+        }).toList(),
       ),
       isLoading: false,
     );
   }
 
   void toggleMarkAllNotifications() {
-    final notifications = state.notificationsModel?.notificationsList;
-    if (notifications == null || notifications.isEmpty) return;
+    final notificationsData = state.notificationsModel?.notifications;
+    if (notificationsData == null || notificationsData.isEmpty) return;
 
     // Check if there are any unread notifications
     final hasUnread =
-        notifications.any((notification) => !(notification.isRead ?? false));
+        notificationsData.any((notification) => !(notification['is_read'] as bool? ?? false));
 
     // If there are unread notifications, mark all as read
     // Otherwise, mark all as unread
-    final updatedNotifications = notifications.map((notification) {
-      return notification.copyWith(
-        isRead: hasUnread ? true : false,
-        iconPath: hasUnread
+    final updatedNotifications = notificationsData.map((notification) {
+      return {
+        ...notification,
+        'is_read': hasUnread ? true : false,
+        'icon_path': hasUnread
             ? ImageConstant.imgButtonsBlueGray300
             : ImageConstant.imgButton,
-      );
+      };
     }).toList();
 
     state = state.copyWith(
       notificationsModel: state.notificationsModel?.copyWith(
-        notificationsList: updatedNotifications,
+        notifications: updatedNotifications,
       ),
       isMarkAsReadSuccess: true,
       toggleMessage: hasUnread
@@ -102,17 +126,19 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   }
 
   void markAllAsRead() {
+    final notificationsData = state.notificationsModel?.notifications;
     final updatedNotifications =
-        state.notificationsModel?.notificationsList?.map((notification) {
-      return notification.copyWith(
-        isRead: true,
-        iconPath: ImageConstant.imgButtonsBlueGray300,
-      );
+        notificationsData?.map((notification) {
+      return {
+        ...notification,
+        'is_read': true,
+        'icon_path': ImageConstant.imgButtonsBlueGray300,
+      };
     }).toList();
 
     state = state.copyWith(
       notificationsModel: state.notificationsModel?.copyWith(
-        notificationsList: updatedNotifications,
+        notifications: updatedNotifications,
       ),
       isMarkAsReadSuccess: true,
     );
@@ -124,23 +150,24 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   }
 
   void handleNotificationTap(int index) {
-    final notifications = state.notificationsModel?.notificationsList;
-    if (notifications != null && index < notifications.length) {
-      final notification = notifications[index];
+    final notificationsData = state.notificationsModel?.notifications;
+    if (notificationsData != null && index < notificationsData.length) {
+      final notification = notificationsData[index];
 
       // Toggle notification read status
       final updatedNotifications =
-          List<NotificationItemModel>.from(notifications);
-      updatedNotifications[index] = notification.copyWith(
-        isRead: !(notification.isRead ?? false),
-        iconPath: !(notification.isRead ?? false)
+          List<Map<String, dynamic>>.from(notificationsData);
+      updatedNotifications[index] = {
+        ...notification,
+        'is_read': !(notification['is_read'] as bool? ?? false),
+        'icon_path': !(notification['is_read'] as bool? ?? false)
             ? ImageConstant.imgButtonsBlueGray300
             : ImageConstant.imgButton,
-      );
+      };
 
       state = state.copyWith(
         notificationsModel: state.notificationsModel?.copyWith(
-          notificationsList: updatedNotifications,
+          notifications: updatedNotifications,
         ),
       );
 

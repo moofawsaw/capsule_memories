@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
+import '../../services/avatar_state_service.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_profile_header.dart';
 import '../../widgets/custom_stat_card.dart';
@@ -19,6 +19,9 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(userProfileScreenTwoNotifier.notifier).initialize();
+
+      // Load avatar into global state for app-wide access
+      ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
     });
   }
 
@@ -28,23 +31,37 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
         appBar: _buildAppBar(context),
-        body: Container(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Container(
-              padding: EdgeInsets.only(top: 24.h, left: 18.h, right: 18.h),
-              child: Column(
-                children: [
-                  _buildProfileHeader(context),
-                  SizedBox(height: 12.h),
-                  _buildStatsSection(context),
-                  SizedBox(height: 28.h),
-                  _buildStoriesGrid(context),
-                  SizedBox(height: 12.h),
-                ],
+        body: Consumer(
+          builder: (context, ref, _) {
+            final state = ref.watch(userProfileScreenTwoNotifier);
+
+            if (state.isLoading) {
+              return Center(
+                child: CircularProgressIndicator(
+                  color: appTheme.color3BD81E,
+                ),
+              );
+            }
+
+            return Container(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Container(
+                  padding: EdgeInsets.only(top: 24.h, left: 18.h, right: 18.h),
+                  child: Column(
+                    children: [
+                      _buildProfileHeader(context),
+                      SizedBox(height: 12.h),
+                      _buildStatsSection(context),
+                      SizedBox(height: 28.h),
+                      _buildStoriesGrid(context),
+                      SizedBox(height: 12.h),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
@@ -62,8 +79,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
         ImageConstant.imgIconGray5032x32
       ],
       showProfileImage: true,
-      profileImagePath: ImageConstant.imgEllipse8DeepOrange100,
-      isProfileCircular: true,
     );
   }
 
@@ -74,15 +89,46 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
         final state = ref.watch(userProfileScreenTwoNotifier);
         final model = state.userProfileScreenTwoModel;
 
-        return CustomProfileHeader(
-          avatarImagePath:
-              model?.avatarImagePath ?? ImageConstant.imgEllipse896x96,
-          userName: model?.userName ?? 'Joe Kool',
-          email: model?.email ?? 'karl_martin67@hotmail.com',
-          onEditTap: () {
-            onTapEditProfile(context);
+        // 🔥 Watch global avatar state for real-time updates
+        final avatarState = ref.watch(avatarStateProvider);
+
+        return GestureDetector(
+          onTap: () {
+            ref.read(userProfileScreenTwoNotifier.notifier).uploadAvatar();
           },
-          margin: EdgeInsets.symmetric(horizontal: 68.h),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CustomProfileHeader(
+                // Use avatar from global state if available, otherwise use local model
+                avatarImagePath: avatarState.avatarUrl ??
+                    model?.avatarImagePath ??
+                    ImageConstant.imgEllipse896x96,
+                userName: model?.userName ?? 'Loading...',
+                email: model?.email ?? 'Fetching data...',
+                onEditTap: () {
+                  onTapEditProfile(context);
+                },
+                margin: EdgeInsets.symmetric(horizontal: 68.h),
+              ),
+              if (state.isUploading)
+                Positioned(
+                  child: Container(
+                    width: 96.h,
+                    height: 96.h,
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
@@ -246,7 +292,7 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
 
   /// Navigate to notifications screen
   void onTapNotificationIcon(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 
   /// Navigate to edit profile
@@ -256,6 +302,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
 
   /// Navigate to video call screen when story is tapped
   void onTapStoryCard(BuildContext context, int index) {
-    NavigatorService.pushNamed(AppRoutes.videoCallScreen);
+    NavigatorService.pushNamed(AppRoutes.appVideoCall);
   }
 }

@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
@@ -8,6 +6,7 @@ import '../../widgets/custom_story_list.dart'
     show CustomStoryList, CustomStoryItem;
 import '../../widgets/custom_story_viewer.dart' as story_viewer
     show CustomStoryViewer, CustomStoryItem;
+import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import 'notifier/memory_details_view_notifier.dart';
 
 class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
@@ -65,8 +64,6 @@ class MemoryDetailsViewScreenState
         ImageConstant.imgIconGray5032x32,
       ],
       showProfileImage: true,
-      profileImagePath: ImageConstant.imgEllipse8,
-      isProfileCircular: true,
     );
   }
 
@@ -242,10 +239,10 @@ class MemoryDetailsViewScreenState
               ImageConstant.imgFrame2,
             ],
             onStoryTap: (index) {
-              NavigatorService.pushNamed(AppRoutes.videoCallScreen);
+              NavigatorService.pushNamed(AppRoutes.appVideoCall);
             },
             onPlayButtonTap: (index) {
-              NavigatorService.pushNamed(AppRoutes.videoCallScreen);
+              NavigatorService.pushNamed(AppRoutes.appVideoCall);
             },
           ),
           _buildTimelineDetails(context),
@@ -368,7 +365,7 @@ class MemoryDetailsViewScreenState
         ),
       ],
       onStoryTap: (index) {
-        NavigatorService.pushNamed(AppRoutes.videoCallScreen);
+        NavigatorService.pushNamed(AppRoutes.appVideoCall);
       },
     );
   }
@@ -396,7 +393,17 @@ class MemoryDetailsViewScreenState
               text: 'Add Media',
               leftIcon: ImageConstant.imgIcon13,
               onPressed: () {
-                ref.read(memoryDetailsViewNotifier.notifier).onAddMediaTap();
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                    ),
+                    child: AddMemoryUploadScreen(),
+                  ),
+                );
               },
               buttonStyle: CustomButtonStyle.fillPrimary,
               buttonTextStyle: CustomButtonTextStyle.bodyMedium,

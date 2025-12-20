@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../models/contributor_item_model.dart';

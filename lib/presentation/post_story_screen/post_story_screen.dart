@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/app_export.dart';
@@ -29,7 +28,7 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(context),
+        appBar: _buildAppBar(context) as PreferredSizeWidget,
         body: Container(
           width: double.maxFinite,
           child: Column(
@@ -54,7 +53,7 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
   }
 
   /// Section Widget
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  Widget _buildAppBar(BuildContext context) {
     return CustomAppBar(
       layoutType: CustomAppBarLayoutType.titleWithLeading,
       leadingIcon: ImageConstant.imgIconGray5042x42,

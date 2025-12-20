@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../models/contact_model.dart';
@@ -33,11 +33,14 @@ class ContactItemWidget extends StatelessWidget {
             ),
             child: ClipOval(
               child: CustomImageView(
-                imagePath:
-                    contact.profileImage ?? ImageConstant.imgDefaultAvatar,
+                imagePath: (contact.profileImage == null ||
+                        contact.profileImage!.isEmpty)
+                    ? ImageConstant.imgEllipse864x64
+                    : contact.profileImage!,
                 height: 60.h,
                 width: 60.h,
                 fit: BoxFit.cover,
+                placeHolder: ImageConstant.imgImageNotFound,
               ),
             ),
           ),

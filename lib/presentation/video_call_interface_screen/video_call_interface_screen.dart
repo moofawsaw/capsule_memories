@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_icon_button.dart';
-import 'notifier/video_call_interface_notifier.dart';
+import '../../widgets/custom_image_view.dart';
+import './notifier/video_call_interface_notifier.dart';
 
 class VideoCallInterfaceScreen extends ConsumerStatefulWidget {
   VideoCallInterfaceScreen({Key? key}) : super(key: key);
@@ -24,20 +23,23 @@ class VideoCallInterfaceScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_02,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.h)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildHeader(),
-          Expanded(
-            child: _buildMainContent(),
-          ),
-        ],
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_02,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20.h)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: _buildMainContent(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -121,17 +123,24 @@ class VideoCallInterfaceScreenState
     return Container(
       padding: EdgeInsets.all(16.h),
       child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            _buildUserInfoSection(),
-            SizedBox(height: 16.h),
-            _buildParticipantsColumn(),
-            SizedBox(height: 104.h),
-            _buildControlButtons(),
-            SizedBox(height: 16.h),
-            _buildReactionSection(),
-          ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height - 200.h,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildUserInfoSection(),
+              SizedBox(height: 16.h),
+              _buildParticipantsColumn(),
+              SizedBox(height: 24.h),
+              _buildControlButtons(),
+              SizedBox(height: 16.h),
+              _buildReactionSection(),
+              SizedBox(height: 16.h),
+            ],
+          ),
         ),
       ),
     );
@@ -370,7 +379,7 @@ class VideoCallInterfaceScreenState
   }
 
   void onTapUserProfile() {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   void onTapHangoutButton() {

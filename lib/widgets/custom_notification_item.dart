@@ -1,108 +1,151 @@
-import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../core/app_export.dart';
-import 'custom_icon_button.dart';
 
-/** 
- * CustomNotificationItem - A reusable notification item component that displays notification content with title, subtitle, timestamp, and an action button.
- * 
- * Features:
- * - Flexible content with customizable title, subtitle, and timestamp
- * - Action button with customizable icon and callback
- * - Consistent spacing and typography following design system
- * - Responsive design using SizeUtils extensions
- * - Support for long text with proper text wrapping
- * 
- * @param title - Main notification title text
- * @param subtitle - Secondary description text  
- * @param timestamp - Time information for the notification
- * @param iconPath - Path to the action button icon
- * @param onIconTap - Callback function when action button is tapped
- * @param margin - Optional margin around the component
- */
 class CustomNotificationItem extends StatelessWidget {
+  final Map<String, dynamic> notification;
+  final VoidCallback onTap;
+
   const CustomNotificationItem({
-    Key? key,
-    this.title,
-    this.subtitle,
-    this.timestamp,
-    this.iconPath,
-    this.onIconTap,
-    this.margin,
-  }) : super(key: key);
+    super.key,
+    required this.notification,
+    required this.onTap,
+  });
 
-  /// Main notification title text
-  final String? title;
+  IconData _getNotificationIcon() {
+    switch (notification['type']) {
+      case 'memory_invite':
+        return Icons.event;
+      case 'friend_request':
+        return Icons.person_add;
+      case 'new_story':
+        return Icons.video_library;
+      case 'followed':
+        return Icons.person;
+      case 'memory_expiring':
+        return Icons.timer;
+      case 'memory_sealed':
+        return Icons.lock;
+      default:
+        return Icons.notifications;
+    }
+  }
 
-  /// Secondary description text below the title
-  final String? subtitle;
+  Color _getNotificationColor() {
+    switch (notification['type']) {
+      case 'memory_invite':
+        return Colors.blue;
+      case 'friend_request':
+        return Colors.green;
+      case 'new_story':
+        return Colors.purple;
+      case 'followed':
+        return Colors.orange;
+      case 'memory_expiring':
+        return Colors.amber;
+      case 'memory_sealed':
+        return Colors.grey;
+      default:
+        return Colors.grey;
+    }
+  }
 
-  /// Timestamp text showing when the notification occurred
-  final String? timestamp;
+  String _formatTimestamp(String timestamp) {
+    final dateTime = DateTime.parse(timestamp);
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
 
-  /// Path to the icon displayed in the action button
-  final String? iconPath;
-
-  /// Callback function triggered when the action button is tapped
-  final VoidCallback? onIconTap;
-
-  /// Optional margin around the entire component
-  final EdgeInsetsGeometry? margin;
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return DateFormat('MMM d').format(dateTime);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: margin ?? EdgeInsets.symmetric(horizontal: 20.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (title != null)
-                      Text(
-                        title!,
-                        style: TextStyleHelper
-                            .instance.title18BoldPlusJakartaSans
-                            .copyWith(color: appTheme.gray_50, height: 1.22),
-                      ),
-                    if (subtitle != null) ...[
-                      SizedBox(height: 4.h),
-                      Text(
-                        subtitle!,
-                        style: TextStyleHelper
-                            .instance.body14RegularPlusJakartaSans
-                            .copyWith(
-                                color: appTheme.blue_gray_300, height: 1.29),
-                      ),
-                    ],
-                  ],
-                ),
+    final isRead = notification['is_read'] as bool;
+    final iconColor = _getNotificationColor();
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        color: isRead ? Colors.transparent : Colors.blue.withAlpha(13),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: iconColor.withAlpha(26),
+                borderRadius: BorderRadius.circular(24),
               ),
-              if (iconPath != null)
-                CustomIconButton(
-                  iconPath: iconPath!,
-                  onTap: onIconTap,
-                  height: 48.h,
-                  width: 48.h,
-                  backgroundColor: appTheme.blue_gray_900_02,
-                  borderRadius: 24.h,
-                  padding: EdgeInsets.all(12.h),
-                ),
-            ],
-          ),
-          if (timestamp != null) ...[
-            SizedBox(height: 16.h),
-            Text(
-              timestamp!,
-              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300, height: 1.29),
+              child: Icon(
+                _getNotificationIcon(),
+                color: iconColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notification['title'] ?? '',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight:
+                                isRead ? FontWeight.normal : FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (!isRead)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                  SizedBox(height: 0.5.h),
+                  Text(
+                    notification['message'] ?? '',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 0.5.h),
+                  Text(
+                    _formatTimestamp(notification['created_at']),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }

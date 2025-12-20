@@ -9,6 +9,14 @@ class NotificationSettingsState extends Equatable {
   final bool? newFollowersEnabled;
   final bool? friendRequestsEnabled;
   final bool? groupInvitesEnabled;
+
+  // Privacy settings
+  final bool? privateAccountEnabled;
+  final bool? showLocationEnabled;
+  final bool? allowMemoryInvitesEnabled;
+  final bool? allowStoryReactionsEnabled;
+  final bool? allowStorySharingEnabled;
+
   final bool? isLoading;
   final bool? isSuccess;
   final NotificationSettingsModel? notificationSettingsModel;
@@ -22,6 +30,11 @@ class NotificationSettingsState extends Equatable {
     this.newFollowersEnabled,
     this.friendRequestsEnabled,
     this.groupInvitesEnabled,
+    this.privateAccountEnabled,
+    this.showLocationEnabled,
+    this.allowMemoryInvitesEnabled,
+    this.allowStoryReactionsEnabled,
+    this.allowStorySharingEnabled,
     this.isLoading = false,
     this.isSuccess = false,
     this.notificationSettingsModel,
@@ -37,6 +50,11 @@ class NotificationSettingsState extends Equatable {
         newFollowersEnabled,
         friendRequestsEnabled,
         groupInvitesEnabled,
+        privateAccountEnabled,
+        showLocationEnabled,
+        allowMemoryInvitesEnabled,
+        allowStoryReactionsEnabled,
+        allowStorySharingEnabled,
         isLoading,
         isSuccess,
         notificationSettingsModel,
@@ -51,6 +69,11 @@ class NotificationSettingsState extends Equatable {
     bool? newFollowersEnabled,
     bool? friendRequestsEnabled,
     bool? groupInvitesEnabled,
+    bool? privateAccountEnabled,
+    bool? showLocationEnabled,
+    bool? allowMemoryInvitesEnabled,
+    bool? allowStoryReactionsEnabled,
+    bool? allowStorySharingEnabled,
     bool? isLoading,
     bool? isSuccess,
     NotificationSettingsModel? notificationSettingsModel,
@@ -67,6 +90,15 @@ class NotificationSettingsState extends Equatable {
       friendRequestsEnabled:
           friendRequestsEnabled ?? this.friendRequestsEnabled,
       groupInvitesEnabled: groupInvitesEnabled ?? this.groupInvitesEnabled,
+      privateAccountEnabled:
+          privateAccountEnabled ?? this.privateAccountEnabled,
+      showLocationEnabled: showLocationEnabled ?? this.showLocationEnabled,
+      allowMemoryInvitesEnabled:
+          allowMemoryInvitesEnabled ?? this.allowMemoryInvitesEnabled,
+      allowStoryReactionsEnabled:
+          allowStoryReactionsEnabled ?? this.allowStoryReactionsEnabled,
+      allowStorySharingEnabled:
+          allowStorySharingEnabled ?? this.allowStorySharingEnabled,
       isLoading: isLoading ?? this.isLoading,
       isSuccess: isSuccess ?? this.isSuccess,
       notificationSettingsModel:

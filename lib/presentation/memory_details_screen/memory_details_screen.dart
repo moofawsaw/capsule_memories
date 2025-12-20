@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
@@ -19,47 +18,50 @@ class MemoryDetailsScreen extends ConsumerStatefulWidget {
 class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_02,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.h),
-          topRight: Radius.circular(20.h),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(height: 12.h),
-          // Drag handle indicator
-          Container(
-            width: 48.h,
-            height: 5.h,
-            decoration: BoxDecoration(
-              color: appTheme.colorFF3A3A,
-              borderRadius: BorderRadius.circular(2.5),
-            ),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_02,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20.h),
+            topRight: Radius.circular(20.h),
           ),
-          SizedBox(height: 20.h),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 20.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  SizedBox(height: 24.h),
-                  _buildMemoryInfo(context),
-                  SizedBox(height: 24.h),
-                  _buildMembersList(context),
-                  SizedBox(height: 24.h),
-                  _buildActionButtons(context),
-                  SizedBox(height: 20.h),
-                ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12.h),
+            // Drag handle indicator
+            Container(
+              width: 48.h,
+              height: 5.h,
+              decoration: BoxDecoration(
+                color: appTheme.colorFF3A3A,
+                borderRadius: BorderRadius.circular(2.5),
               ),
             ),
-          ),
-        ],
+            SizedBox(height: 20.h),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 20.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context),
+                    SizedBox(height: 24.h),
+                    _buildMemoryInfo(context),
+                    SizedBox(height: 24.h),
+                    _buildMembersList(context),
+                    SizedBox(height: 24.h),
+                    _buildActionButtons(context),
+                    SizedBox(height: 20.h),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

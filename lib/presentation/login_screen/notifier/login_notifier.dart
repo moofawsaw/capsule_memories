@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/login_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/supabase_service.dart';
 
 part 'login_state.dart';
 
@@ -58,28 +59,44 @@ class LoginNotifier extends StateNotifier<LoginState> {
     );
 
     try {
-      // Simulate login process
-      await Future.delayed(Duration(seconds: 2));
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
 
       final email = state.emailController?.text ?? '';
       final password = state.passwordController?.text ?? '';
 
-      // Mock validation - in real app, this would be API call
-      if (email.isNotEmpty && password.isNotEmpty) {
+      // Sign in with Supabase
+      final response = await supabaseClient.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (response.user != null) {
         state = state.copyWith(
           isLoading: false,
           isSuccess: true,
         );
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'Invalid credentials',
-        );
+        throw Exception('Login failed: Unable to authenticate user.');
       }
     } catch (e) {
+      String errorMessage = 'Login failed. Please try again.';
+      if (e.toString().contains('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please try again.';
+      } else if (e.toString().contains('Email not confirmed')) {
+        errorMessage = 'Please verify your email address before signing in.';
+      } else if (e.toString().contains('Invalid email')) {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (e.toString().isNotEmpty) {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Login failed. Please try again.',
+        errorMessage: errorMessage,
       );
     }
   }
@@ -92,17 +109,32 @@ class LoginNotifier extends StateNotifier<LoginState> {
     );
 
     try {
-      // Simulate Google login process
-      await Future.delayed(Duration(seconds: 2));
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
+
+      // Sign in with Google OAuth
+      // Note: OAuth requires proper configuration in Supabase dashboard
+      await supabaseClient.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'io.supabase.capsulememories://login-callback/',
+      );
+
+      // Note: OAuth flow will redirect to browser/app, so we don't set success here
+      // The auth state change listener in main.dart will handle the success case
+      // Don't set loading to false here as the OAuth flow is async
+    } catch (e) {
+      String errorMessage =
+          'Google login failed. Please ensure Google OAuth is configured in Supabase dashboard.';
+      if (e.toString().isNotEmpty && !e.toString().contains('Exception: ')) {
+        errorMessage = e.toString();
+      }
 
       state = state.copyWith(
         isLoading: false,
-        isSuccess: true,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Google login failed. Please try again.',
+        errorMessage: errorMessage,
       );
     }
   }
@@ -115,17 +147,32 @@ class LoginNotifier extends StateNotifier<LoginState> {
     );
 
     try {
-      // Simulate Facebook login process
-      await Future.delayed(Duration(seconds: 2));
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
+
+      // Sign in with Facebook OAuth
+      // Note: OAuth requires proper configuration in Supabase dashboard
+      await supabaseClient.auth.signInWithOAuth(
+        OAuthProvider.facebook,
+        redirectTo: 'io.supabase.capsulememories://login-callback/',
+      );
+
+      // Note: OAuth flow will redirect to browser/app, so we don't set success here
+      // The auth state change listener in main.dart will handle the success case
+      // Don't set loading to false here as the OAuth flow is async
+    } catch (e) {
+      String errorMessage =
+          'Facebook login failed. Please ensure Facebook OAuth is configured in Supabase dashboard.';
+      if (e.toString().isNotEmpty && !e.toString().contains('Exception: ')) {
+        errorMessage = e.toString();
+      }
 
       state = state.copyWith(
         isLoading: false,
-        isSuccess: true,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Facebook login failed. Please try again.',
+        errorMessage: errorMessage,
       );
     }
   }

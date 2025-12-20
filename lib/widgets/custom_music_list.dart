@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_icon_button.dart';
+import './custom_icon_button.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomMusicList - A reusable list component for displaying music/audio items
@@ -46,15 +46,18 @@ class CustomMusicList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: margin,
-      child: Column(
-        children: List.generate(items.length, (index) {
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: ClampingScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
           return Container(
             margin: EdgeInsets.only(
               bottom: index < items.length - 1 ? (itemSpacing ?? 46.h) : 0,
             ),
             child: _buildMusicItem(context, index, items[index]),
           );
-        }),
+        },
       ),
     );
   }

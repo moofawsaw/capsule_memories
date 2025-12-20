@@ -4,22 +4,26 @@ import '../../../core/app_export.dart';
 
 // ignore_for_file: must_be_immutable
 class NotificationsModel extends Equatable {
-  NotificationsModel({this.notificationsList}) {
-    notificationsList = notificationsList ?? [];
-  }
+  final List<Map<String, dynamic>> notifications;
+  final int unreadCount;
 
-  List<NotificationItemModel>? notificationsList;
+  const NotificationsModel({
+    this.notifications = const [],
+    this.unreadCount = 0,
+  });
 
   NotificationsModel copyWith({
-    List<NotificationItemModel>? notificationsList,
+    List<Map<String, dynamic>>? notifications,
+    int? unreadCount,
   }) {
     return NotificationsModel(
-      notificationsList: notificationsList ?? this.notificationsList,
+      notifications: notifications ?? this.notifications,
+      unreadCount: unreadCount ?? this.unreadCount,
     );
   }
 
   @override
-  List<Object?> get props => [notificationsList];
+  List<Object?> get props => [notifications, unreadCount];
 }
 
 // ignore_for_file: must_be_immutable

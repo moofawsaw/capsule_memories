@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_image_view.dart';
 import 'notifier/video_call_notifier.dart';
@@ -469,12 +468,12 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
 
   /// Navigates to user profile screen when the user profile is tapped
   void onTapUserProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   /// Handles hangout button tap
   void onTapHangoutButton(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.homeScreen);
+    NavigatorService.pushNamed(AppRoutes.appHome);
   }
 
   /// Handles volume/audio button tap

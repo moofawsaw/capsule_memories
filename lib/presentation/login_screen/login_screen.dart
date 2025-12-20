@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_edit_text.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_edit_text.dart';
+import '../../widgets/custom_image_view.dart';
 import 'notifier/login_notifier.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -52,12 +51,17 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// Logo Section
   Widget _buildLogoSection() {
-    return Container(
-      width: MediaQuery.of(context).size.width * 0.38,
-      child: CustomImageView(
-        imagePath: ImageConstant.imgLogo,
-        height: 26.h,
-        width: 130.h,
+    return GestureDetector(
+      onTap: () {
+        NavigatorService.pushNamed(AppRoutes.appFeed);
+      },
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.38,
+        child: CustomImageView(
+          imagePath: ImageConstant.imgLogo,
+          height: 26.h,
+          width: 130.h,
+        ),
       ),
     );
   }
@@ -83,8 +87,7 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
           (previous, current) {
             if (current.isSuccess ?? false) {
               _clearForm();
-              NavigatorService.pushNamedAndRemoveUntil(
-                  AppRoutes.feedScreen);
+              NavigatorService.pushNamedAndRemoveUntil(AppRoutes.appFeed);
             }
             if (current.errorMessage != null) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -231,12 +234,12 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// Handle forgot password tap
   void _onForgotPasswordTap() {
-    NavigatorService.pushNamed(AppRoutes.resetScreen);
+    NavigatorService.pushNamed(AppRoutes.authReset);
   }
 
   /// Handle sign up tap
   void _onSignUpTap() {
-    NavigatorService.pushNamed(AppRoutes.registerScreen);
+    NavigatorService.pushNamed(AppRoutes.authRegister);
   }
 
   /// Clear form after successful login

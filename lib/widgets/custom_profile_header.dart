@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_icon_button.dart';
+import './custom_icon_button.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomProfileHeader - A reusable profile header component that displays user avatar, name, and email
  * 
  * This component provides:
  * - Circular avatar image with edit button overlay
+ * - Letter avatar fallback when no image is available
  * - User name display with customizable styling
  * - Email address display with secondary styling
  * - Edit functionality with callback support
@@ -55,6 +55,27 @@ class CustomProfileHeader extends StatelessWidget {
   /// Whether to show the edit button
   final bool showEditButton;
 
+  /// Check if avatar URL is a network image (not a local asset)
+  bool _isNetworkImage() {
+    return avatarImagePath.startsWith('http://') ||
+        avatarImagePath.startsWith('https://');
+  }
+
+  /// Check if we should show letter avatar
+  bool _shouldShowLetterAvatar() {
+    // Show letter avatar if:
+    // 1. Avatar path is empty/null
+    // 2. Avatar path is the default placeholder image
+    return avatarImagePath.isEmpty ||
+        avatarImagePath == ImageConstant.imgEllipse896x96;
+  }
+
+  /// Get first letter of email for avatar fallback
+  String _getAvatarLetter() {
+    if (email.isEmpty) return '?';
+    return email[0].toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -77,17 +98,19 @@ class CustomProfileHeader extends StatelessWidget {
 
     return SizedBox(
       width: size,
-      height: size + (showEditButton ? 6.h : 0), // Extra height for edit button
+      height: size + (showEditButton ? 6.h : 0),
       child: Stack(
         children: [
-          // Avatar image
-          CustomImageView(
-            imagePath: avatarImagePath,
-            height: size,
-            width: size,
-            fit: BoxFit.cover,
-            radius: BorderRadius.circular(size / 2),
-          ),
+          // Avatar display - letter avatar or image
+          _shouldShowLetterAvatar()
+              ? _buildLetterAvatar(size)
+              : CustomImageView(
+                  imagePath: avatarImagePath,
+                  height: size,
+                  width: size,
+                  fit: BoxFit.cover,
+                  radius: BorderRadius.circular(size / 2),
+                ),
           // Edit button positioned at bottom-right
           if (showEditButton)
             Positioned(
@@ -104,6 +127,28 @@ class CustomProfileHeader extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Builds letter avatar fallback
+  Widget _buildLetterAvatar(double size) {
+    return Container(
+      height: size,
+      width: size,
+      decoration: BoxDecoration(
+        color: appTheme.color3BD81E,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          _getAvatarLetter(),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: size * 0.4,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

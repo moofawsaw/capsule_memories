@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../../../core/app_export.dart';
 import '../models/create_group_model.dart';

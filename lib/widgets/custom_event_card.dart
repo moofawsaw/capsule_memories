@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 import '../core/app_export.dart';
 import './custom_icon_button.dart';
@@ -27,6 +26,7 @@ class CustomEventCard extends StatelessWidget {
     this.onBackTap,
     this.onIconButtonTap,
     this.onCardTap,
+    this.onAvatarTap,
   }) : super(key: key);
 
   /// The main title text for the event
@@ -52,6 +52,9 @@ class CustomEventCard extends StatelessWidget {
 
   /// Callback for card tap
   final VoidCallback? onCardTap;
+
+  /// Callback for avatar cluster tap
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -186,42 +189,45 @@ class CustomEventCard extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(top: 14.h),
-      child: SizedBox(
-        width: 84.h,
-        height: 36.h,
-        child: Stack(
-          children: [
-            if (avatars.isNotEmpty)
-              Positioned(
-                left: 0,
-                child: CustomImageView(
-                  imagePath: avatars[0],
-                  width: 36.h,
-                  height: 36.h,
-                  radius: BorderRadius.circular(18.h),
+      child: GestureDetector(
+        onTap: onAvatarTap,
+        child: SizedBox(
+          width: 84.h,
+          height: 36.h,
+          child: Stack(
+            children: [
+              if (avatars.isNotEmpty)
+                Positioned(
+                  left: 0,
+                  child: CustomImageView(
+                    imagePath: avatars[0],
+                    width: 36.h,
+                    height: 36.h,
+                    radius: BorderRadius.circular(18.h),
+                  ),
                 ),
-              ),
-            if (avatars.length > 1)
-              Positioned(
-                left: 24.h,
-                child: CustomImageView(
-                  imagePath: avatars[1],
-                  width: 36.h,
-                  height: 36.h,
-                  radius: BorderRadius.circular(18.h),
+              if (avatars.length > 1)
+                Positioned(
+                  left: 24.h,
+                  child: CustomImageView(
+                    imagePath: avatars[1],
+                    width: 36.h,
+                    height: 36.h,
+                    radius: BorderRadius.circular(18.h),
+                  ),
                 ),
-              ),
-            if (avatars.length > 2)
-              Positioned(
-                left: 48.h,
-                child: CustomImageView(
-                  imagePath: avatars[2],
-                  width: 36.h,
-                  height: 36.h,
-                  radius: BorderRadius.circular(18.h),
+              if (avatars.length > 2)
+                Positioned(
+                  left: 48.h,
+                  child: CustomImageView(
+                    imagePath: avatars[2],
+                    width: 36.h,
+                    height: 36.h,
+                    radius: BorderRadius.circular(18.h),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

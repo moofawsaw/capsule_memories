@@ -1,5 +1,4 @@
 import '../../../core/app_export.dart';
-import '../../../core/utils/navigator_service.dart';
 import '../models/vibe_selection_screen_two_model.dart';
 
 part 'vibe_selection_screen_two_state.dart';

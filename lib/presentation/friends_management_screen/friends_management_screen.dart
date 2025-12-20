@@ -1,7 +1,4 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_icon_button_row.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
@@ -33,19 +30,6 @@ class FriendsManagementScreenState
     return SafeArea(
         child: Scaffold(
             backgroundColor: appTheme.gray_900_02,
-            appBar: CustomAppBar(
-              logoImagePath: ImageConstant.imgLogo,
-              showIconButton: true,
-              iconButtonImagePath: ImageConstant.imgFrame19,
-              iconButtonBackgroundColor: appTheme.color3BD81E,
-              actionIcons: [
-                ImageConstant.imgIconGray50,
-                ImageConstant.imgIconGray5032x32,
-              ],
-              showProfileImage: true,
-              profileImagePath: ImageConstant.imgEllipse8,
-              isProfileCircular: true,
-            ),
             body: Container(
                 width: double.infinity,
                 child: Column(children: [
@@ -133,22 +117,22 @@ class FriendsManagementScreenState
 
   /// Navigate to add content
   void onTapAddButton(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.postScreen);
+    NavigatorService.pushNamed(AppRoutes.appPost);
   }
 
   /// Navigate to notifications
   void onTapNotificationIcon(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 
   /// Navigate to notifications
   void onTapNotificationBell(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 
   /// Navigate to profile
   void onTapProfileImage(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   /// Handle QR scan action

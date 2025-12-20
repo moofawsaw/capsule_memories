@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+
 import '../core/app_export.dart';
-import 'custom_icon_button.dart';
+import './custom_icon_button.dart';
 
 /** 
  * CustomInfoRow - A reusable information display component that combines an icon button with descriptive text
@@ -67,7 +67,9 @@ class CustomInfoRow extends StatelessWidget {
             padding: EdgeInsets.all(12.h),
           ),
           SizedBox(width: spacing ?? 12.h),
-          _buildTextWidget(context),
+          Expanded(
+            child: _buildTextWidget(context),
+          ),
         ],
       ),
     );
@@ -78,11 +80,9 @@ class CustomInfoRow extends StatelessWidget {
       text,
       style: TextStyleHelper.instance.body14RegularPlusJakartaSans
           .copyWith(color: appTheme.blue_gray_300, height: 1.2),
+      maxLines: null,
+      overflow: TextOverflow.visible,
     );
-
-    if (useFlexText) {
-      return Flexible(child: textWidget);
-    }
 
     if (textWidth != null) {
       return SizedBox(

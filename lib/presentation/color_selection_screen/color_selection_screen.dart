@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_image_view.dart';

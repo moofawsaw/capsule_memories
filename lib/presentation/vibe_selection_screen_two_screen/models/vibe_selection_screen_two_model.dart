@@ -1,7 +1,36 @@
 import '../../../core/app_export.dart';
-import 'package:flutter/material.dart';
 
 /// This class is used in the [VibeSelectionScreenTwo] screen.
+
+// ignore_for_file: must_be_immutable
+class VibeSelectionScreenTwoModel extends Equatable {
+  VibeSelectionScreenTwoModel({
+    this.selectedVibe,
+    this.id,
+  }) {
+    selectedVibe = selectedVibe ?? "";
+    id = id ?? "";
+  }
+
+  String? selectedVibe;
+  String? id;
+
+  VibeSelectionScreenTwoModel copyWith({
+    String? selectedVibe,
+    String? id,
+  }) {
+    return VibeSelectionScreenTwoModel(
+      selectedVibe: selectedVibe ?? this.selectedVibe,
+      id: id ?? this.id,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        selectedVibe,
+        id,
+      ];
+}
 
 class VibeItem extends Equatable {
   VibeItem({

@@ -1,6 +1,7 @@
 part of 'account_registration_notifier.dart';
 
 class AccountRegistrationState extends Equatable {
+  final TextEditingController? nameController;
   final TextEditingController? emailController;
   final TextEditingController? passwordController;
   final TextEditingController? confirmPasswordController;
@@ -11,6 +12,7 @@ class AccountRegistrationState extends Equatable {
   final AccountRegistrationModel? accountRegistrationModel;
 
   AccountRegistrationState({
+    this.nameController,
     this.emailController,
     this.passwordController,
     this.confirmPasswordController,
@@ -23,6 +25,7 @@ class AccountRegistrationState extends Equatable {
 
   @override
   List<Object?> get props => [
+        nameController,
         emailController,
         passwordController,
         confirmPasswordController,
@@ -34,6 +37,7 @@ class AccountRegistrationState extends Equatable {
       ];
 
   AccountRegistrationState copyWith({
+    TextEditingController? nameController,
     TextEditingController? emailController,
     TextEditingController? passwordController,
     TextEditingController? confirmPasswordController,
@@ -44,6 +48,7 @@ class AccountRegistrationState extends Equatable {
     AccountRegistrationModel? accountRegistrationModel,
   }) {
     return AccountRegistrationState(
+      nameController: nameController ?? this.nameController,
       emailController: emailController ?? this.emailController,
       passwordController: passwordController ?? this.passwordController,
       confirmPasswordController:

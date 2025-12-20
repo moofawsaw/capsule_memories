@@ -1,5 +1,6 @@
 import '../models/user_menu_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/supabase_service.dart';
 
 part 'user_menu_state.dart';
 
@@ -17,11 +18,61 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
     initialize();
   }
 
-  void initialize() {
+  void initialize() async {
     state = state.copyWith(
-      userMenuModel: UserMenuModel(),
+      isLoading: true,
+    );
+
+    await _loadUserProfile();
+
+    state = state.copyWith(
       isLoading: false,
     );
+  }
+
+  // Load authenticated user profile from database
+  Future<void> _loadUserProfile() async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) {
+        print('⚠️ Supabase client not available');
+        return;
+      }
+
+      // Get current authenticated user
+      final user = client.auth.currentUser;
+      if (user == null) {
+        print('⚠️ No authenticated user');
+        return;
+      }
+
+      // Fetch user profile from database
+      final response = await client
+          .from('user_profiles')
+          .select('username, email, display_name, avatar_url, bio')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (response != null) {
+        // Pass empty string for avatar_url if null/empty to trigger letter avatar
+        final avatarUrl = response['avatar_url'] as String?;
+        final cleanAvatarUrl =
+            (avatarUrl?.isNotEmpty ?? false) ? avatarUrl : '';
+
+        state = state.copyWith(
+          userMenuModel: UserMenuModel(
+            userName: response['display_name'] ?? response['username'] ?? '',
+            userEmail: response['email'] ?? '',
+            avatarImagePath: cleanAvatarUrl,
+            bio: response['bio'],
+            userId: user.id,
+            isDarkModeEnabled: state.userMenuModel?.isDarkModeEnabled ?? true,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error loading user profile: $e');
+    }
   }
 
   void toggleDarkMode() {
@@ -35,31 +86,64 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
     );
   }
 
-  void signOut() {
+  Future<void> signOut() async {
     state = state.copyWith(
       isLoading: true,
     );
 
-    // Perform sign out logic here
-    // Clear user data, tokens, etc.
+    try {
+      final client = SupabaseService.instance.client;
+      if (client != null) {
+        await client.auth.signOut();
+      }
 
-    state = state.copyWith(
-      isLoading: false,
-      isSignedOut: true,
-    );
+      state = state.copyWith(
+        isLoading: false,
+        isSignedOut: true,
+      );
+    } catch (e) {
+      print('❌ Error signing out: $e');
+      state = state.copyWith(
+        isLoading: false,
+      );
+    }
   }
 
-  void updateUserProfile(
-      String userName, String userEmail, String? avatarPath) {
-    final currentModel = state.userMenuModel;
-    final updatedModel = currentModel?.copyWith(
-      userName: userName,
-      userEmail: userEmail,
-      avatarImagePath: avatarPath,
-    );
+  Future<void> updateUserProfile(
+      String userName, String userEmail, String? avatarPath) async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) return;
 
-    state = state.copyWith(
-      userMenuModel: updatedModel,
-    );
+      final user = client.auth.currentUser;
+      if (user == null) return;
+
+      // Update profile in database
+      await client.from('user_profiles').update({
+        'display_name': userName,
+        'email': userEmail,
+        'avatar_url': avatarPath,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', user.id);
+
+      // Update local state
+      final currentModel = state.userMenuModel;
+      final updatedModel = currentModel?.copyWith(
+        userName: userName,
+        userEmail: userEmail,
+        avatarImagePath: avatarPath,
+      );
+
+      state = state.copyWith(
+        userMenuModel: updatedModel,
+      );
+    } catch (e) {
+      print('❌ Error updating user profile: $e');
+    }
+  }
+
+  // Refresh user profile data
+  Future<void> refreshProfile() async {
+    await _loadUserProfile();
   }
 }

@@ -1,52 +1,36 @@
 
-import '../../../core/app_export.dart';
+class UserMenuModel {
+  final String userName;
+  final String userEmail;
+  final String? avatarImagePath;
+  final String? bio;
+  final String? userId;
+  final bool isDarkModeEnabled;
 
-/// This class is used in the [UserMenuScreen] screen.
-
-// ignore_for_file: must_be_immutable
-class UserMenuModel extends Equatable {
   UserMenuModel({
-    this.userName,
-    this.userEmail,
+    this.userName = '',
+    this.userEmail = '',
     this.avatarImagePath,
-    this.isDarkModeEnabled,
-    this.id,
-  }) {
-    userName = userName ?? "Joe Kool";
-    userEmail = userEmail ?? "email112@gmail.com";
-    avatarImagePath = avatarImagePath ?? ImageConstant.imgEllipse852x52;
-    isDarkModeEnabled = isDarkModeEnabled ?? true;
-    id = id ?? "";
-  }
-
-  String? userName;
-  String? userEmail;
-  String? avatarImagePath;
-  bool? isDarkModeEnabled;
-  String? id;
+    this.bio,
+    this.userId,
+    this.isDarkModeEnabled = true,
+  });
 
   UserMenuModel copyWith({
     String? userName,
     String? userEmail,
     String? avatarImagePath,
+    String? bio,
+    String? userId,
     bool? isDarkModeEnabled,
-    String? id,
   }) {
     return UserMenuModel(
       userName: userName ?? this.userName,
       userEmail: userEmail ?? this.userEmail,
       avatarImagePath: avatarImagePath ?? this.avatarImagePath,
+      bio: bio ?? this.bio,
+      userId: userId ?? this.userId,
       isDarkModeEnabled: isDarkModeEnabled ?? this.isDarkModeEnabled,
-      id: id ?? this.id,
     );
   }
-
-  @override
-  List<Object?> get props => [
-        userName,
-        userEmail,
-        avatarImagePath,
-        isDarkModeEnabled,
-        id,
-      ];
 }

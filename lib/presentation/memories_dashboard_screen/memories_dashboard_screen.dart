@@ -1,7 +1,4 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart';
@@ -45,7 +42,6 @@ class _MemoriesDashboardScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(),
         body: Container(
           width: double.maxFinite,
           child: Column(
@@ -61,22 +57,6 @@ class _MemoriesDashboardScreenState
           ),
         ),
       ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    return CustomAppBar(
-      logoImagePath: ImageConstant.imgLogo,
-      showIconButton: true,
-      iconButtonImagePath: ImageConstant.imgFrame19,
-      iconButtonBackgroundColor: appTheme.color3BD81E,
-      actionIcons: [
-        ImageConstant.imgIconGray50,
-        ImageConstant.imgIconGray5032x32,
-      ],
-      showProfileImage: true,
-      profileImagePath: ImageConstant.imgEllipse8,
-      isProfileCircular: true,
     );
   }
 
@@ -365,7 +345,7 @@ class _MemoriesDashboardScreenState
   }
 
   void _onStoryTap(BuildContext context, int index) {
-    NavigatorService.pushNamed(AppRoutes.videoCallScreen);
+    NavigatorService.pushNamed(AppRoutes.appVideoCall);
   }
 
   void _onViewAllTap(BuildContext context) {
@@ -382,14 +362,14 @@ class _MemoriesDashboardScreenState
     // Conditional navigation based on memory status
     if (memoryItem.isSealed == true) {
       // Navigate to detail view screen for sealed memories
-      NavigatorService.pushNamed(AppRoutes.timelineSealed);
+      NavigatorService.pushNamed(AppRoutes.appTimelineSealed);
     } else {
       // Navigate to timeline screen for open memories
-      NavigatorService.pushNamed(AppRoutes.timelineScreen);
+      NavigatorService.pushNamed(AppRoutes.appTimeline);
     }
   }
 
   void _onNotificationTap(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 }

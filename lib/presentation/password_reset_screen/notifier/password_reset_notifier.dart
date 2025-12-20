@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
-import '../models/password_reset_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/supabase_service.dart';
+import '../models/password_reset_model.dart';
 
 part 'password_reset_state.dart';
 
@@ -42,6 +42,50 @@ class PasswordResetNotifier extends StateNotifier<PasswordResetState> {
     }
 
     return null;
+  }
+
+  /// Request password reset email
+  Future<void> requestPasswordReset() async {
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+      isSuccess: false,
+    );
+
+    try {
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
+
+      final email = state.emailController?.text ?? '';
+
+      // Request password reset from Supabase
+      await supabaseClient.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'io.supabase.capsulememories://reset-password/',
+      );
+
+      state = state.copyWith(
+        isLoading: false,
+        isSuccess: true,
+      );
+    } catch (e) {
+      String errorMessage = 'Failed to send reset email. Please try again.';
+      if (e.toString().contains('Invalid email')) {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (e.toString().contains('rate limit')) {
+        errorMessage = 'Too many requests. Please try again later.';
+      } else if (e.toString().isNotEmpty) {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: errorMessage,
+      );
+    }
   }
 
   void resetPassword() {

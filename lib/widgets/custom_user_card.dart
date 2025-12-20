@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../core/app_export.dart';
 import 'custom_image_view.dart';
 

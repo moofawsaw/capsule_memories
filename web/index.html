@@ -70,19 +70,15 @@
       <div class="loader"></div>
     </div>
 
-    <script src="flutter.js" defer></script>
+     <script>
+      (function () {
+        window.parent.postMessage({ type: "LOADING_STARTED", }, "*");
+      })();
+    </script>
+
+    <script src="flutter_bootstrap.js" async></script>
 
     <script>
-      var scriptLoaded = false;
-
-      function loadMainDartJs() {
-        if (scriptLoaded) return;
-        scriptLoaded = true;
-        var scriptTag = document.createElement("script");
-        scriptTag.src = "main.dart.js";
-        scriptTag.type = "application/javascript";
-        document.body.appendChild(scriptTag);
-      }
 
       function removeLoader() {
         var loader = document.getElementById("loading-container");
@@ -96,7 +92,6 @@
         window.parent.postMessage({ type: "LOADING_COMPLETED", }, "*");
       });
 
-      loadMainDartJs();
     </script>
 
     <script>
@@ -128,6 +123,6 @@
 
     <!-- Plugin initialization code will be injected into flutter_plugins.js -->
     <script src="flutter_plugins.js" defer></script>
-    <script type="module" src="https://static.rocket.new/rocket-shot.js?v=0.0.1"></script>
+    <script type="module" src="https://static.rocket.new/rocket-shot.js?v=0.0.2"></script>
   </body>
 </html>

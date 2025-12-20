@@ -1,7 +1,4 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_profile_display.dart';
 import '../../widgets/custom_stat_card.dart';
@@ -22,7 +19,6 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(context),
         body: Container(
           width: double.maxFinite,
           child: SingleChildScrollView(
@@ -39,25 +35,6 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  /// Section Widget
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return CustomAppBar(
-      layoutType: CustomAppBarLayoutType.logoWithActions,
-      logoImagePath: ImageConstant.imgLogo,
-      showIconButton: true,
-      iconButtonImagePath: ImageConstant.imgFrame19,
-      iconButtonBackgroundColor: appTheme.color3BD81E,
-      actionIcons: [
-        ImageConstant.imgIconGray50,
-        ImageConstant.imgIconGray5032x32
-      ],
-      showProfileImage: true,
-      profileImagePath: ImageConstant.imgEllipse8DeepOrange100,
-      isProfileCircular: true,
-      customHeight: 99.h,
     );
   }
 
@@ -270,11 +247,11 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
   /// Navigation Functions
   void onTapStoryItem(BuildContext context, int index) {
-    NavigatorService.pushNamed(AppRoutes.videoCallScreen);
+    NavigatorService.pushNamed(AppRoutes.appVideoCall);
   }
 
   void onTapNotification(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 
   /// Opens user menu as a side drawer

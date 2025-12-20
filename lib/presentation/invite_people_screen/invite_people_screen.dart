@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_dropdown.dart';
@@ -19,36 +17,39 @@ class InvitePeopleScreen extends ConsumerStatefulWidget {
 class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_02,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.h),
-          topRight: Radius.circular(20.h),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: double.maxFinite,
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_02,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20.h),
+            topRight: Radius.circular(20.h),
+          ),
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(height: 12.h),
-          // Drag handle indicator
-          Container(
-            width: 48.h,
-            height: 5.h,
-            decoration: BoxDecoration(
-              color: appTheme.colorFF3A3A,
-              borderRadius: BorderRadius.circular(2.5),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12.h),
+            // Drag handle indicator
+            Container(
+              width: 48.h,
+              height: 5.h,
+              decoration: BoxDecoration(
+                color: appTheme.colorFF3A3A,
+                borderRadius: BorderRadius.circular(2.5),
+              ),
             ),
-          ),
-          SizedBox(height: 20.h),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 20.h),
-              child: _buildContent(context),
+            SizedBox(height: 20.h),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 20.h),
+                child: _buildContent(context),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -84,12 +85,16 @@ class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Container(
-            margin: EdgeInsets.only(bottom: 8.h),
-            child: Text(
-              'Invite people (optional)',
-              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
+          Expanded(
+            child: Container(
+              margin: EdgeInsets.only(bottom: 8.h, right: 8.h),
+              child: Text(
+                'Invite people (optional)',
+                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           CustomIconButtonRow(
@@ -522,7 +527,7 @@ class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
   }
 
   void onTapBack(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.bs_memoryCreateScreen);
+    NavigatorService.pushNamed(AppRoutes.appBsMemoryCreate);
   }
 
   void onTapCreate(BuildContext context) {

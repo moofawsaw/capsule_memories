@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
+import '../../widgets/custom_button.dart';
 import 'notifier/memory_invitation_notifier.dart';
 
 class MemoryInvitationScreen extends ConsumerStatefulWidget {
@@ -14,36 +13,47 @@ class MemoryInvitationScreenState
     extends ConsumerState<MemoryInvitationScreen> {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_02,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.h),
-          topRight: Radius.circular(20.h),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: double.maxFinite,
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              appTheme.deep_purple_A100.withAlpha(77),
+              appTheme.gray_900_02,
+            ],
+          ),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20.h),
+            topRight: Radius.circular(20.h),
+          ),
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(height: 12.h),
-          // Drag handle indicator
-          Container(
-            width: 40.h,
-            height: 4.h,
-            decoration: BoxDecoration(
-              color: appTheme.colorFF3A3A,
-              borderRadius: BorderRadius.circular(2.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12.h),
+            // Drag handle indicator
+            Container(
+              width: 40.h,
+              height: 4.h,
+              decoration: BoxDecoration(
+                color: appTheme.colorFF3A3A,
+                borderRadius: BorderRadius.circular(2.h),
+              ),
             ),
-          ),
-          SizedBox(height: 20.h),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 20.h),
-              child: _buildContent(context),
+            SizedBox(height: 20.h),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 20.h),
+                child: _buildContent(context),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -52,15 +62,34 @@ class MemoryInvitationScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryInvitationNotifier);
+        final model = state.memoryInvitationModel;
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _buildInvitationHeader(context),
+            SizedBox(height: 20.h),
+            _buildMemoryIcon(),
+            SizedBox(height: 24.h),
+            _buildMemoryTitle(model?.memoryTitle ?? "Fmaily Xmas 2025"),
+            SizedBox(height: 12.h),
+            _buildInvitationMessage(model?.invitationMessage ??
+                "You've been invited to join this memory"),
+            SizedBox(height: 32.h),
+            _buildCreatorProfile(
+              model?.creatorName ?? "Jane Doe",
+              model?.creatorImage ??
+                  "https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg",
+            ),
+            SizedBox(height: 32.h),
+            _buildStatsRow(
+              model?.membersCount ?? 2,
+              model?.storiesCount ?? 0,
+              model?.status ?? "Open",
+            ),
+            SizedBox(height: 40.h),
+            _buildJoinButton(context),
             SizedBox(height: 16.h),
-            _buildInvitationDetails(context),
-            SizedBox(height: 16.h),
-            _buildActionButtons(context),
+            _buildHelperText(),
             SizedBox(height: 20.h),
           ],
         );
@@ -68,168 +97,141 @@ class MemoryInvitationScreenState
     );
   }
 
-  /// Section Widget
-  Widget _buildInvitationHeader(BuildContext context) {
+  /// Memory icon at the top
+  Widget _buildMemoryIcon() {
     return Container(
-        width: double.maxFinite,
-        margin: EdgeInsets.only(top: 38.h, left: 20.h, right: 20.h),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Container(
-              width: 72.h,
-              height: 60.h,
-              child: Stack(alignment: Alignment.bottomCenter, children: [
-                Align(
-                    alignment: Alignment.topCenter,
-                    child: Text('2',
-                        style: TextStyleHelper
-                            .instance.headline28ExtraBoldPlusJakartaSans
-                            .copyWith(height: 1.29))),
-                Text('Members',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-          Container(
-              width: 54.h,
-              height: 60.h,
-              child: Stack(alignment: Alignment.bottomCenter, children: [
-                Align(
-                    alignment: Alignment.topCenter,
-                    child: Text('0',
-                        style: TextStyleHelper
-                            .instance.headline28ExtraBoldPlusJakartaSans
-                            .copyWith(height: 1.29))),
-                Text('Stories',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-          Container(
-              width: 78.h,
-              margin: EdgeInsets.only(top: 2.h),
-              child: Column(children: [
-                Text('Open',
-                    style: TextStyleHelper
-                        .instance.headline28ExtraBoldPlusJakartaSans
-                        .copyWith(height: 1.29)),
-                Text('Status',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-        ]));
+      width: 80.h,
+      height: 80.h,
+      decoration: BoxDecoration(
+        color: appTheme.deep_purple_A100.withAlpha(51),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Icons.photo_library_rounded,
+        size: 40.h,
+        color: appTheme.deep_purple_A100,
+      ),
+    );
   }
 
-  /// Section Widget
-  Widget _buildInvitationDetails(BuildContext context) {
-    return Container(
-        width: double.maxFinite,
-        margin: EdgeInsets.only(top: 38.h, left: 20.h, right: 20.h),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Container(
-              width: 72.h,
-              height: 60.h,
-              child: Stack(alignment: Alignment.bottomCenter, children: [
-                Align(
-                    alignment: Alignment.topCenter,
-                    child: Text('2',
-                        style: TextStyleHelper
-                            .instance.headline28ExtraBoldPlusJakartaSans
-                            .copyWith(height: 1.29))),
-                Text('Members',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-          Container(
-              width: 54.h,
-              height: 60.h,
-              child: Stack(alignment: Alignment.bottomCenter, children: [
-                Align(
-                    alignment: Alignment.topCenter,
-                    child: Text('0',
-                        style: TextStyleHelper
-                            .instance.headline28ExtraBoldPlusJakartaSans
-                            .copyWith(height: 1.29))),
-                Text('Stories',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-          Container(
-              width: 78.h,
-              margin: EdgeInsets.only(top: 2.h),
-              child: Column(children: [
-                Text('Open',
-                    style: TextStyleHelper
-                        .instance.headline28ExtraBoldPlusJakartaSans
-                        .copyWith(height: 1.29)),
-                Text('Status',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-        ]));
+  /// Memory title
+  Widget _buildMemoryTitle(String title) {
+    return Text(
+      title,
+      style:
+          TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans.copyWith(
+        color: appTheme.white_A700,
+      ),
+      textAlign: TextAlign.center,
+    );
   }
 
-  /// Section Widget
-  Widget _buildActionButtons(BuildContext context) {
-    return Container(
-        width: double.maxFinite,
-        margin: EdgeInsets.only(top: 38.h, left: 20.h, right: 20.h),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Container(
-              width: 72.h,
-              height: 60.h,
-              child: Stack(alignment: Alignment.bottomCenter, children: [
-                Align(
-                    alignment: Alignment.topCenter,
-                    child: Text('2',
-                        style: TextStyleHelper
-                            .instance.headline28ExtraBoldPlusJakartaSans
-                            .copyWith(height: 1.29))),
-                Text('Members',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-          Container(
-              width: 54.h,
-              height: 60.h,
-              child: Stack(alignment: Alignment.bottomCenter, children: [
-                Align(
-                    alignment: Alignment.topCenter,
-                    child: Text('0',
-                        style: TextStyleHelper
-                            .instance.headline28ExtraBoldPlusJakartaSans
-                            .copyWith(height: 1.29))),
-                Text('Stories',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-          Container(
-              width: 78.h,
-              margin: EdgeInsets.only(top: 2.h),
-              child: Column(children: [
-                Text('Open',
-                    style: TextStyleHelper
-                        .instance.headline28ExtraBoldPlusJakartaSans
-                        .copyWith(height: 1.29)),
-                Text('Status',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300, height: 1.31)),
-              ])),
-        ]));
+  /// Invitation message
+  Widget _buildInvitationMessage(String message) {
+    return Text(
+      message,
+      style: TextStyleHelper.instance.title16RegularPlusJakartaSans.copyWith(
+        color: appTheme.blue_gray_300,
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+
+  /// Creator profile section
+  Widget _buildCreatorProfile(String name, String imageUrl) {
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 32.h,
+          backgroundImage: NetworkImage(imageUrl),
+          backgroundColor: appTheme.blue_gray_300,
+        ),
+        SizedBox(height: 12.h),
+        Text(
+          name,
+          style: TextStyleHelper.instance.title18BoldPlusJakartaSans.copyWith(
+            color: appTheme.white_A700,
+          ),
+        ),
+        SizedBox(height: 4.h),
+        Text(
+          'Creator',
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
+            color: appTheme.blue_gray_300,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Stats row (Members, Stories, Status)
+  Widget _buildStatsRow(int members, int stories, String status) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildStatItem(members.toString(), 'Members'),
+        Container(
+          width: 1.h,
+          height: 40.h,
+          color: appTheme.blue_gray_300.withAlpha(77),
+        ),
+        _buildStatItem(stories.toString(), 'Stories'),
+        Container(
+          width: 1.h,
+          height: 40.h,
+          color: appTheme.blue_gray_300.withAlpha(77),
+        ),
+        _buildStatItem(status, 'Status'),
+      ],
+    );
+  }
+
+  /// Individual stat item
+  Widget _buildStatItem(String value, String label) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
+              .copyWith(
+            color: appTheme.white_A700,
+          ),
+        ),
+        SizedBox(height: 4.h),
+        Text(
+          label,
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
+            color: appTheme.blue_gray_300,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Join Memory button
+  Widget _buildJoinButton(BuildContext context) {
+    return CustomButton(
+      text: 'Join Memory',
+      onPressed: () => onTapJoinMemory(context),
+      buttonStyle: CustomButtonStyle.fillPrimary,
+      buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+    );
+  }
+
+  /// Helper text at the bottom
+  Widget _buildHelperText() {
+    return Text(
+      "You'll be able to add your own stories",
+      style: TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
+        color: appTheme.blue_gray_300,
+      ),
+      textAlign: TextAlign.center,
+    );
   }
 
   /// Navigates to user profile when the user card is tapped
   void onTapUserProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   /// Handles joining the memory invitation
@@ -240,7 +242,7 @@ class MemoryInvitationScreenState
     // Listen for success state and navigate
     ref.listen(memoryInvitationNotifier, (previous, current) {
       if (current.isJoined ?? false) {
-        NavigatorService.pushNamed(AppRoutes.memoriesScreen);
+        NavigatorService.pushNamed(AppRoutes.appMemories);
       }
     });
   }

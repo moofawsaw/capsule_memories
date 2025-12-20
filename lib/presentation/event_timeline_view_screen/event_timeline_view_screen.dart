@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
@@ -7,6 +5,7 @@ import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/custom_story_progress.dart';
+import '../memory_members_screen/memory_members_screen.dart';
 import '../qr_code_share_screen/qr_code_share_screen.dart';
 import './widgets/timeline_detail_widget.dart';
 import 'notifier/event_timeline_view_notifier.dart';
@@ -25,29 +24,23 @@ class EventTimelineViewScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
+        appBar: _buildAppBar(context),
         body: Column(
           children: [
-            _buildAppBar(context),
+            _buildEventCard(context),
             Expanded(
               child: Column(
                 children: [
-                  _buildEventCard(context),
+                  _buildTimelineSection(context),
+                  SizedBox(height: 18.h),
                   Expanded(
                     child: Column(
                       children: [
-                        _buildTimelineSection(context),
+                        _buildStoriesSection(context),
                         SizedBox(height: 18.h),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              _buildStoriesSection(context),
-                              SizedBox(height: 18.h),
-                              Expanded(child: SizedBox()),
-                              _buildActionButtons(context),
-                              SizedBox(height: 20.h),
-                            ],
-                          ),
-                        ),
+                        Expanded(child: SizedBox()),
+                        _buildActionButtons(context),
+                        SizedBox(height: 20.h),
                       ],
                     ),
                   ),
@@ -61,7 +54,7 @@ class EventTimelineViewScreenState
   }
 
   /// Section Widget
-  Widget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return CustomAppBar(
       logoImagePath: ImageConstant.imgLogo,
       showIconButton: true,
@@ -69,8 +62,6 @@ class EventTimelineViewScreenState
       iconButtonBackgroundColor: appTheme.color3BD81E,
       actionIcons: [ImageConstant.imgIcon9, ImageConstant.imgIconGray5032x32],
       showProfileImage: true,
-      profileImagePath: ImageConstant.imgEllipse8,
-      isProfileCircular: true,
     );
   }
 
@@ -91,6 +82,9 @@ class EventTimelineViewScreenState
           },
           onIconButtonTap: () {
             onTapEventOptions(context);
+          },
+          onAvatarTap: () {
+            onTapAvatars(context);
           },
         );
       },
@@ -258,7 +252,7 @@ class EventTimelineViewScreenState
 
   /// Handles profile tap
   void onTapProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   /// Handles event options tap
@@ -278,12 +272,12 @@ class EventTimelineViewScreenState
 
   /// Navigates to hangout call
   void onTapHangoutCall(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.homeScreen);
+    NavigatorService.pushNamed(AppRoutes.appHome);
   }
 
   /// Handles story item tap
   void onTapStoryItem(BuildContext context, int index) {
-    NavigatorService.pushNamed(AppRoutes.videoCallScreen);
+    NavigatorService.pushNamed(AppRoutes.appVideoCall);
   }
 
   /// Handles view all tap
@@ -293,11 +287,21 @@ class EventTimelineViewScreenState
 
   /// Navigates to create story
   void onTapCreateStory(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.videoCallScreen);
+    NavigatorService.pushNamed(AppRoutes.appVideoCall);
   }
 
   /// Handles notification tap
   void onTapNotification(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
+  }
+
+  /// Handles avatar cluster tap - opens members bottom sheet
+  void onTapAvatars(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => MemoryMembersScreen(),
+    );
   }
 }

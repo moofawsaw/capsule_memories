@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_image_view.dart';
 import 'notifier/splash_notifier.dart';
@@ -26,7 +25,7 @@ class SplashScreenState extends ConsumerState<SplashScreen> {
       (previous, current) {
         if (current.shouldNavigate ?? false) {
           NavigatorService.pushNamedAndRemoveUntil(
-              AppRoutes.feedScreen);
+              AppRoutes.appFeed);
         }
       },
     );

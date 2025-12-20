@@ -1,7 +1,4 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_image_view.dart';
 import './widgets/following_user_item_widget.dart';
 import 'models/following_list_model.dart';
@@ -20,19 +17,6 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: CustomAppBar(
-          logoImagePath: ImageConstant.imgLogo,
-          showIconButton: true,
-          iconButtonImagePath: ImageConstant.imgFrame19,
-          iconButtonBackgroundColor: appTheme.color3BD81E,
-          actionIcons: [
-            ImageConstant.imgIconGray50,
-            ImageConstant.imgIconGray5032x32,
-          ],
-          showProfileImage: true,
-          profileImagePath: ImageConstant.imgEllipse8,
-          isProfileCircular: true,
-        ),
         body: Container(
           width: double.maxFinite,
           child: Column(
@@ -147,7 +131,7 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
 
   /// Navigates to create content screen
   void onTapCreateContent(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.postScreen);
+    NavigatorService.pushNamed(AppRoutes.appPost);
   }
 
   /// Navigates to gallery screen
@@ -157,22 +141,22 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
 
   /// Navigates to notifications screen
   void onTapNotificationIcon(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 
   /// Navigates to profile screen
   void onTapProfileAvatar(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   /// Navigates to followers screen
   void onTapFollowersTab(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.followersScreen);
+    NavigatorService.pushNamed(AppRoutes.appFollowers);
   }
 
   /// Navigates to user profile screen
   void onTapFollowingUser(BuildContext context, FollowingUserModel? user) {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   /// Handles user action (more options)

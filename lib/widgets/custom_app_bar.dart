@@ -1,15 +1,16 @@
-import 'package:flutter/material.dart';
-
 import '../core/app_export.dart';
 import '../presentation/create_memory_screen/create_memory_screen.dart';
 import '../presentation/notifications_screen/notifier/notifications_notifier.dart';
+import '../services/avatar_state_service.dart';
+import '../services/supabase_service.dart';
 import './custom_image_view.dart';
 
 /// Custom AppBar component that provides flexible layout options
 /// Supports logo display, action buttons, profile images, and custom titles
 /// Implements PreferredSizeWidget for proper AppBar integration
-/// INTERNALLY MANAGES notification count state - no need for screens to pass it
-class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
+/// INTERNALLY MANAGES notification count state and user avatar - no need for screens to pass them
+class CustomAppBar extends ConsumerStatefulWidget
+    implements PreferredSizeWidget {
   CustomAppBar({
     Key? key,
     this.logoImagePath,
@@ -18,9 +19,7 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
     this.iconButtonImagePath,
     this.iconButtonBackgroundColor,
     this.actionIcons,
-    this.profileImagePath,
     this.showProfileImage = false,
-    this.isProfileCircular = false,
     this.layoutType = CustomAppBarLayoutType.logoWithActions,
     this.customHeight,
     this.showBottomBorder = true,
@@ -48,14 +47,8 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   /// List of action icon paths
   final List<String>? actionIcons;
 
-  /// Path to the profile image
-  final String? profileImagePath;
-
   /// Whether to show profile image
   final bool showProfileImage;
-
-  /// Whether profile image should be circular
-  final bool isProfileCircular;
 
   /// Layout type for the app bar
   final CustomAppBarLayoutType layoutType;
@@ -79,27 +72,77 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final VoidCallback? onLeadingTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CustomAppBar> createState() => _CustomAppBarState();
+
+  @override
+  Size get preferredSize => Size.fromHeight(
+        (customHeight ?? 102.h) + (showBottomBorder ? 1.h : 0),
+      );
+}
+
+class _CustomAppBarState extends ConsumerState<CustomAppBar> {
+  bool _isUserAuthenticated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthenticationState();
+  }
+
+  /// Check authentication state WITHOUT loading avatar
+  /// Avatar is loaded once at app startup in main.dart
+  Future<void> _checkAuthenticationState() async {
+    if (!widget.showProfileImage) return;
+
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) {
+        setState(() => _isUserAuthenticated = false);
+        return;
+      }
+
+      final user = client.auth.currentUser;
+      if (user == null) {
+        setState(() => _isUserAuthenticated = false);
+        return;
+      }
+
+      setState(() => _isUserAuthenticated = true);
+
+      // 🔥 CACHE CHECK: Only load avatar if it's NOT already cached in global state
+      final currentAvatarState = ref.read(avatarStateProvider);
+
+      // If avatar is not loaded yet AND user is authenticated, load it ONCE
+      if (currentAvatarState.avatarUrl == null &&
+          currentAvatarState.userId == null &&
+          !currentAvatarState.isLoading) {
+        await ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
+      }
+    } catch (e) {
+      print('❌ Error checking authentication: $e');
+      setState(() => _isUserAuthenticated = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Watch notifications state to get unread count automatically
     final notificationsState = ref.watch(notificationsNotifier);
-    final unreadCount = notificationsState.notificationsModel?.notificationsList
-            ?.where((notification) => !(notification.isRead ?? false))
-            .length ??
-        0;
+    final unreadCount = notificationsState.notificationsModel?.unreadCount ?? 0;
 
     return AppBar(
-      backgroundColor: backgroundColor ?? appTheme.transparentCustom,
+      backgroundColor: widget.backgroundColor ?? appTheme.transparentCustom,
       elevation: 0,
       automaticallyImplyLeading: false,
-      toolbarHeight: customHeight ?? 102.h,
+      toolbarHeight: widget.customHeight ?? 102.h,
       title: _buildAppBarContent(context, unreadCount),
       titleSpacing: 0,
-      bottom: showBottomBorder ? _buildBottomBorder() : null,
+      bottom: widget.showBottomBorder ? _buildBottomBorder() : null,
     );
   }
 
   Widget _buildAppBarContent(BuildContext context, int unreadCount) {
-    switch (layoutType) {
+    switch (widget.layoutType) {
       case CustomAppBarLayoutType.logoWithActions:
         return _buildLogoWithActionsLayout(context, unreadCount);
       case CustomAppBarLayoutType.titleWithLeading:
@@ -117,13 +160,13 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (logoImagePath != null) ...[
+          if (widget.logoImagePath != null) ...[
             Expanded(
               flex: 44,
               child: GestureDetector(
                 onTap: () => _handleLogoTap(context),
                 child: CustomImageView(
-                  imagePath: logoImagePath!,
+                  imagePath: widget.logoImagePath!,
                   height: 26.h,
                   width: 130.h,
                   fit: BoxFit.contain,
@@ -133,110 +176,205 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
             ),
             SizedBox(width: 18.h),
           ],
-          if (showIconButton && iconButtonImagePath != null) ...[
-            Container(
-              width: 46.h,
-              height: 46.h,
-              decoration: BoxDecoration(
-                color: iconButtonBackgroundColor ?? Color(0x3BD81E29),
-                borderRadius: BorderRadius.circular(22.h),
-              ),
-              child: IconButton(
-                onPressed: () => _handlePlusButtonTap(context),
-                padding: EdgeInsets.all(6.h),
-                icon: CustomImageView(
-                  imagePath: iconButtonImagePath!,
-                  width: 34.h,
-                  height: 34.h,
+          // Only show action buttons and icons if user is authenticated
+          if (_isUserAuthenticated) ...[
+            if (widget.showIconButton &&
+                widget.iconButtonImagePath != null) ...[
+              Container(
+                width: 46.h,
+                height: 46.h,
+                decoration: BoxDecoration(
+                  color: widget.iconButtonBackgroundColor ?? Color(0x3BD81E29),
+                  borderRadius: BorderRadius.circular(22.h),
+                ),
+                child: IconButton(
+                  onPressed: () => _handlePlusButtonTap(context),
+                  padding: EdgeInsets.all(6.h),
+                  icon: CustomImageView(
+                    imagePath: widget.iconButtonImagePath!,
+                    width: 34.h,
+                    height: 34.h,
+                  ),
                 ),
               ),
-            ),
-            SizedBox(width: 18.h),
-          ],
-          if (actionIcons != null) ...[
-            ...actionIcons!.asMap().entries.map((entry) {
-              int index = entry.key;
-              String iconPath = entry.value;
-              bool isNotificationIcon = _isNotificationIcon(iconPath);
+              SizedBox(width: 18.h),
+            ],
+            if (widget.actionIcons != null) ...[
+              ...widget.actionIcons!.asMap().entries.map((entry) {
+                int index = entry.key;
+                String iconPath = entry.value;
+                bool isNotificationIcon = _isNotificationIcon(iconPath);
 
-              return Padding(
-                padding: EdgeInsets.only(left: index > 0 ? 6.h : 0),
-                child: GestureDetector(
-                  onTap: () => _handleActionIconTap(context, iconPath),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      CustomImageView(
-                        imagePath: iconPath,
-                        width: 32.h,
-                        height: 32.h,
-                      ),
-                      if (isNotificationIcon && unreadCount > 0)
-                        Positioned(
-                          right: -4.h,
-                          top: -4.h,
-                          child: Container(
-                            padding: EdgeInsets.all(4.h),
-                            decoration: BoxDecoration(
-                              color: appTheme.colorFF52D1,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: appTheme.gray_900_02,
-                                width: 1.5.h,
-                              ),
-                            ),
-                            constraints: BoxConstraints(
-                              minWidth: 18.h,
-                              minHeight: 18.h,
-                            ),
-                            child: Center(
-                              child: Text(
-                                unreadCount > 99
-                                    ? '99+'
-                                    : unreadCount.toString(),
-                                style: TextStyleHelper
-                                    .instance.body10BoldPlusJakartaSans
-                                    .copyWith(
-                                  color: appTheme.gray_50,
-                                  height: 1.0,
-                                  fontSize: unreadCount > 99 ? 8.h : 10.h,
+                return Padding(
+                  padding: EdgeInsets.only(left: index > 0 ? 6.h : 0),
+                  child: GestureDetector(
+                    onTap: () => _handleActionIconTap(context, iconPath),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        CustomImageView(
+                          imagePath: iconPath,
+                          width: 32.h,
+                          height: 32.h,
+                        ),
+                        if (isNotificationIcon && unreadCount > 0)
+                          Positioned(
+                            right: -4.h,
+                            top: -4.h,
+                            child: Container(
+                              padding: EdgeInsets.all(4.h),
+                              decoration: BoxDecoration(
+                                color: appTheme.colorFF52D1,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: appTheme.gray_900_02,
+                                  width: 1.5.h,
                                 ),
-                                textAlign: TextAlign.center,
+                              ),
+                              constraints: BoxConstraints(
+                                minWidth: 18.h,
+                                minHeight: 18.h,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  unreadCount > 99
+                                      ? '99+'
+                                      : unreadCount.toString(),
+                                  style: TextStyleHelper
+                                      .instance.body10BoldPlusJakartaSans
+                                      .copyWith(
+                                    color: appTheme.gray_50,
+                                    height: 1.0,
+                                    fontSize: unreadCount > 99 ? 8.h : 10.h,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ],
           ],
-          if (showProfileImage && profileImagePath != null) ...[
+          if (widget.showProfileImage) ...[
             SizedBox(width: 8.h),
-            GestureDetector(
-              onTap: () => _handleProfileTap(context),
-              child: Container(
-                width: 50.h,
-                height: 50.h,
-                decoration: isProfileCircular
-                    ? BoxDecoration(
-                        shape: BoxShape.circle,
-                      )
-                    : null,
-                child: CustomImageView(
-                  imagePath: profileImagePath!,
-                  width: 50.h,
-                  height: 50.h,
-                  radius:
-                      isProfileCircular ? BorderRadius.circular(24.h) : null,
-                ),
-              ),
-            ),
+            _buildAuthenticationWidget(context),
           ],
         ],
       ),
     );
+  }
+
+  /// Build authentication widget - shows login button or user avatar based on auth state
+  Widget _buildAuthenticationWidget(BuildContext context) {
+    // 🔥 Watch global avatar state - will automatically refresh when avatar changes
+    final avatarState = ref.watch(avatarStateProvider);
+
+    if (avatarState.isLoading) {
+      return Container(
+        width: 50.h,
+        height: 50.h,
+        decoration: BoxDecoration(
+          color: appTheme.deep_purple_A100.withAlpha(77),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: SizedBox(
+            width: 20.h,
+            height: 20.h,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.h,
+              valueColor: AlwaysStoppedAnimation<Color>(appTheme.gray_50),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (!_isUserAuthenticated) {
+      // Show login button when user is not authenticated
+      return GestureDetector(
+        onTap: () => _handleLoginButtonTap(context),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+          decoration: BoxDecoration(
+            color: appTheme.deep_purple_A100,
+            borderRadius: BorderRadius.circular(8.h),
+          ),
+          child: Text(
+            'Login',
+            style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
+          ),
+        ),
+      );
+    }
+
+    // Show user avatar when authenticated - automatically updates from global state
+    return GestureDetector(
+      onTap: () => _handleProfileTap(context),
+      child: _buildUserAvatar(avatarState),
+    );
+  }
+
+  /// Handle login button tap - navigate to login screen
+  void _handleLoginButtonTap(BuildContext context) {
+    NavigatorService.pushNamed(AppRoutes.authLogin);
+  }
+
+  /// Build user avatar widget with real data from global state
+  /// Automatically refreshes when avatar changes anywhere in the app
+  Widget _buildUserAvatar(AvatarState avatarState) {
+    return Container(
+      width: 50.h,
+      height: 50.h,
+      decoration: BoxDecoration(
+        color: appTheme.deep_purple_A100,
+        shape: BoxShape.circle,
+      ),
+      child: avatarState.isLoading
+          ? Center(
+              child: SizedBox(
+                width: 20.h,
+                height: 20.h,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.h,
+                  valueColor: AlwaysStoppedAnimation<Color>(appTheme.gray_50),
+                ),
+              ),
+            )
+          : avatarState.avatarUrl != null && avatarState.avatarUrl!.isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(25.h),
+                  child: CustomImageView(
+                    imagePath: avatarState.avatarUrl!,
+                    width: 50.h,
+                    height: 50.h,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : Center(
+                  child: Text(
+                    _getAvatarFallbackText(avatarState.userEmail),
+                    style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                        .copyWith(
+                      color: appTheme.gray_50,
+                      fontSize: 20.h,
+                    ),
+                  ),
+                ),
+    );
+  }
+
+  /// Get fallback avatar text (first letter of email)
+  String _getAvatarFallbackText(String? userEmail) {
+    if (userEmail != null && userEmail.isNotEmpty) {
+      return userEmail.substring(0, 1).toUpperCase();
+    }
+    return 'U';
   }
 
   Widget _buildTitleWithLeadingLayout() {
@@ -244,20 +382,20 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
       padding: EdgeInsets.symmetric(horizontal: 36.h, vertical: 4.h),
       child: Row(
         children: [
-          if (leadingIcon != null)
+          if (widget.leadingIcon != null)
             GestureDetector(
-              onTap: onLeadingTap,
+              onTap: widget.onLeadingTap,
               child: CustomImageView(
-                imagePath: leadingIcon!,
+                imagePath: widget.leadingIcon!,
                 width: 42.h,
                 height: 42.h,
               ),
             ),
-          if (title != null) ...[
+          if (widget.title != null) ...[
             SizedBox(width: 52.h),
             Text(
-              title!,
-              style: titleTextStyle ??
+              widget.title!,
+              style: widget.titleTextStyle ??
                   TextStyleHelper.instance.headline28ExtraBoldPlusJakartaSans
                       .copyWith(color: appTheme.gray_50, height: 1.28),
             ),
@@ -273,19 +411,19 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          if (leadingIcon != null)
+          if (widget.leadingIcon != null)
             GestureDetector(
-              onTap: onLeadingTap,
+              onTap: widget.onLeadingTap,
               child: CustomImageView(
-                imagePath: leadingIcon!,
+                imagePath: widget.leadingIcon!,
                 width: 26.h,
                 height: 26.h,
               ),
             ),
-          if (title != null)
+          if (widget.title != null)
             Text(
-              title!,
-              style: titleTextStyle ??
+              widget.title!,
+              style: widget.titleTextStyle ??
                   TextStyleHelper.instance.title18BoldPlusJakartaSans
                       .copyWith(color: appTheme.blue_A700, height: 1.28),
             ),
@@ -310,11 +448,11 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
   void _handleActionIconTap(BuildContext context, String iconPath) {
     // Check if this is a notification/bell icon
     if (_isNotificationIcon(iconPath)) {
-      NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+      NavigatorService.pushNamed(AppRoutes.appNotifications);
     }
     // Check if this is a pictures/gallery icon
     else if (_isPicturesIcon(iconPath)) {
-      NavigatorService.pushNamed(AppRoutes.memoriesScreen);
+      NavigatorService.pushNamed(AppRoutes.appMemories);
     }
   }
 
@@ -353,12 +491,12 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
 
   /// Handles profile avatar tap - always opens the user menu drawer
   void _handleProfileTap(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.menuScreen);
+    NavigatorService.pushNamed(AppRoutes.appMenu);
   }
 
   /// Handles logo tap - always navigates to feed screen
   void _handleLogoTap(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.feedScreen);
+    NavigatorService.pushNamed(AppRoutes.appFeed);
   }
 
   PreferredSizeWidget? _buildBottomBorder() {
@@ -377,11 +515,6 @@ class CustomAppBar extends ConsumerWidget implements PreferredSizeWidget {
       ),
     );
   }
-
-  @override
-  Size get preferredSize => Size.fromHeight(
-        (customHeight ?? 102.h) + (showBottomBorder ? 1.h : 0),
-      );
 }
 
 /// Layout types for the custom app bar

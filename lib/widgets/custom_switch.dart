@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../core/app_export.dart';
 
 /**
@@ -67,7 +66,7 @@ class CustomSwitch extends StatelessWidget {
       child: Switch(
         value: value,
         onChanged: isEnabled ? onChanged : null,
-        activeColor: activeColor ?? appTheme.whiteCustom,
+        activeThumbColor: activeColor ?? appTheme.whiteCustom,
         activeTrackColor:
             activeColor?.withAlpha(128) ?? appTheme.deep_purple_A100,
         inactiveTrackColor: inactiveTrackColor ?? Color(0xFFE0E0E0),

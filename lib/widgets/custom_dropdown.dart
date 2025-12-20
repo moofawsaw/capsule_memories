@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../core/app_export.dart';
 import 'custom_image_view.dart';
 
@@ -77,7 +76,7 @@ class CustomDropdown<T> extends StatelessWidget {
     return Container(
       margin: margin ?? EdgeInsets.only(top: 20.h),
       child: DropdownButtonFormField<T>(
-        value: value,
+        initialValue: value,
         items: items,
         onChanged: onChanged,
         validator: validator,

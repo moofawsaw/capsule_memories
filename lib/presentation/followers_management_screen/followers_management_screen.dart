@@ -1,9 +1,7 @@
-import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
-import 'models/followers_management_model.dart';
+import '../../widgets/custom_image_view.dart';
+import './models/followers_management_model.dart';
 import 'notifier/followers_management_notifier.dart';
 
 class FollowersManagementScreen extends ConsumerStatefulWidget {
@@ -21,7 +19,6 @@ class FollowersManagementScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(context),
         body: Container(
           width: double.maxFinite,
           padding: EdgeInsets.only(
@@ -43,61 +40,52 @@ class FollowersManagementScreenState
   }
 
   /// Section Widget
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return CustomAppBar(
-      layoutType: CustomAppBarLayoutType.logoWithActions,
-      logoImagePath: ImageConstant.imgLogo,
-      showIconButton: true,
-      iconButtonImagePath: ImageConstant.imgFrame19,
-      iconButtonBackgroundColor: appTheme.color3BD81E,
-      actionIcons: [
-        ImageConstant.imgIconGray50,
-        ImageConstant.imgIconGray5032x32,
-      ],
-      showProfileImage: true,
-      profileImagePath: ImageConstant.imgEllipse8,
-      isProfileCircular: true,
-      customHeight: 101.h,
-    );
-  }
-
-  /// Section Widget
   Widget _buildTabSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(followersManagementNotifier);
 
         return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CustomImageView(
-              imagePath: ImageConstant.imgIconDeepPurpleA10026x26,
-              height: 26.h,
-              width: 26.h,
+            Container(
               margin: EdgeInsets.only(top: 2.h),
-            ),
-            Padding(
-              padding: EdgeInsets.only(
-                left: 6.h,
-                top: 4.h,
+              child: CustomImageView(
+                imagePath: ImageConstant.imgIconDeepPurpleA10026x26,
+                height: 26.h,
+                width: 26.h,
               ),
+            ),
+            Container(
+              margin: EdgeInsets.fromLTRB(6.h, 4.h, 0, 0),
               child: Text(
                 'Followers (${state.followersManagementModel?.followersList?.length ?? 0})',
-                style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans,
+                style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans
+                    .copyWith(height: 1.3),
               ),
             ),
             Spacer(),
-            CustomButton(
-              text: 'Following (3)',
-              buttonStyle: CustomButtonStyle
-                  .fillDark, // Modified: Fixed CustomButtonStyle type
-              buttonTextStyle: CustomButtonTextStyle
-                  .bodyMedium, // Modified: Fixed CustomButtonTextStyle type
-              padding: EdgeInsets.symmetric(
-                horizontal: 14.h,
-                vertical: 10.h,
+            GestureDetector(
+              onTap: () {
+                onTapFollowing(context);
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+                decoration: BoxDecoration(
+                  color: appTheme.color41C124,
+                  border: Border.all(
+                    color: appTheme.blue_gray_900,
+                    width: 1.h,
+                  ),
+                  borderRadius: BorderRadius.circular(22.h),
+                ),
+                child: Text(
+                  'Following (3)',
+                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50, height: 1.31),
+                ),
               ),
-              onPressed: () => onTapFollowing(context),
             ),
           ],
         );
@@ -206,27 +194,27 @@ class FollowersManagementScreenState
 
   /// Navigates to create content screen
   void onTapCreateContent(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.postScreen);
+    NavigatorService.pushNamed(AppRoutes.appPost);
   }
 
   /// Navigates to notifications screen
   void onTapNotifications(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 
   /// Navigates to profile screen
   void onTapProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   /// Navigates to following screen
   void onTapFollowing(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.followingScreen);
+    NavigatorService.pushNamed(AppRoutes.appFollowing);
   }
 
   /// Navigates to follower profile
   void onTapFollower(BuildContext context, FollowerItemModel follower) {
-    NavigatorService.pushNamed(AppRoutes.profileScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
   /// Blocks the selected follower

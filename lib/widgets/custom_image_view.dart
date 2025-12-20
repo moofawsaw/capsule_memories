@@ -1,7 +1,8 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+
 import '../core/app_export.dart';
 
 extension ImageTypeExtension on String {
@@ -23,19 +24,21 @@ extension ImageTypeExtension on String {
 
 enum ImageType { svg, png, network, networkSvg, file, unknown }
 
-class CustomImageView extends StatelessWidget {
-  CustomImageView(
-      {this.imagePath,
-      this.height,
-      this.width,
-      this.color,
-      this.fit,
-      this.alignment,
-      this.onTap,
-      this.radius,
-      this.margin,
-      this.border,
-      this.placeHolder}) {
+class CustomImageView extends StatefulWidget {
+  CustomImageView({
+    Key? key,
+    this.imagePath,
+    this.height,
+    this.width,
+    this.color,
+    this.fit,
+    this.alignment,
+    this.onTap,
+    this.radius,
+    this.margin,
+    this.border,
+    this.placeHolder,
+  }) : super(key: key) {
     if (imagePath == null || imagePath!.isEmpty) {
       imagePath = ImageConstant.imgImageNotFound;
     }
@@ -65,27 +68,113 @@ class CustomImageView extends StatelessWidget {
   final BoxBorder? border;
 
   @override
+  State<CustomImageView> createState() => _CustomImageViewState();
+}
+
+class _CustomImageViewState extends State<CustomImageView>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  String? _previousImagePath;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousImagePath = widget.imagePath;
+
+    // Initialize animation controller
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutBack,
+      ),
+    );
+
+    // Only animate if this is a network image (avatar images are network images)
+    if (_isNetworkImage(widget.imagePath)) {
+      _animationController.forward();
+    } else {
+      // For non-network images, skip animation
+      _animationController.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(CustomImageView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Check if the image path ACTUALLY changed
+    if (_hasImagePathChanged(oldWidget.imagePath, widget.imagePath)) {
+      _previousImagePath = widget.imagePath;
+
+      // Only animate network images (avatars)
+      if (_isNetworkImage(widget.imagePath)) {
+        _animationController.reset();
+        _animationController.forward();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  /// Check if image path actually changed (not just rebuilt with same path)
+  bool _hasImagePathChanged(String? oldPath, String? newPath) {
+    // Handle null cases
+    if (oldPath == null && newPath == null) return false;
+    if (oldPath == null || newPath == null) return true;
+
+    // Compare paths - only return true if they're different
+    return oldPath != newPath;
+  }
+
+  /// Check if this is a network image (avatars are network images)
+  bool _isNetworkImage(String? path) {
+    if (path == null || path.isEmpty) return false;
+    return path.startsWith('http://') || path.startsWith('https://');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return alignment != null
-        ? Align(alignment: alignment!, child: _buildWidget())
+    return widget.alignment != null
+        ? Align(alignment: widget.alignment!, child: _buildWidget())
         : _buildWidget();
   }
 
   Widget _buildWidget() {
-    return Padding(
-      padding: margin ?? EdgeInsets.zero,
+    // Only wrap with animation if this is a network image
+    Widget imageContent = Padding(
+      padding: widget.margin ?? EdgeInsets.zero,
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         child: _buildCircleImage(),
       ),
     );
+
+    // Apply scale animation ONLY for network images
+    if (_isNetworkImage(widget.imagePath)) {
+      return ScaleTransition(
+        scale: _scaleAnimation,
+        child: imageContent,
+      );
+    }
+
+    return imageContent;
   }
 
   ///build the image with border radius
   _buildCircleImage() {
-    if (radius != null) {
+    if (widget.radius != null) {
       return ClipRRect(
-        borderRadius: radius ?? BorderRadius.zero,
+        borderRadius: widget.radius ?? BorderRadius.zero,
         child: _buildImageWithBorder(),
       );
     } else {
@@ -95,11 +184,11 @@ class CustomImageView extends StatelessWidget {
 
   ///build the image with border and border radius style
   _buildImageWithBorder() {
-    if (border != null) {
+    if (widget.border != null) {
       return Container(
         decoration: BoxDecoration(
-          border: border,
-          borderRadius: radius,
+          border: widget.border,
+          borderRadius: widget.radius,
         ),
         child: _buildImageView(),
       );
@@ -109,48 +198,48 @@ class CustomImageView extends StatelessWidget {
   }
 
   Widget _buildImageView() {
-    switch (imagePath!.imageType) {
+    switch (widget.imagePath!.imageType) {
       case ImageType.svg:
         return Container(
-          height: height,
-          width: width,
+          height: widget.height,
+          width: widget.width,
           child: SvgPicture.asset(
-            imagePath!,
-            height: height,
-            width: width,
-            fit: fit ?? BoxFit.contain,
-            colorFilter: this.color != null
+            widget.imagePath!,
+            height: widget.height,
+            width: widget.width,
+            fit: widget.fit ?? BoxFit.contain,
+            colorFilter: widget.color != null
                 ? ColorFilter.mode(
-                    this.color ?? appTheme.transparentCustom, BlendMode.srcIn)
+                    widget.color ?? appTheme.transparentCustom, BlendMode.srcIn)
                 : null,
           ),
         );
       case ImageType.file:
         return Image.file(
-          File(imagePath!),
-          height: height,
-          width: width,
-          fit: fit ?? BoxFit.cover,
-          color: color,
+          File(widget.imagePath!),
+          height: widget.height,
+          width: widget.width,
+          fit: widget.fit ?? BoxFit.cover,
+          color: widget.color,
         );
       case ImageType.networkSvg:
         return SvgPicture.network(
-          imagePath!,
-          height: height,
-          width: width,
-          fit: fit ?? BoxFit.contain,
-          colorFilter: this.color != null
+          widget.imagePath!,
+          height: widget.height,
+          width: widget.width,
+          fit: widget.fit ?? BoxFit.contain,
+          colorFilter: widget.color != null
               ? ColorFilter.mode(
-                  this.color ?? appTheme.transparentCustom, BlendMode.srcIn)
+                  widget.color ?? appTheme.transparentCustom, BlendMode.srcIn)
               : null,
         );
       case ImageType.network:
         return CachedNetworkImage(
-          height: height,
-          width: width,
-          fit: fit,
-          imageUrl: imagePath!,
-          color: color,
+          height: widget.height,
+          width: widget.width,
+          fit: widget.fit,
+          imageUrl: widget.imagePath!,
+          color: widget.color,
           placeholder: (context, url) => Container(
             height: 30,
             width: 30,
@@ -160,20 +249,26 @@ class CustomImageView extends StatelessWidget {
             ),
           ),
           errorWidget: (context, url, error) => Image.asset(
-            placeHolder ?? ImageConstant.imgImageNotFound,
-            height: height,
-            width: width,
-            fit: fit ?? BoxFit.cover,
+            widget.placeHolder ?? ImageConstant.imgImageNotFound,
+            height: widget.height,
+            width: widget.width,
+            fit: widget.fit ?? BoxFit.cover,
           ),
         );
       case ImageType.png:
       default:
         return Image.asset(
-          imagePath!,
-          height: height,
-          width: width,
-          fit: fit ?? BoxFit.cover,
-          color: color,
+          widget.imagePath!,
+          height: widget.height,
+          width: widget.width,
+          fit: widget.fit ?? BoxFit.cover,
+          color: widget.color,
+          errorBuilder: (context, error, stackTrace) => Image.asset(
+            widget.placeHolder ?? ImageConstant.imgImageNotFound,
+            height: widget.height,
+            width: widget.width,
+            fit: widget.fit ?? BoxFit.cover,
+          ),
         );
     }
   }

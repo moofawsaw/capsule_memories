@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_edit_text.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_edit_text.dart';
+import '../../widgets/custom_image_view.dart';
 import 'notifier/account_registration_notifier.dart';
 
 class AccountRegistrationScreen extends ConsumerStatefulWidget {
@@ -48,13 +47,18 @@ class AccountRegistrationScreenState
 
   /// Section Widget - Logo
   Widget _buildLogo(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(top: 26.h),
-      width: SizeUtils.width * 0.38,
-      child: CustomImageView(
-        imagePath: ImageConstant.imgLogo,
-        height: 26.h,
-        width: 130.h,
+    return GestureDetector(
+      onTap: () {
+        NavigatorService.pushNamed(AppRoutes.appFeed);
+      },
+      child: Container(
+        margin: EdgeInsets.only(top: 26.h),
+        width: SizeUtils.width * 0.38,
+        child: CustomImageView(
+          imagePath: ImageConstant.imgLogo,
+          height: 26.h,
+          width: 130.h,
+        ),
       ),
     );
   }
@@ -89,8 +93,8 @@ class AccountRegistrationScreenState
               );
               // Clear form fields after successful registration
               ref.read(accountRegistrationNotifier.notifier).clearForm();
-              // Navigate to login screen
-              NavigatorService.pushNamed(AppRoutes.loginScreen);
+              // Navigate to feed screen after successful signup
+              NavigatorService.pushNamed(AppRoutes.appFeed);
             }
             if (current.hasError ?? false) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -107,6 +111,23 @@ class AccountRegistrationScreenState
           margin: EdgeInsets.only(top: 52.h),
           child: Column(
             children: [
+              // Name Field
+              CustomEditText(
+                controller: state.nameController,
+                hintText: 'Name',
+                prefixIcon: ImageConstant.imgIcon,
+                keyboardType: TextInputType.name,
+                validator: (value) => ref
+                    .read(accountRegistrationNotifier.notifier)
+                    .validateName(value),
+                fillColor: appTheme.gray_900,
+                borderRadius: 8.h,
+                textStyle: TextStyleHelper
+                    .instance.title16RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+              SizedBox(height: 18.h),
+
               // Email Field
               CustomEditText(
                 controller: state.emailController,
@@ -122,6 +143,7 @@ class AccountRegistrationScreenState
                     .instance.title16RegularPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
+              SizedBox(height: 18.h),
 
               // Password Field
               CustomEditText(
@@ -144,6 +166,7 @@ class AccountRegistrationScreenState
                   left: 36.h,
                 ),
               ),
+              SizedBox(height: 18.h),
 
               // Confirm Password Field
               CustomEditText(
@@ -297,6 +320,6 @@ class AccountRegistrationScreenState
 
   /// Navigates to login screen
   void onTapSignInLink(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.loginScreen);
+    NavigatorService.pushNamed(AppRoutes.authLogin);
   }
 }

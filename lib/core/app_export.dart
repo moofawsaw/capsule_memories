@@ -1,3 +1,4 @@
+export 'package:flutter/material.dart';
 export 'utils/navigator_service.dart';
 export 'package:flutter_riverpod/flutter_riverpod.dart';
 export 'package:equatable/equatable.dart';

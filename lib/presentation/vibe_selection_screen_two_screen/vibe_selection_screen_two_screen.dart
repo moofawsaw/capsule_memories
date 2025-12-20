@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 import '../../core/app_export.dart';
 import '../../core/utils/vibe_categories.dart';

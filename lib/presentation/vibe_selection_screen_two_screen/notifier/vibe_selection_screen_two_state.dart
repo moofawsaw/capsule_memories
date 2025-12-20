@@ -6,8 +6,8 @@ class VibeSelectionScreenTwoState extends Equatable {
     this.selectedCategory,
   });
 
-  VibeSelectionScreenTwoModel? vibeSelectionScreenTwoModel;
-  String? selectedCategory;
+  final VibeSelectionScreenTwoModel? vibeSelectionScreenTwoModel;
+  final String? selectedCategory;
 
   @override
   List<Object?> get props => [

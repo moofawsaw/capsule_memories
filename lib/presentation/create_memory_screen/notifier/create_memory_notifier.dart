@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../models/create_memory_model.dart';
 import '../../../core/app_export.dart';
 
@@ -21,6 +20,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   void initialize() {
     state = state.copyWith(
       memoryNameController: TextEditingController(),
+      searchController: TextEditingController(),
       isLoading: false,
       currentStep: 1,
       shouldNavigateToInvite: false,
@@ -29,6 +29,10 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         isPublic: true,
         memoryName: null,
         selectedGroup: null,
+        searchQuery: null,
+        searchResults: [],
+        invitedUserIds: {},
+        groupMembers: [],
       ),
     );
   }
@@ -72,9 +76,45 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   }
 
   void updateSelectedGroup(String? groupValue) {
+    final groupMembers = groupValue != null
+        ? CreateMemoryModel.getGroupMembers(groupValue)
+        : <Map<String, dynamic>>[];
+
     state = state.copyWith(
       createMemoryModel: state.createMemoryModel?.copyWith(
         selectedGroup: groupValue,
+        groupMembers: groupMembers,
+      ),
+    );
+  }
+
+  void updateSearchQuery(String query) {
+    final filteredUsers = state.createMemoryModel
+            ?.copyWith(searchQuery: query)
+            .getFilteredUsers() ??
+        [];
+
+    state = state.copyWith(
+      createMemoryModel: state.createMemoryModel?.copyWith(
+        searchQuery: query,
+        searchResults: filteredUsers,
+      ),
+    );
+  }
+
+  void toggleUserInvite(String userId) {
+    final currentInvitedUsers =
+        Set<String>.from(state.createMemoryModel?.invitedUserIds ?? {});
+
+    if (currentInvitedUsers.contains(userId)) {
+      currentInvitedUsers.remove(userId);
+    } else {
+      currentInvitedUsers.add(userId);
+    }
+
+    state = state.copyWith(
+      createMemoryModel: state.createMemoryModel?.copyWith(
+        invitedUserIds: currentInvitedUsers,
       ),
     );
   }
@@ -139,6 +179,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   @override
   void dispose() {
     state.memoryNameController?.dispose();
+    state.searchController?.dispose();
     super.dispose();
   }
 }

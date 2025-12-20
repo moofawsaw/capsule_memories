@@ -1,5 +1,5 @@
 import '../../../core/app_export.dart';
-import 'contact_model.dart';
+import './contact_model.dart';
 
 /// This class is used in the [ShareStoryScreen] screen.
 // ignore_for_file: must_be_immutable
@@ -34,35 +34,36 @@ class ShareStoryModel extends Equatable {
   List<Object?> get props => [contacts, filteredContacts, searchQuery];
 
   List<ContactModel> _getInitialContacts() {
+    // Use existing ellipse images as placeholders since contact images don't exist
     return [
       ContactModel(
         name: "Sarah Smith",
-        profileImage: ImageConstant.imgContact1,
+        profileImage: ImageConstant.imgEllipse864x64,
         isSelected: false,
       ),
       ContactModel(
         name: "John Doe",
-        profileImage: ImageConstant.imgContact2,
+        profileImage: ImageConstant.imgEllipse864x64,
         isSelected: false,
       ),
       ContactModel(
         name: "Emily Johnson",
-        profileImage: ImageConstant.imgContact3,
+        profileImage: ImageConstant.imgEllipse864x64,
         isSelected: false,
       ),
       ContactModel(
         name: "Michael Brown",
-        profileImage: ImageConstant.imgContact4,
+        profileImage: ImageConstant.imgEllipse864x64,
         isSelected: false,
       ),
       ContactModel(
         name: "Jessica Davis",
-        profileImage: ImageConstant.imgContact5,
+        profileImage: ImageConstant.imgEllipse864x64,
         isSelected: false,
       ),
       ContactModel(
         name: "William Garcia",
-        profileImage: ImageConstant.imgContact6,
+        profileImage: ImageConstant.imgEllipse864x64,
         isSelected: false,
       ),
     ];

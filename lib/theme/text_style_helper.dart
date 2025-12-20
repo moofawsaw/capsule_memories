@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../core/app_export.dart';
 
 /// A helper class for managing text styles in the application
@@ -170,6 +169,12 @@ class TextStyleHelper {
         fontSize: 14.fSize,
         fontWeight: FontWeight.w700,
         color: appTheme.gray_50,
+      );
+
+  TextStyle get body16BoldPlusJakartaSans => TextStyle(
+        fontSize: 16.fSize,
+        fontWeight: FontWeight.w700,
+        fontFamily: 'Plus Jakarta Sans',
       );
 
   TextStyle get body12MediumPlusJakartaSans => TextStyle(

@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/account_registration_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/supabase_service.dart';
+import '../../../services/user_profile_service.dart';
 
 part 'account_registration_state.dart';
 
@@ -21,6 +23,7 @@ class AccountRegistrationNotifier
 
   void initialize() {
     state = state.copyWith(
+      nameController: TextEditingController(),
       emailController: TextEditingController(),
       passwordController: TextEditingController(),
       confirmPasswordController: TextEditingController(),
@@ -29,6 +32,16 @@ class AccountRegistrationNotifier
       hasError: false,
       errorMessage: '',
     );
+  }
+
+  String? validateName(String? value) {
+    if (value?.isEmpty ?? true) {
+      return 'Name is required';
+    }
+    if ((value?.length ?? 0) < 2) {
+      return 'Name must be at least 2 characters long';
+    }
+    return null;
   }
 
   String? validateEmail(String? value) {
@@ -69,26 +82,60 @@ class AccountRegistrationNotifier
     );
 
     try {
-      // Simulate registration process
-      await Future.delayed(Duration(seconds: 2));
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
 
-      // Update model with form data
-      final updatedModel = state.accountRegistrationModel?.copyWith(
-        email: state.emailController?.text ?? '',
-        password: state.passwordController?.text ?? '',
-        registrationMethod: 'email',
+      final name = state.nameController?.text ?? '';
+      final email = state.emailController?.text ?? '';
+      final password = state.passwordController?.text ?? '';
+
+      // Sign up with Supabase
+      final response = await supabaseClient.auth.signUp(
+        email: email,
+        password: password,
       );
 
-      state = state.copyWith(
-        isLoading: false,
-        isSuccess: true,
-        accountRegistrationModel: updatedModel,
-      );
+      if (response.user != null) {
+        // Update user_profiles with the display name
+        await UserProfileService.instance.updateUserProfile(
+          displayName: name,
+        );
+
+        // Update model with form data
+        final updatedModel = state.accountRegistrationModel?.copyWith(
+          email: email,
+          password: password,
+          registrationMethod: 'email',
+        );
+
+        state = state.copyWith(
+          isLoading: false,
+          isSuccess: true,
+          accountRegistrationModel: updatedModel,
+        );
+      } else {
+        throw Exception('Registration failed: Unable to create user account.');
+      }
     } catch (e) {
+      String errorMessage = 'Registration failed. Please try again.';
+      if (e.toString().contains('User already registered')) {
+        errorMessage =
+            'This email is already registered. Please sign in instead.';
+      } else if (e.toString().contains('Invalid email')) {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (e.toString().contains('Password')) {
+        errorMessage = 'Password does not meet requirements.';
+      } else if (e.toString().isNotEmpty) {
+        errorMessage = e.toString().replaceAll('Exception: ', '');
+      }
+
       state = state.copyWith(
         isLoading: false,
         hasError: true,
-        errorMessage: 'Registration failed. Please try again.',
+        errorMessage: errorMessage,
       );
     }
   }
@@ -101,24 +148,33 @@ class AccountRegistrationNotifier
     );
 
     try {
-      // Simulate Google sign up process
-      await Future.delayed(Duration(seconds: 2));
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
 
-      final updatedModel = state.accountRegistrationModel?.copyWith(
-        email: 'user@gmail.com',
-        registrationMethod: 'google',
+      // Sign in with Google OAuth
+      // Note: OAuth requires proper configuration in Supabase dashboard
+      await supabaseClient.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'io.supabase.capsulememories://login-callback/',
       );
 
-      state = state.copyWith(
-        isLoading: false,
-        isSuccess: true,
-        accountRegistrationModel: updatedModel,
-      );
+      // Note: OAuth flow will redirect to browser/app, so we don't set success here
+      // The auth state change listener in main.dart will handle the success case
+      // Don't set loading to false here as the OAuth flow is async
     } catch (e) {
+      String errorMessage =
+          'Google sign up failed. Please ensure Google OAuth is configured in Supabase dashboard.';
+      if (e.toString().isNotEmpty && !e.toString().contains('Exception: ')) {
+        errorMessage = e.toString();
+      }
+
       state = state.copyWith(
         isLoading: false,
         hasError: true,
-        errorMessage: 'Google sign up failed. Please try again.',
+        errorMessage: errorMessage,
       );
     }
   }
@@ -131,29 +187,39 @@ class AccountRegistrationNotifier
     );
 
     try {
-      // Simulate Facebook sign up process
-      await Future.delayed(Duration(seconds: 2));
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
 
-      final updatedModel = state.accountRegistrationModel?.copyWith(
-        email: 'user@facebook.com',
-        registrationMethod: 'facebook',
+      // Sign in with Facebook OAuth
+      // Note: OAuth requires proper configuration in Supabase dashboard
+      await supabaseClient.auth.signInWithOAuth(
+        OAuthProvider.facebook,
+        redirectTo: 'io.supabase.capsulememories://login-callback/',
       );
 
-      state = state.copyWith(
-        isLoading: false,
-        isSuccess: true,
-        accountRegistrationModel: updatedModel,
-      );
+      // Note: OAuth flow will redirect to browser/app, so we don't set success here
+      // The auth state change listener in main.dart will handle the success case
+      // Don't set loading to false here as the OAuth flow is async
     } catch (e) {
+      String errorMessage =
+          'Facebook sign up failed. Please ensure Facebook OAuth is configured in Supabase dashboard.';
+      if (e.toString().isNotEmpty && !e.toString().contains('Exception: ')) {
+        errorMessage = e.toString();
+      }
+
       state = state.copyWith(
         isLoading: false,
         hasError: true,
-        errorMessage: 'Facebook sign up failed. Please try again.',
+        errorMessage: errorMessage,
       );
     }
   }
 
   void clearForm() {
+    state.nameController?.clear();
     state.emailController?.clear();
     state.passwordController?.clear();
     state.confirmPasswordController?.clear();
@@ -167,6 +233,7 @@ class AccountRegistrationNotifier
 
   @override
   void dispose() {
+    state.nameController?.dispose();
     state.emailController?.dispose();
     state.passwordController?.dispose();
     state.confirmPasswordController?.dispose();

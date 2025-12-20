@@ -1,7 +1,5 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
+import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_public_memories.dart';
@@ -19,12 +17,25 @@ class MemoryFeedDashboardScreen extends ConsumerStatefulWidget {
 
 class _MemoryFeedDashboardScreenState
     extends ConsumerState<MemoryFeedDashboardScreen> {
+  bool _isAuthenticated = false;
+
   @override
   void initState() {
     super.initState();
+    _checkAuthState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(memoryFeedDashboardNotifier.notifier).initialize();
     });
+  }
+
+  Future<void> _checkAuthState() async {
+    final client = SupabaseService.instance.client;
+    if (client != null) {
+      final session = client.auth.currentSession;
+      setState(() {
+        _isAuthenticated = session != null;
+      });
+    }
   }
 
   @override
@@ -34,7 +45,6 @@ class _MemoryFeedDashboardScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(),
         body: Container(
           width: double.maxFinite,
           child: SingleChildScrollView(
@@ -46,8 +56,9 @@ class _MemoryFeedDashboardScreenState
               child: Column(
                 children: [
                   SizedBox(height: 20.h),
-                  _buildCreateMemoryButton(context),
-                  SizedBox(height: 22.h),
+                  if (_isAuthenticated) _buildCreateMemoryButton(context),
+                  if (_isAuthenticated) SizedBox(height: 22.h),
+                  if (!_isAuthenticated) SizedBox(height: 2.h),
                   _buildHappeningNowSection(context),
                   _buildPublicMemoriesSection(context),
                   _buildTrendingStoriesSection(context),
@@ -58,22 +69,6 @@ class _MemoryFeedDashboardScreenState
           ),
         ),
       ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    return CustomAppBar(
-      logoImagePath: ImageConstant.imgLogo,
-      showIconButton: true,
-      iconButtonImagePath: ImageConstant.imgFrame19,
-      iconButtonBackgroundColor: appTheme.color3BD81E,
-      actionIcons: [
-        ImageConstant.imgIconGray50,
-        ImageConstant.imgIconGray5032x32,
-      ],
-      showProfileImage: true,
-      profileImagePath: ImageConstant.imgEllipse8,
-      isProfileCircular: true,
     );
   }
 
@@ -138,7 +133,7 @@ class _MemoryFeedDashboardScreenState
                   return HappeningNowStoryCard(
                     story: story,
                     onTap: () =>
-                        NavigatorService.pushNamed(AppRoutes.videoCallScreen),
+                        NavigatorService.pushNamed(AppRoutes.appVideoCall),
                   );
                 },
               ),
@@ -184,7 +179,7 @@ class _MemoryFeedDashboardScreenState
           sectionIcon: ImageConstant.imgIcon22x22,
           memories: convertedMemories,
           onMemoryTap: (memory) =>
-              NavigatorService.pushNamed(AppRoutes.reelsScreen),
+              NavigatorService.pushNamed(AppRoutes.appReels),
           margin: EdgeInsets.only(top: 30.h, left: 0),
         );
       },
@@ -230,7 +225,7 @@ class _MemoryFeedDashboardScreenState
                   return HappeningNowStoryCard(
                     story: story,
                     onTap: () =>
-                        NavigatorService.pushNamed(AppRoutes.videoCallScreen),
+                        NavigatorService.pushNamed(AppRoutes.appVideoCall),
                   );
                 },
               ),

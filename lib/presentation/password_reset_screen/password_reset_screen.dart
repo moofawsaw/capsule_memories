@@ -1,8 +1,6 @@
-import 'package:flutter/material.dart';
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_edit_text.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_edit_text.dart';
 import 'notifier/password_reset_notifier.dart';
 
 class PasswordResetScreen extends ConsumerStatefulWidget {
@@ -26,27 +24,113 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
+        appBar: AppBar(
+          backgroundColor: appTheme.gray_900_02,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: appTheme.gray_50),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            'Reset Password',
+            style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
+          ),
+        ),
         body: Form(
           key: _formKey,
           child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            padding: EdgeInsets.only(
-              top: 98.h,
-              left: 24.h,
-              right: 24.h,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildLogoSection(),
-                SizedBox(height: 24.h),
-                _buildForgotPasswordTitle(),
-                SizedBox(height: 68.h),
-                _buildFormSection(),
-                SizedBox(height: 50.h),
-                _buildSignInSection(),
-              ],
+            width: double.maxFinite,
+            padding: EdgeInsets.all(24.h),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final state = ref.watch(passwordResetNotifier);
+
+                // Listen for state changes
+                ref.listen(
+                  passwordResetNotifier,
+                  (previous, current) {
+                    if (current.isSuccess ?? false) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Reset email sent!'),
+                          backgroundColor: appTheme.colorFF52D1,
+                        ),
+                      );
+                      // Navigate back to login after 2 seconds
+                      Future.delayed(Duration(seconds: 2), () {
+                        Navigator.pop(context);
+                      });
+                    }
+                    if (current.errorMessage != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(current.errorMessage!),
+                          backgroundColor: appTheme.colorFFD81E,
+                        ),
+                      );
+                    }
+                  },
+                );
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 20.h),
+                    Text(
+                      'Forgot your password?',
+                      style: TextStyleHelper.instance.title20BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'Enter your email address and we\'ll send you a link to reset your password.',
+                      style: TextStyleHelper
+                          .instance.title16RegularPlusJakartaSans
+                          .copyWith(color: appTheme.blue_gray_300),
+                    ),
+                    SizedBox(height: 40.h),
+                    CustomEditText(
+                      controller: state.emailController,
+                      hintText: 'Email',
+                      prefixIcon: ImageConstant.imgMail,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) {
+                          return 'Email is required';
+                        }
+                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                            .hasMatch(value!)) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 28.h),
+                    CustomButton(
+                      text: 'Send Reset Link',
+                      width: double.infinity,
+                      onPressed: (state.isLoading ?? false)
+                          ? null
+                          : () => _onSendResetLink(),
+                      buttonStyle: CustomButtonStyle.fillPrimary,
+                      buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                    ),
+                    SizedBox(height: 20.h),
+                    Center(
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Text(
+                          'Back to login',
+                          style: TextStyleHelper
+                              .instance.title16RegularPlusJakartaSans
+                              .copyWith(color: appTheme.deep_purple_A100),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -54,119 +138,9 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
     );
   }
 
-  /// Section Widget - Logo
-  Widget _buildLogoSection() {
-    return Container(
-      width: 130.h,
-      child: CustomImageView(
-        imagePath: ImageConstant.imgLogo,
-        height: 26.h,
-        width: 130.h,
-      ),
-    );
-  }
-
-  /// Section Widget - Forgot Password Title
-  Widget _buildForgotPasswordTitle() {
-    return Text(
-      'forgot password?',
-      style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-          .copyWith(color: appTheme.gray_50, height: 1.31),
-    );
-  }
-
-  /// Section Widget - Form Section
-  Widget _buildFormSection() {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(passwordResetNotifier);
-
-        // Listen for state changes
-        ref.listen(
-          passwordResetNotifier,
-          (previous, current) {
-            if (current.isSuccess ?? false) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Password reset email sent successfully!'),
-                  backgroundColor: appTheme.deep_purple_A100,
-                ),
-              );
-            }
-            if (current.errorMessage != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(current.errorMessage!),
-                  backgroundColor: appTheme.redCustom,
-                ),
-              );
-            }
-          },
-        );
-
-        return Column(
-          spacing: 28.h,
-          children: [
-            // Email Input Field
-            CustomEditText(
-              controller: state.emailController,
-              hintText: 'Email',
-              prefixIcon: ImageConstant.imgMail,
-              keyboardType: TextInputType.emailAddress,
-              validator: (value) =>
-                  ref.read(passwordResetNotifier.notifier).validateEmail(value),
-              textStyle: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
-              fillColor: appTheme.gray_900,
-              borderRadius: 8.h,
-            ),
-            // Reset Password Button
-            CustomButton(
-              text: 'Reset Password',
-              width: double.infinity,
-              onPressed:
-                  state.isLoading ?? false ? null : () => onTapResetPassword(),
-              buttonStyle: CustomButtonStyle.fillPrimary,
-              buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  /// Section Widget - Sign In Section
-  Widget _buildSignInSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      spacing: 8.h,
-      children: [
-        Text(
-          'Remember your password?',
-          style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-              .copyWith(color: appTheme.gray_50),
-        ),
-        GestureDetector(
-          onTap: () => onTapSignIn(),
-          child: Text(
-            'Sign in',
-            style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                .copyWith(color: appTheme.deep_purple_A100),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Handle Reset Password Button Press
-  void onTapResetPassword() {
+  void _onSendResetLink() {
     if (_formKey.currentState?.validate() ?? false) {
-      ref.read(passwordResetNotifier.notifier).resetPassword();
+      ref.read(passwordResetNotifier.notifier).requestPasswordReset();
     }
-  }
-
-  /// Navigate to Sign In Screen
-  void onTapSignIn() {
-    NavigatorService.pushNamed(AppRoutes.loginScreen);
   }
 }

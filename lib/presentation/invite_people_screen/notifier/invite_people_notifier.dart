@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../../../core/app_export.dart';
 import '../models/invite_people_model.dart';
 
@@ -116,7 +114,7 @@ class InvitePeopleNotifier extends StateNotifier<InvitePeopleState> {
       state = state.copyWith(
         isLoading: false,
         isNavigating: true,
-        navigationRoute: AppRoutes.videoCallScreen,
+        navigationRoute: AppRoutes.appVideoCall,
       );
     });
   }

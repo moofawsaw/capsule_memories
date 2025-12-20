@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+
 import '../../core/app_export.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_fab.dart';
+import '../../widgets/custom_image_view.dart';
 import 'notifier/hangout_call_notifier.dart';
 
 class HangoutCallScreen extends ConsumerStatefulWidget {
@@ -19,8 +19,6 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
         backgroundColor: appTheme.gray_900_02,
         body: Consumer(
           builder: (context, ref, _) {
-            final state = ref.watch(hangoutCallNotifier);
-
             ref.listen(
               hangoutCallNotifier,
               (previous, current) {
@@ -103,6 +101,7 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
               ),
             ),
           ),
+          SizedBox(width: 8.h),
           _buildCloseButton(context),
         ],
       ),
@@ -152,50 +151,54 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                height: 58.h,
-                child: Stack(
-                  children: [
-                    if (participants.isNotEmpty)
-                      Positioned(
-                        left: 0,
-                        child: CustomImageView(
-                          imagePath: participants.length > 0
-                              ? participants[0]
-                              : ImageConstant.imgEllipse81,
-                          height: 40.h,
-                          width: 40.h,
-                          radius: BorderRadius.circular(20.h),
+              Flexible(
+                child: Container(
+                  height: 58.h,
+                  constraints: BoxConstraints(maxWidth: 200.h),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (participants.isNotEmpty)
+                        Positioned(
+                          left: 0,
+                          child: CustomImageView(
+                            imagePath: participants.length > 0
+                                ? participants[0]
+                                : ImageConstant.imgEllipse81,
+                            height: 40.h,
+                            width: 40.h,
+                            radius: BorderRadius.circular(20.h),
+                          ),
                         ),
-                      ),
-                    if (participants.length > 1)
-                      Positioned(
-                        left: 31.h,
-                        child: CustomImageView(
-                          imagePath: participants.length > 1
-                              ? participants[1]
-                              : ImageConstant.imgFrame3,
-                          height: 40.h,
-                          width: 40.h,
-                          radius: BorderRadius.circular(20.h),
+                      if (participants.length > 1)
+                        Positioned(
+                          left: 31.h,
+                          child: CustomImageView(
+                            imagePath: participants.length > 1
+                                ? participants[1]
+                                : ImageConstant.imgFrame3,
+                            height: 40.h,
+                            width: 40.h,
+                            radius: BorderRadius.circular(20.h),
+                          ),
                         ),
-                      ),
-                    if (participants.length > 2)
-                      Positioned(
-                        left: 62.h,
-                        child: CustomImageView(
-                          imagePath: participants.length > 2
-                              ? participants[2]
-                              : ImageConstant.imgFrame2,
-                          height: 40.h,
-                          width: 40.h,
-                          radius: BorderRadius.circular(20.h),
+                      if (participants.length > 2)
+                        Positioned(
+                          left: 62.h,
+                          child: CustomImageView(
+                            imagePath: participants.length > 2
+                                ? participants[2]
+                                : ImageConstant.imgFrame2,
+                            height: 40.h,
+                            width: 40.h,
+                            radius: BorderRadius.circular(20.h),
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              SizedBox(width: 21.h),
+              SizedBox(width: 8.h),
               if ((state.hangoutCallModel?.additionalParticipants ?? 0) > 0)
                 Container(
                   width: 38.h,

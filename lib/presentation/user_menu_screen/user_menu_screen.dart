@@ -1,12 +1,10 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
+import '../../services/avatar_state_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_menu_item.dart';
 import '../../widgets/custom_navigation_drawer.dart';
 import '../../widgets/custom_settings_row.dart';
-import '../../widgets/custom_user_profile.dart';
 import 'notifier/user_menu_notifier.dart';
 
 class UserMenuScreen extends ConsumerStatefulWidget {
@@ -19,59 +17,153 @@ class UserMenuScreen extends ConsumerStatefulWidget {
 class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-        child: Scaffold(
-            backgroundColor: appTheme.color5B0000,
-            body: Container(
-                width: double.maxFinite,
-                child: Stack(alignment: Alignment.centerLeft, children: [
-                  Container(
-                      width: 310.h,
-                      height: double.infinity,
-                      decoration: BoxDecoration(color: appTheme.gray_900_02)),
-                  Container(
-                      width: 310.h,
-                      padding: EdgeInsets.fromLTRB(12.h, 28.h, 12.h, 16.h),
-                      decoration: BoxDecoration(color: appTheme.color5B0000),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildProfileSection(context),
-                            SizedBox(height: 30.h),
-                            _buildNavigationMenu(context),
-                            SizedBox(height: 26.h),
-                            _buildDivider(context),
-                            SizedBox(height: 20.h),
-                            _buildDarkModeSection(context),
-                            SizedBox(height: 22.h),
-                            _buildBottomDivider(context),
-                            Spacer(),
-                            _buildActionButtons(context),
-                            SizedBox(height: 16.h),
-                            _buildSignOutSection(context),
-                          ])),
-                ]))));
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: 310.h,
+            height: double.infinity,
+            decoration: BoxDecoration(color: appTheme.color5B0000),
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                Container(
+                  width: 310.h,
+                  height: double.infinity,
+                  decoration: BoxDecoration(color: appTheme.gray_900_02),
+                ),
+                Container(
+                  width: 310.h,
+                  padding: EdgeInsets.fromLTRB(12.h, 28.h, 12.h, 16.h),
+                  decoration: BoxDecoration(color: appTheme.color5B0000),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildProfileSection(context),
+                      SizedBox(height: 30.h),
+                      _buildNavigationMenu(context),
+                      SizedBox(height: 26.h),
+                      _buildDivider(context),
+                      SizedBox(height: 20.h),
+                      _buildDarkModeSection(context),
+                      SizedBox(height: 22.h),
+                      _buildBottomDivider(context),
+                      Spacer(),
+                      _buildActionButtons(context),
+                      SizedBox(height: 16.h),
+                      _buildSignOutSection(context),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
-  /// Profile section with user info and close button
+  /// Profile section with authenticated user info and close button
   Widget _buildProfileSection(BuildContext context) {
-    return Padding(
-        padding: EdgeInsets.only(top: 2.h),
-        child: Row(children: [
-          Expanded(
-              flex: 7,
-              child: CustomUserProfile(
-                  userName: 'Joe Kool',
-                  userEmail: 'email112@gmail.com',
-                  avatarImagePath: ImageConstant.imgEllipse852x52,
-                  onTap: () => onTapProfile(context))),
-          GestureDetector(
-              onTap: () => onTapCloseButton(context),
-              child: CustomImageView(
-                  imagePath: ImageConstant.imgFrame19,
-                  height: 26.h,
-                  width: 26.h)),
-        ]));
+    return Consumer(builder: (context, ref, _) {
+      final state = ref.watch(userMenuNotifier);
+      final avatarState = ref.watch(avatarStateProvider);
+      final userModel = state.userMenuModel;
+
+      // Use global avatar state if available, otherwise fallback to local state
+      final avatarUrl = (avatarState.avatarUrl?.isNotEmpty ?? false)
+          ? avatarState.avatarUrl
+          : (userModel?.avatarImagePath?.isNotEmpty ?? false)
+              ? userModel?.avatarImagePath
+              : null;
+
+      // Generate avatar letter from email if no avatar URL
+      final email = userModel?.userEmail ?? '';
+      final avatarLetter = email.isNotEmpty ? email[0].toUpperCase() : 'U';
+
+      // Determine if we should show letter avatar (no valid URL)
+      final showLetterAvatar = avatarUrl == null || avatarUrl.isEmpty;
+
+      return Padding(
+          padding: EdgeInsets.only(top: 2.h),
+          child: Row(children: [
+            Expanded(
+                flex: 7,
+                child: GestureDetector(
+                  onTap: () => onTapProfile(context),
+                  child: Row(
+                    children: [
+                      // Avatar - show letter or image
+                      Container(
+                        width: 52.h,
+                        height: 52.h,
+                        decoration: BoxDecoration(
+                          color: showLetterAvatar
+                              ? appTheme.deep_purple_A100
+                              : null,
+                          shape: BoxShape.circle,
+                          image: !showLetterAvatar
+                              ? DecorationImage(
+                                  image: NetworkImage(avatarUrl),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                        ),
+                        child: showLetterAvatar
+                            ? Center(
+                                child: Text(
+                                  avatarLetter,
+                                  style: TextStyle(
+                                    color: appTheme.white_A700,
+                                    fontSize: 24.h,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
+                      SizedBox(width: 12.h),
+                      // User info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              userModel?.userName ?? 'User',
+                              style: TextStyle(
+                                color: appTheme.white_A700,
+                                fontSize: 16.h,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 4.h),
+                            Text(
+                              userModel?.userEmail ?? '',
+                              style: TextStyle(
+                                color: appTheme.gray_50,
+                                fontSize: 14.h,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+            GestureDetector(
+                onTap: () => onTapCloseButton(context),
+                child: CustomImageView(
+                    imagePath: ImageConstant.imgFrame19,
+                    height: 26.h,
+                    width: 26.h)),
+          ]));
+    });
   }
 
   /// Main navigation menu items
@@ -170,32 +262,32 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
 
   /// Navigates to user profile screen
   void onTapProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.profileTwoScreen);
+    NavigatorService.pushNamed(AppRoutes.appProfileTwo);
   }
 
   /// Navigates to memories dashboard
   void onTapMemories(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.memoriesScreen);
+    NavigatorService.pushNamed(AppRoutes.appMemories);
   }
 
   /// Navigates to groups management
   void onTapGroups(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.groupsScreen);
+    NavigatorService.pushNamed(AppRoutes.appGroups);
   }
 
   /// Navigates to friends management
   void onTapFriends(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.friendsScreen);
+    NavigatorService.pushNamed(AppRoutes.appFriends);
   }
 
   /// Navigates to following list
   void onTapFollowing(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.followingScreen);
+    NavigatorService.pushNamed(AppRoutes.appFollowing);
   }
 
   /// Navigates to notification settings
   void onTapSettings(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.settingsScreen);
+    NavigatorService.pushNamed(AppRoutes.appSettings);
   }
 
   /// Closes the menu drawer
@@ -205,17 +297,17 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
 
   /// Handles share app functionality
   void onTapShareApp(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.downloadScreen);
+    NavigatorService.pushNamed(AppRoutes.appBsDownload);
   }
 
   /// Navigates to feature request screen
   void onTapSuggestFeature(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.feedbackScreen);
+    NavigatorService.pushNamed(AppRoutes.appFeedback);
   }
 
-  /// Handles sign out functionality
-  void onTapSignOut(BuildContext context) {
-    ref.read(userMenuNotifier.notifier).signOut();
-    NavigatorService.pushNamedAndRemoveUntil(AppRoutes.loginScreen);
+  /// Handles sign out functionality with database integration
+  void onTapSignOut(BuildContext context) async {
+    await ref.read(userMenuNotifier.notifier).signOut();
+    NavigatorService.pushNamedAndRemoveUntil(AppRoutes.authLogin);
   }
 }

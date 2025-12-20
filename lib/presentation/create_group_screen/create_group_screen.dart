@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
@@ -18,46 +16,49 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_02,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.h),
-          topRight: Radius.circular(20.h),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(height: 12.h),
-          // Drag handle indicator
-          Container(
-            width: 48.h,
-            height: 5.h,
-            decoration: BoxDecoration(
-              color: appTheme.colorFF3A3A,
-              borderRadius: BorderRadius.circular(2.5),
-            ),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: double.maxFinite,
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_02,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20.h),
+            topRight: Radius.circular(20.h),
           ),
-          SizedBox(height: 20.h),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 20.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  SizedBox(height: 24.h),
-                  _buildFriendsList(context),
-                  SizedBox(height: 24.h),
-                  _buildActionButtons(context),
-                  SizedBox(height: 20.h),
-                ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 12.h),
+            // Drag handle indicator
+            Container(
+              width: 48.h,
+              height: 5.h,
+              decoration: BoxDecoration(
+                color: appTheme.colorFF3A3A,
+                borderRadius: BorderRadius.circular(2.5),
               ),
             ),
-          ),
-        ],
+            SizedBox(height: 20.h),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 20.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context),
+                    SizedBox(height: 24.h),
+                    _buildFriendsList(context),
+                    SizedBox(height: 24.h),
+                    _buildActionButtons(context),
+                    SizedBox(height: 20.h),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -127,7 +128,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text('Group created successfully!'),
               backgroundColor: appTheme.colorFF52D1));
-          NavigatorService.pushNamed(AppRoutes.homeScreen);
+          NavigatorService.pushNamed(AppRoutes.appHome);
         }
       });
 
@@ -157,7 +158,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
   /// Navigates back to the previous screen
   void onTapCancel(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.homeScreen);
+    NavigatorService.pushNamed(AppRoutes.appHome);
   }
 
   /// Creates the group after validation

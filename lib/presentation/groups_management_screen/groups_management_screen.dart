@@ -1,7 +1,4 @@
-import 'package:flutter/material.dart';
-
 import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_group_card.dart';
 import '../../widgets/custom_group_invitation_card.dart';
@@ -24,19 +21,6 @@ class GroupsManagementScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: CustomAppBar(
-          logoImagePath: ImageConstant.imgLogo,
-          showIconButton: true,
-          iconButtonImagePath: ImageConstant.imgFrame19,
-          iconButtonBackgroundColor: appTheme.color3BD81E,
-          actionIcons: [
-            ImageConstant.imgIconGray50,
-            ImageConstant.imgIconGray5032x32,
-          ],
-          showProfileImage: true,
-          profileImagePath: ImageConstant.imgEllipse8,
-          isProfileCircular: true,
-        ),
         body: Container(
           width: double.maxFinite,
           height: double.maxFinite,
@@ -178,7 +162,7 @@ class GroupsManagementScreenState
 
   /// Navigates to the notifications screen
   void onTapNotificationIcon(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.notificationsScreen);
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 
   /// Navigates to create group screen

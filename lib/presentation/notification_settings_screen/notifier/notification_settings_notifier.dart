@@ -1,98 +1,92 @@
-import '../models/notification_settings_model.dart';
 import '../../../core/app_export.dart';
+import '../models/notification_settings_model.dart';
 
 part 'notification_settings_state.dart';
 
-final notificationSettingsNotifier = StateNotifierProvider.autoDispose<
+final notificationSettingsNotifier = StateNotifierProvider<
     NotificationSettingsNotifier, NotificationSettingsState>(
-  (ref) => NotificationSettingsNotifier(
-    NotificationSettingsState(
-      notificationSettingsModel: NotificationSettingsModel(),
-    ),
-  ),
+  (ref) => NotificationSettingsNotifier(NotificationSettingsState(
+    notificationSettingsModel: NotificationSettingsModel(),
+    pushNotificationsEnabled: true,
+    memoryInvitesEnabled: true,
+    memoryActivityEnabled: true,
+    memorySealedEnabled: true,
+    reactionsEnabled: true,
+    newFollowersEnabled: true,
+    friendRequestsEnabled: true,
+    groupInvitesEnabled: true,
+    privateAccountEnabled: false,
+    showLocationEnabled: true,
+    allowMemoryInvitesEnabled: true,
+    allowStoryReactionsEnabled: true,
+    allowStorySharingEnabled: true,
+  )),
 );
 
 class NotificationSettingsNotifier
     extends StateNotifier<NotificationSettingsState> {
-  NotificationSettingsNotifier(NotificationSettingsState state) : super(state) {
-    initialize();
-  }
-
-  void initialize() {
-    state = state.copyWith(
-      pushNotificationsEnabled: true,
-      memoryInvitesEnabled: true,
-      memoryActivityEnabled: true,
-      memorySealedEnabled: true,
-      reactionsEnabled: true,
-      newFollowersEnabled: true,
-      friendRequestsEnabled: true,
-      groupInvitesEnabled: true,
-      isLoading: false,
-    );
-  }
+  NotificationSettingsNotifier(NotificationSettingsState state) : super(state);
 
   void updatePushNotifications(bool value) {
+    // Master toggle: when turned off, turn off all nested toggles
+    // When turned on, turn on all nested toggles
     state = state.copyWith(
       pushNotificationsEnabled: value,
-    );
-  }
-
-  void updateMemoryInvites(bool value) {
-    state = state.copyWith(
       memoryInvitesEnabled: value,
-    );
-  }
-
-  void updateMemoryActivity(bool value) {
-    state = state.copyWith(
       memoryActivityEnabled: value,
-    );
-  }
-
-  void updateMemorySealed(bool value) {
-    state = state.copyWith(
       memorySealedEnabled: value,
-    );
-  }
-
-  void updateReactions(bool value) {
-    state = state.copyWith(
       reactionsEnabled: value,
-    );
-  }
-
-  void updateNewFollowers(bool value) {
-    state = state.copyWith(
       newFollowersEnabled: value,
-    );
-  }
-
-  void updateFriendRequests(bool value) {
-    state = state.copyWith(
       friendRequestsEnabled: value,
-    );
-  }
-
-  void updateGroupInvites(bool value) {
-    state = state.copyWith(
       groupInvitesEnabled: value,
     );
   }
 
-  void saveSettings() {
-    state = state.copyWith(
-      isLoading: true,
-    );
+  void updateMemoryInvites(bool value) {
+    state = state.copyWith(memoryInvitesEnabled: value);
+  }
 
-    // Simulate API call to save settings
-    Future.delayed(Duration(milliseconds: 1500), () {
-      if (mounted) {
-        state = state.copyWith(
-          isLoading: false,
-          isSuccess: true,
-        );
-      }
-    });
+  void updateMemoryActivity(bool value) {
+    state = state.copyWith(memoryActivityEnabled: value);
+  }
+
+  void updateMemorySealed(bool value) {
+    state = state.copyWith(memorySealedEnabled: value);
+  }
+
+  void updateReactions(bool value) {
+    state = state.copyWith(reactionsEnabled: value);
+  }
+
+  void updateNewFollowers(bool value) {
+    state = state.copyWith(newFollowersEnabled: value);
+  }
+
+  void updateFriendRequests(bool value) {
+    state = state.copyWith(friendRequestsEnabled: value);
+  }
+
+  void updateGroupInvites(bool value) {
+    state = state.copyWith(groupInvitesEnabled: value);
+  }
+
+  void updatePrivateAccount(bool value) {
+    state = state.copyWith(privateAccountEnabled: value);
+  }
+
+  void updateShowLocation(bool value) {
+    state = state.copyWith(showLocationEnabled: value);
+  }
+
+  void updateAllowMemoryInvites(bool value) {
+    state = state.copyWith(allowMemoryInvitesEnabled: value);
+  }
+
+  void updateAllowStoryReactions(bool value) {
+    state = state.copyWith(allowStoryReactionsEnabled: value);
+  }
+
+  void updateAllowStorySharing(bool value) {
+    state = state.copyWith(allowStorySharingEnabled: value);
   }
 }
