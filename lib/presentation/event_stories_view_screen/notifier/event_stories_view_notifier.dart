@@ -2,6 +2,7 @@ import '../models/event_stories_view_model.dart';
 import '../models/contributor_item_model.dart';
 import '../models/story_item_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/feed_service.dart';
 
 part 'event_stories_view_state.dart';
 
@@ -15,76 +16,71 @@ final eventStoriesViewNotifier = StateNotifierProvider.autoDispose<
 );
 
 class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
-  EventStoriesViewNotifier(EventStoriesViewState state) : super(state) {
-    initialize();
+  final FeedService _feedService = FeedService();
+
+  EventStoriesViewNotifier(EventStoriesViewState state) : super(state);
+
+  /// Initialize with memory ID from navigation arguments
+  Future<void> initialize(String? memoryId) async {
+    if (memoryId == null || memoryId.isEmpty) {
+      print('❌ ERROR: No memory ID provided to event stories view');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Memory not found',
+      );
+      return;
+    }
+
+    state = state.copyWith(isLoading: true);
+    await _loadMemoryData(memoryId);
   }
 
-  void initialize() {
-    _loadEventData();
-  }
+  /// Load memory data from database
+  Future<void> _loadMemoryData(String memoryId) async {
+    try {
+      final memoryData = await _feedService.fetchMemoryDetails(memoryId);
 
-  void _loadEventData() {
-    final contributorsList = [
-      ContributorItemModel(
-        contributorId: '1',
-        contributorName: 'Jane Doe',
-        contributorImage: ImageConstant.imgJaneDoe,
-      ),
-      ContributorItemModel(
-        contributorId: '2',
-        contributorName: 'Cassy Downs',
-        contributorImage: ImageConstant.imgCassyDowns,
-      ),
-      ContributorItemModel(
-        contributorId: '3',
-        contributorName: 'Lily Phillips',
-        contributorImage: ImageConstant.imgLilyPhillips,
-      ),
-    ];
+      if (memoryData == null) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Failed to load memory data',
+        );
+        return;
+      }
 
-    final storiesList = [
-      StoryItemModel(
-        storyId: '1',
-        storyImage: ImageConstant.imgStory1,
-        timeAgo: '2 mins ago',
-      ),
-      StoryItemModel(
-        storyId: '2',
-        storyImage: ImageConstant.imgStory2,
-        timeAgo: '2 mins ago',
-      ),
-      StoryItemModel(
-        storyId: '3',
-        storyImage: ImageConstant.imgStory3,
-        timeAgo: '2 mins ago',
-      ),
-      StoryItemModel(
-        storyId: '4',
-        storyImage: ImageConstant.imgStory4,
-        timeAgo: '3 mins ago',
-      ),
-      StoryItemModel(
-        storyId: '5',
-        storyImage: ImageConstant.imgStory5,
-        timeAgo: '3 mins ago',
-      ),
-      StoryItemModel(
-        storyId: '6',
-        storyImage: ImageConstant.imgStory6,
-        timeAgo: '3 mins ago',
-      ),
-    ];
+      final contributorsList = (memoryData['contributorsList'] as List)
+          .map((c) => ContributorItemModel(
+                contributorId: c['contributorId'] ?? '',
+                contributorName: c['contributorName'] ?? 'Unknown User',
+                contributorImage: c['contributorImage'] ?? '',
+              ))
+          .toList();
 
-    state = state.copyWith(
-      eventStoriesViewModel: state.eventStoriesViewModel?.copyWith(
-        eventTitle: 'Nixon Wedding 2025',
-        eventDate: 'Dec 4, 2025',
-        eventLocation: 'Tillsonburg, ON',
-        viewCount: '19',
-        contributorsList: contributorsList,
-        storiesList: storiesList,
-      ),
-      isLoading: false,
-    );
+      final storiesList = (memoryData['storiesList'] as List)
+          .map((s) => StoryItemModel(
+                storyId: s['storyId'] ?? '',
+                storyImage: s['storyImage'] ?? '',
+                timeAgo: s['timeAgo'] ?? '',
+              ))
+          .toList();
+
+      state = state.copyWith(
+        eventStoriesViewModel: state.eventStoriesViewModel?.copyWith(
+          eventTitle: memoryData['eventTitle'] ?? '',
+          eventDate: memoryData['eventDate'] ?? '',
+          eventLocation: memoryData['eventLocation'] ?? '',
+          viewCount: memoryData['viewCount'] ?? '0',
+          contributorsList: contributorsList,
+          storiesList: storiesList,
+        ),
+        isLoading: false,
+      );
+    } catch (e) {
+      print('❌ ERROR loading memory data: $e');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Error loading memory: ${e.toString()}',
+      );
+    }
   }
 }

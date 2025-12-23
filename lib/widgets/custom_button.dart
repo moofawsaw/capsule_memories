@@ -1,4 +1,3 @@
-
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
@@ -102,7 +101,7 @@ class CustomButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: disabled ? null : onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: style.backgroundColor ?? Color(0xFFA78BFA),
+        backgroundColor: style.backgroundColor ?? appTheme.deep_purple_A100,
         foregroundColor: textStyle.color ?? appTheme.whiteCustom,
         elevation: 0,
         shadowColor: appTheme.transparentCustom,
@@ -128,7 +127,7 @@ class CustomButton extends StatelessWidget {
       onPressed: disabled ? null : onPressed,
       style: OutlinedButton.styleFrom(
         backgroundColor: style.backgroundColor ?? appTheme.transparentCustom,
-        foregroundColor: textStyle.color ?? Color(0xFF94A3B8),
+        foregroundColor: textStyle.color ?? appTheme.blue_gray_300,
         side: style.borderSide ??
             BorderSide(
               color: appTheme.blue_gray_900,
@@ -155,7 +154,7 @@ class CustomButton extends StatelessWidget {
       onPressed: disabled ? null : onPressed,
       style: TextButton.styleFrom(
         backgroundColor: style.backgroundColor ?? appTheme.transparentCustom,
-        foregroundColor: textStyle.color ?? Color(0xFF94A3B8),
+        foregroundColor: textStyle.color ?? appTheme.blue_gray_300,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(style.borderRadius ?? 6.h),
         ),
@@ -259,6 +258,21 @@ class CustomButtonStyle {
 
   static CustomButtonStyle get fillTransparentRed => CustomButtonStyle(
         backgroundColor: appTheme.color41C124,
+        variant: CustomButtonVariant.fill,
+      );
+
+  static CustomButtonStyle get fillGray => CustomButtonStyle(
+        backgroundColor: appTheme.gray_400,
+        variant: CustomButtonVariant.fill,
+      );
+
+  static CustomButtonStyle get fillDeepPurpleA => CustomButtonStyle(
+        backgroundColor: appTheme.deep_purple_A200,
+        variant: CustomButtonVariant.fill,
+      );
+
+  static CustomButtonStyle get fillRed => CustomButtonStyle(
+        backgroundColor: appTheme.red_500,
         variant: CustomButtonVariant.fill,
       );
 

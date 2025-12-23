@@ -1,32 +1,27 @@
 part of 'memory_members_notifier.dart';
 
-class MemoryMembersState extends Equatable {
-  final MemoryMembersModel? memoryMembersModel;
-  final String? selectedMemberName;
-  final bool? isLoading;
+/// Represents the state of MemoryMembers in the application.
 
+// ignore_for_file: must_be_immutable
+class MemoryMembersState extends Equatable {
   MemoryMembersState({
     this.memoryMembersModel,
-    this.selectedMemberName,
-    this.isLoading = false,
+    this.selectedMemberId,
   });
 
+  MemoryMembersModel? memoryMembersModel;
+  String? selectedMemberId;
+
   @override
-  List<Object?> get props => [
-        memoryMembersModel,
-        selectedMemberName,
-        isLoading,
-      ];
+  List<Object?> get props => [memoryMembersModel, selectedMemberId];
 
   MemoryMembersState copyWith({
     MemoryMembersModel? memoryMembersModel,
-    String? selectedMemberName,
-    bool? isLoading,
+    String? selectedMemberId,
   }) {
     return MemoryMembersState(
       memoryMembersModel: memoryMembersModel ?? this.memoryMembersModel,
-      selectedMemberName: selectedMemberName ?? this.selectedMemberName,
-      isLoading: isLoading ?? this.isLoading,
+      selectedMemberId: selectedMemberId ?? this.selectedMemberId,
     );
   }
 }

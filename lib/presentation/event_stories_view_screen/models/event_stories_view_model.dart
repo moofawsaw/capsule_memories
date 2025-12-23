@@ -1,6 +1,6 @@
 import '../../../core/app_export.dart';
-import 'contributor_item_model.dart';
-import 'story_item_model.dart';
+import './contributor_item_model.dart';
+import './story_item_model.dart';
 
 /// This class is used in the [event_stories_view_screen] screen.
 
@@ -56,4 +56,17 @@ class EventStoriesViewModel extends Equatable {
         contributorsList,
         storiesList,
       ];
+}
+
+/// Model for passing feed context to story viewer
+class FeedStoryContext {
+  final String feedType; // 'happening_now' or 'trending'
+  final List<String> storyIds; // All story IDs in this feed
+  final String initialStoryId; // Which story was clicked
+
+  FeedStoryContext({
+    required this.feedType,
+    required this.storyIds,
+    required this.initialStoryId,
+  });
 }

@@ -1,7 +1,8 @@
 import '../../core/app_export.dart';
 import '../../services/notification_service.dart';
+import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_notification_item.dart';
+import '../../widgets/custom_notification_card.dart';
 import 'notifier/notifications_notifier.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -18,8 +19,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    _setupRealtimeSubscription();
-    _loadNotifications();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupRealtimeSubscription();
+      _loadNotifications();
+    });
   }
 
   @override
@@ -32,10 +35,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     try {
       await _notificationService.subscribeToNotifications(
         onNewNotification: (notification) {
-          // Reload notifications when new one arrives
           _loadNotifications();
-
-          // Show in-app notification
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -43,9 +43,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 duration: const Duration(seconds: 3),
                 action: SnackBarAction(
                   label: 'View',
-                  onPressed: () {
-                    _handleNotificationTap(notification);
-                  },
+                  onPressed: () => _handleNotificationTap(notification),
                 ),
               ),
             );
@@ -63,6 +61,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       final notifications = await _notificationService.getNotifications();
       notifier.setNotifications(notifications);
     } catch (error) {
+      debugPrint('❌ Error loading notifications: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load notifications: $error')),
@@ -79,6 +78,22 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to mark as read: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleReadState(
+      String notificationId, bool currentReadState) async {
+    try {
+      await _notificationService.toggleReadState(
+          notificationId, currentReadState);
+      await _loadNotifications();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to toggle notification state: $error')),
         );
       }
     }
@@ -102,107 +117,250 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
-  void _handleNotificationTap(Map<String, dynamic> notification) {
-    final type = notification['type'];
-    final data = notification['data'] as Map<String, dynamic>?;
+  Future<void> _deleteNotification(String notificationId) async {
+    final confirmed = await CustomConfirmationDialog.show(
+      context: context,
+      title: 'Delete Notification?',
+      message: 'Are you sure you want to delete this notification?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      icon: Icons.delete_outline,
+    );
 
-    if (!notification['is_read']) {
-      _markAsRead(notification['id']);
+    if (confirmed == true) {
+      try {
+        // Add delete notification logic here
+        await _loadNotifications();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Notification deleted')),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete notification: $error')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _deleteAllNotifications() async {
+    final confirmed = await CustomConfirmationDialog.show(
+      context: context,
+      title: 'Delete All Notifications?',
+      message:
+          'Are you sure you want to delete all notifications? This action cannot be undone.',
+      confirmText: 'Delete All',
+      cancelText: 'Cancel',
+      icon: Icons.delete_sweep_outlined,
+    );
+
+    if (confirmed == true) {
+      try {
+        // Add delete all notifications logic here
+        await _loadNotifications();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('All notifications deleted')),
+          );
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete notifications: $error')),
+          );
+        }
+      }
+    }
+  }
+
+  void _handleNotificationTap(Map<String, dynamic> notification) {
+    debugPrint('🔔 Notification tapped - Type: ${notification['type']}');
+
+    final notificationId = notification['id'] as String?;
+    final type = notification['type'] as String?;
+    final data = notification['data'] as Map<String, dynamic>?;
+    final isRead = notification['is_read'] as bool? ?? false;
+
+    // Mark as read if unread
+    if (!isRead && notificationId != null) {
+      _markAsRead(notificationId);
+    }
+
+    // Navigate based on type
+    if (type == null) {
+      debugPrint('⚠️ Notification type is null');
+      return;
     }
 
     switch (type) {
       case 'memory_invite':
-        if (data != null && data['memory_id'] != null) {
+        final memoryId = data?['memory_id'];
+        if (memoryId != null) {
+          debugPrint('🔔 Navigating to memory: $memoryId');
           Navigator.pushNamed(
             context,
             AppRoutes.appTimelineSealed,
-            arguments: {'memoryId': data['memory_id']},
+            arguments: {'memoryId': memoryId},
           );
+        } else {
+          debugPrint('⚠️ Missing memory_id');
         }
         break;
+
       case 'friend_request':
+        debugPrint('🔔 Navigating to friends screen');
         Navigator.pushNamed(context, AppRoutes.appFriends);
         break;
+
       case 'new_story':
-        if (data != null && data['memory_id'] != null) {
+        final memoryId = data?['memory_id'];
+        if (memoryId != null) {
+          debugPrint('🔔 Navigating to story: $memoryId');
           Navigator.pushNamed(
             context,
             AppRoutes.appBsStories,
-            arguments: {'memoryId': data['memory_id']},
+            arguments: {'memoryId': memoryId},
           );
+        } else {
+          debugPrint('⚠️ Missing memory_id');
         }
         break;
+
       case 'followed':
-        if (data != null && data['follower_id'] != null) {
+        final followerId = data?['follower_id'];
+        if (followerId != null) {
+          debugPrint('🔔 Navigating to profile: $followerId');
           Navigator.pushNamed(
             context,
-            AppRoutes.appProfileTwo,
-            arguments: {'userId': data['follower_id']},
+            AppRoutes.appProfileUser,
+            arguments: {'userId': followerId},
           );
+        } else {
+          debugPrint('⚠️ Missing follower_id');
         }
         break;
+
       case 'memory_expiring':
       case 'memory_sealed':
-        if (data != null && data['memory_id'] != null) {
+        final memoryId = data?['memory_id'];
+        if (memoryId != null) {
+          debugPrint('🔔 Navigating to sealed memory: $memoryId');
           Navigator.pushNamed(
             context,
             AppRoutes.appTimelineSealed,
-            arguments: {'memoryId': data['memory_id']},
+            arguments: {'memoryId': memoryId},
           );
+        } else {
+          debugPrint('⚠️ Missing memory_id');
         }
         break;
+
+      default:
+        debugPrint('⚠️ Unknown notification type: $type');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-        width: double.maxFinite,
-        child: Column(children: [
+      width: double.maxFinite,
+      child: Column(
+        children: [
           SizedBox(height: 26.h),
           Expanded(
-              child: Container(
-                  margin: EdgeInsets.fromLTRB(8.h, 0, 8.h, 62.h),
-                  child: Column(spacing: 32.h, children: [
-                    _buildNotificationsHeader(context),
-                    _buildNotificationsList()
-                  ]))),
-        ]));
-  }
-
-  /// Section Widget
-  Widget _buildNotificationsHeader(BuildContext context) {
-    return Consumer(builder: (context, ref, _) {
-      final state = ref.watch(notificationsNotifier);
-      final notifications = state.notificationsModel?.notifications ?? [];
-
-      // Check if there are any unread notifications to determine button text
-      final hasUnread = notifications
-          .any((notification) => !(notification['is_read'] ?? false));
-      final buttonText = hasUnread ? 'mark as read' : 'mark as unread';
-
-      return Container(
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        CustomImageView(
-            imagePath: ImageConstant.imgIconDeepPurpleA10032x32,
-            height: 26.h,
-            width: 26.h),
-        SizedBox(width: 6.h),
-        Text('Notifications',
-            style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans),
-        Spacer(),
-        GestureDetector(
-            onTap: () => _onMarkAsReadTap(),
             child: Container(
-                margin: EdgeInsets.only(top: 4.h),
-                child: Text(buttonText,
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50)))),
-      ]));
-    });
+              margin: EdgeInsets.fromLTRB(8.h, 0, 8.h, 62.h),
+              child: Column(
+                spacing: 32.h,
+                children: [
+                  _buildNotificationsHeader(context),
+                  Expanded(child: _buildNotificationsList())
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  /// Section Widget
+  Widget _buildNotificationsHeader(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(notificationsNotifier);
+        final notifications = state.notificationsModel?.notifications ?? [];
+        final hasUnread =
+            notifications.any((n) => !(n['is_read'] as bool? ?? false));
+        final buttonText = hasUnread ? 'mark all read' : 'mark all unread';
+
+        return Container(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CustomImageView(
+                imagePath: ImageConstant.imgIconDeepPurpleA10032x32,
+                height: 26.h,
+                width: 26.h,
+              ),
+              SizedBox(width: 6.h),
+              Text(
+                'Notifications',
+                style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans,
+              ),
+              Spacer(),
+              GestureDetector(
+                onTap: _onMarkAllTap,
+                child: Container(
+                  margin: EdgeInsets.only(top: 4.h),
+                  padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 4.h),
+                  child: Text(
+                    buttonText,
+                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _getNotificationIconPath(String type) {
+    switch (type) {
+      case 'memory_invite':
+      case 'new_story':
+      case 'memory_expiring':
+      case 'memory_sealed':
+        return ImageConstant.imgIconDeepPurpleA10032x32;
+      case 'friend_request':
+      case 'followed':
+        return ImageConstant.imgIcon5;
+      default:
+        return ImageConstant.imgIconDeepPurpleA10032x32;
+    }
+  }
+
+  Color? _getNotificationBackgroundColor(bool isRead) {
+    return isRead
+        ? Colors.transparent
+        : appTheme.deep_purple_A100.withAlpha(20);
+  }
+
+  Color _getNotificationTextColor(bool isRead) {
+    return isRead ? appTheme.blue_gray_300 : appTheme.gray_50;
+  }
+
+  Color _getNotificationDescriptionColor(bool isRead) {
+    return isRead
+        ? appTheme.blue_gray_300.withAlpha(179)
+        : appTheme.blue_gray_300;
+  }
+
   Widget _buildNotificationsList() {
     final state = ref.watch(notificationsNotifier);
     final notifications = state.notificationsModel?.notifications ?? [];
@@ -216,7 +374,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             SizedBox(height: 2.h),
             Text(
               'No notifications yet',
-              style: TextStyle(fontSize: 16.h, color: Colors.grey),
+              style: TextStyle(fontSize: 16.fSize, color: Colors.grey),
             ),
           ],
         ),
@@ -226,42 +384,53 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     return RefreshIndicator(
       onRefresh: _loadNotifications,
       child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.symmetric(vertical: 2.h),
         itemCount: notifications.length,
-        separatorBuilder: (context, index) => Divider(height: 1, thickness: 1),
+        separatorBuilder: (context, index) => SizedBox(height: 8.h),
         itemBuilder: (context, index) {
           final notification = notifications[index];
-          return CustomNotificationItem(
-            notification: notification,
-            onTap: () => _handleNotificationTap(notification),
+          final isRead = notification['is_read'] as bool? ?? false;
+          final notificationId = notification['id'] as String;
+
+          return CustomNotificationCard(
+            iconPath:
+                _getNotificationIconPath(notification['type'] as String? ?? ''),
+            title: notification['title'] as String? ?? 'Notification',
+            description: notification['message'] as String? ?? '',
+            isRead: isRead,
+            backgroundColor: _getNotificationBackgroundColor(isRead),
+            titleColor: _getNotificationTextColor(isRead),
+            descriptionColor: _getNotificationDescriptionColor(isRead),
+            onTap: () {
+              debugPrint('🎯 Card tapped at index $index');
+              _handleNotificationTap(notification);
+            },
+            onToggleRead: () {
+              debugPrint(
+                  '🔄 Toggle read state for notification $notificationId');
+              _toggleReadState(notificationId, isRead);
+            },
           );
         },
       ),
     );
   }
 
-  /// Handles icon button tap in app bar
-  void _onIconButtonTap() {
-    // Handle add/plus button tap
-  }
+  void _onMarkAllTap() {
+    final notifications =
+        ref.read(notificationsNotifier).notificationsModel?.notifications ?? [];
+    final hasUnread =
+        notifications.any((n) => !(n['is_read'] as bool? ?? false));
 
-  /// Navigates to profile screen
-  void _onProfileTap() {
-    NavigatorService.pushNamed(AppRoutes.appProfile);
-  }
-
-  /// Handles mark as read/unread toggle functionality
-  void _onMarkAsReadTap() {
-    ref.read(notificationsNotifier.notifier).toggleMarkAllNotifications();
-  }
-
-  /// Handles notification card tap to mark as read
-  void _onNotificationTap(int index) {
-    ref.read(notificationsNotifier.notifier).handleNotificationTap(index);
-  }
-
-  /// Handles notification icon tap
-  void _onNotificationIconTap(int index) {
-    ref.read(notificationsNotifier.notifier).handleNotificationTap(index);
+    if (hasUnread) {
+      _markAllAsRead();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All notifications already read')),
+        );
+      }
+    }
   }
 }

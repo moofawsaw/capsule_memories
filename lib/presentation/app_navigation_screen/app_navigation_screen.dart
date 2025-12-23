@@ -112,7 +112,7 @@ class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
                         context,
                         screenTitle: "Screen/Profile/Profile",
                         onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.appProfileTwo),
+                            context, AppRoutes.appProfileUser),
                       ),
                       _buildScreenTitle(
                         context,

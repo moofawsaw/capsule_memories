@@ -1,9 +1,3 @@
-android/app/build.gradle 
-
-(AAB Bounce code Dec 18)
-|||||Working
-
-
 plugins {
     id "com.android.application"
     id "kotlin-android"
@@ -53,7 +47,9 @@ signingConfigs {
         release {
             minifyEnabled false
             shrinkResources false
-            signingConfig signingConfigs.release
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

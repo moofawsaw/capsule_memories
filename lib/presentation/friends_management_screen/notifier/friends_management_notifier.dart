@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/friends_management_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/friends_service.dart';
 
 part 'friends_management_state.dart';
 
@@ -15,69 +16,94 @@ final friendsManagementNotifier = StateNotifierProvider.autoDispose<
 );
 
 class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
+  final FriendsService _friendsService = FriendsService();
+
   FriendsManagementNotifier(FriendsManagementState state) : super(state) {
     initialize();
   }
 
-  void initialize() {
+  Future<void> initialize() async {
     state = state.copyWith(
       searchController: TextEditingController(),
-      isLoading: false,
-      friendsManagementModel: FriendsManagementModel(
-        friendsList: _generateFriendsList(),
-        sentRequestsList: _generateSentRequestsList(),
-        incomingRequestsList: _generateIncomingRequestsList(),
-      ),
+      isLoading: true,
     );
+
+    await _fetchAllFriendsData();
+
+    state = state.copyWith(isLoading: false);
   }
 
-  List<FriendModel> _generateFriendsList() {
-    return [
-      FriendModel(
-        id: '1',
-        profileImagePath: ImageConstant.imgFrame,
-        userName: 'Justine Black',
-      ),
-      FriendModel(
-        id: '2',
-        profileImagePath: ImageConstant.imgFrameBlueGray90001,
-        userName: 'Marcus Green',
-      ),
-    ];
+  Future<void> _fetchAllFriendsData() async {
+    try {
+      // Fetch friends, sent requests, and incoming requests concurrently
+      final results = await Future.wait([
+        _friendsService.getUserFriends(),
+        _friendsService.getSentFriendRequests(),
+        _friendsService.getIncomingFriendRequests(),
+      ]);
+
+      final friendsData = results[0];
+      final sentRequestsData = results[1];
+      final incomingRequestsData = results[2];
+
+      state = state.copyWith(
+        friendsManagementModel: FriendsManagementModel(
+          friendsList: _transformFriendsData(friendsData),
+          sentRequestsList: _transformSentRequestsData(sentRequestsData),
+          incomingRequestsList:
+              _transformIncomingRequestsData(incomingRequestsData),
+        ),
+      );
+
+      _filterFriends(state.searchQuery ?? '');
+    } catch (e) {
+      debugPrint('Error fetching friends data: $e');
+      state = state.copyWith(
+        errorMessage: 'Failed to load friends data',
+        isLoading: false,
+      );
+    }
   }
 
-  List<SentRequestModel> _generateSentRequestsList() {
-    return [
-      SentRequestModel(
-        id: '1',
-        profileImagePath: ImageConstant.imgFrame48x48,
-        userName: 'Sofia White',
-        status: 'Pending',
-      ),
-      SentRequestModel(
-        id: '2',
-        profileImagePath: ImageConstant.imgFrame1,
-        userName: 'Jonah White',
-        status: 'Pending',
-      ),
-    ];
+  List<FriendModel> _transformFriendsData(List<Map<String, dynamic>> data) {
+    return data.map((friend) {
+      return FriendModel(
+        id: friend['id'] ?? '',
+        friendshipId: friend['friendship_id'] ?? '',
+        userName: friend['username'] ?? '',
+        displayName: friend['display_name'] ?? friend['username'] ?? '',
+        profileImagePath: friend['avatar_url'] ?? '',
+      );
+    }).toList();
   }
 
-  List<IncomingRequestModel> _generateIncomingRequestsList() {
-    return [
-      IncomingRequestModel(
-        id: '1',
-        profileImagePath: ImageConstant.imgFrame2,
-        userName: 'Payton White',
+  List<SentRequestModel> _transformSentRequestsData(
+      List<Map<String, dynamic>> data) {
+    return data.map((request) {
+      return SentRequestModel(
+        id: request['id'] ?? '',
+        userId: request['user_id'] ?? '',
+        userName: request['username'] ?? '',
+        displayName: request['display_name'] ?? request['username'] ?? '',
+        profileImagePath: request['avatar_url'] ?? '',
+        status: request['status'] ?? 'pending',
+      );
+    }).toList();
+  }
+
+  List<IncomingRequestModel> _transformIncomingRequestsData(
+      List<Map<String, dynamic>> data) {
+    return data.map((request) {
+      return IncomingRequestModel(
+        id: request['id'] ?? '',
+        userId: request['user_id'] ?? '',
+        userName: request['username'] ?? '',
+        displayName: request['display_name'] ?? request['username'] ?? '',
+        profileImagePath: request['avatar_url'] ?? '',
+        bio: request['bio'] ?? '',
         buttonText: 'Accept',
-      ),
-      IncomingRequestModel(
-        id: '2',
-        profileImagePath: ImageConstant.imgFrame3,
-        userName: 'Bella Thorne',
-        buttonText: 'Accept',
-      ),
-    ];
+      );
+    }).toList();
   }
 
   void onSearchChanged(String query) {
@@ -97,22 +123,34 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
     } else {
       final filteredFriends = state.friendsManagementModel?.friendsList
           ?.where((friend) =>
-              friend.userName?.toLowerCase().contains(query.toLowerCase()) ??
-              false)
+              (friend.userName?.toLowerCase().contains(query.toLowerCase()) ??
+                  false) ||
+              (friend.displayName
+                      ?.toLowerCase()
+                      .contains(query.toLowerCase()) ??
+                  false))
           .toList();
 
       final filteredSentRequests = state
           .friendsManagementModel?.sentRequestsList
           ?.where((request) =>
-              request.userName?.toLowerCase().contains(query.toLowerCase()) ??
-              false)
+              (request.userName?.toLowerCase().contains(query.toLowerCase()) ??
+                  false) ||
+              (request.displayName
+                      ?.toLowerCase()
+                      .contains(query.toLowerCase()) ??
+                  false))
           .toList();
 
       final filteredIncomingRequests = state
           .friendsManagementModel?.incomingRequestsList
           ?.where((request) =>
-              request.userName?.toLowerCase().contains(query.toLowerCase()) ??
-              false)
+              (request.userName?.toLowerCase().contains(query.toLowerCase()) ??
+                  false) ||
+              (request.displayName
+                      ?.toLowerCase()
+                      .contains(query.toLowerCase()) ??
+                  false))
           .toList();
 
       state = state.copyWith(
@@ -131,51 +169,86 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
     // Show friend management options
   }
 
-  void onRemoveSentRequest(String requestId) {
-    final updatedList = state.friendsManagementModel?.sentRequestsList
-        ?.where((request) => request.id != requestId)
-        .toList();
+  Future<void> onRemoveSentRequest(String requestId) async {
+    try {
+      final success = await _friendsService.cancelSentRequest(requestId);
 
-    state = state.copyWith(
-      friendsManagementModel: state.friendsManagementModel?.copyWith(
-        sentRequestsList: updatedList,
-      ),
-    );
+      if (success) {
+        final updatedList = state.friendsManagementModel?.sentRequestsList
+            ?.where((request) => request.id != requestId)
+            .toList();
 
-    _filterFriends(state.searchQuery ?? '');
+        state = state.copyWith(
+          friendsManagementModel: state.friendsManagementModel?.copyWith(
+            sentRequestsList: updatedList,
+          ),
+        );
+
+        _filterFriends(state.searchQuery ?? '');
+      }
+    } catch (e) {
+      debugPrint('Error removing sent request: $e');
+      state = state.copyWith(errorMessage: 'Failed to cancel request');
+    }
   }
 
-  void onAcceptIncomingRequest(String requestId) {
-    final requestToAccept = state.friendsManagementModel?.incomingRequestsList
-        ?.firstWhere((request) => request.id == requestId);
+  Future<void> onAcceptIncomingRequest(String requestId) async {
+    try {
+      final success = await _friendsService.acceptFriendRequest(requestId);
 
-    if (requestToAccept != null) {
-      // Add to friends list
-      final newFriend = FriendModel(
-        id: requestToAccept.id,
-        profileImagePath: requestToAccept.profileImagePath,
-        userName: requestToAccept.userName,
-      );
+      if (success) {
+        // Refresh all friends data to get updated lists
+        await _fetchAllFriendsData();
+      }
+    } catch (e) {
+      debugPrint('Error accepting request: $e');
+      state = state.copyWith(errorMessage: 'Failed to accept request');
+    }
+  }
 
-      final updatedFriendsList = [
-        ...(state.friendsManagementModel?.friendsList ?? []),
-        newFriend,
-      ].cast<FriendModel>();
+  Future<void> onDeclineIncomingRequest(String requestId) async {
+    try {
+      final success = await _friendsService.declineFriendRequest(requestId);
 
-      // Remove from incoming requests
-      final updatedIncomingList = state
-          .friendsManagementModel?.incomingRequestsList
-          ?.where((request) => request.id != requestId)
-          .toList();
+      if (success) {
+        final updatedList = state.friendsManagementModel?.incomingRequestsList
+            ?.where((request) => request.id != requestId)
+            .toList();
 
-      state = state.copyWith(
-        friendsManagementModel: state.friendsManagementModel?.copyWith(
-          friendsList: updatedFriendsList,
-          incomingRequestsList: updatedIncomingList,
-        ),
-      );
+        state = state.copyWith(
+          friendsManagementModel: state.friendsManagementModel?.copyWith(
+            incomingRequestsList: updatedList,
+          ),
+        );
 
-      _filterFriends(state.searchQuery ?? '');
+        _filterFriends(state.searchQuery ?? '');
+      }
+    } catch (e) {
+      debugPrint('Error declining request: $e');
+      state = state.copyWith(errorMessage: 'Failed to decline request');
+    }
+  }
+
+  Future<void> onRemoveFriend(String friendshipId) async {
+    try {
+      final success = await _friendsService.removeFriend(friendshipId);
+
+      if (success) {
+        final updatedList = state.friendsManagementModel?.friendsList
+            ?.where((friend) => friend.friendshipId != friendshipId)
+            .toList();
+
+        state = state.copyWith(
+          friendsManagementModel: state.friendsManagementModel?.copyWith(
+            friendsList: updatedList,
+          ),
+        );
+
+        _filterFriends(state.searchQuery ?? '');
+      }
+    } catch (e) {
+      debugPrint('Error removing friend: $e');
+      state = state.copyWith(errorMessage: 'Failed to remove friend');
     }
   }
 

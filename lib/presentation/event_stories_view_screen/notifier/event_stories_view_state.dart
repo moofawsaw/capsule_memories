@@ -1,28 +1,33 @@
 part of 'event_stories_view_notifier.dart';
 
 class EventStoriesViewState extends Equatable {
-  final EventStoriesViewModel? eventStoriesViewModel;
-  final bool? isLoading;
-
   EventStoriesViewState({
     this.eventStoriesViewModel,
-    this.isLoading = true,
+    this.isLoading = false,
+    this.errorMessage,
   });
+
+  final EventStoriesViewModel? eventStoriesViewModel;
+  final bool isLoading;
+  final String? errorMessage;
 
   @override
   List<Object?> get props => [
         eventStoriesViewModel,
         isLoading,
+        errorMessage,
       ];
 
   EventStoriesViewState copyWith({
     EventStoriesViewModel? eventStoriesViewModel,
     bool? isLoading,
+    String? errorMessage,
   }) {
     return EventStoriesViewState(
       eventStoriesViewModel:
           eventStoriesViewModel ?? this.eventStoriesViewModel,
       isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }

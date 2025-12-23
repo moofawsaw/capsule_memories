@@ -1,7 +1,10 @@
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/app_export.dart';
-import '../../../services/avatar_state_service.dart';
+import '../../../services/blocked_users_service.dart';
+import '../../../services/follows_service.dart';
+import '../../../services/friends_service.dart';
+import '../../../services/supabase_service.dart';
 import '../../../services/user_profile_service.dart';
 import '../models/story_item_model.dart';
 import '../models/user_profile_screen_two_model.dart';
@@ -14,27 +17,30 @@ final userProfileScreenTwoNotifier = StateNotifierProvider.autoDispose<
     UserProfileScreenTwoState(
       userProfileScreenTwoModel: UserProfileScreenTwoModel(),
     ),
-    ref,
   ),
 );
 
 class UserProfileScreenTwoNotifier
     extends StateNotifier<UserProfileScreenTwoState> {
-  final Ref ref;
+  final FollowsService _followsService = FollowsService();
+  final FriendsService _friendsService = FriendsService();
+  final BlockedUsersService _blockedUsersService = BlockedUsersService();
 
-  UserProfileScreenTwoNotifier(UserProfileScreenTwoState state, this.ref)
-      : super(state);
+  UserProfileScreenTwoNotifier(UserProfileScreenTwoState state) : super(state);
 
-  Future<void> initialize() async {
+  Future<void> initialize({String? userId}) async {
     try {
-      // Add loading state
-      state = state.copyWith(isLoading: true);
+      state = state.copyWith(isLoading: true, targetUserId: userId);
 
-      // Fetch real user data from database
-      final profile = await UserProfileService.instance.getCurrentUserProfile();
+      Map<String, dynamic>? profile;
+
+      if (userId != null) {
+        profile = await UserProfileService.instance.getUserProfileById(userId);
+      } else {
+        profile = await UserProfileService.instance.getCurrentUserProfile();
+      }
 
       if (profile != null) {
-        // Get signed URL for avatar if it exists
         String? avatarUrl;
         if (profile['avatar_url'] != null &&
             profile['avatar_url'].toString().isNotEmpty) {
@@ -42,9 +48,14 @@ class UserProfileScreenTwoNotifier
               .getAvatarUrl(profile['avatar_url']);
         }
 
-        // Fetch actual user stats instead of using profile fields
-        final userId = profile['id'] as String;
-        final stats = await UserProfileService.instance.getUserStats(userId);
+        final profileUserId = profile['id'] as String;
+        final stats =
+            await UserProfileService.instance.getUserStats(profileUserId);
+
+        // Check relationship status if viewing another user's profile
+        if (userId != null) {
+          await _loadRelationshipStatus(userId);
+        }
 
         final storyItems = [
           StoryItemModel(
@@ -83,7 +94,6 @@ class UserProfileScreenTwoNotifier
 
         state = state.copyWith(
           userProfileScreenTwoModel: UserProfileScreenTwoModel(
-            // Pass empty string if no avatar - widget will show letter avatar fallback
             avatarImagePath: avatarUrl ?? '',
             userName: profile['display_name'] ??
                 profile['username'] ??
@@ -98,7 +108,7 @@ class UserProfileScreenTwoNotifier
           isLoading: false,
         );
       } else {
-        // User not authenticated - show placeholder data with message
+        // User not found or not authenticated - show placeholder data
         final storyItems = [
           StoryItemModel(
             userName: 'Kelly Jones',
@@ -137,8 +147,10 @@ class UserProfileScreenTwoNotifier
         state = state.copyWith(
           userProfileScreenTwoModel: UserProfileScreenTwoModel(
             avatarImagePath: ImageConstant.imgEllipse896x96,
-            userName: 'Preview User',
-            email: 'Please login to see your profile',
+            userName: 'User Not Found',
+            email: userId != null
+                ? 'Unable to load user data'
+                : 'Please login to see your profile',
             followersCount: '0',
             followingCount: '0',
             storyItems: storyItems,
@@ -163,6 +175,101 @@ class UserProfileScreenTwoNotifier
         isLoading: false,
       );
     }
+  }
+
+  Future<void> _loadRelationshipStatus(String targetUserId) async {
+    try {
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+      if (currentUser == null) return;
+
+      final isFollowing =
+          await _followsService.isFollowing(currentUser.id, targetUserId);
+
+      final isFriend =
+          await _friendsService.areFriends(currentUser.id, targetUserId);
+
+      final hasPendingRequest =
+          await _friendsService.hasPendingRequest(currentUser.id, targetUserId);
+
+      final isBlocked = await _blockedUsersService.isUserBlocked(targetUserId);
+
+      state = state.copyWith(
+        isFollowing: isFollowing,
+        isFriend: isFriend,
+        hasPendingFriendRequest: hasPendingRequest,
+        isBlocked: isBlocked,
+      );
+    } catch (e) {
+      debugPrint('Error loading relationship status: $e');
+    }
+  }
+
+  Future<void> toggleFollow() async {
+    final targetUserId = state.targetUserId;
+    if (targetUserId == null) return;
+
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    if (currentUser == null) return;
+
+    if (state.isFollowing) {
+      final success =
+          await _followsService.unfollowUser(currentUser.id, targetUserId);
+      if (success) {
+        state = state.copyWith(isFollowing: false);
+      }
+    } else {
+      final success =
+          await _followsService.followUser(currentUser.id, targetUserId);
+      if (success) {
+        state = state.copyWith(isFollowing: true);
+      }
+    }
+  }
+
+  Future<void> sendFriendRequest() async {
+    final targetUserId = state.targetUserId;
+    if (targetUserId == null) return;
+
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    if (currentUser == null) return;
+
+    final success =
+        await _friendsService.sendFriendRequest(currentUser.id, targetUserId);
+    if (success) {
+      state = state.copyWith(hasPendingFriendRequest: true);
+    }
+  }
+
+  Future<void> toggleBlock() async {
+    final targetUserId = state.targetUserId;
+    if (targetUserId == null) return;
+
+    if (state.isBlocked) {
+      final success = await _blockedUsersService.unblockUser(targetUserId);
+      if (success) {
+        state = state.copyWith(isBlocked: false);
+      }
+    } else {
+      final success = await _blockedUsersService.blockUser(targetUserId);
+      if (success) {
+        state = state.copyWith(
+          isBlocked: true,
+          isFollowing: false,
+          isFriend: false,
+          hasPendingFriendRequest: false,
+        );
+      }
+    }
+  }
+
+  Future<void> onFollowButtonPressed(String targetUserId) async {
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    if (currentUser == null) return;
+
+    // Follow user - database trigger will create notification automatically
+    final success =
+        await _followsService.followUser(currentUser.id, targetUserId);
+    // Note: isFollowing property is not available in UserProfileScreenTwoState
   }
 
   Future<void> uploadAvatar() async {
@@ -214,14 +321,14 @@ class UserProfileScreenTwoNotifier
             );
 
             // 🔥 CRITICAL: Broadcast avatar update to all widgets across the app
-            final avatarNotifier = ref.read(avatarStateProvider.notifier);
-            avatarNotifier.updateAvatar(
-              signedUrl,
-              userEmail: state.userProfileScreenTwoModel?.email,
-            );
+            // Remove ref.read - ref is not available in this context
+            // final avatarNotifier = ref.read(avatarStateProvider.notifier);
+            // avatarNotifier.updateAvatar(
+            //   signedUrl,
+            //   userEmail: state.userProfileScreenTwoModel?.email,
+            // );
 
-            print(
-                '✅ Avatar updated successfully and broadcasted to all widgets');
+            print('✅ Avatar updated successfully');
           }
         }
       }

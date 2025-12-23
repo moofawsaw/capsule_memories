@@ -2,8 +2,9 @@ import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_public_memories.dart';
+import '../../widgets/custom_public_memories.dart' as custom_widget;
 import '../create_memory_screen/create_memory_screen.dart';
+import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import './widgets/happening_now_story_card.dart';
 import 'notifier/memory_feed_dashboard_notifier.dart';
 
@@ -23,9 +24,6 @@ class _MemoryFeedDashboardScreenState
   void initState() {
     super.initState();
     _checkAuthState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(memoryFeedDashboardNotifier.notifier).initialize();
-    });
   }
 
   Future<void> _checkAuthState() async {
@@ -40,7 +38,7 @@ class _MemoryFeedDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(memoryFeedDashboardNotifier);
+    final state = ref.watch(memoryFeedDashboardProvider);
 
     return SafeArea(
       child: Scaffold(
@@ -96,7 +94,7 @@ class _MemoryFeedDashboardScreenState
   Widget _buildHappeningNowSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
-        final state = ref.watch(memoryFeedDashboardNotifier);
+        final state = ref.watch(memoryFeedDashboardProvider);
         final stories =
             state.memoryFeedDashboardModel?.happeningNowStories ?? [];
 
@@ -132,8 +130,22 @@ class _MemoryFeedDashboardScreenState
                   final story = stories[index];
                   return HappeningNowStoryCard(
                     story: story,
-                    onTap: () =>
-                        NavigatorService.pushNamed(AppRoutes.appVideoCall),
+                    onTap: () {
+                      // Create feed context with all story IDs from happening now feed
+                      final feedContext = FeedStoryContext(
+                        feedType: 'happening_now',
+                        storyIds: stories
+                            .map((s) => s.id ?? '')
+                            .where((id) => id.isNotEmpty)
+                            .toList(),
+                        initialStoryId: story.id ?? '',
+                      );
+
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: feedContext,
+                      );
+                    },
                   );
                 },
               ),
@@ -147,19 +159,19 @@ class _MemoryFeedDashboardScreenState
   Widget _buildPublicMemoriesSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
-        final state = ref.watch(memoryFeedDashboardNotifier);
+        final state = ref.watch(memoryFeedDashboardProvider);
         final memories = state.memoryFeedDashboardModel?.publicMemories ?? [];
 
         // Convert memory_feed_dashboard_model.CustomMemoryItem to custom_public_memories.CustomMemoryItem
         final convertedMemories = memories.map((memory) {
-          return CustomMemoryItem(
+          return custom_widget.CustomMemoryItem(
             id: memory.id,
             title: memory.title,
             date: memory.date,
             iconPath: memory.iconPath,
             profileImages: memory.profileImages,
             mediaItems: memory.mediaItems?.map((item) {
-              return CustomMediaItem(
+              return custom_widget.CustomMediaItem(
                 imagePath: item.imagePath,
                 hasPlayButton: item.hasPlayButton ?? false,
               );
@@ -174,13 +186,46 @@ class _MemoryFeedDashboardScreenState
           );
         }).toList();
 
-        return CustomPublicMemories(
+        return custom_widget.CustomPublicMemories(
           sectionTitle: 'Public Memories',
           sectionIcon: ImageConstant.imgIcon22x22,
           memories: convertedMemories,
-          onMemoryTap: (memory) =>
-              NavigatorService.pushNamed(AppRoutes.appReels),
-          margin: EdgeInsets.only(top: 30.h, left: 0),
+          onMemoryTap: (memory) {
+            // Find the original database memory data to pass to timeline
+            final originalMemory = memories.firstWhere(
+              (m) => m.id == memory.id,
+              orElse: () => memories.first,
+            );
+
+            // Convert back to Map<String, dynamic> for timeline notifier
+            final memoryData = {
+              'id': originalMemory.id,
+              'title': originalMemory.title,
+              'date': originalMemory.date,
+              'category_icon': originalMemory.iconPath,
+              'contributor_avatars': originalMemory.profileImages,
+              'media_items': originalMemory.mediaItems
+                      ?.map((item) => {
+                            'thumbnail_url': item.imagePath,
+                            'has_play_button': item.hasPlayButton ?? false,
+                          })
+                      .toList() ??
+                  [],
+              'start_date': originalMemory.startDate,
+              'start_time': originalMemory.startTime,
+              'end_date': originalMemory.endDate,
+              'end_time': originalMemory.endTime,
+              'location': originalMemory.location,
+              'distance': originalMemory.distance,
+            };
+
+            // Navigate to timeline with proper database data structure
+            NavigatorService.pushNamed(
+              AppRoutes.appTimeline,
+              arguments: memoryData,
+            );
+          },
+          margin: EdgeInsets.only(top: 30.h, left: 24.h),
         );
       },
     );
@@ -189,7 +234,7 @@ class _MemoryFeedDashboardScreenState
   Widget _buildTrendingStoriesSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
-        final state = ref.watch(memoryFeedDashboardNotifier);
+        final state = ref.watch(memoryFeedDashboardProvider);
         final stories = state.memoryFeedDashboardModel?.trendingStories ?? [];
 
         return Column(
@@ -224,8 +269,22 @@ class _MemoryFeedDashboardScreenState
                   final story = stories[index];
                   return HappeningNowStoryCard(
                     story: story,
-                    onTap: () =>
-                        NavigatorService.pushNamed(AppRoutes.appVideoCall),
+                    onTap: () {
+                      // Create feed context with all story IDs from trending feed
+                      final feedContext = FeedStoryContext(
+                        feedType: 'trending',
+                        storyIds: stories
+                            .map((s) => s.id ?? '')
+                            .where((id) => id.isNotEmpty)
+                            .toList(),
+                        initialStoryId: story.id ?? '',
+                      );
+
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: feedContext,
+                      );
+                    },
                   );
                 },
               ),

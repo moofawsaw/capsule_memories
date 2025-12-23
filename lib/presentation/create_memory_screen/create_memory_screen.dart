@@ -1,4 +1,3 @@
-
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_dropdown.dart';
@@ -315,19 +314,22 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(createMemoryNotifier);
+        final availableGroups = state.createMemoryModel?.availableGroups ?? [];
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CustomDropdown<String>(
-              items: _buildDropdownItems(),
+              items: _buildDropdownItemsFromGroups(availableGroups),
               onChanged: (value) {
                 ref
                     .read(createMemoryNotifier.notifier)
                     .updateSelectedGroup(value);
               },
               value: state.createMemoryModel?.selectedGroup,
-              placeholder: 'Select from group...',
+              placeholder: availableGroups.isEmpty
+                  ? 'No groups available'
+                  : 'Select from group...',
               leftIcon: ImageConstant.imgIconBlueGray30022x26,
               rightIcon: ImageConstant.imgIconBlueGray30022x18,
               margin: EdgeInsets.zero,
@@ -687,25 +689,18 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  /// Dropdown items builder
-  List<DropdownMenuItem<String>> _buildDropdownItems() {
-    return [
-      DropdownMenuItem(
-        value: 'family',
-        child: Text('Family'),
-      ),
-      DropdownMenuItem(
-        value: 'friends',
-        child: Text('Friends'),
-      ),
-      DropdownMenuItem(
-        value: 'work',
-        child: Text('Work'),
-      ),
-      DropdownMenuItem(
-        value: 'school',
-        child: Text('School'),
-      ),
-    ];
+  /// Dropdown items builder from real groups
+  List<DropdownMenuItem<String>> _buildDropdownItemsFromGroups(
+      List<Map<String, dynamic>> groups) {
+    if (groups.isEmpty) {
+      return [];
+    }
+
+    return groups.map((group) {
+      return DropdownMenuItem<String>(
+        value: group['id'] as String,
+        child: Text(group['name'] as String),
+      );
+    }).toList();
   }
 }

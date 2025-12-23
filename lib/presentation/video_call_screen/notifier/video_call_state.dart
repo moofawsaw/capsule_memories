@@ -23,6 +23,9 @@ class VideoCallState extends Equatable {
     this.lastEmojiReaction,
   });
 
+  // Backward compatibility getter
+  VideoCallModel? get videoCallModelObj => videoCallModel;
+
   @override
   List<Object?> get props => [
         videoCallModel,

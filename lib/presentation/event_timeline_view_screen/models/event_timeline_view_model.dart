@@ -1,6 +1,5 @@
 import '../../../core/app_export.dart';
-import '../../../widgets/custom_story_list.dart'
-    as story_list; // Modified: Added alias to resolve ambiguous import
+import '../../../widgets/custom_story_list.dart';
 import 'timeline_detail_model.dart';
 
 /// This class is used in the [event_timeline_view_screen] screen.
@@ -11,46 +10,49 @@ class EventTimelineViewModel extends Equatable {
     this.eventTitle,
     this.eventDate,
     this.isPrivate,
+    this.categoryIcon,
     this.participantImages,
-    this.storyItems,
+    this.customStoryItems,
     this.timelineDetail,
-    this.storiesCount,
+    this.memoryId,
   }) {
-    eventTitle = eventTitle ?? "Nixon Wedding 2025";
-    eventDate = eventDate ?? "Dec 4, 2025";
-    isPrivate = isPrivate ?? true;
+    eventTitle = eventTitle ?? 'Beach Day Adventure';
+    eventDate = eventDate ?? 'Dec 22';
+    isPrivate = isPrivate ?? false;
+    categoryIcon = categoryIcon ?? ImageConstant.imgFrame13;
     participantImages = participantImages ?? [];
-    storyItems = storyItems ?? [];
-    storiesCount = storiesCount ?? 6;
+    customStoryItems = customStoryItems ?? [];
+    memoryId = memoryId ?? '';
   }
 
   String? eventTitle;
   String? eventDate;
   bool? isPrivate;
+  String? categoryIcon;
   List<String>? participantImages;
-  List<story_list.CustomStoryItem>?
-      storyItems; // Modified: Used alias to resolve ambiguous import
+  List<CustomStoryItem>? customStoryItems;
   TimelineDetailModel? timelineDetail;
-  int? storiesCount;
+  String? memoryId;
 
   EventTimelineViewModel copyWith({
     String? eventTitle,
     String? eventDate,
     bool? isPrivate,
+    String? categoryIcon,
     List<String>? participantImages,
-    List<story_list.CustomStoryItem>?
-        storyItems, // Modified: Used alias to resolve ambiguous import
+    List<CustomStoryItem>? customStoryItems,
     TimelineDetailModel? timelineDetail,
-    int? storiesCount,
+    String? memoryId,
   }) {
     return EventTimelineViewModel(
       eventTitle: eventTitle ?? this.eventTitle,
       eventDate: eventDate ?? this.eventDate,
       isPrivate: isPrivate ?? this.isPrivate,
+      categoryIcon: categoryIcon ?? this.categoryIcon,
       participantImages: participantImages ?? this.participantImages,
-      storyItems: storyItems ?? this.storyItems,
+      customStoryItems: customStoryItems ?? this.customStoryItems,
       timelineDetail: timelineDetail ?? this.timelineDetail,
-      storiesCount: storiesCount ?? this.storiesCount,
+      memoryId: memoryId ?? this.memoryId,
     );
   }
 
@@ -59,9 +61,10 @@ class EventTimelineViewModel extends Equatable {
         eventTitle,
         eventDate,
         isPrivate,
+        categoryIcon,
         participantImages,
-        storyItems,
+        customStoryItems,
         timelineDetail,
-        storiesCount,
+        memoryId,
       ];
 }

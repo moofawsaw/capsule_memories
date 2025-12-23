@@ -44,16 +44,19 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             Flexible(
               child: SingleChildScrollView(
                 padding: EdgeInsets.symmetric(horizontal: 20.h),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context),
-                    SizedBox(height: 24.h),
-                    _buildFriendsList(context),
-                    SizedBox(height: 24.h),
-                    _buildActionButtons(context),
-                    SizedBox(height: 20.h),
-                  ],
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(context),
+                      SizedBox(height: 24.h),
+                      _buildFriendsList(context),
+                      SizedBox(height: 24.h),
+                      _buildActionButtons(context),
+                      SizedBox(height: 20.h),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -91,10 +94,28 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   Widget _buildFriendsList(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(createGroupNotifier);
+
+      if (state.isLoading ?? false) {
+        return Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 20.h),
+            child: CircularProgressIndicator(color: appTheme.colorFF52D1),
+          ),
+        );
+      }
+
       final filteredFriends = state.createGroupModel?.filteredFriends ?? [];
 
       if (filteredFriends.isEmpty) {
-        return SizedBox();
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: 20.h),
+          child: Text(
+            'No friends found. Add friends to create a group.',
+            style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300),
+            textAlign: TextAlign.center,
+          ),
+        );
       }
 
       return Column(
@@ -128,7 +149,12 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text('Group created successfully!'),
               backgroundColor: appTheme.colorFF52D1));
-          NavigatorService.pushNamed(AppRoutes.appHome);
+          NavigatorService.goBack();
+        } else if (current.isSuccess == false &&
+            (previous?.isLoading ?? false)) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text('Failed to create group. Please try again.'),
+              backgroundColor: Colors.red));
         }
       });
 
@@ -158,7 +184,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
   /// Navigates back to the previous screen
   void onTapCancel(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.appHome);
+    NavigatorService.goBack();
   }
 
   /// Creates the group after validation
@@ -166,13 +192,5 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     if (_formKey.currentState?.validate() ?? false) {
       ref.read(createGroupNotifier.notifier).createGroup();
     }
-  }
-
-  /// Opens QR scanner for adding friends
-  void onTapScanFriend(BuildContext context) {
-    // TODO: Implement QR scanner functionality
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('QR Scanner feature coming soon!'),
-        backgroundColor: appTheme.blue_gray_300));
   }
 }

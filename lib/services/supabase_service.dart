@@ -14,6 +14,31 @@ class SupabaseService {
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
+  // Initialize Supabase client with credentials
+  static Future<void> initialize() async {
+    try {
+      if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+        print('⚠️ Supabase credentials not configured');
+        return;
+      }
+
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+        authOptions: const FlutterAuthClientOptions(
+          authFlowType: AuthFlowType.pkce,
+          autoRefreshToken: true,
+        ),
+      );
+
+      instance.markAsInitialized();
+      print('✅ Supabase initialized successfully');
+    } catch (e) {
+      print('❌ Failed to initialize Supabase: $e');
+      rethrow;
+    }
+  }
+
   // Mark service as initialized (called after successful Supabase.initialize in main.dart)
   void markAsInitialized() {
     _isInitialized = true;

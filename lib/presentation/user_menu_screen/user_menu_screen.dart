@@ -262,7 +262,7 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
 
   /// Navigates to user profile screen
   void onTapProfile(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.appProfileTwo);
+    NavigatorService.pushNamed(AppRoutes.appProfileUser);
   }
 
   /// Navigates to memories dashboard

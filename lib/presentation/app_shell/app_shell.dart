@@ -33,7 +33,7 @@ class AppShell extends StatelessWidget {
       iconButtonBackgroundColor: appTheme.color3BD81E,
       actionIcons: [
         ImageConstant.imgIconGray50,
-        ImageConstant.imgIconDeepPurpleA10032x32
+        ImageConstant.imgIconGray5032x32
       ],
       showProfileImage: true,
       showBottomBorder: true,

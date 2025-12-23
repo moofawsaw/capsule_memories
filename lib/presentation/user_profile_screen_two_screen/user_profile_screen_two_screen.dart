@@ -1,6 +1,6 @@
 import '../../core/app_export.dart';
 import '../../services/avatar_state_service.dart';
-import '../../widgets/custom_app_bar.dart';
+import '../../widgets/custom_button.dart';
 import '../../widgets/custom_profile_header.dart';
 import '../../widgets/custom_stat_card.dart';
 import '../../widgets/custom_story_card.dart';
@@ -14,14 +14,26 @@ class UserProfileScreenTwo extends ConsumerStatefulWidget {
 }
 
 class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
+  String? _userId;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(userProfileScreenTwoNotifier.notifier).initialize();
+      // Extract userId from navigation arguments
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      _userId = args?['userId'] as String?;
 
-      // Load avatar into global state for app-wide access
-      ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
+      // Initialize with userId (if null, will load current user's profile)
+      ref
+          .read(userProfileScreenTwoNotifier.notifier)
+          .initialize(userId: _userId);
+
+      // Load avatar into global state for app-wide access (only for current user)
+      if (_userId == null) {
+        ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
+      }
     });
   }
 
@@ -30,7 +42,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(context),
         body: Consumer(
           builder: (context, ref, _) {
             final state = ref.watch(userProfileScreenTwoNotifier);
@@ -53,6 +64,10 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
                       _buildProfileHeader(context),
                       SizedBox(height: 12.h),
                       _buildStatsSection(context),
+                      if (_userId != null) ...[
+                        SizedBox(height: 16.h),
+                        _buildActionButtons(context),
+                      ],
                       SizedBox(height: 28.h),
                       _buildStoriesGrid(context),
                       SizedBox(height: 12.h),
@@ -67,51 +82,44 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     );
   }
 
-  /// AppBar Section
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return CustomAppBar(
-      logoImagePath: ImageConstant.imgLogo,
-      showIconButton: true,
-      iconButtonImagePath: ImageConstant.imgFrame19,
-      iconButtonBackgroundColor: appTheme.color3BD81E,
-      actionIcons: [
-        ImageConstant.imgIconGray50,
-        ImageConstant.imgIconGray5032x32
-      ],
-      showProfileImage: true,
-    );
-  }
-
   /// Profile Header Section
   Widget _buildProfileHeader(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(userProfileScreenTwoNotifier);
         final model = state.userProfileScreenTwoModel;
+        final isCurrentUser = _userId == null;
 
-        // 🔥 Watch global avatar state for real-time updates
+        // 🔥 Watch global avatar state for real-time updates (only for current user)
         final avatarState = ref.watch(avatarStateProvider);
 
         return GestureDetector(
-          onTap: () {
-            ref.read(userProfileScreenTwoNotifier.notifier).uploadAvatar();
-          },
+          onTap: isCurrentUser
+              ? () {
+                  ref
+                      .read(userProfileScreenTwoNotifier.notifier)
+                      .uploadAvatar();
+                }
+              : null,
           child: Stack(
             alignment: Alignment.center,
             children: [
               CustomProfileHeader(
-                // Use avatar from global state if available, otherwise use local model
-                avatarImagePath: avatarState.avatarUrl ??
-                    model?.avatarImagePath ??
-                    ImageConstant.imgEllipse896x96,
+                // Use avatar from global state if current user, otherwise use model avatar
+                avatarImagePath:
+                    (isCurrentUser ? avatarState.avatarUrl : null) ??
+                        model?.avatarImagePath ??
+                        ImageConstant.imgEllipse896x96,
                 userName: model?.userName ?? 'Loading...',
                 email: model?.email ?? 'Fetching data...',
-                onEditTap: () {
-                  onTapEditProfile(context);
-                },
+                onEditTap: isCurrentUser
+                    ? () {
+                        onTapEditProfile(context);
+                      }
+                    : null,
                 margin: EdgeInsets.symmetric(horizontal: 68.h),
               ),
-              if (state.isUploading)
+              if (state.isUploading && isCurrentUser)
                 Positioned(
                   child: Container(
                     width: 96.h,
@@ -152,6 +160,124 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             CustomStatCard(
               count: model?.followingCount ?? '6',
               label: 'following',
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Action Buttons Section (Follow, Add Friend, Block)
+  Widget _buildActionButtons(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(userProfileScreenTwoNotifier);
+        final notifier = ref.read(userProfileScreenTwoNotifier.notifier);
+
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+              child: CustomButton(
+                text: state.isFollowing ? 'Unfollow' : 'Follow',
+                buttonStyle: state.isFollowing
+                    ? CustomButtonStyle.fillGray
+                    : CustomButtonStyle.fillDeepPurpleA,
+                onPressed: () {
+                  notifier.toggleFollow();
+                },
+              ),
+            ),
+            SizedBox(width: 8.h),
+            Expanded(
+              child: CustomButton(
+                text: state.isFriend
+                    ? 'Friends'
+                    : state.hasPendingFriendRequest
+                        ? 'Pending'
+                        : 'Add Friend',
+                buttonStyle: state.isFriend || state.hasPendingFriendRequest
+                    ? CustomButtonStyle.fillGray
+                    : CustomButtonStyle.fillDeepPurpleA,
+                onPressed: state.isFriend || state.hasPendingFriendRequest
+                    ? null
+                    : () {
+                        notifier.sendFriendRequest();
+                      },
+              ),
+            ),
+            SizedBox(width: 8.h),
+            Expanded(
+              child: CustomButton(
+                text: state.isBlocked ? 'Unblock' : 'Block',
+                buttonStyle: state.isBlocked
+                    ? CustomButtonStyle.fillGray
+                    : CustomButtonStyle.fillRed,
+                onPressed: () {
+                  _showBlockConfirmationDialog(context, state.isBlocked, () {
+                    notifier.toggleBlock();
+                  });
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showBlockConfirmationDialog(
+      BuildContext context, bool isBlocked, VoidCallback onConfirm) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: appTheme.gray_900_02,
+          title: Text(
+            isBlocked ? 'Unblock User?' : 'Block User?',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
+          ),
+          content: Text(
+            isBlocked
+                ? 'This user will be able to see your content and interact with you again.'
+                : 'This user will no longer be able to see your content or interact with you. All existing relationships (friends, follows) will be removed.',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.normal,
+              color: Colors.grey[300],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[300],
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onConfirm();
+              },
+              child: Text(
+                isBlocked ? 'Unblock' : 'Block',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.deepPurpleAccent[100],
+                ),
+              ),
             ),
           ],
         );

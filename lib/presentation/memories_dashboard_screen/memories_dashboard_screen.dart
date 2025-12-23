@@ -16,14 +16,10 @@ class MemoriesDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _MemoriesDashboardScreenState
-    extends ConsumerState<MemoriesDashboardScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController tabController;
-
+    extends ConsumerState<MemoriesDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(memoriesDashboardNotifier.notifier).initialize();
     });
@@ -31,7 +27,6 @@ class _MemoriesDashboardScreenState
 
   @override
   void dispose() {
-    tabController.dispose();
     super.dispose();
   }
 
@@ -121,7 +116,7 @@ class _MemoriesDashboardScreenState
             CustomStoryList(
               storyItems: (state.memoriesDashboardModel?.storyItems ?? [])
                   .map((item) => CustomStoryItem(
-                        // Modified: Convert StoryItemModel to CustomStoryItem
+                        // Use backgroundImage directly - notifier already handles media URL selection
                         backgroundImage: item.backgroundImage ?? '',
                         profileImage: item.profileImage ?? '',
                         timestamp: item.timestamp ?? '2 mins ago',
@@ -158,6 +153,7 @@ class _MemoriesDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoriesDashboardNotifier);
+        final selectedIndex = state.selectedTabIndex ?? 0;
 
         return Container(
           margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
@@ -170,69 +166,80 @@ class _MemoriesDashboardScreenState
               width: 1.0,
             ),
           ),
-          child: TabBar(
-            controller: tabController,
-            labelColor: appTheme.gray_900_02,
-            unselectedLabelColor: appTheme.gray_50.withAlpha(179),
-            labelStyle: TextStyleHelper.instance.body14BoldPlusJakartaSans,
-            unselectedLabelStyle:
-                TextStyleHelper.instance.body14RegularPlusJakartaSans,
-            indicator: BoxDecoration(
-              color: appTheme.deep_purple_A100,
-              borderRadius: BorderRadius.circular(20.h),
-            ),
-            indicatorSize: TabBarIndicatorSize.tab,
-            indicatorPadding:
-                EdgeInsets.symmetric(horizontal: 2.h, vertical: 2.h),
-            dividerColor: appTheme.transparentCustom,
-            tabs: [
-              Tab(
-                child: Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('All'),
-                      SizedBox(width: 4.h),
-                      Text('${state.memoriesDashboardModel?.allCount ?? 1}'),
-                    ],
-                  ),
-                ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildFilterButton(
+                context: context,
+                label: 'All',
+                count: state.memoriesDashboardModel?.allCount ?? 0,
+                isSelected: selectedIndex == 0,
+                onTap: () => _onFilterTap(context, 0),
               ),
-              Tab(
-                child: Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Live'),
-                      SizedBox(width: 4.h),
-                      Text('${state.memoriesDashboardModel?.liveCount ?? 1}'),
-                    ],
-                  ),
-                ),
+              _buildFilterButton(
+                context: context,
+                label: 'Live',
+                count: state.memoriesDashboardModel?.liveCount ?? 0,
+                isSelected: selectedIndex == 1,
+                onTap: () => _onFilterTap(context, 1),
               ),
-              Tab(
-                child: Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Sealed'),
-                      SizedBox(width: 4.h),
-                      Text('${state.memoriesDashboardModel?.sealedCount ?? 1}'),
-                    ],
-                  ),
-                ),
+              _buildFilterButton(
+                context: context,
+                label: 'Sealed',
+                count: state.memoriesDashboardModel?.sealedCount ?? 0,
+                isSelected: selectedIndex == 2,
+                onTap: () => _onFilterTap(context, 2),
               ),
             ],
-            onTap: (index) => _onTabTap(context, index),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildFilterButton({
+    required BuildContext context,
+    required String label,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? appTheme.deep_purple_A100
+                : appTheme.transparentCustom,
+            borderRadius: BorderRadius.circular(20.h),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: isSelected
+                    ? TextStyleHelper.instance.body14BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_900_02)
+                    : TextStyleHelper.instance.body14RegularPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50.withAlpha(179)),
+              ),
+              SizedBox(width: 4.h),
+              Text(
+                '$count',
+                style: isSelected
+                    ? TextStyleHelper.instance.body14BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_900_02)
+                    : TextStyleHelper.instance.body14RegularPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50.withAlpha(179)),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -241,6 +248,7 @@ class _MemoriesDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoriesDashboardNotifier);
+        final selectedIndex = state.selectedTabIndex ?? 0;
 
         ref.listen(
           memoriesDashboardNotifier,
@@ -266,19 +274,21 @@ class _MemoriesDashboardScreenState
           );
         }
 
+        // Get filtered memories based on selected filter
+        List<MemoryItemModel> filteredMemories;
+        if (selectedIndex == 0) {
+          filteredMemories = state.memoriesDashboardModel?.memoryItems ?? [];
+        } else if (selectedIndex == 1) {
+          filteredMemories =
+              state.memoriesDashboardModel?.liveMemoryItems ?? [];
+        } else {
+          filteredMemories =
+              state.memoriesDashboardModel?.sealedMemoryItems ?? [];
+        }
+
         return Container(
           margin: EdgeInsets.fromLTRB(16.h, 20.h, 0, 0),
-          child: TabBarView(
-            controller: tabController,
-            children: [
-              _buildMemoryList(
-                  context, state.memoriesDashboardModel?.memoryItems ?? []),
-              _buildMemoryList(
-                  context, state.memoriesDashboardModel?.liveMemoryItems ?? []),
-              _buildMemoryList(context,
-                  state.memoriesDashboardModel?.sealedMemoryItems ?? []),
-            ],
-          ),
+          child: _buildMemoryList(context, filteredMemories),
         );
       },
     );
@@ -345,12 +355,27 @@ class _MemoriesDashboardScreenState
   }
 
   void _onStoryTap(BuildContext context, int index) {
-    NavigatorService.pushNamed(AppRoutes.appVideoCall);
+    final state = ref.read(memoriesDashboardNotifier);
+    final stories = state.memoriesDashboardModel?.storyItems ?? [];
+
+    if (index < stories.length) {
+      final story = stories[index];
+      // Pass only story ID as String, matching /feed pattern
+      NavigatorService.pushNamed(
+        AppRoutes.appStoryView,
+        arguments: story.id,
+      );
+    }
   }
 
   void _onViewAllTap(BuildContext context) {
     final notifier = ref.read(memoriesDashboardNotifier.notifier);
     notifier.loadAllStories();
+  }
+
+  void _onFilterTap(BuildContext context, int index) {
+    final notifier = ref.read(memoriesDashboardNotifier.notifier);
+    notifier.updateSelectedTabIndex(index);
   }
 
   void _onTabTap(BuildContext context, int index) {
@@ -359,13 +384,45 @@ class _MemoriesDashboardScreenState
   }
 
   void _onMemoryTap(BuildContext context, MemoryItemModel memoryItem) {
+    print('🔍 NAVIGATION DEBUG: Memory tapped: ${memoryItem.id}');
+    print(
+        '🔍 NAVIGATION DEBUG: participantAvatars = ${memoryItem.participantAvatars}');
+    print(
+        '🔍 NAVIGATION DEBUG: categoryIconUrl = ${memoryItem.categoryIconUrl}');
+
+    // Convert MemoryItemModel to Map for timeline screen
+    final memoryData = {
+      'id': memoryItem.id,
+      'title': memoryItem.title,
+      'date': memoryItem.date,
+      'start_date': memoryItem.eventDate,
+      'start_time': memoryItem.eventTime,
+      'end_date': memoryItem.endDate,
+      'end_time': memoryItem.endTime,
+      'location': memoryItem.location,
+      'category_icon': memoryItem
+          .categoryIconUrl, // FIXED: Use categoryIconUrl instead of categoryName
+      'contributor_avatars': memoryItem
+          .participantAvatars, // FIXED: Already contains actual filtered avatars from database (excluding current user)
+      'media_items': [], // Empty for now, will be loaded by timeline screen
+      'visibility': memoryItem.visibility,
+    };
+
+    print('🔍 NAVIGATION DEBUG: Final memoryData = $memoryData');
+
     // Conditional navigation based on memory status
     if (memoryItem.isSealed == true) {
-      // Navigate to detail view screen for sealed memories
-      NavigatorService.pushNamed(AppRoutes.appTimelineSealed);
+      // Navigate to detail view screen for sealed memories with data
+      NavigatorService.pushNamed(
+        AppRoutes.appTimelineSealed,
+        arguments: memoryData,
+      );
     } else {
-      // Navigate to timeline screen for open memories
-      NavigatorService.pushNamed(AppRoutes.appTimeline);
+      // Navigate to timeline screen for open memories with data
+      NavigatorService.pushNamed(
+        AppRoutes.appTimeline,
+        arguments: memoryData,
+      );
     }
   }
 

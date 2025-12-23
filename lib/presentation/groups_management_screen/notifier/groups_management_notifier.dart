@@ -1,5 +1,6 @@
 import '../models/groups_management_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/groups_service.dart';
 
 part 'groups_management_state.dart';
 
@@ -17,43 +18,41 @@ class GroupsManagementNotifier extends StateNotifier<GroupsManagementState> {
     initialize();
   }
 
-  void initialize() {
-    state = state.copyWith(
-      isLoading: false,
-      groups: [
-        GroupModel(
-          name: 'Family',
-          memberCount: 2,
-          memberImages: [
-            ImageConstant.imgEllipse81,
-            ImageConstant.imgEllipse842x42,
-          ],
-        ),
-        GroupModel(
-          name: 'Work',
-          memberCount: 1,
-          memberImages: [
-            ImageConstant.imgEllipse81,
-          ],
-        ),
-        GroupModel(
-          name: 'Friends',
-          memberCount: 3,
-          memberImages: [
-            ImageConstant.imgEllipse81,
-            ImageConstant.imgEllipse842x42,
-            ImageConstant.imgFrame1,
-          ],
-        ),
-      ],
-      invitations: [
-        GroupInvitationModel(
-          groupName: 'Gang',
-          memberCount: 3,
-          avatarImage: ImageConstant.imgFrame403,
-        ),
-      ],
-    );
+  Future<void> initialize() async {
+    state = state.copyWith(isLoading: true);
+    await loadGroups();
+    state = state.copyWith(isLoading: false);
+  }
+
+  Future<void> loadGroups() async {
+    try {
+      final groupsData = await GroupsService.fetchUserGroups();
+
+      final List<GroupModel> groups = [];
+
+      for (final groupData in groupsData) {
+        final group = GroupModel.fromJson(groupData);
+
+        // Fetch member avatars for this group
+        final avatars = await GroupsService.fetchGroupMemberAvatars(
+          group.id ?? '',
+          limit: 3,
+        );
+
+        groups.add(group.copyWith(memberImages: avatars));
+      }
+
+      state = state.copyWith(
+        groups: groups,
+        invitations: [],
+      );
+    } catch (e) {
+      print('Error loading groups: $e');
+      state = state.copyWith(
+        message: 'Failed to load groups',
+        groups: [],
+      );
+    }
   }
 
   void showGroupQR(String groupName) {
@@ -63,13 +62,35 @@ class GroupsManagementNotifier extends StateNotifier<GroupsManagementState> {
     );
   }
 
-  void deleteGroup(String groupName) {
-    final updatedGroups =
-        state.groups?.where((group) => group.name != groupName).toList() ?? [];
-    state = state.copyWith(
-      groups: updatedGroups,
-      message: 'Group "$groupName" deleted successfully',
-    );
+  Future<void> deleteGroup(String groupName) async {
+    try {
+      final group = state.groups?.firstWhere(
+        (g) => g.name == groupName,
+        orElse: () => GroupModel(),
+      );
+
+      if (group?.id == null) return;
+
+      final success = await GroupsService.deleteGroup(group!.id!);
+
+      if (success) {
+        final updatedGroups =
+            state.groups?.where((g) => g.name != groupName).toList() ?? [];
+        state = state.copyWith(
+          groups: updatedGroups,
+          message: 'Group "$groupName" deleted successfully',
+        );
+      } else {
+        state = state.copyWith(
+          message: 'Failed to delete group',
+        );
+      }
+    } catch (e) {
+      print('Error deleting group: $e');
+      state = state.copyWith(
+        message: 'Error deleting group',
+      );
+    }
   }
 
   void acceptInvitation() {
@@ -96,5 +117,9 @@ class GroupsManagementNotifier extends StateNotifier<GroupsManagementState> {
 
   void clearMessage() {
     state = state.copyWith(message: null);
+  }
+
+  Future<void> refresh() async {
+    await loadGroups();
   }
 }

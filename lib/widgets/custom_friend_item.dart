@@ -1,7 +1,7 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_button.dart';
-import 'custom_icon_button.dart';
+import './custom_button.dart';
+import './custom_icon_button.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomFriendItem - A reusable component for displaying user/friend information in a list format.
@@ -53,16 +53,21 @@ class CustomFriendItem extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Profile Image
+          // Profile Image with proper circular clipping
           GestureDetector(
             onTap: onProfileTap,
             child: Container(
               margin: EdgeInsets.only(left: 16.h),
-              child: CustomImageView(
-                imagePath: profileImagePath,
-                height: 48.h,
-                width: 48.h,
-                fit: BoxFit.cover,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24.h),
+                child: CustomImageView(
+                  imagePath: profileImagePath.isNotEmpty
+                      ? profileImagePath
+                      : ImageConstant.imgEllipse842x42,
+                  height: 48.h,
+                  width: 48.h,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
           ),

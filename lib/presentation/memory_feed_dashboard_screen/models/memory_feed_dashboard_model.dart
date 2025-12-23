@@ -184,7 +184,7 @@ class MemoryFeedDashboardModel extends Equatable {
   }
 }
 
-class HappeningNowStoryData extends Equatable {
+class HappeningNowStoryData {
   final String? id;
   final String? backgroundImage;
   final String? profileImage;
@@ -193,6 +193,7 @@ class HappeningNowStoryData extends Equatable {
   final String? categoryIcon;
   final String? timestamp;
   final bool? isViewed;
+  final String? memoryId;
 
   HappeningNowStoryData({
     this.id,
@@ -203,6 +204,7 @@ class HappeningNowStoryData extends Equatable {
     this.categoryIcon,
     this.timestamp,
     this.isViewed = false,
+    this.memoryId,
   });
 
   HappeningNowStoryData copyWith({
@@ -214,6 +216,7 @@ class HappeningNowStoryData extends Equatable {
     String? categoryIcon,
     String? timestamp,
     bool? isViewed,
+    String? memoryId,
   }) {
     return HappeningNowStoryData(
       id: id ?? this.id,
@@ -224,20 +227,9 @@ class HappeningNowStoryData extends Equatable {
       categoryIcon: categoryIcon ?? this.categoryIcon,
       timestamp: timestamp ?? this.timestamp,
       isViewed: isViewed ?? this.isViewed,
+      memoryId: memoryId ?? this.memoryId,
     );
   }
-
-  @override
-  List<Object?> get props => [
-        id,
-        backgroundImage,
-        profileImage,
-        userName,
-        categoryName,
-        categoryIcon,
-        timestamp,
-        isViewed,
-      ];
 }
 
 class CustomMemoryItem extends Equatable {

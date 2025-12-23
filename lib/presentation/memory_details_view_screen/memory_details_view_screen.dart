@@ -1,5 +1,4 @@
 import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart'
@@ -20,50 +19,30 @@ class MemoryDetailsViewScreenState
     extends ConsumerState<MemoryDetailsViewScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(),
-        body: Column(
+    // This screen is rendered inside `AppShell`, which already provides a
+    // `Scaffold` with a persistent header. To avoid duplicate app bars and
+    // layout overflow issues, we render only the content here and make it
+    // scrollable.
+    return Container(
+      color: appTheme.gray_900_02,
+      child: SingleChildScrollView(
+        child: Column(
           children: [
             SizedBox(height: 18.h),
             _buildEventCard(context),
             SizedBox(height: 18.h),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTimelineSection(context),
-                  SizedBox(height: 20.h),
-                  _buildStoriesSection(context),
-                  SizedBox(height: 19.h),
-                  Expanded(
-                    child: _buildStoriesList(context),
-                  ),
-                  SizedBox(height: 23.h),
-                  _buildActionButtons(context),
-                  SizedBox(height: 24.h),
-                  _buildFooterMessage(context),
-                ],
-              ),
-            ),
+            _buildTimelineSection(context),
+            SizedBox(height: 20.h),
+            _buildStoriesSection(context),
+            SizedBox(height: 19.h),
+            _buildStoriesList(context),
+            SizedBox(height: 23.h),
+            _buildActionButtons(context),
+            _buildFooterMessage(context),
+            SizedBox(height: 24.h),
           ],
         ),
       ),
-    );
-  }
-
-  /// Section Widget
-  PreferredSizeWidget _buildAppBar() {
-    return CustomAppBar(
-      logoImagePath: ImageConstant.imgLogo,
-      showIconButton: true,
-      iconButtonImagePath: ImageConstant.imgFrame19,
-      iconButtonBackgroundColor: appTheme.color3BD81E,
-      actionIcons: [
-        ImageConstant.imgIcon9,
-        ImageConstant.imgIconGray5032x32,
-      ],
-      showProfileImage: true,
     );
   }
 
@@ -255,8 +234,6 @@ class MemoryDetailsViewScreenState
   Widget _buildTimelineDetails(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
-        final state = ref.watch(memoryDetailsViewNotifier);
-
         return Container(
           margin: EdgeInsets.only(bottom: 12.h),
           child: Row(

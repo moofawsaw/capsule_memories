@@ -1,5 +1,5 @@
-
 import '../core/app_export.dart';
+import '../core/utils/memory_categories.dart';
 import './custom_icon_button.dart';
 import './custom_image_view.dart';
 
@@ -16,6 +16,15 @@ import './custom_image_view.dart';
  * - Flexible content configuration
  */
 class CustomEventCard extends StatelessWidget {
+  final String? eventTitle;
+  final String? eventDate;
+  final bool? isPrivate;
+  final String? iconButtonImagePath;
+  final List<String>? participantImages;
+  final VoidCallback? onBackTap;
+  final VoidCallback? onIconButtonTap;
+  final VoidCallback? onAvatarTap;
+
   const CustomEventCard({
     Key? key,
     this.eventTitle,
@@ -25,65 +34,58 @@ class CustomEventCard extends StatelessWidget {
     this.participantImages,
     this.onBackTap,
     this.onIconButtonTap,
-    this.onCardTap,
     this.onAvatarTap,
   }) : super(key: key);
 
-  /// The main title text for the event
-  final String? eventTitle;
-
-  /// The date text for the event
-  final String? eventDate;
-
-  /// Whether the event is private or public
-  final bool? isPrivate;
-
-  /// Image path for the variable icon button
-  final String? iconButtonImagePath;
-
-  /// List of participant avatar image paths (up to 3)
-  final List<String>? participantImages;
-
-  /// Callback for back arrow tap
-  final VoidCallback? onBackTap;
-
-  /// Callback for icon button tap
-  final VoidCallback? onIconButtonTap;
-
-  /// Callback for card tap
-  final VoidCallback? onCardTap;
-
-  /// Callback for avatar cluster tap
-  final VoidCallback? onAvatarTap;
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onCardTap,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_01,
-          border: Border(
-            bottom: BorderSide(
-              color: appTheme.blue_gray_900,
-              width: 1,
-            ),
+    // Extract category name from icon path URL to look up the proper category
+    String? categoryName;
+    if (iconButtonImagePath != null &&
+        iconButtonImagePath!.contains('icon_url=')) {
+      // Parse category name from Supabase URL format
+      final uri = Uri.parse(iconButtonImagePath!);
+      categoryName = uri.queryParameters['icon_url'];
+      print(
+          '🔍 DEBUG CustomEventCard: Extracted category name = "$categoryName"');
+    }
+
+    // Get category using the same successful pattern as story cards
+    final category = categoryName != null
+        ? MemoryCategories.getByName(categoryName)
+        : MemoryCategories.custom; // fallback to custom category
+
+    print(
+        '🔍 DEBUG CustomEventCard: Using category = "${category.name}" with emoji = "${category.emoji}"');
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_01,
+        border: Border(
+          bottom: BorderSide(
+            color: appTheme.blue_gray_900,
+            width: 1,
           ),
         ),
-        padding: EdgeInsets.fromLTRB(12.h, 12.h, 12.h, 12.h),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildBackButton(),
-            SizedBox(width: 16.h),
-            _buildIconButton(),
-            SizedBox(width: 16.h),
-            _buildEventDetails(context),
-            SizedBox(width: 16.h),
-            _buildAvatarStack(),
-          ],
-        ),
+      ),
+      padding: EdgeInsets.fromLTRB(12.h, 12.h, 12.h, 12.h),
+      child: Column(
+        children: [
+          // Header row with back button, title, and options
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildBackButton(),
+              SizedBox(width: 16.h),
+              _buildIconButton(),
+              SizedBox(width: 16.h),
+              _buildEventDetails(context),
+              SizedBox(width: 16.h),
+              _buildAvatarStack(),
+            ],
+          ),
+        ],
       ),
     );
   }

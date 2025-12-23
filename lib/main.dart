@@ -1,6 +1,7 @@
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import './core/utils/theme_provider.dart';
 import './services/notification_service.dart';
 import './services/supabase_service.dart';
 import 'core/app_export.dart';
@@ -10,22 +11,11 @@ var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase with session persistence configuration
+  // Initialize Supabase
   try {
-    await Supabase.initialize(
-      url: const String.fromEnvironment('SUPABASE_URL'),
-      anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
-      authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
-        autoRefreshToken: true,
-      ),
-      debug: false,
-    );
-
-    SupabaseService.instance.markAsInitialized();
-    debugPrint('✅ Supabase initialized with session persistence enabled');
+    await SupabaseService.initialize();
   } catch (e) {
-    debugPrint('❌ Failed to initialize Supabase: $e');
+    debugPrint('Failed to initialize Supabase: $e');
   }
 
   _setupGlobalNotificationListener();
@@ -59,14 +49,21 @@ void _setupGlobalNotificationListener() {
   });
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
-      theme: theme,
+      theme: ThemeHelper().getThemeData(ThemeMode.light),
+      darkTheme: ThemeHelper().getThemeData(ThemeMode.dark),
+      themeMode: themeMode,
       title: 'capsule_memories',
       // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
       builder: (context, child) {
+        // Update global theme instance on every rebuild
+        ThemeHelper().setThemeMode(themeMode);
+
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.linear(1.0),

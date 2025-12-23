@@ -1,15 +1,17 @@
 part of 'following_list_notifier.dart';
 
+/// Represents the state for the following list screen.
+// ignore: must_be_immutable
 class FollowingListState extends Equatable {
-  final FollowingListModel? followingListModel;
-  final FollowingUserModel? selectedUser;
-  final bool? isLoading;
-
   FollowingListState({
     this.followingListModel,
     this.selectedUser,
-    this.isLoading = false,
+    this.isLoading,
   });
+
+  FollowingListModel? followingListModel;
+  FollowingUserModel? selectedUser;
+  bool? isLoading;
 
   @override
   List<Object?> get props => [

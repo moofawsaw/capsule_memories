@@ -1,5 +1,6 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import '../core/utils/memory_categories.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomStoryCard - A story card component that displays user stories with background images,
@@ -8,7 +9,7 @@ import 'custom_image_view.dart';
  * Features:
  * - Background story image with overlay content
  * - Circular profile avatar with decorative border
- * - Category badge with icon and label
+ * - Category badge with emoji icon from database
  * - Responsive design with consistent styling
  * - Optional navigation callback support
  * - Dark theme optimized design
@@ -40,7 +41,7 @@ class CustomStoryCard extends StatelessWidget {
   /// Text label for the category badge
   final String? categoryText;
 
-  /// Icon path for the category badge
+  /// Icon path for the category badge (will be resolved from MemoryCategories)
   final String? categoryIcon;
 
   /// Timestamp text (e.g., "2 mins ago")
@@ -60,6 +61,11 @@ class CustomStoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Resolve category emoji from database category name
+    final category = categoryText != null
+        ? MemoryCategories.getByName(categoryText!)
+        : MemoryCategories.custom;
+
     return Container(
       width: width ?? 116.h,
       height: height ?? 202.h,
@@ -96,7 +102,7 @@ class CustomStoryCard extends StatelessWidget {
                   children: [
                     _buildProfileAvatar(context),
                     Spacer(),
-                    _buildUserInfo(context),
+                    _buildUserInfo(context, category),
                   ],
                 ),
               ),
@@ -132,7 +138,7 @@ class CustomStoryCard extends StatelessWidget {
   }
 
   /// Builds the user information section (name, category, timestamp)
-  Widget _buildUserInfo(BuildContext context) {
+  Widget _buildUserInfo(BuildContext context, MemoryCategory category) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -146,7 +152,7 @@ class CustomStoryCard extends StatelessWidget {
 
         if (categoryText != null) ...[
           SizedBox(height: 18.h),
-          _buildCategoryBadge(context),
+          _buildCategoryBadge(context, category),
         ],
 
         if (timestamp != null) ...[
@@ -161,8 +167,8 @@ class CustomStoryCard extends StatelessWidget {
     );
   }
 
-  /// Builds the category badge with icon and text
-  Widget _buildCategoryBadge(BuildContext context) {
+  /// Builds the category badge with emoji icon and text
+  Widget _buildCategoryBadge(BuildContext context, MemoryCategory category) {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: 2.h,
@@ -175,14 +181,12 @@ class CustomStoryCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (categoryIcon != null) ...[
-            CustomImageView(
-              imagePath: categoryIcon!,
-              width: 24.h,
-              height: 24.h,
-            ),
-            SizedBox(width: 8.h),
-          ],
+          // Use emoji from MemoryCategories instead of image path
+          Text(
+            category.emoji,
+            style: TextStyle(fontSize: 20.h),
+          ),
+          SizedBox(width: 8.h),
           Text(
             categoryText ?? '',
             style: TextStyleHelper.instance.body12BoldPlusJakartaSans

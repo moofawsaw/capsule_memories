@@ -1,4 +1,5 @@
 import '../../../core/app_export.dart';
+import '../../../widgets/custom_confirmation_dialog.dart';
 import '../../../widgets/custom_friend_request_card.dart';
 import '../notifier/friends_management_notifier.dart';
 
@@ -7,54 +8,67 @@ class IncomingRequestsSectionWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(friendsManagementNotifier);
+    final incomingRequests = state.filteredIncomingRequestsList ??
+        state.friendsManagementModel?.incomingRequestsList ??
+        [];
+
+    if (incomingRequests.isEmpty) {
+      return SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          margin: EdgeInsets.only(left: 4.h),
-          child: Text(
-            'Incoming Requests',
-            style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
+        Text(
+          'Incoming Requests (${incomingRequests.length})',
+          style: TextStyleHelper.instance.title16MediumPlusJakartaSans.copyWith(
+            color: appTheme.gray_50,
           ),
         ),
-        SizedBox(height: 10.h),
-        Consumer(
-          builder: (context, ref, _) {
-            final state = ref.watch(friendsManagementNotifier);
-            final incomingRequestsList = state.filteredIncomingRequestsList ??
-                state.friendsManagementModel?.incomingRequestsList ??
-                [];
-
-            if (incomingRequestsList.isEmpty) {
-              return Container(
-                padding: EdgeInsets.all(20.h),
-                child: Text(
-                  'No incoming requests',
-                  style: TextStyleHelper.instance.body14,
-                ),
-              );
-            }
-
-            return Container(
-              margin: EdgeInsets.only(left: 4.h),
-              child: Column(
-                spacing: 6.h,
-                children: incomingRequestsList
-                    .map((request) => CustomFriendRequestCard(
-                          profileImagePath: request.profileImagePath,
-                          userName: request.userName,
-                          buttonText: request.buttonText,
-                          onButtonPressed: () => ref
-                              .read(friendsManagementNotifier.notifier)
-                              .onAcceptIncomingRequest(request.id ?? ''),
-                        ))
-                    .toList(),
-              ),
+        SizedBox(height: 12.h),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          itemCount: incomingRequests.length,
+          separatorBuilder: (context, index) => SizedBox(height: 12.h),
+          itemBuilder: (context, index) {
+            final request = incomingRequests[index];
+            return CustomFriendRequestCard(
+              profileImagePath: request.profileImagePath ?? '',
+              userName: request.displayName ?? request.userName ?? '',
+              buttonText: request.buttonText ?? 'Accept',
+              onButtonPressed: () {
+                ref
+                    .read(friendsManagementNotifier.notifier)
+                    .onAcceptIncomingRequest(request.id ?? '');
+              },
+              onSecondaryButtonTap: () {
+                _showDeclineRequestConfirmation(context, ref, request.id ?? '',
+                    request.displayName ?? request.userName ?? '');
+              },
             );
           },
         ),
       ],
     );
+  }
+
+  void _showDeclineRequestConfirmation(
+      BuildContext context, WidgetRef ref, String requestId, String userName) async {
+    final result = await CustomConfirmationDialog.show(
+      context: context,
+      title: 'Decline Request',
+      message:
+          'Are you sure you want to decline the friend request from $userName?',
+      confirmText: 'Decline',
+      cancelText: 'Cancel',
+    );
+    
+    if (result == true) {
+      ref
+          .read(friendsManagementNotifier.notifier)
+          .onDeclineIncomingRequest(requestId);
+    }
   }
 }

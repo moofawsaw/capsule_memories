@@ -1,4 +1,3 @@
-
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
@@ -100,7 +99,7 @@ class CustomPublicMemories extends StatelessWidget {
     return Container(
         padding: EdgeInsets.all(18.h),
         decoration: BoxDecoration(
-          color: Color(0xFFD81E29).withAlpha(59),
+          color: appTheme.background_transparent,
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(20.h),
             topRight: Radius.circular(20.h),

@@ -1,8 +1,6 @@
-
 import '../../../core/app_export.dart';
-import '../../../core/utils/memory_categories.dart';
 import '../../../widgets/custom_image_view.dart';
-import '../models/memory_feed_dashboard_model.dart';
+import '../model/memory_feed_dashboard_model.dart';
 
 class HappeningNowStoryCard extends StatelessWidget {
   final HappeningNowStoryData story;
@@ -16,8 +14,9 @@ class HappeningNowStoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get category from the centralized categories
-    final category = MemoryCategories.getByName(story.categoryName ?? 'Custom');
+    // Debug: Log what the widget receives
+    print(
+        '🔍 DEBUG: Widget rendering story by "${story.userName}" with categoryIcon: "${story.categoryIcon}"');
 
     return GestureDetector(
       onTap: onTap,
@@ -107,7 +106,7 @@ class HappeningNowStoryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Category badge with emoji and subtext
+                    // Category badge with icon and name from database
                     Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 10.h,
@@ -120,13 +119,32 @@ class HappeningNowStoryCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            category.emoji,
-                            style: TextStyle(fontSize: 14.h),
-                          ),
+                          if (story.categoryIcon.isNotEmpty)
+                            Builder(
+                              builder: (context) {
+                                print(
+                                    '🔍 DEBUG: Displaying category icon: "${story.categoryIcon}"');
+                                return CustomImageView(
+                                  imagePath: story.categoryIcon,
+                                  height: 14.h,
+                                  width: 14.h,
+                                );
+                              },
+                            ),
+                          if (story.categoryIcon.isEmpty)
+                            Builder(
+                              builder: (context) {
+                                print(
+                                    '⚠️ WARNING: No category icon, showing camera fallback');
+                                return Text(
+                                  '📸',
+                                  style: TextStyle(fontSize: 14.h),
+                                );
+                              },
+                            ),
                           SizedBox(width: 4.h),
                           Text(
-                            category.name,
+                            story.categoryName ?? 'Custom',
                             style: TextStyleHelper
                                 .instance.body12MediumPlusJakartaSans
                                 .copyWith(

@@ -1,5 +1,8 @@
 import '../models/create_group_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/friends_service.dart';
+import '../../../services/groups_service.dart';
+import '../../groups_management_screen/notifier/groups_management_notifier.dart';
 
 part 'create_group_state.dart';
 
@@ -9,56 +12,62 @@ final createGroupNotifier =
     CreateGroupState(
       createGroupModel: CreateGroupModel(),
     ),
+    ref,
   ),
 );
 
 class CreateGroupNotifier extends StateNotifier<CreateGroupState> {
-  CreateGroupNotifier(CreateGroupState state) : super(state) {
+  final FriendsService _friendsService = FriendsService();
+  final Ref _ref;
+
+  CreateGroupNotifier(CreateGroupState state, this._ref) : super(state) {
     initialize();
   }
 
-  void initialize() {
+  void initialize() async {
     state = state.copyWith(
       groupNameController: TextEditingController(),
       searchController: TextEditingController(),
-      isLoading: false,
+      isLoading: true,
     );
 
-    // Initialize with sample friends data
-    final sampleFriends = [
-      FriendModel(
-        id: '1',
-        name: 'Maxine Bates',
-        profileImage: ImageConstant.imgEllipse842x42,
-      ),
-      FriendModel(
-        id: '2',
-        name: 'Alex Johnson',
-        profileImage: ImageConstant.imgEllipse81,
-      ),
-      FriendModel(
-        id: '3',
-        name: 'Sarah Wilson',
-        profileImage: ImageConstant.imgEllipse842x42,
-      ),
-    ];
+    // Fetch actual friends from Supabase
+    await fetchFriends();
+  }
 
-    // Add Jane Doe as a selected member initially
-    final selectedMembers = [
-      FriendModel(
-        id: '4',
-        name: 'Jane Doe',
-        profileImage: ImageConstant.imgEllipse81,
-      ),
-    ];
+  Future<void> fetchFriends() async {
+    try {
+      state = state.copyWith(isLoading: true);
 
-    state = state.copyWith(
-      createGroupModel: state.createGroupModel?.copyWith(
-        friendsList: sampleFriends,
-        filteredFriends: sampleFriends,
-        selectedMembers: selectedMembers,
-      ),
-    );
+      final friendsData = await _friendsService.getUserFriends();
+
+      final friends = friendsData
+          .map((friend) => FriendModel(
+                id: friend['id'] as String,
+                name: friend['display_name'] as String? ??
+                    friend['username'] as String,
+                profileImage: friend['avatar_url'] as String? ?? '',
+              ))
+          .toList();
+
+      state = state.copyWith(
+        createGroupModel: state.createGroupModel?.copyWith(
+          friendsList: friends,
+          filteredFriends: friends,
+          selectedMembers: [],
+        ),
+        isLoading: false,
+      );
+    } catch (e) {
+      debugPrint('Error fetching friends: $e');
+      state = state.copyWith(
+        isLoading: false,
+        createGroupModel: state.createGroupModel?.copyWith(
+          friendsList: [],
+          filteredFriends: [],
+        ),
+      );
+    }
   }
 
   void searchFriends(String query) {
@@ -110,25 +119,50 @@ class CreateGroupNotifier extends StateNotifier<CreateGroupState> {
     );
   }
 
-  void createGroup() {
-    state = state.copyWith(isLoading: true);
+  Future<void> createGroup() async {
+    try {
+      state = state.copyWith(isLoading: true);
 
-    // Simulate group creation process
-    Future.delayed(Duration(seconds: 1), () {
-      if (mounted) {
-        // Clear form after successful creation
-        state.groupNameController?.clear();
-        state.searchController?.clear();
-
-        state = state.copyWith(
-          isLoading: false,
-          isSuccess: true,
-          createGroupModel: state.createGroupModel?.copyWith(
-            selectedMembers: [],
-          ),
-        );
+      final groupName = state.groupNameController?.text.trim();
+      if (groupName == null || groupName.isEmpty) {
+        state = state.copyWith(isLoading: false);
+        return;
       }
-    });
+
+      // Create the group
+      final groupId = await GroupsService.createGroup(groupName);
+
+      if (groupId == null) {
+        throw Exception('Failed to create group');
+      }
+
+      // Add selected members to the group
+      final selectedMembers = state.createGroupModel?.selectedMembers ?? [];
+      for (final member in selectedMembers) {
+        await GroupsService.addGroupMember(groupId, member.id!);
+      }
+
+      // Clear form after successful creation
+      state.groupNameController?.clear();
+      state.searchController?.clear();
+
+      state = state.copyWith(
+        isLoading: false,
+        isSuccess: true,
+        createGroupModel: state.createGroupModel?.copyWith(
+          selectedMembers: [],
+        ),
+      );
+
+      // Invalidate groups management to trigger real-time refresh
+      _ref.invalidate(groupsManagementNotifier);
+    } catch (e) {
+      debugPrint('Error creating group: $e');
+      state = state.copyWith(
+        isLoading: false,
+        isSuccess: false,
+      );
+    }
   }
 
   @override

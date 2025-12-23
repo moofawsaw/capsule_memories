@@ -1,6 +1,7 @@
-import '../models/user_menu_model.dart';
 import '../../../core/app_export.dart';
+import '../../../core/utils/theme_provider.dart';
 import '../../../services/supabase_service.dart';
+import '../models/user_menu_model.dart';
 
 part 'user_menu_state.dart';
 
@@ -10,11 +11,14 @@ final userMenuNotifier =
     UserMenuState(
       userMenuModel: UserMenuModel(),
     ),
+    ref,
   ),
 );
 
 class UserMenuNotifier extends StateNotifier<UserMenuState> {
-  UserMenuNotifier(UserMenuState state) : super(state) {
+  final Ref ref;
+
+  UserMenuNotifier(UserMenuState state, this.ref) : super(state) {
     initialize();
   }
 
@@ -77,13 +81,23 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
 
   void toggleDarkMode() {
     final currentModel = state.userMenuModel;
+    final newDarkModeValue = !(currentModel?.isDarkModeEnabled ?? true);
+    final newThemeMode = newDarkModeValue ? ThemeMode.dark : ThemeMode.light;
+
+    // CRITICAL: Update ThemeHelper FIRST before any state changes
+    ThemeHelper().setThemeMode(newThemeMode);
+
+    // Update local state
     final updatedModel = currentModel?.copyWith(
-      isDarkModeEnabled: !(currentModel.isDarkModeEnabled ?? true),
+      isDarkModeEnabled: newDarkModeValue,
     );
 
     state = state.copyWith(
       userMenuModel: updatedModel,
     );
+
+    // Update global theme provider (this will trigger MaterialApp rebuild)
+    ref.read(themeModeProvider.notifier).setThemeMode(newThemeMode);
   }
 
   Future<void> signOut() async {

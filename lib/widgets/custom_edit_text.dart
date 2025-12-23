@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomEditText is a reusable text input field component that provides
@@ -88,7 +88,7 @@ class _CustomEditTextState extends State<CustomEditText> {
         hintText: widget.hintText,
         hintStyle: widget.hintStyle ?? _getDefaultHintStyle(),
         filled: true,
-        fillColor: widget.fillColor ?? Color(0xFF1B181E),
+        fillColor: widget.fillColor ?? appTheme.gray_900,
         contentPadding: widget.contentPadding ?? _getDefaultPadding(),
         prefixIcon: widget.prefixIcon != null ? _buildPrefixIcon() : null,
         suffixIcon: _buildSuffixIcon(),

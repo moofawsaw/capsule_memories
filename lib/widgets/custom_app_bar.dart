@@ -86,7 +86,8 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
   @override
   void initState() {
     super.initState();
-    _checkAuthenticationState();
+    // Delay to avoid modifying provider during build
+    Future.microtask(() => _checkAuthenticationState());
   }
 
   /// Check authentication state WITHOUT loading avatar
@@ -97,17 +98,17 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
     try {
       final client = SupabaseService.instance.client;
       if (client == null) {
-        setState(() => _isUserAuthenticated = false);
+        if (mounted) setState(() => _isUserAuthenticated = false);
         return;
       }
 
       final user = client.auth.currentUser;
       if (user == null) {
-        setState(() => _isUserAuthenticated = false);
+        if (mounted) setState(() => _isUserAuthenticated = false);
         return;
       }
 
-      setState(() => _isUserAuthenticated = true);
+      if (mounted) setState(() => _isUserAuthenticated = true);
 
       // 🔥 CACHE CHECK: Only load avatar if it's NOT already cached in global state
       final currentAvatarState = ref.read(avatarStateProvider);
@@ -116,11 +117,12 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
       if (currentAvatarState.avatarUrl == null &&
           currentAvatarState.userId == null &&
           !currentAvatarState.isLoading) {
+        // Delay avatar loading to happen AFTER build completes
         await ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
       }
     } catch (e) {
       print('❌ Error checking authentication: $e');
-      setState(() => _isUserAuthenticated = false);
+      if (mounted) setState(() => _isUserAuthenticated = false);
     }
   }
 
@@ -155,6 +157,9 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
   }
 
   Widget _buildLogoWithActionsLayout(BuildContext context, int unreadCount) {
+    // 🔥 Get current route to determine active state
+    final currentRoute = ModalRoute.of(context)?.settings.name ?? '';
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 22.h, vertical: 26.h),
       child: Row(
@@ -204,6 +209,21 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
                 int index = entry.key;
                 String iconPath = entry.value;
                 bool isNotificationIcon = _isNotificationIcon(iconPath);
+                bool isPicturesIcon = _isPicturesIcon(iconPath);
+
+                // 🎯 Determine if this icon should be in active state
+                bool isActive = false;
+                Color? activeColor;
+
+                if (isNotificationIcon &&
+                    currentRoute == AppRoutes.appNotifications) {
+                  isActive = true;
+                  activeColor = appTheme.deep_purple_A100;
+                } else if (isPicturesIcon &&
+                    currentRoute == AppRoutes.appMemories) {
+                  isActive = true;
+                  activeColor = appTheme.deep_purple_A100;
+                }
 
                 return Padding(
                   padding: EdgeInsets.only(left: index > 0 ? 6.h : 0),
@@ -212,10 +232,23 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        CustomImageView(
-                          imagePath: iconPath,
+                        // Icon with conditional active state
+                        Container(
                           width: 32.h,
                           height: 32.h,
+                          padding: EdgeInsets.all(isActive ? 6.h : 0),
+                          decoration: isActive
+                              ? BoxDecoration(
+                                  color: activeColor,
+                                  shape: BoxShape.circle,
+                                )
+                              : null,
+                          child: CustomImageView(
+                            imagePath: iconPath,
+                            width: isActive ? 20.h : 32.h,
+                            height: isActive ? 20.h : 32.h,
+                            color: isActive ? appTheme.gray_50 : null,
+                          ),
                         ),
                         if (isNotificationIcon && unreadCount > 0)
                           Positioned(
@@ -458,35 +491,23 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
 
   /// Identifies if an icon is a notification/bell icon
   bool _isNotificationIcon(String iconPath) {
-    // Match against actual notification icon paths used in the app
-    // These patterns match the bell/notification icons from image_constant.dart
-    final notificationIconPatterns = [
-      'icon_deep_purple_a100_32x32',
-      'icon_deep_purple_a100_22x22',
-      'icon_deep_purple_a100_26x26',
-      'icon_deep_purple_a100_20x20',
-      'icon_deep_purple_a100_14x14',
-      'icon_deep_purple_a100',
-      'icon_22x22',
-      'icon_gray_50_32x32',
-      'icons_26x26',
-      'icons',
-    ];
-
-    return notificationIconPatterns
-        .any((pattern) => iconPath.contains(pattern));
+    // 🎯 EXACT match for notification bell icon - outline version used in app_shell
+    // This is the default notification icon that gets styled when active
+    return iconPath.contains('icon_gray_50_32x32');
   }
 
   /// Identifies if an icon is a pictures/gallery icon
   bool _isPicturesIcon(String iconPath) {
-    // Match against actual pictures/gallery icon paths used in the app
-    final picturesIconPatterns = [
-      'imagesmode',
-      'icon_22x22',
-      'img',
-    ];
-
-    return picturesIconPatterns.any((pattern) => iconPath.contains(pattern));
+    // 🎯 EXACT match for pictures/memories icon - must match the icon used in app_shell
+    // This is the ONLY pictures icon in the app
+    return iconPath.contains('icon_gray_50') &&
+        !iconPath
+            .contains('icon_gray_50_32x32') && // Exclude notification bell icon
+        !iconPath.contains('icon_gray_50_18x') &&
+        !iconPath.contains('icon_gray_50_20x') &&
+        !iconPath.contains('icon_gray_50_24x') &&
+        !iconPath.contains('icon_gray_50_26x') &&
+        !iconPath.contains('icon_gray_50_42x');
   }
 
   /// Handles profile avatar tap - always opens the user menu drawer

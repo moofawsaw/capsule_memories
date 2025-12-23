@@ -93,8 +93,10 @@ class GroupJoinConfirmationScreenState
         iconPath: ImageConstant.imgFrameDeepOrangeA700,
         title: 'Fmaily Xmas 2025',
         description: 'You have successfully joined Family Xmas 2025',
+        isRead: true,
+        onToggleRead: () {},
         margin: EdgeInsets.symmetric(horizontal: 46.h),
-        onIconTap: () {});
+        onTap: () {});
   }
 
   /// Section Widget

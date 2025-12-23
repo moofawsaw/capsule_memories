@@ -1,8 +1,11 @@
-import '../../../widgets/custom_story_list.dart'
-    as story_list; // Modified: Added alias to resolve ambiguous import
+import '../../../core/app_export.dart';
+import '../../../services/avatar_helper_service.dart';
+import '../../../services/memory_cache_service.dart';
+import '../../../services/story_service.dart';
+import '../../../services/supabase_service.dart';
+import '../../../widgets/custom_story_list.dart';
 import '../models/event_timeline_view_model.dart';
 import '../models/timeline_detail_model.dart';
-import '../../../core/app_export.dart';
 
 part 'event_timeline_view_state.dart';
 
@@ -16,48 +19,197 @@ final eventTimelineViewNotifier = StateNotifierProvider.autoDispose<
 );
 
 class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
-  EventTimelineViewNotifier(EventTimelineViewState state) : super(state) {
-    initialize();
+  final _storyService = StoryService();
+  final _cacheService = MemoryCacheService();
+
+  // CRITICAL FIX: Store story IDs for cycling functionality
+  List<String> _currentMemoryStoryIds = [];
+
+  EventTimelineViewNotifier(EventTimelineViewState state) : super(state);
+
+  // CRITICAL FIX: Add getter for story IDs to use in navigation
+  List<String> get currentMemoryStoryIds => _currentMemoryStoryIds;
+
+  void initializeFromMemory(dynamic memoryData) async {
+    if (memoryData is Map<String, dynamic>) {
+      // Extract memory ID
+      final memoryId = memoryData['id'] as String? ?? '';
+
+      print('🔍 TIMELINE DEBUG: Initializing from memory ID: $memoryId');
+      print('🔍 TIMELINE DEBUG: Full memory data: $memoryData');
+
+      final memory = memoryData;
+
+      // Use category icon URL directly from database data
+      String? categoryIcon = memory['category_icon'] as String?;
+
+      print('🔍 TIMELINE DEBUG: Category icon = "$categoryIcon"');
+
+      // Get contributor avatars from memory data
+      final contributorAvatars = memory['contributor_avatars'];
+      print(
+          '🔍 TIMELINE DEBUG: Raw contributor_avatars type: ${contributorAvatars.runtimeType}');
+      print(
+          '🔍 TIMELINE DEBUG: Raw contributor_avatars content: $contributorAvatars');
+
+      List<String> participantImages = [];
+
+      if (contributorAvatars != null) {
+        if (contributorAvatars is List) {
+          participantImages = contributorAvatars
+              .map((e) => e.toString())
+              .where((url) => url.isNotEmpty)
+              .toList();
+          print(
+              '🔍 TIMELINE DEBUG: Processed ${participantImages.length} participant images from List');
+        } else if (contributorAvatars is String) {
+          participantImages = [contributorAvatars];
+          print('🔍 TIMELINE DEBUG: Processed 1 participant image from String');
+        }
+      }
+
+      // Log each avatar URL for debugging
+      for (int i = 0; i < participantImages.length; i++) {
+        print(
+            '🔍 TIMELINE DEBUG: Participant avatar $i: ${participantImages[i]}');
+      }
+
+      // ONLY use fallback if we have NO avatars at all
+      if (participantImages.isEmpty) {
+        print(
+            '⚠️ TIMELINE DEBUG: No participant avatars found, using fallback images');
+        participantImages = [
+          ImageConstant.imgFrame2,
+          ImageConstant.imgFrame1,
+          ImageConstant.imgEllipse81,
+        ];
+      } else {
+        print(
+            '✅ TIMELINE DEBUG: Using ${participantImages.length} real participant images');
+      }
+
+      // Initialize timeline detail from memory data
+      TimelineDetailModel timelineDetail = TimelineDetailModel(
+        leftDate: memory['start_date'] as String? ?? 'Dec 4',
+        leftTime: memory['start_time'] as String? ?? '3:18pm',
+        centerLocation: memory['location'] as String? ?? 'Unknown Location',
+        centerDistance: '0km',
+        rightDate: memory['end_date'] as String? ?? 'Dec 4',
+        rightTime: memory['end_time'] as String? ?? '3:18am',
+      );
+
+      // Set initial state with memory details
+      state = state.copyWith(
+        eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
+          memoryId: memoryId,
+          eventTitle: memory['title'] as String? ?? 'Memory Event',
+          eventDate: memory['date'] as String? ?? 'Unknown Date',
+          isPrivate: false,
+          categoryIcon: categoryIcon ?? ImageConstant.imgFrame13,
+          participantImages: participantImages,
+          customStoryItems: [],
+          timelineDetail: timelineDetail,
+        ),
+        isLoading: true,
+      );
+
+      // CRITICAL: Fetch stories and trigger cache refresh
+      print('🔍 TIMELINE DEBUG: Fetching stories for memory $memoryId');
+      await _loadMemoryStories(memoryId);
+
+      // CRITICAL: Trigger cache refresh after viewing timeline
+      print('🔄 TIMELINE DEBUG: Triggering cache refresh for /memories screen');
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+      if (currentUser != null) {
+        await _cacheService.refreshMemoryCache(currentUser.id);
+        print('✅ TIMELINE DEBUG: Cache refresh complete');
+      }
+
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
+  Future<void> _loadMemoryStories(String memoryId) async {
+    try {
+      print('🔍 TIMELINE DEBUG: Loading stories for memory: $memoryId');
+
+      // Fetch stories from database
+      final storiesData = await _storyService.fetchMemoryStories(memoryId);
+
+      print(
+          '🔍 TIMELINE DEBUG: Fetched ${storiesData.length} stories from database');
+
+      // CRITICAL FIX: Extract story IDs in order for cycling
+      _currentMemoryStoryIds =
+          storiesData.map((storyData) => storyData['id'] as String).toList();
+
+      print(
+          '🔍 TIMELINE DEBUG: Story IDs for cycling: $_currentMemoryStoryIds');
+
+      // Convert to CustomStoryItem format
+      final storyItems = storiesData.map((storyData) {
+        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final createdAt = DateTime.parse(storyData['created_at'] as String);
+
+        final backgroundImage = _storyService.getStoryMediaUrl(storyData);
+        final profileImage = AvatarHelperService.getAvatarUrl(
+          contributor?['avatar_url'] as String?,
+        );
+
+        print('🔍 TIMELINE DEBUG: Story ${storyData['id']}:');
+        print('   - Background: $backgroundImage');
+        print('   - Profile: $profileImage');
+
+        return CustomStoryItem(
+          backgroundImage: backgroundImage,
+          profileImage: profileImage,
+          timestamp: _storyService.getTimeAgo(createdAt),
+          navigateTo: storyData['id'] as String,
+        );
+      }).toList();
+
+      print('✅ TIMELINE DEBUG: Converted to ${storyItems.length} story items');
+
+      // Update state with fetched stories
+      state = state.copyWith(
+        eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
+          customStoryItems: storyItems,
+        ),
+      );
+
+      print('✅ TIMELINE DEBUG: Stories updated in state');
+    } catch (e) {
+      print('❌ TIMELINE DEBUG: Error loading memory stories: $e');
+    }
   }
 
   void initialize() {
-    // Initialize story items
-    List<story_list.CustomStoryItem> storyItems = [
-      // Modified: Used alias to resolve ambiguous import
-      story_list.CustomStoryItem(
-        // Modified: Used alias and fixed constructor call
+    // Initialize story items as CustomStoryItem
+    List<CustomStoryItem> storyItems = [
+      CustomStoryItem(
         backgroundImage: ImageConstant.imgImage8202x116,
-        profileImage: ImageConstant.imgFrame2,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
+        profileImage: ImageConstant.imgEllipse826x26,
+        timestamp: '5 mins ago',
       ),
-      story_list.CustomStoryItem(
-        // Modified: Used alias and fixed constructor call
+      CustomStoryItem(
         backgroundImage: ImageConstant.imgImage8120x90,
-        profileImage: ImageConstant.imgFrame1,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
+        profileImage: ImageConstant.imgFrame2,
+        timestamp: '12 mins ago',
       ),
-      story_list.CustomStoryItem(
-        // Modified: Used alias and fixed constructor call
+      CustomStoryItem(
         backgroundImage: ImageConstant.imgImage8,
-        profileImage: ImageConstant.imgFrame48x48,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
+        profileImage: ImageConstant.imgFrame1,
+        timestamp: '23 mins ago',
       ),
-      story_list.CustomStoryItem(
-        // Modified: Used alias and fixed constructor call
+      CustomStoryItem(
         backgroundImage: ImageConstant.imgImg,
-        profileImage: ImageConstant.imgEllipse842x42,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
-      ),
-      story_list.CustomStoryItem(
-        // Modified: Used alias and fixed constructor call
-        backgroundImage: ImageConstant.imgImage81,
         profileImage: ImageConstant.imgEllipse81,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
+        timestamp: '1 hour ago',
+      ),
+      CustomStoryItem(
+        backgroundImage: ImageConstant.imgImage81,
+        profileImage: ImageConstant.imgEllipse826x26,
+        timestamp: '2 hours ago',
       ),
     ];
 
@@ -84,19 +236,36 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         eventDate: 'Dec 4, 2025',
         isPrivate: true,
         participantImages: participantImages,
-        storyItems: storyItems,
+        customStoryItems: storyItems,
         timelineDetail: timelineDetail,
-        storiesCount: 6,
       ),
       isLoading: false,
     );
   }
 
+  String _formatTimestamp(String timestamp) {
+    try {
+      final date = DateTime.parse(timestamp);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inMinutes < 60) {
+        return '${difference.inMinutes} mins ago';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours} hours ago';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays} days ago';
+      } else {
+        return 'Dec ${date.day}';
+      }
+    } catch (e) {
+      return '2 mins ago';
+    }
+  }
+
   void updateStoriesCount(int count) {
     state = state.copyWith(
-      eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
-        storiesCount: count,
-      ),
+      eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(),
     );
   }
 

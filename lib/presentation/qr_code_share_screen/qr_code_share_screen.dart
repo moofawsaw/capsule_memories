@@ -74,6 +74,8 @@ class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
               iconPath: ImageConstant.imgFrameDeepOrangeA700,
               title: 'Family Xmas 2025',
               description: 'Scan to join memory',
+              isRead: true,
+              onToggleRead: () {},
               titleFontSize: 20.0,
               descriptionAlignment: TextAlign.center,
               margin: EdgeInsets.zero,

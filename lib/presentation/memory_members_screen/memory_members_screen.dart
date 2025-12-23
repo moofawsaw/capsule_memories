@@ -1,17 +1,36 @@
-
 import '../../core/app_export.dart';
-import '../../widgets/custom_user_card.dart';
 import '../../widgets/custom_user_status_row.dart';
 import 'notifier/memory_members_notifier.dart';
 
 class MemoryMembersScreen extends ConsumerStatefulWidget {
-  MemoryMembersScreen({Key? key}) : super(key: key);
+  final String? memoryId;
+  final String? memoryTitle;
+
+  const MemoryMembersScreen({
+    Key? key,
+    this.memoryId,
+    this.memoryTitle,
+  }) : super(key: key);
 
   @override
   MemoryMembersScreenState createState() => MemoryMembersScreenState();
 }
 
 class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Initialize with memory ID passed to the screen
+      if (widget.memoryId != null) {
+        ref.read(memoryMembersNotifier.notifier).initialize(
+              widget.memoryId!,
+              memoryTitle: widget.memoryTitle,
+            );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -55,12 +74,37 @@ class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryMembersNotifier);
+        final model = state.memoryMembersModel;
 
         return Column(
           children: [
             _buildHeaderSection(context),
             SizedBox(height: 16.h),
-            SizedBox(height: 16.h),
+
+            // Loading state
+            if (model?.isLoading == true)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 40.h),
+                child: CircularProgressIndicator(
+                  color: appTheme.deep_purple_A100,
+                ),
+              ),
+
+            // Error state
+            if (model?.errorMessage != null && model?.isLoading == false)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 20.h),
+                child: Text(
+                  model!.errorMessage!,
+                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                      .copyWith(color: appTheme.red_500),
+                ),
+              ),
+
+            // Members list
+            if (model?.isLoading == false && model?.errorMessage == null)
+              _buildMembersList(context),
+
             SizedBox(height: 20.h),
           ],
         );
@@ -70,43 +114,80 @@ class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
 
   /// Section Widget
   Widget _buildHeaderSection(BuildContext context) {
-    return Container(
-        width: double.maxFinite,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Memory Members',
-              style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-                  .copyWith(height: 1.29)),
-          SizedBox(height: 24.h),
-          _buildMembersList(context),
-        ]));
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryMembersNotifier);
+        final memberCount = state.memoryMembersModel?.members?.length ?? 0;
+
+        return Container(
+          width: double.maxFinite,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Memory Members',
+                style: TextStyleHelper
+                    .instance.headline24ExtraBoldPlusJakartaSans
+                    .copyWith(height: 1.29),
+              ),
+              if (memberCount > 0)
+                Padding(
+                  padding: EdgeInsets.only(top: 8.h),
+                  child: Text(
+                    '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
+                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50.withAlpha(153)),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   /// Section Widget
   Widget _buildMembersList(BuildContext context) {
-    return Consumer(builder: (context, ref, _) {
-      final state = ref.watch(memoryMembersNotifier);
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryMembersNotifier);
+        final members = state.memoryMembersModel?.members ?? [];
 
-      return Column(spacing: 10.h, children: [
-        CustomUserCard(
-            userName: 'Joe Dirt',
-            profileImagePath: ImageConstant.imgEllipse826x26),
-        CustomUserStatusRow(
-            profileImagePath: ImageConstant.imgFrame3,
-            userName: 'Cassey Campbell',
-            onTap: () => _onTapMember(context, 'Cassey Campbell')),
-        CustomUserStatusRow(
-            profileImagePath: ImageConstant.imgEllipse81,
-            userName: 'Jane Doe',
-            statusText: 'Pending Invite',
-            statusBackgroundColor: appTheme.gray_900_03,
-            statusTextColor: appTheme.orange_700,
-            onTap: () => _onTapMember(context, 'Jane Doe')),
-      ]);
-    });
+        if (members.isEmpty) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: 40.h),
+            child: Text(
+              'No members found',
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50.withAlpha(153)),
+            ),
+          );
+        }
+
+        return Column(
+          spacing: 10.h,
+          children: members.map((member) {
+            final isCreator = member.isCreator ?? false;
+
+            return CustomUserStatusRow(
+              profileImagePath:
+                  member.avatarUrl ?? ImageConstant.imgEllipse826x26,
+              userName: member.displayName ?? member.username ?? 'Unknown',
+              statusText: isCreator ? 'Creator' : null,
+              statusBackgroundColor:
+                  isCreator ? appTheme.deep_purple_A100.withAlpha(51) : null,
+              statusTextColor: isCreator ? appTheme.deep_purple_A100 : null,
+              onTap: () => _onTapMember(context, member.userId ?? ''),
+            );
+          }).toList(),
+        );
+      },
+    );
   }
 
   /// Handle member tap
-  void _onTapMember(BuildContext context, String memberName) {
-    ref.read(memoryMembersNotifier.notifier).selectMember(memberName);
+  void _onTapMember(BuildContext context, String memberId) {
+    ref.read(memoryMembersNotifier.notifier).selectMember(memberId);
+    // Could navigate to user profile here
   }
 }

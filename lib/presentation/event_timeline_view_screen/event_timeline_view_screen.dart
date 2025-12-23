@@ -1,10 +1,10 @@
 import '../../core/app_export.dart';
-import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/custom_story_progress.dart';
+import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import '../qr_code_share_screen/qr_code_share_screen.dart';
 import './widgets/timeline_detail_widget.dart';
@@ -20,48 +20,45 @@ class EventTimelineViewScreen extends ConsumerStatefulWidget {
 class EventTimelineViewScreenState
     extends ConsumerState<EventTimelineViewScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Extract memory data from route arguments
+      final memory = ModalRoute.of(context)?.settings.arguments;
+
+      if (memory != null) {
+        // Initialize notifier with memory data
+        ref
+            .read(eventTimelineViewNotifier.notifier)
+            .initializeFromMemory(memory);
+      } else {
+        // Initialize with default data if no arguments
+        ref.read(eventTimelineViewNotifier.notifier).initialize();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(context),
-        body: Column(
+    // This screen is rendered inside `AppShell`, which already provides
+    // a `Scaffold` with a persistent `CustomAppBar`. To avoid showing
+    // two app bars and to prevent bottom overflow on smaller screens,
+    // we render only the content here and make it scrollable.
+    return Container(
+      color: appTheme.gray_900_02,
+      child: SingleChildScrollView(
+        child: Column(
           children: [
             _buildEventCard(context),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTimelineSection(context),
-                  SizedBox(height: 18.h),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildStoriesSection(context),
-                        SizedBox(height: 18.h),
-                        Expanded(child: SizedBox()),
-                        _buildActionButtons(context),
-                        SizedBox(height: 20.h),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildTimelineSection(context),
+            SizedBox(height: 18.h),
+            _buildStoriesSection(context),
+            SizedBox(height: 18.h),
+            _buildActionButtons(context),
+            SizedBox(height: 20.h),
           ],
         ),
       ),
-    );
-  }
-
-  /// Section Widget
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return CustomAppBar(
-      logoImagePath: ImageConstant.imgLogo,
-      showIconButton: true,
-      iconButtonImagePath: ImageConstant.imgFrame19,
-      iconButtonBackgroundColor: appTheme.color3BD81E,
-      actionIcons: [ImageConstant.imgIcon9, ImageConstant.imgIconGray5032x32],
-      showProfileImage: true,
     );
   }
 
@@ -75,7 +72,8 @@ class EventTimelineViewScreenState
           eventTitle: state.eventTimelineViewModel?.eventTitle,
           eventDate: state.eventTimelineViewModel?.eventDate,
           isPrivate: state.eventTimelineViewModel?.isPrivate,
-          iconButtonImagePath: ImageConstant.imgFrame13,
+          iconButtonImagePath: state.eventTimelineViewModel?.categoryIcon ??
+              ImageConstant.imgFrame13,
           participantImages: state.eventTimelineViewModel?.participantImages,
           onBackTap: () {
             onTapBackButton(context);
@@ -179,10 +177,18 @@ class EventTimelineViewScreenState
         children: [
           Container(
             margin: EdgeInsets.only(left: 20.h),
-            child: Text(
-              'Stories (6)',
-              style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final state = ref.watch(eventTimelineViewNotifier);
+                final storyCount =
+                    state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
+
+                return Text(
+                  'Stories ($storyCount)',
+                  style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                );
+              },
             ),
           ),
           SizedBox(height: 18.h),
@@ -197,9 +203,28 @@ class EventTimelineViewScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
+        final storyItems = state.eventTimelineViewModel?.customStoryItems ?? [];
+
+        if (storyItems.isEmpty) {
+          return Container(
+            margin: EdgeInsets.only(left: 20.h),
+            padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 16.h),
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_03,
+              borderRadius: BorderRadius.circular(12.h),
+            ),
+            child: Center(
+              child: Text(
+                'No stories yet',
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: appTheme.gray_300),
+              ),
+            ),
+          );
+        }
 
         return CustomStoryList(
-          storyItems: state.eventTimelineViewModel?.storyItems ?? [],
+          storyItems: storyItems,
           onStoryTap: (index) {
             onTapStoryItem(context, index);
           },
@@ -277,7 +302,31 @@ class EventTimelineViewScreenState
 
   /// Handles story item tap
   void onTapStoryItem(BuildContext context, int index) {
-    NavigatorService.pushNamed(AppRoutes.appVideoCall);
+    final notifier = ref.read(eventTimelineViewNotifier.notifier);
+    final state = ref.read(eventTimelineViewNotifier);
+    final storyItems = state.eventTimelineViewModel?.customStoryItems ?? [];
+
+    if (index < storyItems.length) {
+      final storyItem = storyItems[index];
+
+      // CRITICAL FIX: Pass FeedStoryContext with memory-specific story array
+      // This ensures story viewer cycles through ONLY this memory's 3 stories
+      final feedContext = FeedStoryContext(
+        feedType: 'memory_timeline',
+        storyIds: notifier.currentMemoryStoryIds, // Use memory-specific IDs
+        initialStoryId: storyItem.navigateTo ?? '', // Add null check with default empty string
+      );
+
+      print('🔍 TIMELINE DEBUG: Opening story viewer with context:');
+      print('   - Story IDs: ${feedContext.storyIds}');
+      print('   - Initial story: ${feedContext.initialStoryId}');
+      print('   - Total stories: ${feedContext.storyIds.length}');
+
+      NavigatorService.pushNamed(
+        AppRoutes.appStoryView,
+        arguments: feedContext, // Pass context instead of just ID
+      );
+    }
   }
 
   /// Handles view all tap
@@ -297,11 +346,20 @@ class EventTimelineViewScreenState
 
   /// Handles avatar cluster tap - opens members bottom sheet
   void onTapAvatars(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => MemoryMembersScreen(),
-    );
+    final state = ref.read(eventTimelineViewNotifier);
+    final memoryId = state.eventTimelineViewModel?.memoryId;
+    final memoryTitle = state.eventTimelineViewModel?.eventTitle;
+
+    if (memoryId != null) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => MemoryMembersScreen(
+          memoryId: memoryId,
+          memoryTitle: memoryTitle,
+        ),
+      );
+    }
   }
 }

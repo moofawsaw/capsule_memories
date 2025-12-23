@@ -1,5 +1,6 @@
 import '../models/create_memory_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/groups_service.dart';
 
 part 'create_memory_state.dart';
 
@@ -33,8 +34,26 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         searchResults: [],
         invitedUserIds: {},
         groupMembers: [],
+        availableGroups: [],
       ),
     );
+    // Fetch available groups on initialization
+    _fetchAvailableGroups();
+  }
+
+  /// Fetch available groups from Supabase
+  Future<void> _fetchAvailableGroups() async {
+    try {
+      final groups = await GroupsService.fetchUserGroups();
+
+      state = state.copyWith(
+        createMemoryModel: state.createMemoryModel?.copyWith(
+          availableGroups: groups,
+        ),
+      );
+    } catch (e) {
+      print('Error fetching groups: $e');
+    }
   }
 
   String? validateMemoryName(String? value) {
@@ -75,17 +94,55 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     );
   }
 
-  void updateSelectedGroup(String? groupValue) {
-    final groupMembers = groupValue != null
-        ? CreateMemoryModel.getGroupMembers(groupValue)
-        : <Map<String, dynamic>>[];
+  Future<void> updateSelectedGroup(String? groupId) async {
+    if (groupId == null) {
+      state = state.copyWith(
+        createMemoryModel: state.createMemoryModel?.copyWith(
+          selectedGroup: null,
+          groupMembers: [],
+        ),
+      );
+      return;
+    }
 
+    // Set loading state
     state = state.copyWith(
       createMemoryModel: state.createMemoryModel?.copyWith(
-        selectedGroup: groupValue,
-        groupMembers: groupMembers,
+        selectedGroup: groupId,
+        groupMembers: [], // Clear current members while loading
       ),
     );
+
+    try {
+      // Fetch group members from Supabase
+      final members = await _fetchGroupMembers(groupId);
+
+      state = state.copyWith(
+        createMemoryModel: state.createMemoryModel?.copyWith(
+          selectedGroup: groupId,
+          groupMembers: members,
+        ),
+      );
+    } catch (e) {
+      print('Error fetching group members: $e');
+      state = state.copyWith(
+        createMemoryModel: state.createMemoryModel?.copyWith(
+          selectedGroup: groupId,
+          groupMembers: [],
+        ),
+      );
+    }
+  }
+
+  /// Fetch group members from Supabase
+  Future<List<Map<String, dynamic>>> _fetchGroupMembers(String groupId) async {
+    try {
+      // Use the existing GroupsService.fetchGroupMembers method
+      return await GroupsService.fetchGroupMembers(groupId);
+    } catch (e) {
+      print('Error fetching group members: $e');
+      return [];
+    }
   }
 
   void updateSearchQuery(String query) {

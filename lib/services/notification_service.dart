@@ -1,5 +1,6 @@
 import './supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 /// Service class for managing notifications with real-time capabilities
 class NotificationService {
@@ -53,8 +54,11 @@ class NotificationService {
     try {
       final userId = _client.auth.currentUser?.id;
       if (userId == null) {
+        debugPrint('❌ No authenticated user found');
         throw Exception('User not authenticated');
       }
+
+      debugPrint('🔍 Fetching notifications for user: $userId');
 
       var query = _client.from('notifications').select().eq('user_id', userId);
 
@@ -65,8 +69,17 @@ class NotificationService {
       final response =
           await query.order('created_at', ascending: false).limit(limit);
 
+      debugPrint('✅ Fetched ${response.length} notifications from database');
+
+      if (response.isEmpty) {
+        debugPrint('⚠️ No notifications found for user $userId');
+      } else {
+        debugPrint('📋 First notification: ${response.first}');
+      }
+
       return List<Map<String, dynamic>>.from(response);
     } catch (error) {
+      debugPrint('❌ Error fetching notifications: $error');
       throw Exception('Failed to fetch notifications: $error');
     }
   }
@@ -107,6 +120,25 @@ class NotificationService {
           .eq('user_id', userId);
     } catch (error) {
       throw Exception('Failed to mark notification as read: $error');
+    }
+  }
+
+  /// Toggle notification read/unread state
+  Future<void> toggleReadState(
+      String notificationId, bool currentReadState) async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      await _client
+          .from('notifications')
+          .update({'is_read': !currentReadState})
+          .eq('id', notificationId)
+          .eq('user_id', userId);
+    } catch (error) {
+      throw Exception('Failed to toggle notification read state: $error');
     }
   }
 

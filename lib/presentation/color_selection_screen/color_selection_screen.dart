@@ -63,36 +63,40 @@ class ColorSelectionScreenState extends ConsumerState<ColorSelectionScreen> {
               final state = ref.watch(colorSelectionNotifier);
               final colors = state.colorSelectionModel?.colors ?? [];
 
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                spacing: 12.h,
-                children: colors.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final colorModel = entry.value;
-                  final isSelected = state.selectedColorIndex == index;
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  spacing: 12.h,
+                  children: colors.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final colorModel = entry.value;
+                    final isSelected = state.selectedColorIndex == index;
 
-                  return GestureDetector(
-                    onTap: () {
-                      onTapColorOption(index);
-                    },
-                    child: Container(
-                      height: 42.h,
-                      width: 42.h,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: isSelected
-                            ? Border.all(color: appTheme.blue_A700, width: 2.h)
-                            : null,
-                      ),
-                      child: CustomImageView(
-                        imagePath: colorModel.imagePath,
+                    return GestureDetector(
+                      onTap: () {
+                        onTapColorOption(index);
+                      },
+                      child: Container(
                         height: 42.h,
                         width: 42.h,
-                        fit: BoxFit.cover,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(
+                                  color: appTheme.blue_A700, width: 2.h)
+                              : null,
+                        ),
+                        child: CustomImageView(
+                          imagePath: colorModel.imagePath,
+                          height: 42.h,
+                          width: 42.h,
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               );
             },
           ),
@@ -119,61 +123,51 @@ class ColorSelectionScreenState extends ConsumerState<ColorSelectionScreen> {
           final state = ref.watch(colorSelectionNotifier);
           final themes = state.colorSelectionModel?.themes ?? [];
 
-          return Row(
-            spacing: 12.h,
-            children: themes.asMap().entries.map((entry) {
-              final index = entry.key;
-              final themeModel = entry.value;
-              final isSelected = state.selectedThemeIndex == index;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              spacing: 12.h,
+              children: themes.asMap().entries.map((entry) {
+                final index = entry.key;
+                final themeModel = entry.value;
+                final isSelected = state.selectedThemeIndex == index;
 
-              return GestureDetector(
-                onTap: () {
-                  onTapThemeOption(index);
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 30.h,
-                    vertical: themeModel.title == 'typewriter'
-                        ? 18.h
-                        : (themeModel.title == 'neon' ? 16.h : 14.h),
+                return GestureDetector(
+                  onTap: () {
+                    onTapThemeOption(index);
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 30.h,
+                      vertical: themeModel.title == 'typewriter'
+                          ? 18.h
+                          : (themeModel.title == 'neon' ? 16.h : 14.h),
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(
+                          themeModel.title == 'typewriter' ? 22.h : 32.h),
+                      color:
+                          isSelected ? Color(0xFF0061FF) : appTheme.gray_900_01,
+                      border: isSelected
+                          ? Border.all(color: appTheme.blue_A700, width: 1.h)
+                          : null,
+                    ),
+                    child: Text(
+                      themeModel.title ?? '',
+                      style: TextStyleHelper.instance.headline24
+                          .copyWith(color: appTheme.gray_50),
+                      textAlign: themeModel.title == 'typewriter'
+                          ? TextAlign.center
+                          : TextAlign.left,
+                    ),
                   ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(
-                        themeModel.title == 'typewriter' ? 22.h : 32.h),
-                    color:
-                        isSelected ? Color(0xFF0061FF) : appTheme.gray_900_01,
-                    border: isSelected
-                        ? Border.all(color: appTheme.blue_A700, width: 1.h)
-                        : null,
-                  ),
-                  child: Text(
-                    themeModel.title ?? '',
-                    style: TextStyleHelper.instance.headline24
-                        .copyWith(color: appTheme.gray_50),
-                    textAlign: themeModel.title == 'typewriter'
-                        ? TextAlign.center
-                        : TextAlign.left,
-                  ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           );
         },
       ),
     );
-  }
-
-  FontWeight _getThemeFontWeight(String themeName) {
-    switch (themeName) {
-      case 'classic':
-        return FontWeight.w600;
-      case 'neon':
-        return FontWeight.w700;
-      case 'typewriter':
-        return FontWeight.w400;
-      default:
-        return FontWeight.w400;
-    }
   }
 
   /// Handles back navigation

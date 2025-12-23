@@ -1,101 +1,69 @@
-import '../models/video_call_model.dart';
 import '../../../core/app_export.dart';
+import '../models/video_call_model.dart';
 
 part 'video_call_state.dart';
 
-final videoCallNotifier =
-    StateNotifierProvider.autoDispose<VideoCallNotifier, VideoCallState>(
-  (ref) => VideoCallNotifier(
-    VideoCallState(
-      videoCallModel: VideoCallModel(),
-    ),
-  ),
-);
+final videoCallProvider =
+    StateNotifierProvider<VideoCallNotifier, VideoCallState>((ref) {
+  return VideoCallNotifier(VideoCallState());
+});
 
+/// A notifier that manages the state of the VideoCall screen
 class VideoCallNotifier extends StateNotifier<VideoCallState> {
-  VideoCallNotifier(VideoCallState state) : super(state) {
-    initialize();
-  }
+  VideoCallNotifier(VideoCallState state) : super(state);
 
-  void initialize() {
-    state = state.copyWith(
-      isAudioEnabled: true,
-      isVideoEnabled: true,
-      isCallActive: true,
-      participantCount: 3,
+  void initializeWithStoryData(Map<String, dynamic>? args) {
+    if (args == null) return;
+
+    final model = VideoCallModel(
+      storyId: args['storyId'] as String? ?? '',
+      memoryId: args['memoryId'] as String? ?? '',
+      memoryTitle: args['memoryTitle'] as String? ?? '',
+      memoryCategoryName: args['memoryCategoryName'] as String? ?? '',
+      memoryCategoryIcon: args['memoryCategoryIcon'] as String? ?? '',
+      contributorName: args['contributorName'] as String? ?? '',
+      contributorAvatar: args['contributorAvatar'] as String? ?? '',
+      contributorsList:
+          args['contributorsList'] as List<Map<String, dynamic>>? ?? [],
+      lastSeen: args['lastSeen'] as String? ?? '',
     );
+
+    state = VideoCallState(videoCallModel: model);
   }
 
   void onReactionTap(String reaction) {
-    // Handle reaction button tap
-    print('Reaction tapped: $reaction');
+    final currentCounts = state.videoCallModel?.reactionCounts ?? {};
+    final updatedCounts = Map<String, int>.from(currentCounts);
+    updatedCounts[reaction] = (updatedCounts[reaction] ?? 0) + 1;
 
-    // Update reaction counts
-    final currentModel = state.videoCallModel;
-    final updatedModel = currentModel?.copyWith();
-
-    state = state.copyWith(
-      videoCallModel: updatedModel,
-      lastReaction: reaction,
+    state = VideoCallState(
+      videoCallModel: state.videoCallModel?.copyWith(
+        reactionCounts: updatedCounts,
+      ),
     );
   }
 
   void onEmojiTap(String emoji) {
-    // Handle emoji reaction tap
-    print('Emoji tapped: $emoji');
+    final currentCounts = state.videoCallModel?.emojiCounts ?? {};
+    final updatedCounts = Map<String, int>.from(currentCounts);
+    updatedCounts[emoji] = (updatedCounts[emoji] ?? 0) + 1;
 
-    // Update emoji counts
-    final currentModel = state.videoCallModel;
-    final updatedModel = currentModel?.copyWith();
-
-    state = state.copyWith(
-      videoCallModel: updatedModel,
-      lastEmojiReaction: emoji,
+    state = VideoCallState(
+      videoCallModel: state.videoCallModel?.copyWith(
+        emojiCounts: updatedCounts,
+      ),
     );
   }
 
   void toggleAudio() {
-    state = state.copyWith(
-      isAudioEnabled: !(state.isAudioEnabled ?? true),
-    );
-  }
-
-  void toggleVideo() {
-    state = state.copyWith(
-      isVideoEnabled: !(state.isVideoEnabled ?? true),
-    );
+    // Audio toggle logic
   }
 
   void shareCall() {
-    // Handle call sharing functionality
-    print('Sharing call');
-
-    state = state.copyWith(
-      isSharing: true,
-    );
-
-    // Simulate sharing process
-    Future.delayed(Duration(seconds: 2), () {
-      if (mounted) {
-        state = state.copyWith(
-          isSharing: false,
-        );
-      }
-    });
+    // Share call logic
   }
 
   void showCallOptions() {
-    // Handle showing call options
-    print('Showing call options');
-
-    state = state.copyWith(
-      showOptions: true,
-    );
-  }
-
-  void endCall() {
-    state = state.copyWith(
-      isCallActive: false,
-    );
+    // Show call options logic
   }
 }

@@ -44,6 +44,8 @@ class FollowersManagementScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(followersManagementNotifier);
+        final followersCount =
+            state.followersManagementModel?.followersList?.length ?? 0;
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -60,7 +62,7 @@ class FollowersManagementScreenState
             Container(
               margin: EdgeInsets.fromLTRB(6.h, 4.h, 0, 0),
               child: Text(
-                'Followers (${state.followersManagementModel?.followersList?.length ?? 0})',
+                'Followers ($followersCount)',
                 style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans
                     .copyWith(height: 1.3),
               ),
@@ -81,7 +83,7 @@ class FollowersManagementScreenState
                   borderRadius: BorderRadius.circular(22.h),
                 ),
                 child: Text(
-                  'Following (3)',
+                  'Following',
                   style: TextStyleHelper.instance.title16BoldPlusJakartaSans
                       .copyWith(color: appTheme.gray_50, height: 1.31),
                 ),
@@ -117,7 +119,24 @@ class FollowersManagementScreenState
             );
 
             if (state.isLoading ?? false) {
-              return Center(child: CircularProgressIndicator());
+              return Center(
+                child: CircularProgressIndicator(
+                  color: appTheme.deep_purple_A100,
+                ),
+              );
+            }
+
+            final followersList =
+                state.followersManagementModel?.followersList ?? [];
+
+            if (followersList.isEmpty) {
+              return Center(
+                child: Text(
+                  'No followers yet',
+                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                      .copyWith(color: appTheme.blue_gray_300),
+                ),
+              );
             }
 
             return ListView.separated(
@@ -127,11 +146,9 @@ class FollowersManagementScreenState
               separatorBuilder: (context, index) {
                 return SizedBox(height: 20.h);
               },
-              itemCount:
-                  state.followersManagementModel?.followersList?.length ?? 0,
+              itemCount: followersList.length,
               itemBuilder: (context, index) {
-                final follower =
-                    state.followersManagementModel?.followersList?[index];
+                final follower = followersList[index];
                 return _buildFollowerItem(context, follower, index);
               },
             );

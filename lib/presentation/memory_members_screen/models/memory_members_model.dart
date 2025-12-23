@@ -8,70 +8,94 @@ class MemoryMembersModel extends Equatable {
     this.members,
     this.memoryTitle,
     this.memoryId,
+    this.isLoading = false,
+    this.errorMessage,
   }) {
     members = members ?? [];
-    memoryTitle = memoryTitle ?? "Family Memory";
+    memoryTitle = memoryTitle ?? "";
     memoryId = memoryId ?? "";
   }
 
   List<MemberModel>? members;
   String? memoryTitle;
   String? memoryId;
+  bool isLoading;
+  String? errorMessage;
 
   MemoryMembersModel copyWith({
     List<MemberModel>? members,
     String? memoryTitle,
     String? memoryId,
+    bool? isLoading,
+    String? errorMessage,
   }) {
     return MemoryMembersModel(
       members: members ?? this.members,
       memoryTitle: memoryTitle ?? this.memoryTitle,
       memoryId: memoryId ?? this.memoryId,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage,
     );
   }
 
   @override
-  List<Object?> get props => [members, memoryTitle, memoryId];
+  List<Object?> get props =>
+      [members, memoryTitle, memoryId, isLoading, errorMessage];
 }
 
 // ignore_for_file: must_be_immutable
 class MemberModel extends Equatable {
   MemberModel({
-    this.name,
-    this.profileImagePath,
-    this.role,
-    this.status,
     this.userId,
+    this.displayName,
+    this.username,
+    this.avatarUrl,
+    this.isCreator = false,
+    this.isVerified = false,
+    this.joinedAt,
   }) {
-    name = name ?? "";
-    profileImagePath = profileImagePath ?? "";
-    role = role ?? "Member";
-    status = status ?? "Active";
     userId = userId ?? "";
+    displayName = displayName ?? "";
+    username = username ?? "";
+    avatarUrl = avatarUrl ?? "";
   }
 
-  String? name;
-  String? profileImagePath;
-  String? role;
-  String? status;
   String? userId;
+  String? displayName;
+  String? username;
+  String? avatarUrl;
+  bool isCreator;
+  bool isVerified;
+  String? joinedAt;
 
   MemberModel copyWith({
-    String? name,
-    String? profileImagePath,
-    String? role,
-    String? status,
     String? userId,
+    String? displayName,
+    String? username,
+    String? avatarUrl,
+    bool? isCreator,
+    bool? isVerified,
+    String? joinedAt,
   }) {
     return MemberModel(
-      name: name ?? this.name,
-      profileImagePath: profileImagePath ?? this.profileImagePath,
-      role: role ?? this.role,
-      status: status ?? this.status,
       userId: userId ?? this.userId,
+      displayName: displayName ?? this.displayName,
+      username: username ?? this.username,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isCreator: isCreator ?? this.isCreator,
+      isVerified: isVerified ?? this.isVerified,
+      joinedAt: joinedAt ?? this.joinedAt,
     );
   }
 
   @override
-  List<Object?> get props => [name, profileImagePath, role, status, userId];
+  List<Object?> get props => [
+        userId,
+        displayName,
+        username,
+        avatarUrl,
+        isCreator,
+        isVerified,
+        joinedAt
+      ];
 }

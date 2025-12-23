@@ -44,7 +44,8 @@ class FriendsManagementScreenState
   /// Main content section with friends management
   Widget _buildMainContentSection(BuildContext context) {
     return Container(
-        margin: EdgeInsets.only(left: 16.h, right: 20.h, bottom: 14.h),
+        margin:
+            EdgeInsets.only(left: 16.h, top: 24.h, right: 20.h, bottom: 14.h),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _buildFriendsHeaderSection(context),
           SizedBox(height: 16.h),
@@ -60,31 +61,37 @@ class FriendsManagementScreenState
 
   /// Friends header with count and action buttons
   Widget _buildFriendsHeaderSection(BuildContext context) {
-    return Container(
-        margin: EdgeInsets.only(right: 6.h),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-              width: 26.h,
-              height: 26.h,
-              margin: EdgeInsets.only(top: 2.h),
-              child: CustomImageView(
-                  imagePath: ImageConstant.imgIconDeepPurpleA100,
-                  fit: BoxFit.contain)),
-          SizedBox(width: 6.h),
-          Container(
-              margin: EdgeInsets.only(top: 2.h),
-              child: Text('Friends (2)',
-                  style: TextStyleHelper
-                      .instance.title20ExtraBoldPlusJakartaSans)),
-          Expanded(
-              child: Container(
-                  alignment: Alignment.centerRight,
-                  child: CustomIconButtonRow(
-                      firstIconPath: ImageConstant.imgButtons,
-                      secondIconPath: ImageConstant.imgButtonsGray50,
-                      onFirstIconTap: () => _openQRShareBottomSheet(context),
-                      onSecondIconTap: () => onTapCameraButton(context)))),
-        ]));
+    return Consumer(builder: (context, ref, _) {
+      final state = ref.watch(friendsManagementNotifier);
+      final friendsCount =
+          state.friendsManagementModel?.friendsList?.length ?? 0;
+
+      return Container(
+          margin: EdgeInsets.only(right: 6.h),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+                width: 26.h,
+                height: 26.h,
+                margin: EdgeInsets.only(top: 2.h),
+                child: CustomImageView(
+                    imagePath: ImageConstant.imgIconDeepPurpleA100,
+                    fit: BoxFit.contain)),
+            SizedBox(width: 6.h),
+            Container(
+                margin: EdgeInsets.only(top: 2.h),
+                child: Text('Friends ($friendsCount)',
+                    style: TextStyleHelper
+                        .instance.title20ExtraBoldPlusJakartaSans)),
+            Expanded(
+                child: Container(
+                    alignment: Alignment.centerRight,
+                    child: CustomIconButtonRow(
+                        firstIconPath: ImageConstant.imgButtons,
+                        secondIconPath: ImageConstant.imgButtonsGray50,
+                        onFirstIconTap: () => _openQRShareBottomSheet(context),
+                        onSecondIconTap: () => onTapCameraButton(context)))),
+          ]));
+    });
   }
 
   /// Open QR share bottom sheet

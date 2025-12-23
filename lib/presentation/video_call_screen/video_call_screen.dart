@@ -11,6 +11,16 @@ class VideoCallScreen extends ConsumerStatefulWidget {
 
 class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      ref.read(videoCallProvider.notifier).initializeWithStoryData(args);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
@@ -79,125 +89,153 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
 
   /// Section Widget
   Widget _buildUserInfoSection(BuildContext context) {
-    return Row(
-      spacing: 12.h,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        GestureDetector(
-          onTap: () {
-            onTapUserProfile(context);
-          },
-          child: Container(
-            width: 54.h,
-            height: 58.h,
-            child: Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: CustomImageView(
-                    imagePath: ImageConstant.imgEllipse852x52,
-                    height: 52.h,
-                    width: 52.h,
-                    radius: BorderRadius.circular(26.h),
-                  ),
+    return Consumer(
+      builder: (context, ref, _) {
+        final model = ref.watch(videoCallProvider).videoCallModel;
+        final contributorName = model?.contributorName ?? 'Unknown User';
+        final contributorAvatar = model?.contributorAvatar ?? '';
+        final lastSeen = model?.lastSeen ?? '';
+        final memoryCategoryName = model?.memoryCategoryName ?? '';
+        final memoryCategoryIcon = model?.memoryCategoryIcon ?? '';
+
+        return Row(
+          spacing: 12.h,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () {
+                onTapUserProfile(context);
+              },
+              child: Container(
+                width: 54.h,
+                height: 58.h,
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: CustomImageView(
+                        imagePath: contributorAvatar.isNotEmpty
+                            ? contributorAvatar
+                            : ImageConstant.imgEllipse852x52,
+                        height: 52.h,
+                        width: 52.h,
+                        radius: BorderRadius.circular(26.h),
+                      ),
+                    ),
+                    if (memoryCategoryIcon.isNotEmpty)
+                      Container(
+                        height: 24.h,
+                        width: 24.h,
+                        padding: EdgeInsets.all(4.h),
+                        decoration: BoxDecoration(
+                          color: appTheme.deep_purple_A100,
+                          border:
+                              Border.all(color: appTheme.gray_900_02, width: 2),
+                          borderRadius: BorderRadius.circular(12.h),
+                        ),
+                        child: Text(
+                          memoryCategoryIcon,
+                          style: TextStyle(fontSize: 14.0),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
                 ),
-                Container(
-                  height: 24.h,
-                  width: 24.h,
-                  padding: EdgeInsets.all(4.h),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                spacing: 2.h,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    contributorName,
+                    style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    lastSeen,
+                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300),
+                  ),
+                ],
+              ),
+            ),
+            if (memoryCategoryName.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  onTapMemoryCategory(context);
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 8.h),
                   decoration: BoxDecoration(
-                    color: appTheme.deep_purple_A100,
-                    border: Border.all(color: appTheme.gray_900_02, width: 2),
-                    borderRadius: BorderRadius.circular(12.h),
+                    color: appTheme.gray_900_02,
+                    borderRadius: BorderRadius.circular(18.h),
                   ),
-                  child: CustomImageView(
-                    imagePath: ImageConstant.imgIcon20x20,
-                    height: 20.h,
-                    width: 20.h,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (memoryCategoryIcon.isNotEmpty)
+                        Text(
+                          memoryCategoryIcon,
+                          style: TextStyle(fontSize: 18.h),
+                        ),
+                      SizedBox(width: 4.h),
+                      Text(
+                        memoryCategoryName,
+                        style: TextStyleHelper
+                            .instance.body12BoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          child: Column(
-            spacing: 2.h,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Sarah Smith',
-                style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
               ),
-              Text(
-                '2 mins ago',
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-            ],
-          ),
-        ),
-        GestureDetector(
-          onTap: () {
-            onTapHangoutButton(context);
-          },
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 8.h),
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_02,
-              borderRadius: BorderRadius.circular(18.h),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CustomImageView(
-                  imagePath: ImageConstant.imgEmojiMemorycategory,
-                  height: 24.h,
-                  width: 24.h,
-                ),
-                SizedBox(width: 4.h),
-                Text(
-                  'Hangout',
-                  style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
   /// Section Widget
   Widget _buildParticipantsSection(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        margin: EdgeInsets.only(top: 16.h, right: 16.h),
-        padding: EdgeInsets.all(8.h),
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_01,
-          borderRadius: BorderRadius.circular(26.h),
-        ),
-        child: Column(
-          spacing: 8.h,
-          children: [
-            CustomImageView(
-              imagePath: ImageConstant.imgEllipse826x26,
-              height: 40.h,
-              width: 40.h,
+    return Consumer(
+      builder: (context, ref, _) {
+        final model = ref.watch(videoCallProvider).videoCallModel;
+        final contributors = model?.contributorsList ?? [];
+
+        if (contributors.isEmpty) {
+          return SizedBox.shrink();
+        }
+
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Container(
+            margin: EdgeInsets.only(top: 16.h, right: 16.h),
+            padding: EdgeInsets.all(8.h),
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_01,
+              borderRadius: BorderRadius.circular(26.h),
             ),
-            CustomImageView(
-              imagePath: ImageConstant.imgEllipse8DeepOrange10001,
-              height: 40.h,
-              width: 40.h,
+            child: Column(
+              spacing: 8.h,
+              children: contributors.take(3).map((contributor) {
+                final avatarUrl = contributor['avatar_url'] as String? ?? '';
+                return CustomImageView(
+                  imagePath: avatarUrl.isNotEmpty
+                      ? avatarUrl
+                      : ImageConstant.imgEllipse826x26,
+                  height: 40.h,
+                  width: 40.h,
+                  radius: BorderRadius.circular(20.h),
+                );
+              }).toList(),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -292,13 +330,13 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   Widget _buildReactionButtons(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
-        final state = ref.watch(videoCallNotifier);
+        final state = ref.watch(videoCallProvider);
 
         return Row(
           children: [
             GestureDetector(
               onTap: () {
-                ref.read(videoCallNotifier.notifier).onReactionTap('LOL');
+                ref.read(videoCallProvider.notifier).onReactionTap('LOL');
               },
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 12.h),
@@ -316,7 +354,7 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
             SizedBox(width: 16.h),
             GestureDetector(
               onTap: () {
-                ref.read(videoCallNotifier.notifier).onReactionTap('HOTT');
+                ref.read(videoCallProvider.notifier).onReactionTap('HOTT');
               },
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 12.h),
@@ -334,7 +372,7 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
             SizedBox(width: 16.h),
             GestureDetector(
               onTap: () {
-                ref.read(videoCallNotifier.notifier).onReactionTap('WILD');
+                ref.read(videoCallProvider.notifier).onReactionTap('WILD');
               },
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 12.h),
@@ -352,7 +390,7 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
             SizedBox(width: 16.h),
             GestureDetector(
               onTap: () {
-                ref.read(videoCallNotifier.notifier).onReactionTap('OMG');
+                ref.read(videoCallProvider.notifier).onReactionTap('OMG');
               },
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 12.h),
@@ -377,7 +415,7 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
   Widget _buildEmojiReactions(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
-        final state = ref.watch(videoCallNotifier);
+        final state = ref.watch(videoCallProvider);
 
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: 4.h),
@@ -388,14 +426,14 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                 context,
                 ImageConstant.imgHeart,
                 '2',
-                () => ref.read(videoCallNotifier.notifier).onEmojiTap('heart'),
+                () => ref.read(videoCallProvider.notifier).onEmojiTap('heart'),
               ),
               _buildEmojiItem(
                 context,
                 null,
                 '2',
                 () => ref
-                    .read(videoCallNotifier.notifier)
+                    .read(videoCallProvider.notifier)
                     .onEmojiTap('heart_eyes'),
                 backgroundColor: appTheme.red_600,
               ),
@@ -404,14 +442,14 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                 ImageConstant.imgLaughing,
                 '2',
                 () =>
-                    ref.read(videoCallNotifier.notifier).onEmojiTap('laughing'),
+                    ref.read(videoCallProvider.notifier).onEmojiTap('laughing'),
               ),
               _buildEmojiItem(
                 context,
                 ImageConstant.imgThumbsup,
                 '2',
                 () =>
-                    ref.read(videoCallNotifier.notifier).onEmojiTap('thumbsup'),
+                    ref.read(videoCallProvider.notifier).onEmojiTap('thumbsup'),
               ),
             ],
           ),
@@ -471,23 +509,29 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
     NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
-  /// Handles hangout button tap
-  void onTapHangoutButton(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.appHome);
+  /// Handles memory category button tap
+  void onTapMemoryCategory(BuildContext context) {
+    final memoryId = ref.read(videoCallProvider).videoCallModel?.memoryId;
+    if (memoryId != null && memoryId.isNotEmpty) {
+      NavigatorService.pushNamed(
+        AppRoutes.appBsDetails,
+        arguments: {'memoryId': memoryId},
+      );
+    }
   }
 
   /// Handles volume/audio button tap
   void onTapVolumeButton(BuildContext context) {
-    ref.read(videoCallNotifier.notifier).toggleAudio();
+    ref.read(videoCallProvider.notifier).toggleAudio();
   }
 
   /// Handles share button tap
   void onTapShareButton(BuildContext context) {
-    ref.read(videoCallNotifier.notifier).shareCall();
+    ref.read(videoCallProvider.notifier).shareCall();
   }
 
   /// Handles options button tap
   void onTapOptionsButton(BuildContext context) {
-    ref.read(videoCallNotifier.notifier).showCallOptions();
+    ref.read(videoCallProvider.notifier).showCallOptions();
   }
 }

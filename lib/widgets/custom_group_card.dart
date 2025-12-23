@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /** CustomGroupCard - A reusable group card component that displays group information with member avatars and action buttons. Supports flexible member avatar stacking and customizable styling for group management interfaces. */
 class CustomGroupCard extends StatelessWidget {
@@ -8,6 +8,7 @@ class CustomGroupCard extends StatelessWidget {
     required this.groupData,
     this.onActionTap,
     this.onDeleteTap,
+    this.onEditTap,
     this.backgroundColor,
     this.borderRadius,
     this.padding,
@@ -22,6 +23,9 @@ class CustomGroupCard extends StatelessWidget {
 
   /// Callback for the delete/remove action button
   final VoidCallback? onDeleteTap;
+
+  /// Callback for the edit action button (for creators)
+  final VoidCallback? onEditTap;
 
   /// Background color of the card
   final Color? backgroundColor;
@@ -61,10 +65,36 @@ class CustomGroupCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          groupData.title ?? '',
-          style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-              .copyWith(color: appTheme.gray_50),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                groupData.title ?? '',
+                style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                    .copyWith(color: appTheme.gray_50),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (groupData.isCreator == true) ...[
+              SizedBox(width: 8.h),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: appTheme.deep_purple_A100,
+                  borderRadius: BorderRadius.circular(6.h),
+                ),
+                child: Text(
+                  'Creator',
+                  style: TextStyleHelper.instance.bodyTextRegularPlusJakartaSans
+                      .copyWith(
+                    color: appTheme.gray_50,
+                    fontSize: 10.fSize,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         SizedBox(
             height: groupData.memberImages?.isNotEmpty == true ? 6.h : 4.h),
@@ -132,6 +162,17 @@ class CustomGroupCard extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (groupData.isCreator == true && onEditTap != null) ...[
+          GestureDetector(
+            onTap: onEditTap,
+            child: CustomImageView(
+              imagePath: ImageConstant.imgEdit,
+              height: 26.h,
+              width: 26.h,
+            ),
+          ),
+          SizedBox(width: 12.h),
+        ],
         GestureDetector(
           onTap: onActionTap,
           child: CustomImageView(
@@ -160,6 +201,7 @@ class CustomGroupData {
     this.title,
     this.memberCountText,
     this.memberImages,
+    this.isCreator = false,
   });
 
   /// The group title/name
@@ -170,4 +212,7 @@ class CustomGroupData {
 
   /// List of profile image paths for group members
   final List<String>? memberImages;
+
+  /// Whether the current user is the creator of this group
+  final bool? isCreator;
 }

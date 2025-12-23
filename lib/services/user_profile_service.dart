@@ -137,7 +137,7 @@ class UserProfileService {
     }
   }
 
-  /// Get user profile by ID
+  /// Get user profile by specific user ID (for viewing other users' profiles)
   Future<Map<String, dynamic>?> getUserProfileById(String userId) async {
     try {
       final client = SupabaseService.instance.client;
@@ -145,13 +145,19 @@ class UserProfileService {
 
       final response = await client
           .from('user_profiles')
-          .select('*')
+          .select()
           .eq('id', userId)
           .maybeSingle();
 
+      if (response == null) {
+        debugPrint('⚠️ No profile found for user: $userId');
+        return null;
+      }
+
+      debugPrint('✅ User profile fetched successfully for: $userId');
       return response;
     } catch (e) {
-      print('❌ Error fetching user profile by ID: $e');
+      debugPrint('❌ Error fetching user profile by ID: $e');
       return null;
     }
   }

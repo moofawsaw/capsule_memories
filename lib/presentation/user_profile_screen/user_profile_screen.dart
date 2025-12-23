@@ -113,30 +113,52 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   Widget _buildActionButtons(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
+        final state = ref.watch(userProfileNotifier);
+        final notifier = ref.read(userProfileNotifier.notifier);
+        final isFollowing = state.isFollowing ?? false;
+
         return Row(
           children: [
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: appTheme.deep_purple_A100,
-                  borderRadius: BorderRadius.circular(6.h),
-                ),
-                padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 12.h),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  spacing: 8.h,
-                  children: [
-                    Text(
-                      'follow',
-                      style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                          .copyWith(color: appTheme.white_A700),
-                    ),
-                    CustomImageView(
-                      imagePath: ImageConstant.imgIconWhiteA70018x18,
-                      height: 18.h,
-                      width: 18.h,
-                    ),
-                  ],
+              child: GestureDetector(
+                onTap: () {
+                  // Get target user ID from route arguments or state
+                  final targetUserId =
+                      'target-user-id'; // Replace with actual user ID
+                  notifier.onFollowButtonPressed(targetUserId);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isFollowing
+                        ? appTheme.gray_50
+                        : appTheme.deep_purple_A100,
+                    borderRadius: BorderRadius.circular(6.h),
+                  ),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 20.h, vertical: 12.h),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    spacing: 8.h,
+                    children: [
+                      Text(
+                        isFollowing ? 'following' : 'follow',
+                        style: TextStyleHelper
+                            .instance.body14BoldPlusJakartaSans
+                            .copyWith(
+                                color: isFollowing
+                                    ? appTheme.gray_900_02
+                                    : appTheme.white_A700),
+                      ),
+                      CustomImageView(
+                        imagePath: ImageConstant.imgIconWhiteA70018x18,
+                        height: 18.h,
+                        width: 18.h,
+                        color: isFollowing
+                            ? appTheme.gray_900_02
+                            : appTheme.white_A700,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

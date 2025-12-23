@@ -5,22 +5,27 @@ import '../../../core/app_export.dart';
 // ignore_for_file: must_be_immutable
 class VideoCallModel extends Equatable {
   VideoCallModel({
-    this.userName,
-    this.userImage,
+    this.storyId,
+    this.memoryId,
+    this.memoryTitle,
+    this.memoryCategoryName,
+    this.memoryCategoryIcon,
+    this.contributorName,
+    this.contributorAvatar,
+    this.contributorsList,
     this.lastSeen,
-    this.participantImages,
     this.reactionCounts,
     this.emojiCounts,
-    this.id,
   }) {
-    userName = userName ?? "Sarah Smith";
-    userImage = userImage ?? ImageConstant.imgEllipse852x52;
-    lastSeen = lastSeen ?? "2 mins ago";
-    participantImages = participantImages ??
-        [
-          ImageConstant.imgEllipse826x26,
-          ImageConstant.imgEllipse8DeepOrange10001
-        ];
+    storyId = storyId ?? "";
+    memoryId = memoryId ?? "";
+    memoryTitle = memoryTitle ?? "";
+    memoryCategoryName = memoryCategoryName ?? "";
+    memoryCategoryIcon = memoryCategoryIcon ?? "";
+    contributorName = contributorName ?? "";
+    contributorAvatar = contributorAvatar ?? "";
+    contributorsList = contributorsList ?? [];
+    lastSeen = lastSeen ?? "";
     reactionCounts = reactionCounts ??
         {
           "LOL": 0,
@@ -35,45 +40,60 @@ class VideoCallModel extends Equatable {
           "laughing": 2,
           "thumbsup": 2,
         };
-    id = id ?? "";
   }
 
-  String? userName;
-  String? userImage;
+  String? storyId;
+  String? memoryId;
+  String? memoryTitle;
+  String? memoryCategoryName;
+  String? memoryCategoryIcon;
+  String? contributorName;
+  String? contributorAvatar;
+  List<Map<String, dynamic>>? contributorsList;
   String? lastSeen;
-  List<String>? participantImages;
   Map<String, int>? reactionCounts;
   Map<String, int>? emojiCounts;
-  String? id;
 
   VideoCallModel copyWith({
-    String? userName,
-    String? userImage,
+    String? storyId,
+    String? memoryId,
+    String? memoryTitle,
+    String? memoryCategoryName,
+    String? memoryCategoryIcon,
+    String? contributorName,
+    String? contributorAvatar,
+    List<Map<String, dynamic>>? contributorsList,
     String? lastSeen,
-    List<String>? participantImages,
     Map<String, int>? reactionCounts,
     Map<String, int>? emojiCounts,
-    String? id,
   }) {
     return VideoCallModel(
-      userName: userName ?? this.userName,
-      userImage: userImage ?? this.userImage,
+      storyId: storyId ?? this.storyId,
+      memoryId: memoryId ?? this.memoryId,
+      memoryTitle: memoryTitle ?? this.memoryTitle,
+      memoryCategoryName: memoryCategoryName ?? this.memoryCategoryName,
+      memoryCategoryIcon: memoryCategoryIcon ?? this.memoryCategoryIcon,
+      contributorName: contributorName ?? this.contributorName,
+      contributorAvatar: contributorAvatar ?? this.contributorAvatar,
+      contributorsList: contributorsList ?? this.contributorsList,
       lastSeen: lastSeen ?? this.lastSeen,
-      participantImages: participantImages ?? this.participantImages,
       reactionCounts: reactionCounts ?? this.reactionCounts,
       emojiCounts: emojiCounts ?? this.emojiCounts,
-      id: id ?? this.id,
     );
   }
 
   @override
   List<Object?> get props => [
-        userName,
-        userImage,
+        storyId,
+        memoryId,
+        memoryTitle,
+        memoryCategoryName,
+        memoryCategoryIcon,
+        contributorName,
+        contributorAvatar,
+        contributorsList,
         lastSeen,
-        participantImages,
         reactionCounts,
         emojiCounts,
-        id,
       ];
 }

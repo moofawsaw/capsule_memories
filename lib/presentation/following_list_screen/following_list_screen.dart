@@ -1,4 +1,5 @@
 import '../../core/app_export.dart';
+import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_image_view.dart';
 import './widgets/following_user_item_widget.dart';
 import 'models/following_list_model.dart';
@@ -46,6 +47,8 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(followingListNotifier);
+        final followingCount =
+            state.followingListModel?.followingUsers?.length ?? 0;
 
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -62,7 +65,7 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
             Container(
               margin: EdgeInsets.fromLTRB(6.h, 4.h, 0, 0),
               child: Text(
-                'Following (3)',
+                'Following ($followingCount)',
                 style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans
                     .copyWith(height: 1.3),
               ),
@@ -83,7 +86,7 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
                   borderRadius: BorderRadius.circular(22.h),
                 ),
                 child: Text(
-                  'Followers (21)',
+                  'Followers',
                   style: TextStyleHelper.instance.title16BoldPlusJakartaSans
                       .copyWith(color: appTheme.gray_50, height: 1.31),
                 ),
@@ -101,6 +104,26 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
       builder: (context, ref, _) {
         final state = ref.watch(followingListNotifier);
 
+        if (state.isLoading ?? false) {
+          return Center(
+            child: CircularProgressIndicator(
+              color: appTheme.deep_purple_A100,
+            ),
+          );
+        }
+
+        final followingUsers = state.followingListModel?.followingUsers ?? [];
+
+        if (followingUsers.isEmpty) {
+          return Center(
+            child: Text(
+              'No following yet',
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+            ),
+          );
+        }
+
         return Container(
           margin: EdgeInsets.symmetric(horizontal: 8.h),
           child: ListView.separated(
@@ -110,9 +133,9 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
             separatorBuilder: (context, index) {
               return SizedBox(height: 20.h);
             },
-            itemCount: state.followingListModel?.followingUsers?.length ?? 0,
+            itemCount: followingUsers.length,
             itemBuilder: (context, index) {
-              final user = state.followingListModel?.followingUsers?[index];
+              final user = followingUsers[index];
               return FollowingUserItemWidget(
                 user: user,
                 onUserTap: () {
@@ -160,8 +183,22 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
   }
 
   /// Handles user action (more options)
-  void onTapUserAction(BuildContext context, FollowingUserModel? user) {
-    // Show user options menu or bottom sheet
-    ref.read(followingListNotifier.notifier).onUserAction(user);
+  void onTapUserAction(BuildContext context, FollowingUserModel? user) async {
+    if (user == null) return;
+
+    final confirmed = await CustomConfirmationDialog.show(
+      context: context,
+      title: 'Unfollow ${user.name}?',
+      message:
+          'Are you sure you want to unfollow this user? You can always follow them again later.',
+      confirmText: 'Unfollow',
+      cancelText: 'Cancel',
+      confirmColor: appTheme.red_500,
+      icon: Icons.person_remove_outlined,
+    );
+
+    if (confirmed == true) {
+      await ref.read(followingListNotifier.notifier).unfollowUser(user.id ?? '');
+    }
   }
 }

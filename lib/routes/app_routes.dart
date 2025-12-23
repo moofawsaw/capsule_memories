@@ -42,77 +42,93 @@ import '../presentation/user_profile_screen/user_profile_screen.dart';
 import '../presentation/user_profile_screen_two_screen/user_profile_screen_two_screen.dart';
 import '../presentation/vibe_selection_screen/vibe_selection_screen.dart';
 import '../presentation/video_call_interface_screen/video_call_interface_screen.dart';
-import '../presentation/video_call_screen/video_call_screen.dart';
 
 class AppRoutes {
-  // Auth routes (no header)
+  // App shell route - renders AppShell with persistent header
+  static const String app = '/app';
+
+  // Bottom sheet routes under /app (alphabetically organized)
+  static const String appBsDetails = '/app/bs/details';
+  static const String appBsDownload = '/app/bs/download';
+  static const String appBsGroupCreate = '/app/bs/group-create';
+  static const String appBsInvite = '/app/bs/invite';
+  static const String appBsMembers = '/app/bs/members';
+  static const String appBsMemoryCreate = '/app/bs/memory-create';
+  static const String appBsQrFriend = '/app/bs/qr-friend';
+  static const String appBsQrGroup = '/app/bs/qr-group';
+  static const String appBsQrMemory = '/app/bs/qr-memory';
+  static const String appBsQrTimeline = '/app/bs/qr-timeline';
+  static const String appBsShare = '/app/bs/share';
+  static const String appBsStories = '/app/bs/stories';
+  static const String appBsUpload = '/app/bs/upload';
+  static const String appBsVibes = '/app/bs/vibes';
+
+  // Child routes under /app (alphabetically organized)
+  static const String appFeed = '/app/feed';
+  static const String appFeedback = '/app/feedback';
+  static const String appFollowers = '/app/followers';
+  static const String appFollowing = '/app/following';
+  static const String appFriends = '/app/friends';
+  static const String appGroups = '/app/groups';
+  @Deprecated('Use appStoryRecord instead')
+  static const String appHome = '/app/home';
+  static const String appJoin = '/app/join';
+  static const String appMemories = '/app/memories';
+  static const String appMenu = '/app/menu';
+  static const String appNavigation = '/app/navigation';
+  static const String appNotifications = '/app/notifications';
+  static const String appOverlayText = '/app/overlay/text';
+  @Deprecated('Use appStoryEdit instead')
+  static const String appPost = '/app/post';
+  static const String appProfile = '/app/profile';
+  static const String appProfileUser = '/app/profile-user';
+  static const String appReels = '/app/reels';
+  static const String appReport = '/app/report';
+  static const String appSettings = '/app/settings';
+  static const String appStickers = '/app/stickers';
+  static const String appStoryEdit = '/app/story/edit';
+  static const String appStoryRecord = '/app/story/record';
+  static const String appStoryView = '/app/story/view';
+  static const String appTimeline = '/app/timeline';
+  static const String appTimelineSealed = '/app/timeline-sealed';
+  @Deprecated('Use appStoryView instead')
+  static const String appVideoCall = '/app/video-call';
+
+  // Auth routes (alphabetically organized)
   static const String authLogin = '/auth/login';
   static const String authRegister = '/auth/register';
   static const String authReset = '/auth/reset';
 
-  // Top-level routes (no header)
+  // Other routes (alphabetically organized)
+  static const String groupEditBottomSheet = '/group-edit-bottom-sheet';
   static const String splash = '/splash';
-
-  // App shell route - renders AppShell with persistent header
-  static const String app = '/app';
-
-  // Child routes under /app (header persists, only content changes)
-  static const String appHome = '/app/home';
-  static const String appFeed = '/app/feed';
-  static const String appMemories = '/app/memories';
-  static const String appProfile = '/app/profile';
-  static const String appProfileTwo = '/app/profile-two';
-  static const String appNotifications = '/app/notifications';
-  static const String appSettings = '/app/settings';
-  static const String appFriends = '/app/friends';
-  static const String appFollowers = '/app/followers';
-  static const String appFollowing = '/app/following';
-  static const String appGroups = '/app/groups';
-  static const String appMenu = '/app/menu';
-  static const String appNavigation = '/app/navigation';
-  static const String appTimeline = '/app/timeline';
-  static const String appTimelineSealed = '/app/timeline-sealed';
-  static const String appVideoCall = '/app/video-call';
-  static const String appReels = '/app/reels';
-  static const String appPost = '/app/post';
-  static const String appReport = '/app/report';
-  static const String appStickers = '/app/stickers';
-  static const String appJoin = '/app/join';
-  static const String appFeedback = '/app/feedback';
-
-  // Bottom sheet routes under /app
-  static const String appBsMemoryCreate = '/app/bs/memory-create';
-  static const String appBsShare = '/app/bs/share';
-  static const String appBsInvite = '/app/bs/invite';
-  static const String appBsMembers = '/app/bs/members';
-  static const String appBsQrTimeline = '/app/bs/qr-timeline';
-  static const String appBsQrFriend = '/app/bs/qr-friend';
-  static const String appBsGroupCreate = '/app/bs/group-create';
-  static const String appBsQrGroup = '/app/bs/qr-group';
-  static const String appBsStories = '/app/bs/stories';
-  static const String appBsUpload = '/app/bs/upload';
-  static const String appBsDetails = '/app/bs/details';
-  static const String appBsVibes = '/app/bs/vibes';
-  static const String appBsQrMemory = '/app/bs/qr-memory';
-  static const String appBsDownload = '/app/bs/download';
-
-  // Overlay routes under /app
-  static const String appOverlayText = '/app/overlay/text';
 
   static const String initialRoute = appFeed;
 
   /// Get the child widget for a given app route
   static Widget _getAppChild(String routeName) {
     switch (routeName) {
-      case appHome:
+      // Story workflow routes - record, edit, view
+      case appStoryRecord:
         return HangoutCallScreen();
+      case appStoryEdit:
+        return PostStoryScreen();
+      case appStoryView:
+        return EventStoriesViewScreen();
+
+      // Backward compatibility - deprecated routes redirect to new story routes
+      case appHome:
+        return HangoutCallScreen(); // Redirects to record
+      case appPost:
+        return PostStoryScreen(); // Redirects to edit
+
       case appFeed:
         return const MemoryFeedDashboardScreen();
       case appMemories:
         return MemoriesDashboardScreen();
       case appProfile:
         return UserProfileScreen();
-      case appProfileTwo:
+      case appProfileUser:
         return UserProfileScreenTwo();
       case appNotifications:
         return const NotificationsScreen();
@@ -134,12 +150,8 @@ class AppRoutes {
         return EventTimelineViewScreen();
       case appTimelineSealed:
         return MemoryDetailsViewScreen();
-      case appVideoCall:
-        return VideoCallScreen();
       case appReels:
         return VideoCallInterfaceScreen();
-      case appPost:
-        return PostStoryScreen();
       case appReport:
         return ReportStoryScreen();
       case appStickers:

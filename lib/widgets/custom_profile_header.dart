@@ -21,11 +21,7 @@ class CustomProfileHeader extends StatelessWidget {
     required this.userName,
     required this.email,
     this.onEditTap,
-    this.avatarSize,
-    this.userNameStyle,
-    this.emailStyle,
     this.margin,
-    this.showEditButton = true,
   }) : super(key: key);
 
   /// Path to the user's avatar image
@@ -40,41 +36,11 @@ class CustomProfileHeader extends StatelessWidget {
   /// Callback function when edit button is tapped
   final VoidCallback? onEditTap;
 
-  /// Size of the avatar image
-  final double? avatarSize;
-
-  /// Text style for the user name
-  final TextStyle? userNameStyle;
-
-  /// Text style for the email
-  final TextStyle? emailStyle;
-
   /// Margin around the entire component
   final EdgeInsetsGeometry? margin;
 
-  /// Whether to show the edit button
-  final bool showEditButton;
-
-  /// Check if avatar URL is a network image (not a local asset)
-  bool _isNetworkImage() {
-    return avatarImagePath.startsWith('http://') ||
-        avatarImagePath.startsWith('https://');
-  }
-
-  /// Check if we should show letter avatar
-  bool _shouldShowLetterAvatar() {
-    // Show letter avatar if:
-    // 1. Avatar path is empty/null
-    // 2. Avatar path is the default placeholder image
-    return avatarImagePath.isEmpty ||
-        avatarImagePath == ImageConstant.imgEllipse896x96;
-  }
-
-  /// Get first letter of email for avatar fallback
-  String _getAvatarLetter() {
-    if (email.isEmpty) return '?';
-    return email[0].toUpperCase();
-  }
+  /// Determines if the edit button should be displayed
+  bool get showEditButton => onEditTap != null;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +52,21 @@ class CustomProfileHeader extends StatelessWidget {
           SizedBox(height: 4.h),
           _buildUserName(context),
           SizedBox(height: 8.h),
-          _buildEmail(context),
+
+          // Show edit icon only if onEditTap is provided (current user)
+          if (onEditTap != null)
+            GestureDetector(
+              onTap: onEditTap,
+              child: Container(
+                padding: EdgeInsets.all(2.h),
+                child: CustomImageView(
+                  imagePath: ImageConstant.imgEdit,
+                  height: 20.h,
+                  width: 20.h,
+                  color: appTheme.gray_50,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -94,7 +74,7 @@ class CustomProfileHeader extends StatelessWidget {
 
   /// Builds the avatar section with optional edit button
   Widget _buildAvatarSection(BuildContext context) {
-    final size = avatarSize ?? 96.h;
+    final size = 96.h;
 
     return SizedBox(
       width: size,
@@ -153,13 +133,23 @@ class CustomProfileHeader extends StatelessWidget {
     );
   }
 
+  /// Determines if letter avatar should be shown
+  bool _shouldShowLetterAvatar() {
+    return avatarImagePath.isEmpty || 
+           avatarImagePath == ImageConstant.imgDefaultAvatar;
+  }
+
+  /// Gets the first letter of user name for avatar
+  String _getAvatarLetter() {
+    return userName.isNotEmpty ? userName[0].toUpperCase() : '?';
+  }
+
   /// Builds the user name text
   Widget _buildUserName(BuildContext context) {
     return Text(
       userName,
-      style: userNameStyle ??
-          TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-              .copyWith(height: 1.29),
+      style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
+          .copyWith(height: 1.29),
     );
   }
 
@@ -167,9 +157,8 @@ class CustomProfileHeader extends StatelessWidget {
   Widget _buildEmail(BuildContext context) {
     return Text(
       email,
-      style: emailStyle ??
-          TextStyleHelper.instance.title16RegularPlusJakartaSans
-              .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+      style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+          .copyWith(color: appTheme.blue_gray_300, height: 1.31),
     );
   }
 }

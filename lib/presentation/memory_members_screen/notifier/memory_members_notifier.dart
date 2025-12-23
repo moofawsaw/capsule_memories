@@ -1,5 +1,6 @@
 import '../models/memory_members_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/memory_members_service.dart';
 
 part 'memory_members_state.dart';
 
@@ -13,74 +14,64 @@ final memoryMembersNotifier = StateNotifierProvider.autoDispose<
 );
 
 class MemoryMembersNotifier extends StateNotifier<MemoryMembersState> {
-  MemoryMembersNotifier(MemoryMembersState state) : super(state) {
-    initialize();
-  }
+  final MemoryMembersService _membersService = MemoryMembersService();
 
-  void initialize() {
-    final members = [
-      MemberModel(
-        name: 'Joe Dirt',
-        profileImagePath: ImageConstant.imgEllipse826x26,
-        role: 'Creator',
-        status: 'Active',
-      ),
-      MemberModel(
-        name: 'Cassey Campbell',
-        profileImagePath: ImageConstant.imgFrame3,
-        role: 'Member',
-        status: 'Active',
-      ),
-      MemberModel(
-        name: 'Jane Doe',
-        profileImagePath: ImageConstant.imgEllipse81,
-        role: 'Member',
-        status: 'Pending Invite',
-      ),
-    ];
+  MemoryMembersNotifier(MemoryMembersState state) : super(state);
 
+  /// Initialize with memory ID to fetch actual members from database
+  Future<void> initialize(String memoryId, {String? memoryTitle}) async {
+    // Set loading state
     state = state.copyWith(
       memoryMembersModel: state.memoryMembersModel?.copyWith(
-        members: members,
+        memoryId: memoryId,
+        memoryTitle: memoryTitle ?? 'Memory',
+        isLoading: true,
+        errorMessage: null,
       ),
     );
+
+    try {
+      // Fetch all members (creator + contributors)
+      final membersData = await _membersService.fetchAllMemoryMembers(memoryId);
+
+      // Convert to MemberModel objects
+      final members = membersData.map((data) {
+        return MemberModel(
+          userId: data['user_id'] as String? ?? '',
+          displayName: data['display_name'] as String? ?? 'Unknown',
+          username: data['username'] as String? ?? '',
+          avatarUrl: data['avatar_url'] as String? ?? '',
+          isCreator: data['is_creator'] as bool? ?? false,
+          isVerified: data['is_verified'] as bool? ?? false,
+          joinedAt: data['joined_at'] as String?,
+        );
+      }).toList();
+
+      // Update state with fetched members
+      state = state.copyWith(
+        memoryMembersModel: state.memoryMembersModel?.copyWith(
+          members: members,
+          isLoading: false,
+          errorMessage: null,
+        ),
+      );
+    } catch (e) {
+      // Handle error
+      state = state.copyWith(
+        memoryMembersModel: state.memoryMembersModel?.copyWith(
+          members: [],
+          isLoading: false,
+          errorMessage: 'Failed to load members',
+        ),
+      );
+      print('Error loading memory members: $e');
+    }
   }
 
-  void selectMember(String memberName) {
+  void selectMember(String memberId) {
     state = state.copyWith(
-      selectedMemberName: memberName,
+      selectedMemberId: memberId,
     );
-
     // Navigate to member profile or show member options
-    // This can be extended based on requirements
-  }
-
-  void removeMember(String memberId) {
-    final updatedMembers = state.memoryMembersModel?.members
-        ?.where(
-          (member) => member.name != memberId,
-        )
-        .toList();
-
-    state = state.copyWith(
-      memoryMembersModel: state.memoryMembersModel?.copyWith(
-        members: updatedMembers,
-      ),
-    );
-  }
-
-  void updateMemberRole(String memberName, String newRole) {
-    final updatedMembers = state.memoryMembersModel?.members?.map((member) {
-      if (member.name == memberName) {
-        return member.copyWith(role: newRole);
-      }
-      return member;
-    }).toList();
-
-    state = state.copyWith(
-      memoryMembersModel: state.memoryMembersModel?.copyWith(
-        members: updatedMembers,
-      ),
-    );
   }
 }

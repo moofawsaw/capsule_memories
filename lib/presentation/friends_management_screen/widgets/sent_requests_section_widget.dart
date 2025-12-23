@@ -1,5 +1,6 @@
 import '../../../core/app_export.dart';
-import '../../../widgets/custom_friend_item.dart';
+import '../../../widgets/custom_confirmation_dialog.dart';
+import '../../../widgets/custom_friend_request_card.dart';
 import '../notifier/friends_management_notifier.dart';
 
 class SentRequestsSectionWidget extends ConsumerWidget {
@@ -7,54 +8,62 @@ class SentRequestsSectionWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(friendsManagementNotifier);
+    final sentRequests = state.filteredSentRequestsList ??
+        state.friendsManagementModel?.sentRequestsList ??
+        [];
+
+    if (sentRequests.isEmpty) {
+      return SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          margin: EdgeInsets.only(left: 4.h),
-          child: Text(
-            'Sent Requests',
-            style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
+        Text(
+          'Sent Requests (${sentRequests.length})',
+          style: TextStyleHelper.instance.title16MediumPlusJakartaSans.copyWith(
+            color: appTheme.gray_50,
           ),
         ),
-        SizedBox(height: 10.h),
-        Consumer(
-          builder: (context, ref, _) {
-            final state = ref.watch(friendsManagementNotifier);
-            final sentRequestsList = state.filteredSentRequestsList ??
-                state.friendsManagementModel?.sentRequestsList ??
-                [];
-
-            if (sentRequestsList.isEmpty) {
-              return Container(
-                padding: EdgeInsets.all(20.h),
-                child: Text(
-                  'No sent requests',
-                  style: TextStyleHelper.instance.body14,
-                ),
-              );
-            }
-
-            return Container(
-              margin: EdgeInsets.only(left: 4.h),
-              child: Column(
-                spacing: 6.h,
-                children: sentRequestsList
-                    .map((request) => CustomFriendItem(
-                          profileImagePath: request.profileImagePath ?? '',
-                          userName: request.userName ?? '',
-                          statusText: request.status,
-                          onActionTap: () => ref
-                              .read(friendsManagementNotifier.notifier)
-                              .onRemoveSentRequest(request.id ?? ''),
-                        ))
-                    .toList(),
-              ),
+        SizedBox(height: 12.h),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          itemCount: sentRequests.length,
+          separatorBuilder: (context, index) => SizedBox(height: 12.h),
+          itemBuilder: (context, index) {
+            final request = sentRequests[index];
+            return CustomFriendRequestCard(
+              profileImagePath: request.profileImagePath ?? '',
+              userName: request.displayName ?? request.userName ?? '',
+              buttonText: 'Cancel',
+              onButtonPressed: () {
+                _showCancelRequestConfirmation(context, ref, request.id ?? '',
+                    request.displayName ?? request.userName ?? '');
+              },
             );
           },
         ),
       ],
     );
+  }
+
+  void _showCancelRequestConfirmation(
+      BuildContext context, WidgetRef ref, String requestId, String userName) {
+    CustomConfirmationDialog.show(
+      context: context,
+      title: 'Cancel Request',
+      message:
+          'Are you sure you want to cancel the friend request to $userName?',
+      confirmText: 'Cancel Request',
+      cancelText: 'Keep',
+    ).then((confirmed) {
+      if (confirmed == true) {
+        ref
+            .read(friendsManagementNotifier.notifier)
+            .onRemoveSentRequest(requestId);
+      }
+    });
   }
 }

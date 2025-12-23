@@ -1,7 +1,7 @@
-import '../models/memories_dashboard_model.dart';
-import '../models/memory_item_model.dart';
-import '../models/story_item_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/memory_cache_service.dart';
+import '../../../services/supabase_service.dart';
+import '../models/memories_dashboard_model.dart';
 
 part 'memories_dashboard_state.dart';
 
@@ -15,215 +15,121 @@ final memoriesDashboardNotifier = StateNotifierProvider.autoDispose<
 );
 
 class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
+  final _cacheService = MemoryCacheService();
+
   MemoriesDashboardNotifier(MemoriesDashboardState state) : super(state) {
     initialize();
   }
 
-  void initialize() {
-    _initializeStoryItems();
-    _initializeMemoryItems();
+  void initialize() async {
+    state = state.copyWith(isLoading: true);
 
-    state = state.copyWith(
-      isLoading: false,
-      selectedTabIndex: 0,
-    );
+    try {
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+
+      print('🔍 MEMORIES DEBUG: Initializing memories dashboard');
+      print('🔍 MEMORIES DEBUG: Current user ID: ${currentUser?.id}');
+
+      if (currentUser == null) {
+        print('❌ MEMORIES DEBUG: No authenticated user found');
+        state = state.copyWith(isLoading: false);
+        return;
+      }
+
+      // Use cache service for data loading
+      await _loadFromCache(currentUser.id);
+
+      state = state.copyWith(
+        isLoading: false,
+        selectedTabIndex: 0,
+      );
+
+      print('✅ MEMORIES DEBUG: Initialization complete');
+    } catch (e) {
+      print('❌ MEMORIES DEBUG: Error initializing memories dashboard: $e');
+      state = state.copyWith(isLoading: false);
+    }
   }
 
-  void _initializeStoryItems() {
-    final storyItems = [
-      StoryItemModel(
-        backgroundImage: ImageConstant.imgImage8202x116,
-        profileImage: ImageConstant.imgFrame2,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
-      ),
-      StoryItemModel(
-        backgroundImage: ImageConstant.imgImage8120x90,
-        profileImage: ImageConstant.imgFrame1,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
-      ),
-      StoryItemModel(
-        backgroundImage: ImageConstant.imgImage8,
-        profileImage: ImageConstant.imgFrame48x48,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
-      ),
-      StoryItemModel(
-        backgroundImage: ImageConstant.imgImg,
-        profileImage: ImageConstant.imgEllipse842x42,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
-      ),
-      StoryItemModel(
-        backgroundImage: ImageConstant.imgImage81,
-        profileImage: ImageConstant.imgEllipse81,
-        timestamp: '2 mins ago',
-        navigateTo: '1398:6774',
-      ),
-    ];
+  Future<void> _loadFromCache(String userId) async {
+    try {
+      print('🔍 MEMORIES DEBUG: Loading data from cache service');
 
-    state = state.copyWith(
-      memoriesDashboardModel: state.memoriesDashboardModel?.copyWith(
-        storyItems: storyItems,
-      ),
-    );
-  }
+      // Load stories and memories from cache
+      final stories = await _cacheService.getStories(userId);
+      final memories = await _cacheService.getMemories(userId);
 
-  void _initializeMemoryItems() {
-    final memoryItems = [
-      MemoryItemModel(
-        title: 'Nixon Wedding 2025',
-        date: 'Dec 4, 2025',
-        eventDate: 'Dec 4',
-        eventTime: '3:18pm',
-        endDate: 'Dec 4',
-        endTime: '3:18am',
-        location: 'Tillsonburg, ON',
-        distance: '21km',
-        participantAvatars: [
-          ImageConstant.imgFrame2,
-          ImageConstant.imgFrame1,
-          ImageConstant.imgEllipse81,
-        ],
-        memoryThumbnails: [
-          ImageConstant.imgImage9,
-          ImageConstant.imgImage8,
-        ],
-        isLive: true,
-      ),
-      MemoryItemModel(
-        title: 'Family Reunion 2024',
-        date: 'Dec 1, 2024',
-        eventDate: 'Dec 1',
-        eventTime: '2:30pm',
-        endDate: 'Dec 1',
-        endTime: '11:45pm',
-        location: 'Toronto, ON',
-        distance: '45km',
-        participantAvatars: [
-          ImageConstant.imgFrame2,
-          ImageConstant.imgFrame1,
-          ImageConstant.imgEllipse81,
-        ],
-        memoryThumbnails: [
-          ImageConstant.imgImage9,
-          ImageConstant.imgImage8,
-        ],
-        isSealed: true,
-      ),
-    ];
+      print(
+          '✅ MEMORIES DEBUG: Loaded ${stories.length} stories and ${memories.length} memories from cache');
 
-    final liveMemories =
-        memoryItems.where((item) => item.isLive ?? false).toList();
-    final sealedMemories =
-        memoryItems.where((item) => item.isSealed ?? false).toList();
+      final liveMemories = memories.where((m) => m.state == 'open').toList();
+      final sealedMemories =
+          memories.where((m) => m.state == 'sealed').toList();
 
-    state = state.copyWith(
-      memoriesDashboardModel: state.memoriesDashboardModel?.copyWith(
-        memoryItems: memoryItems,
-        liveMemoryItems: liveMemories,
-        sealedMemoryItems: sealedMemories,
-        allCount: memoryItems.length,
-        liveCount: liveMemories.length,
-        sealedCount: sealedMemories.length,
-      ),
-    );
+      state = state.copyWith(
+        memoriesDashboardModel: state.memoriesDashboardModel?.copyWith(
+          storyItems: stories,
+          memoryItems: memories,
+          liveMemoryItems: liveMemories,
+          sealedMemoryItems: sealedMemories,
+          allCount: memories.length,
+          liveCount: liveMemories.length,
+          sealedCount: sealedMemories.length,
+        ),
+      );
+
+      print('✅ MEMORIES DEBUG: State updated with cached data');
+    } catch (e) {
+      print('❌ MEMORIES DEBUG: Error loading from cache: $e');
+    }
   }
 
   void updateSelectedTabIndex(int index) {
     state = state.copyWith(selectedTabIndex: index);
   }
 
-  void loadAllStories() {
+  void loadAllStories() async {
     state = state.copyWith(isLoading: true);
 
-    // Simulate loading more stories
-    Future.delayed(Duration(milliseconds: 500), () {
-      final currentStories = state.memoriesDashboardModel?.storyItems ?? [];
-      final additionalStories = [
-        StoryItemModel(
-          backgroundImage: ImageConstant.imgImage8202x116,
-          profileImage: ImageConstant.imgFrame2,
-          timestamp: '5 mins ago',
-          navigateTo: '1398:6774',
-        ),
-        StoryItemModel(
-          backgroundImage: ImageConstant.imgImage8120x90,
-          profileImage: ImageConstant.imgFrame1,
-          timestamp: '8 mins ago',
-          navigateTo: '1398:6774',
-        ),
-      ];
-
-      final updatedStories = [...currentStories, ...additionalStories];
+    try {
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+      if (currentUser != null) {
+        final stories = await _cacheService.getStories(currentUser.id);
+        state = state.copyWith(
+          memoriesDashboardModel: state.memoriesDashboardModel?.copyWith(
+            storyItems: stories,
+          ),
+        );
+      }
 
       state = state.copyWith(
-        memoriesDashboardModel: state.memoriesDashboardModel?.copyWith(
-          storyItems: updatedStories,
-        ),
         isLoading: false,
         isSuccess: true,
       );
-    });
+    } catch (e) {
+      print('Error loading all stories: $e');
+      state = state.copyWith(isLoading: false);
+    }
   }
 
-  void createNewMemory() {
+  void refreshMemories() async {
     state = state.copyWith(isLoading: true);
 
-    Future.delayed(Duration(milliseconds: 800), () {
-      final newMemory = MemoryItemModel(
-        title: 'New Year Celebration 2025',
-        date: 'Dec 31, 2024',
-        eventDate: 'Dec 31',
-        eventTime: '11:30pm',
-        endDate: 'Jan 1',
-        endTime: '2:00am',
-        location: 'Downtown, ON',
-        distance: '12km',
-        participantAvatars: [
-          ImageConstant.imgFrame2,
-          ImageConstant.imgFrame1,
-        ],
-        memoryThumbnails: [
-          ImageConstant.imgImage9,
-        ],
-        isLive: true,
-      );
-
-      final currentMemories = state.memoriesDashboardModel?.memoryItems ?? [];
-      final updatedMemories = [newMemory, ...currentMemories];
-
-      final liveMemories =
-          updatedMemories.where((item) => item.isLive ?? false).toList();
-      final sealedMemories =
-          updatedMemories.where((item) => item.isSealed ?? false).toList();
-
-      state = state.copyWith(
-        memoriesDashboardModel: state.memoriesDashboardModel?.copyWith(
-          memoryItems: updatedMemories,
-          liveMemoryItems: liveMemories,
-          sealedMemoryItems: sealedMemories,
-          allCount: updatedMemories.length,
-          liveCount: liveMemories.length,
-          sealedCount: sealedMemories.length,
-        ),
-        isLoading: false,
-        isSuccess: true,
-      );
-    });
-  }
-
-  void refreshMemories() {
-    state = state.copyWith(isLoading: true);
-
-    Future.delayed(Duration(milliseconds: 1000), () {
-      initialize();
+    try {
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+      if (currentUser != null) {
+        // Force refresh cache
+        await _cacheService.refreshMemoryCache(currentUser.id);
+        await _loadFromCache(currentUser.id);
+      }
 
       state = state.copyWith(
         isLoading: false,
         isSuccess: true,
       );
-    });
+    } catch (e) {
+      print('Error refreshing memories: $e');
+      state = state.copyWith(isLoading: false);
+    }
   }
 }

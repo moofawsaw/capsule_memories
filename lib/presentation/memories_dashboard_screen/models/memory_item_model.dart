@@ -1,10 +1,33 @@
-import '../../../core/app_export.dart';
+import 'package:equatable/equatable.dart';
 
-/// This class is used for memory items in the [memories_dashboard_screen] screen.
-
-// ignore_for_file: must_be_immutable
 class MemoryItemModel extends Equatable {
-  MemoryItemModel({
+  final String? id;
+  final String? title;
+  final String? date;
+  final String? eventDate;
+  final String? eventTime;
+  final String? endDate;
+  final String? endTime;
+  final String? location;
+  final String? distance;
+  final List<String>? participantAvatars;
+  final List<String>? memoryThumbnails;
+  final bool? isLive;
+  final bool? isSealed;
+  final String? state;
+  final String? visibility;
+  final String? categoryName;
+  final String? categoryIconUrl;
+  final String? creatorId;
+  final String? creatorName;
+  final String? creatorAvatar;
+  final int? contributorCount;
+  final DateTime? expiresAt;
+  final DateTime? sealedAt;
+  final DateTime? createdAt;
+
+  const MemoryItemModel({
+    this.id,
     this.title,
     this.date,
     this.eventDate,
@@ -15,37 +38,23 @@ class MemoryItemModel extends Equatable {
     this.distance,
     this.participantAvatars,
     this.memoryThumbnails,
-    this.isLive,
-    this.isSealed,
-  }) {
-    title = title ?? "";
-    date = date ?? "";
-    eventDate = eventDate ?? "";
-    eventTime = eventTime ?? "";
-    endDate = endDate ?? "";
-    endTime = endTime ?? "";
-    location = location ?? "";
-    distance = distance ?? "";
-    participantAvatars = participantAvatars ?? [];
-    memoryThumbnails = memoryThumbnails ?? [];
-    isLive = isLive ?? false;
-    isSealed = isSealed ?? false;
-  }
-
-  String? title;
-  String? date;
-  String? eventDate;
-  String? eventTime;
-  String? endDate;
-  String? endTime;
-  String? location;
-  String? distance;
-  List<String>? participantAvatars;
-  List<String>? memoryThumbnails;
-  bool? isLive;
-  bool? isSealed;
+    this.isLive = false,
+    this.isSealed = false,
+    this.state,
+    this.visibility,
+    this.categoryName,
+    this.categoryIconUrl,
+    this.creatorId,
+    this.creatorName,
+    this.creatorAvatar,
+    this.contributorCount,
+    this.expiresAt,
+    this.sealedAt,
+    this.createdAt,
+  });
 
   MemoryItemModel copyWith({
+    String? id,
     String? title,
     String? date,
     String? eventDate,
@@ -58,8 +67,20 @@ class MemoryItemModel extends Equatable {
     List<String>? memoryThumbnails,
     bool? isLive,
     bool? isSealed,
+    String? state,
+    String? visibility,
+    String? categoryName,
+    String? categoryIconUrl,
+    String? creatorId,
+    String? creatorName,
+    String? creatorAvatar,
+    int? contributorCount,
+    DateTime? expiresAt,
+    DateTime? sealedAt,
+    DateTime? createdAt,
   }) {
     return MemoryItemModel(
+      id: id ?? this.id,
       title: title ?? this.title,
       date: date ?? this.date,
       eventDate: eventDate ?? this.eventDate,
@@ -72,11 +93,23 @@ class MemoryItemModel extends Equatable {
       memoryThumbnails: memoryThumbnails ?? this.memoryThumbnails,
       isLive: isLive ?? this.isLive,
       isSealed: isSealed ?? this.isSealed,
+      state: state ?? this.state,
+      visibility: visibility ?? this.visibility,
+      categoryName: categoryName ?? this.categoryName,
+      categoryIconUrl: categoryIconUrl ?? this.categoryIconUrl,
+      creatorId: creatorId ?? this.creatorId,
+      creatorName: creatorName ?? this.creatorName,
+      creatorAvatar: creatorAvatar ?? this.creatorAvatar,
+      contributorCount: contributorCount ?? this.contributorCount,
+      expiresAt: expiresAt ?? this.expiresAt,
+      sealedAt: sealedAt ?? this.sealedAt,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
   @override
   List<Object?> get props => [
+        id,
         title,
         date,
         eventDate,
@@ -89,5 +122,16 @@ class MemoryItemModel extends Equatable {
         memoryThumbnails,
         isLive,
         isSealed,
+        state,
+        visibility,
+        categoryName,
+        categoryIconUrl,
+        creatorId,
+        creatorName,
+        creatorAvatar,
+        contributorCount,
+        expiresAt,
+        sealedAt,
+        createdAt,
       ];
 }
