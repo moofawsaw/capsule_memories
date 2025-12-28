@@ -4,9 +4,22 @@ import './avatar_helper_service.dart';
 class StoryService {
   final _supabase = SupabaseService.instance.client;
 
+  // Retry configuration
+  static const int _maxRetries = 3;
+  static const Duration _initialRetryDelay = Duration(milliseconds: 500);
+
   /// Fetch stories ONLY from memories where user is a participant (creator or contributor)
-  /// Uses explicit memory filtering to ensure user access
+  /// Uses explicit memory filtering to ensure user access with automatic retry
   Future<List<Map<String, dynamic>>> fetchUserStories(String userId) async {
+    return await _retryOperation(
+      () => _fetchUserStoriesInternal(userId),
+      'fetch user stories',
+    );
+  }
+
+  /// Internal implementation of fetchUserStories with retry support
+  Future<List<Map<String, dynamic>>> _fetchUserStoriesInternal(
+      String userId) async {
     try {
       print('🔍 STORY SERVICE: Fetching stories for userId: $userId');
 
@@ -106,12 +119,21 @@ class StoryService {
       return stories;
     } catch (e) {
       print('❌ Error fetching user stories: $e');
-      return [];
+      rethrow;
     }
   }
 
-  /// Fetch timeline cards (memories) where user is associated
+  /// Fetch timeline cards (memories) where user is associated with automatic retry
   Future<List<Map<String, dynamic>>> fetchUserTimelines(String userId) async {
+    return await _retryOperation(
+      () => _fetchUserTimelinesInternal(userId),
+      'fetch user timelines',
+    );
+  }
+
+  /// Internal implementation of fetchUserTimelines with retry support
+  Future<List<Map<String, dynamic>>> _fetchUserTimelinesInternal(
+      String userId) async {
     try {
       // Step 1: Get memory IDs from memory_contributors
       final contributorMemoryIds = await _supabase
@@ -164,12 +186,21 @@ class StoryService {
       return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
       print('Error fetching user timelines: $e');
-      return [];
+      rethrow;
     }
   }
 
-  /// Fetch stories for a specific memory
+  /// Fetch stories for a specific memory with automatic retry
   Future<List<Map<String, dynamic>>> fetchMemoryStories(String memoryId) async {
+    return await _retryOperation(
+      () => _fetchMemoryStoriesInternal(memoryId),
+      'fetch memory stories',
+    );
+  }
+
+  /// Internal implementation of fetchMemoryStories with retry support
+  Future<List<Map<String, dynamic>>> _fetchMemoryStoriesInternal(
+      String memoryId) async {
     try {
       print('🔍 STORY SERVICE: Fetching stories for memory: $memoryId');
 
@@ -207,7 +238,37 @@ class StoryService {
       return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
       print('❌ STORY SERVICE: Error fetching memory stories: $e');
-      return [];
+      rethrow;
+    }
+  }
+
+  /// Retry operation with exponential backoff for transient Supabase errors
+  Future<T> _retryOperation<T>(
+    Future<T> Function() operation,
+    String operationName,
+  ) async {
+    int attempt = 0;
+    Duration delay = _initialRetryDelay;
+
+    while (true) {
+      try {
+        return await operation();
+      } catch (e) {
+        attempt++;
+
+        if (attempt >= _maxRetries) {
+          print(
+              '❌ STORY SERVICE: Failed to $operationName after $attempt attempts: $e');
+          rethrow;
+        }
+
+        print(
+            '⚠️ STORY SERVICE: Attempt $attempt to $operationName failed: $e');
+        print('🔄 STORY SERVICE: Retrying in ${delay.inMilliseconds}ms...');
+
+        await Future.delayed(delay);
+        delay *= 2; // Exponential backoff
+      }
     }
   }
 
@@ -379,10 +440,10 @@ class StoryService {
   }) async {
     try {
       print('🔍 STORY SERVICE: Creating memory "$title"');
-      
+
       final now = DateTime.now();
       final start = startTime ?? now;
-      
+
       // Calculate expires_at based on duration
       Duration expiresDuration;
       switch (duration) {
@@ -433,16 +494,20 @@ class StoryService {
       // Add invited users as contributors (only valid UUIDs)
       if (invitedUserIds != null && invitedUserIds.isNotEmpty) {
         // Filter out invalid UUIDs (mock user IDs like "user1", "user2", etc.)
-        final validUserIds = invitedUserIds.where((userId) => _isValidUUID(userId)).toList();
-        
+        final validUserIds =
+            invitedUserIds.where((userId) => _isValidUUID(userId)).toList();
+
         if (validUserIds.isNotEmpty) {
-          final contributors = validUserIds.map((userId) => {
-            'memory_id': memoryId,
-            'user_id': userId,
-          }).toList();
+          final contributors = validUserIds
+              .map((userId) => {
+                    'memory_id': memoryId,
+                    'user_id': userId,
+                  })
+              .toList();
 
           await _supabase?.from('memory_contributors').insert(contributors);
-          print('✅ STORY SERVICE: Added ${validUserIds.length} contributors (filtered ${invitedUserIds.length - validUserIds.length} invalid IDs)');
+          print(
+              '✅ STORY SERVICE: Added ${validUserIds.length} contributors (filtered ${invitedUserIds.length - validUserIds.length} invalid IDs)');
         } else {
           print('⚠️ STORY SERVICE: No valid UUIDs found in invited user IDs');
         }

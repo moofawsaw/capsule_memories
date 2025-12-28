@@ -402,26 +402,25 @@ class _MemoriesDashboardScreenState
       return;
     }
 
-    // Convert MemoryItemModel to Map for timeline screen
+    // CRITICAL FIX: Use correct field names that match timeline expectations
     final memoryData = {
-      'id': memoryItem
-          .id, // CRITICAL: This ID is used by timeline to fetch actual data
+      'id': memoryItem.id,
       'title': memoryItem.title,
-      'date': memoryItem.date,
-      'start_date': memoryItem.eventDate,
-      'start_time': memoryItem.eventTime,
-      'end_date': memoryItem.endDate,
-      'end_time': memoryItem.endTime,
+      'date': memoryItem.date, // Used for main display date
+      'eventDate': memoryItem.eventDate, // Start date
+      'eventTime': memoryItem.eventTime, // Start time
+      'endDate': memoryItem.endDate, // End date
+      'endTime': memoryItem.endTime, // End time
       'location': memoryItem.location,
       'category_icon': memoryItem.categoryIconUrl,
       'contributor_avatars': memoryItem.participantAvatars,
-      'media_items': [], // Empty - timeline will fetch from database using ID
       'visibility': memoryItem.visibility,
     };
 
     print('✅ NAVIGATION DEBUG: Passing memory data with ID to timeline');
     print('   - Memory ID: ${memoryData['id']}');
     print('   - Title: ${memoryData['title']}');
+    print('   - Date: ${memoryData['date']}');
 
     // Navigate based on memory status
     if (memoryItem.isSealed == true) {

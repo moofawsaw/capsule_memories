@@ -14,6 +14,19 @@ class TimelineDetailWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // CRITICAL DEBUG: Log what data widget receives for rendering
+    print('🚨 TIMELINE WIDGET DEBUG: TimelineDetailWidget.build() called');
+    print('   - model is null: ${model == null}');
+    if (model != null) {
+      print('   - centerLocation: "${model?.centerLocation}"');
+      print('   - centerDistance: "${model?.centerDistance}"');
+      print(
+          '   - timelineStories count: ${model?.timelineStories?.length ?? 0}');
+      print(
+          '   - Using fallback location: ${model?.centerLocation == "Tillsonburg, ON"}');
+      print('   - Using fallback distance: ${model?.centerDistance == "21km"}');
+    }
+
     return Container(
       child: Column(
         children: [

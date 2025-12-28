@@ -26,12 +26,36 @@ class EventTimelineViewScreenState
       // Extract memory data from route arguments
       final memory = ModalRoute.of(context)?.settings.arguments;
 
+      // CRITICAL DEBUG: Log what we actually receive from navigation
+      print('🚨 TIMELINE SCREEN DEBUG: Route arguments received');
+      print('   - Type: ${memory.runtimeType}');
+      print('   - Is null: ${memory == null}');
+      print('   - Full content: $memory');
+
       if (memory != null) {
-        // Initialize notifier with memory data
-        ref
-            .read(eventTimelineViewNotifier.notifier)
-            .initializeFromMemory(memory);
+        if (memory is Map<String, dynamic>) {
+          print('✅ TIMELINE SCREEN: Valid Map received');
+          print('   - Memory ID: ${memory['id']}');
+          print('   - Title: ${memory['title']}');
+          print('   - Date: ${memory['date']}');
+          print('   - Location: ${memory['location']}');
+
+          // Initialize notifier with memory data
+          ref
+              .read(eventTimelineViewNotifier.notifier)
+              .initializeFromMemory(memory);
+        } else {
+          print(
+              '❌ TIMELINE SCREEN: Invalid argument type - expected Map<String, dynamic>');
+          print('   - Received type: ${memory.runtimeType}');
+
+          // Initialize with default data
+          ref.read(eventTimelineViewNotifier.notifier).initialize();
+        }
       } else {
+        print(
+            '⚠️ TIMELINE SCREEN: No arguments provided, using default initialization');
+
         // Initialize with default data if no arguments
         ref.read(eventTimelineViewNotifier.notifier).initialize();
       }
@@ -44,21 +68,87 @@ class EventTimelineViewScreenState
     // a `Scaffold` with a persistent `CustomAppBar`. To avoid showing
     // two app bars and to prevent bottom overflow on smaller screens,
     // we render only the content here and make it scrollable.
-    return Container(
-      color: appTheme.gray_900_02,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildEventCard(context),
-            _buildTimelineSection(context),
-            SizedBox(height: 18.h),
-            _buildStoriesSection(context),
-            SizedBox(height: 18.h),
-            _buildActionButtons(context),
-            SizedBox(height: 20.h),
-          ],
-        ),
-      ),
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(eventTimelineViewNotifier);
+
+        // Display error state if present
+        if (state.errorMessage != null) {
+          return Container(
+            color: appTheme.gray_900_02,
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.h),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64.h,
+                      color: appTheme.red_500,
+                    ),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'Failed to Load Memory',
+                      style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 8.h),
+                    Text(
+                      state.errorMessage!,
+                      style: TextStyleHelper
+                          .instance.body14MediumPlusJakartaSans
+                          .copyWith(color: appTheme.gray_300),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 24.h),
+                    CustomButton(
+                      text: 'Go Back',
+                      width: double.infinity,
+                      buttonStyle: CustomButtonStyle.fillPrimary,
+                      buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                      onPressed: () {
+                        NavigatorService.goBack();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Display loading state
+        if (state.isLoading ?? false) {
+          return Container(
+            color: appTheme.gray_900_02,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: appTheme.deep_purple_A100,
+              ),
+            ),
+          );
+        }
+
+        // Display content when data loaded successfully
+        return Container(
+          color: appTheme.gray_900_02,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildEventCard(context),
+                _buildTimelineSection(context),
+                SizedBox(height: 18.h),
+                _buildStoriesSection(context),
+                SizedBox(height: 18.h),
+                _buildActionButtons(context),
+                SizedBox(height: 20.h),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

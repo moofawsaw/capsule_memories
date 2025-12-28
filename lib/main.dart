@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './core/utils/theme_provider.dart';
 import './services/notification_service.dart';
-import './services/push_notification_service.dart';
 import './services/supabase_service.dart';
 import 'core/app_export.dart';
 
@@ -12,43 +11,50 @@ var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase
-  try {
-    await SupabaseService.initialize();
-  } catch (e) {
-    debugPrint('Failed to initialize Supabase: $e');
+  final bool supabaseReady = await _initSupabaseSafely();
+
+  if (supabaseReady) {
+    _setupGlobalNotificationListener();
+  } else {
+    debugPrint('Supabase not initialized. Skipping auth listener setup.');
   }
-
-  // Initialize push notifications
-  await PushNotificationService.instance.initialize();
-  await PushNotificationService.instance.createNotificationChannel();
-
-  _setupGlobalNotificationListener();
 
   runApp(
     ProviderScope(
-      child: Sizer(builder: (context, orientation, deviceType) {
-        return MyApp();
-      }),
+      child: Sizer(
+        builder: (context, orientation, deviceType) {
+          return MyApp();
+        },
+      ),
     ),
   );
+}
+
+Future<bool> _initSupabaseSafely() async {
+  try {
+    await SupabaseService.initialize();
+
+    // Hard assertion: ensures the client exists right now
+    Supabase.instance.client;
+    return true;
+  } catch (e, st) {
+    debugPrint('Failed to initialize Supabase: $e');
+    debugPrint('$st');
+    return false;
+  }
 }
 
 void _setupGlobalNotificationListener() {
   final notificationService = NotificationService.instance;
 
-  // Listen to auth state changes to setup/teardown notification subscription
   Supabase.instance.client.auth.onAuthStateChange.listen((data) {
     if (data.event == AuthChangeEvent.signedIn) {
-      // Setup notification subscription when user signs in
       notificationService.subscribeToNotifications(
         onNewNotification: (notification) {
-          // Global notification handler can be implemented here
           debugPrint('New notification: ${notification['title']}');
         },
       );
     } else if (data.event == AuthChangeEvent.signedOut) {
-      // Cleanup subscription when user signs out
       notificationService.unsubscribeFromNotifications();
     }
   });
@@ -60,13 +66,11 @@ class MyApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
-      theme: theme,
-      darkTheme: theme,
+      theme: ThemeHelper().themeData(),
+      darkTheme: ThemeHelper().themeData(),
       themeMode: themeMode,
       title: 'capsule_memories',
-      // 🚨 CRITICAL: NEVER REMOVE OR MODIFY
       builder: (context, child) {
-        // Update global theme instance on every rebuild
         ThemeHelper().setThemeMode(themeMode);
 
         return MediaQuery(
@@ -76,15 +80,14 @@ class MyApp extends ConsumerWidget {
           child: child!,
         );
       },
-      // 🚨 END CRITICAL SECTION
       navigatorKey: NavigatorService.navigatorKey,
       debugShowCheckedModeBanner: false,
-      localizationsDelegates: [
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: [Locale('en', '')],
+      supportedLocales: const [Locale('en', '')],
       initialRoute: AppRoutes.initialRoute,
       onGenerateRoute: AppRoutes.onGenerateRoute,
     );

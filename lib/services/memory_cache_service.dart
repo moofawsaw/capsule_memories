@@ -24,6 +24,10 @@ class MemoryCacheService {
   // Cache configuration
   static const _cacheDuration = Duration(minutes: 5);
 
+  // Retry configuration
+  static const int _maxRetries = 3;
+  static const Duration _initialRetryDelay = Duration(milliseconds: 500);
+
   // Stream controllers for cache updates
   final _memoriesStreamController =
       StreamController<List<MemoryItemModel>>.broadcast();
@@ -45,7 +49,7 @@ class MemoryCacheService {
     return cacheAge < _cacheDuration;
   }
 
-  /// Get cached memories or fetch from database
+  /// Get cached memories or fetch from database with automatic retry
   Future<List<MemoryItemModel>> getMemories(String userId,
       {bool forceRefresh = false}) async {
     print('🔍 CACHE: getMemories called for userId: $userId');
@@ -57,7 +61,10 @@ class MemoryCacheService {
     }
 
     print('🔄 CACHE: Fetching fresh memories from database');
-    _cachedMemories = await _loadUserMemories(userId);
+    _cachedMemories = await _retryOperation(
+      () => _loadUserMemories(userId),
+      'load memories',
+    );
     _cachedUserId = userId;
     _lastCacheTime = DateTime.now();
 
@@ -67,7 +74,7 @@ class MemoryCacheService {
     return _cachedMemories!;
   }
 
-  /// Get cached stories or fetch from database
+  /// Get cached stories or fetch from database with automatic retry
   Future<List<StoryItemModel>> getStories(String userId,
       {bool forceRefresh = false}) async {
     print('🔍 CACHE: getStories called for userId: $userId');
@@ -79,7 +86,10 @@ class MemoryCacheService {
     }
 
     print('🔄 CACHE: Fetching fresh stories from database');
-    _cachedStories = await _loadUserStories(userId);
+    _cachedStories = await _retryOperation(
+      () => _loadUserStories(userId),
+      'load stories',
+    );
     _cachedUserId = userId;
     _lastCacheTime = DateTime.now();
 
@@ -87,6 +97,35 @@ class MemoryCacheService {
     print('✅ CACHE: Cached ${_cachedStories!.length} stories');
 
     return _cachedStories!;
+  }
+
+  /// Retry operation with exponential backoff
+  Future<T> _retryOperation<T>(
+    Future<T> Function() operation,
+    String operationName,
+  ) async {
+    int attempt = 0;
+    Duration delay = _initialRetryDelay;
+
+    while (true) {
+      try {
+        return await operation();
+      } catch (e) {
+        attempt++;
+
+        if (attempt >= _maxRetries) {
+          print(
+              '❌ CACHE: Failed to $operationName after $attempt attempts: $e');
+          rethrow;
+        }
+
+        print('⚠️ CACHE: Attempt $attempt to $operationName failed: $e');
+        print('🔄 CACHE: Retrying in ${delay.inMilliseconds}ms...');
+
+        await Future.delayed(delay);
+        delay *= 2; // Exponential backoff
+      }
+    }
   }
 
   /// Refresh cache for specific memory (called when navigating from /timeline)
@@ -164,7 +203,7 @@ class MemoryCacheService {
         final sealedAt = memoryData['sealed_at'] != null
             ? DateTime.parse(memoryData['sealed_at'] as String)
             : null;
-        
+
         // Use start_time/end_time if available, otherwise fall back to created_at/expires_at
         final startTime = memoryData['start_time'] != null
             ? DateTime.parse(memoryData['start_time'] as String)
@@ -312,13 +351,13 @@ class MemoryCacheService {
     var hour = dateTime.hour;
     final minute = dateTime.minute;
     final period = hour >= 12 ? 'pm' : 'am';
-    
+
     if (hour == 0) {
       hour = 12;
     } else if (hour > 12) {
       hour -= 12;
     }
-    
+
     return '$hour:${minute.toString().padLeft(2, '0')}$period';
   }
 

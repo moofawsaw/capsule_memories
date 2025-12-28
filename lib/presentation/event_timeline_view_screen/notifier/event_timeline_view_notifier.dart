@@ -28,9 +28,23 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   List<String> get currentMemoryStoryIds => _currentMemoryStoryIds;
 
   void initializeFromMemory(dynamic memoryData) async {
+    print('🚨 NOTIFIER DEBUG: initializeFromMemory called');
+    print('   - Argument type: ${memoryData.runtimeType}');
+    print('   - Is null: ${memoryData == null}');
+
     if (memoryData is Map<String, dynamic>) {
       // CRITICAL: Extract memory ID - this is used to fetch actual data
       final memoryId = memoryData['id'] as String? ?? '';
+
+      print('🔍 NOTIFIER DEBUG: Processing memory data');
+      print('   - Memory ID: "$memoryId"');
+      print('   - Title: "${memoryData['title']}"');
+      print('   - Date: "${memoryData['date']}"');
+      print('   - Location: "${memoryData['location']}"');
+      print('   - Event Date: "${memoryData['eventDate']}"');
+      print('   - Event Time: "${memoryData['eventTime']}"');
+      print('   - End Date: "${memoryData['endDate']}"');
+      print('   - End Time: "${memoryData['endTime']}"');
 
       // Validate memory ID before proceeding
       if (memoryId.isEmpty) {
@@ -111,6 +125,11 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         centerDistance: '0km',
       );
 
+      print('🔍 TIMELINE DEBUG: Setting initial state with memory details');
+      print('   - Title: ${memory['title']}');
+      print('   - Date: ${memory['date']}');
+      print('   - Location: ${memory['location']}');
+
       // Set initial state with memory details (before loading stories)
       state = state.copyWith(
         eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
@@ -126,6 +145,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         isLoading: true,
       );
 
+      print('✅ TIMELINE DEBUG: Initial state set, now fetching stories...');
+
       // CRITICAL: Fetch actual stories from database using memory ID
       print('🔄 TIMELINE DEBUG: Fetching stories for memory $memoryId...');
       await _loadMemoryStories(memoryId);
@@ -140,9 +161,20 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       state = state.copyWith(isLoading: false);
       print('✅ TIMELINE DEBUG: Timeline initialization complete');
+      print('   - Final title: ${state.eventTimelineViewModel?.eventTitle}');
+      print('   - Final date: ${state.eventTimelineViewModel?.eventDate}');
+      print(
+          '   - Final location: ${state.eventTimelineViewModel?.timelineDetail?.centerLocation}');
+      print(
+          '   - Stories count: ${state.eventTimelineViewModel?.customStoryItems?.length ?? 0}');
     } else {
       print(
           '❌ TIMELINE ERROR: Invalid memory data type: ${memoryData.runtimeType}');
+      print('   - Expected: Map<String, dynamic>');
+      print('   - Received: ${memoryData.runtimeType}');
+
+      // Fall back to default initialization
+      initialize();
     }
   }
 
@@ -274,6 +306,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
             timelineStories: timelineStories,
           ),
         ),
+        errorMessage: null,
       );
 
       print('✅ TIMELINE DEBUG: Timeline updated with memory window');
@@ -281,8 +314,15 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('   - ${timelineStories.length} positioned timeline stories');
       print(
           '   - Timeline window: $memoryStartTime to $memoryEndTime (${memoryEndTime.difference(memoryStartTime).inMinutes} min)');
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ TIMELINE DEBUG: Error loading memory stories: $e');
+      print('❌ TIMELINE DEBUG: Stack trace: $stackTrace');
+
+      // CRITICAL FIX: Set error state instead of silently failing
+      state = state.copyWith(
+        errorMessage: 'Failed to load memory data. Please try refreshing.',
+        isLoading: false,
+      );
     }
   }
 

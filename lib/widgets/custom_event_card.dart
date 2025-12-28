@@ -39,6 +39,15 @@ class CustomEventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // CRITICAL DEBUG: Log what CustomEventCard receives for rendering
+    print('🚨 CUSTOM EVENT CARD DEBUG: build() called');
+    print('   - eventTitle: "$eventTitle"');
+    print('   - eventDate: "$eventDate"');
+    print('   - participantImages count: ${participantImages?.length ?? 0}');
+    print('   - iconButtonImagePath: "$iconButtonImagePath"');
+    print('   - Using fallback title: ${eventTitle == "Event Title"}');
+    print('   - Using fallback date: ${eventDate == "Event Date"}');
+
     // Extract category name from icon path URL to look up the proper category
     String? categoryName;
     if (iconButtonImagePath != null &&
