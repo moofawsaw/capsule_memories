@@ -1,6 +1,6 @@
 import '../../core/app_export.dart';
 import '../../widgets/custom_image_view.dart';
-import 'notifier/splash_notifier.dart';
+import './notifier/splash_notifier.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   SplashScreen({Key? key}) : super(key: key);
@@ -24,8 +24,7 @@ class SplashScreenState extends ConsumerState<SplashScreen> {
       splashNotifier,
       (previous, current) {
         if (current.shouldNavigate ?? false) {
-          NavigatorService.pushNamedAndRemoveUntil(
-              AppRoutes.appFeed);
+          NavigatorService.pushNamedAndRemoveUntil(AppRoutes.appFeed);
         }
       },
     );

@@ -1,5 +1,5 @@
-import 'custom_image_view.dart';
 import '../core/app_export.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomStoryProgress - A story creation progress component that displays image preview with progress indicator

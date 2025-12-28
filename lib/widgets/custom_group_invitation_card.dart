@@ -1,6 +1,6 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_button.dart';
+import './custom_button.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomGroupInvitationCard - A reusable invitation card component for group invitations

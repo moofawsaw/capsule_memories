@@ -1,4 +1,6 @@
 import '../../core/app_export.dart';
+import '../../core/utils/memory_nav_args.dart';
+import '../../core/utils/memory_navigation_wrapper.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
@@ -140,7 +142,8 @@ class _MemoryFeedDashboardScreenState
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 CustomImageView(
-                                  imagePath: ImageConstant.imgIconDeepPurpleA10022x22,
+                                  imagePath:
+                                      ImageConstant.imgIconDeepPurpleA10022x22,
                                   height: 48.h,
                                   width: 48.h,
                                   color: appTheme.blue_gray_300,
@@ -148,15 +151,15 @@ class _MemoryFeedDashboardScreenState
                                 SizedBox(height: 12.h),
                                 Text(
                                   'No stories happening now',
-                                  style: TextStyleHelper.instance
-                                      .title16MediumPlusJakartaSans
+                                  style: TextStyleHelper
+                                      .instance.title16MediumPlusJakartaSans
                                       .copyWith(color: appTheme.blue_gray_300),
                                 ),
                                 SizedBox(height: 4.h),
                                 Text(
                                   'Check back later for new stories',
-                                  style: TextStyleHelper.instance
-                                      .body12MediumPlusJakartaSans
+                                  style: TextStyleHelper
+                                      .instance.body12MediumPlusJakartaSans
                                       .copyWith(color: appTheme.blue_gray_300),
                                 ),
                               ],
@@ -232,38 +235,16 @@ class _MemoryFeedDashboardScreenState
           sectionIcon: ImageConstant.imgIcon22x22,
           memories: convertedMemories,
           onMemoryTap: (memory) {
-            // Find the original database memory data to pass to timeline
-            final originalMemory = memories.firstWhere(
-              (m) => m.id == memory.id,
-              orElse: () => memories.first,
-            );
-
-            // Convert back to Map<String, dynamic> for timeline notifier
-            final memoryData = {
-              'id': originalMemory.id,
-              'title': originalMemory.title,
-              'date': originalMemory.date,
-              'category_icon': originalMemory.iconPath,
-              'contributor_avatars': originalMemory.profileImages,
-              'media_items': originalMemory.mediaItems
-                      ?.map((item) => {
-                            'thumbnail_url': item.imagePath,
-                            'has_play_button': item.hasPlayButton ?? false,
-                          })
-                      .toList() ??
-                  [],
-              'start_date': originalMemory.startDate,
-              'start_time': originalMemory.startTime,
-              'end_date': originalMemory.endDate,
-              'end_time': originalMemory.endTime,
-              'location': originalMemory.location,
-              'distance': originalMemory.distance,
-            };
-
-            // Navigate to timeline with proper database data structure
-            NavigatorService.pushNamed(
-              AppRoutes.appTimeline,
-              arguments: memoryData,
+            // CRITICAL FIX: Use validated navigation wrapper
+            MemoryNavigationWrapper.navigateToTimeline(
+              context: context,
+              memoryId: memory.id ?? '',
+              title: memory.title,
+              date: memory.date,
+              location: memory.location,
+              categoryIcon: memory.iconPath,
+              participantAvatars: memory.profileImages,
+              isPrivate: false, // Public memories are never private
             );
           },
           margin: EdgeInsets.only(top: 30.h, left: 24.h),
@@ -333,6 +314,45 @@ class _MemoryFeedDashboardScreenState
           ],
         );
       },
+    );
+  }
+
+  /// CRITICAL FIX: Use MemoryNavArgs for memory card navigation
+  void _onMemoryCardTap(BuildContext context, dynamic memoryData) {
+    print('🔍 FEED NAVIGATION: Memory card tapped');
+
+    // Extract memory ID
+    String? memoryId;
+    if (memoryData is Map<String, dynamic>) {
+      memoryId = memoryData['id'] as String?;
+    }
+
+    // Validate memory ID
+    if (memoryId == null || memoryId.isEmpty) {
+      print('❌ FEED NAVIGATION: Missing memory ID');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to open memory - missing ID'),
+          backgroundColor: appTheme.red_500,
+        ),
+      );
+      return;
+    }
+
+    // Create MemoryNavArgs with snapshot
+    final navArgs = MemoryNavArgs(
+      memoryId: memoryId,
+      snapshot: memoryData is Map<String, dynamic>
+          ? MemorySnapshot.fromMap(memoryData)
+          : null,
+    );
+
+    print('✅ FEED NAVIGATION: Passing MemoryNavArgs to timeline');
+    print('   - Memory ID: ${navArgs.memoryId}');
+
+    NavigatorService.pushNamed(
+      AppRoutes.appTimeline,
+      arguments: navArgs,
     );
   }
 }

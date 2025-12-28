@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomHeaderRow - A reusable header component with title text and trailing icon button

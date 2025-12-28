@@ -10,10 +10,11 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_qr_info_card.dart';
+import './models/group_qr_invite_model.dart';
 import 'notifier/group_qr_invite_notifier.dart';
 
 class GroupQRInviteScreen extends ConsumerStatefulWidget {
-  GroupQRInviteScreen({Key? key}) : super(key: key);
+  const GroupQRInviteScreen({Key? key}) : super(key: key);
 
   @override
   GroupQRInviteScreenState createState() => GroupQRInviteScreenState();
@@ -21,14 +22,23 @@ class GroupQRInviteScreen extends ConsumerStatefulWidget {
 
 class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   final GlobalKey _qrKey = GlobalKey();
-  final TextEditingController _urlController = TextEditingController(
-    text: 'https://capsule.app/group/jones-family-invite',
-  );
+  String? _groupId;
 
   @override
-  void dispose() {
-    _urlController.dispose();
-    super.dispose();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Get group ID from route arguments
+    if (_groupId == null) {
+      _groupId = ModalRoute.of(context)?.settings.arguments as String?;
+
+      if (_groupId != null) {
+        // Initialize notifier with group ID
+        Future.microtask(() {
+          ref.read(groupQRInviteNotifier.notifier).initialize(_groupId!);
+        });
+      }
+    }
   }
 
   @override
@@ -74,6 +84,42 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(groupQRInviteNotifier);
+        final model = state.groupQRInviteModel;
+
+        if (state.isLoading == true) {
+          return Container(
+            height: 400.h,
+            alignment: Alignment.center,
+            child: CircularProgressIndicator(
+              color: appTheme.deep_purple_A100,
+            ),
+          );
+        }
+
+        if (state.errorMessage != null) {
+          return Container(
+            height: 400.h,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline,
+                    color: appTheme.redCustom, size: 48.h),
+                SizedBox(height: 16.h),
+                Text(
+                  state.errorMessage!,
+                  style: TextStyleHelper.instance.body16RegularPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (model == null) {
+          return SizedBox.shrink();
+        }
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -88,15 +134,15 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
             ),
             SizedBox(height: 20.h),
             CustomQrInfoCard(
-              title: "Jones Family",
-              description: "Scan to join the group",
+              title: model.groupName ?? "Group",
+              description: model.groupDescription ?? "Scan to join",
             ),
             SizedBox(height: 16.h),
-            _buildQRCodeSection(),
+            _buildQRCodeSection(model),
             SizedBox(height: 20.h),
-            _buildUrlSection(),
+            _buildUrlSection(model),
             SizedBox(height: 20.h),
-            _buildActionButtons(),
+            _buildActionButtons(model),
             SizedBox(height: 20.h),
             _buildInfoText(),
           ],
@@ -106,7 +152,7 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   }
 
   /// Section Widget
-  Widget _buildQRCodeSection() {
+  Widget _buildQRCodeSection(GroupQRInviteModel model) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 68.h),
       child: RepaintBoundary(
@@ -118,7 +164,7 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
             borderRadius: BorderRadius.circular(12.h),
           ),
           child: QrImageView(
-            data: _urlController.text,
+            data: model.qrCodeData ?? '',
             version: QrVersions.auto,
             size: 200.h,
             backgroundColor: appTheme.whiteCustom,
@@ -130,7 +176,7 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   }
 
   /// Section Widget
-  Widget _buildUrlSection() {
+  Widget _buildUrlSection(GroupQRInviteModel model) {
     return Container(
       margin: EdgeInsets.only(right: 16.h, left: 4.h),
       child: Row(
@@ -143,7 +189,7 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
                 borderRadius: BorderRadius.circular(8.h),
               ),
               child: Text(
-                _urlController.text,
+                model.invitationUrl ?? '',
                 style: TextStyleHelper.instance.title16RegularPlusJakartaSans
                     .copyWith(color: appTheme.gray_50),
                 maxLines: 1,
@@ -153,7 +199,7 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
           ),
           SizedBox(width: 22.h),
           GestureDetector(
-            onTap: () => _copyUrl(),
+            onTap: () => _copyUrl(model.invitationUrl ?? ''),
             child: CustomImageView(
               imagePath: ImageConstant.imgIcon14,
               height: 24.h,
@@ -166,48 +212,45 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   }
 
   /// Section Widget
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(GroupQRInviteModel model) {
     return Container(
       child: Row(
         children: [
           Expanded(
-            child: Consumer(
-              builder: (context, ref, _) {
-                return GestureDetector(
-                  onTap: () => _downloadQR(),
-                  child: Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 22.h, vertical: 12.h),
-                    decoration: BoxDecoration(
-                      color: appTheme.color41C124,
-                      borderRadius: BorderRadius.circular(6.h),
+            child: GestureDetector(
+              onTap: () => _downloadQR(model.groupName ?? 'group'),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 22.h, vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: appTheme.color41C124,
+                  borderRadius: BorderRadius.circular(6.h),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CustomImageView(
+                      imagePath: ImageConstant.imgIcon15,
+                      height: 18.h,
+                      width: 18.h,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CustomImageView(
-                          imagePath: ImageConstant.imgIcon15,
-                          height: 18.h,
-                          width: 18.h,
-                        ),
-                        SizedBox(width: 8.h),
-                        Text(
-                          "Download QR",
-                          style: TextStyleHelper
-                              .instance.body14BoldPlusJakartaSans
-                              .copyWith(color: appTheme.gray_50),
-                        ),
-                      ],
+                    SizedBox(width: 8.h),
+                    Text(
+                      "Download QR",
+                      style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
                     ),
-                  ),
-                );
-              },
+                  ],
+                ),
+              ),
             ),
           ),
           SizedBox(width: 12.h),
           Expanded(
             child: GestureDetector(
-              onTap: () => _shareLink(),
+              onTap: () => _shareLink(
+                model.groupName ?? 'group',
+                model.invitationUrl ?? '',
+              ),
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 decoration: BoxDecoration(
@@ -242,7 +285,7 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   Widget _buildInfoText() {
     return Container(
       child: Text(
-        "People who scan this code or open the link will be added to your group",
+        "People who scan this code or open the link will be added to your group instantly",
         textAlign: TextAlign.center,
         style: TextStyleHelper.instance.body14RegularPlusJakartaSans
             .copyWith(color: appTheme.blue_gray_300, height: 1.2),
@@ -251,8 +294,10 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   }
 
   /// Copy URL to clipboard
-  void _copyUrl() {
-    Clipboard.setData(ClipboardData(text: _urlController.text));
+  void _copyUrl(String url) {
+    Clipboard.setData(ClipboardData(text: url));
+    ref.read(groupQRInviteNotifier.notifier).onCopyUrl();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Link copied to clipboard'),
@@ -263,8 +308,10 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   }
 
   /// Download QR code as image
-  Future<void> _downloadQR() async {
+  Future<void> _downloadQR(String groupName) async {
     try {
+      ref.read(groupQRInviteNotifier.notifier).onDownloadQR();
+
       final boundary =
           _qrKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
@@ -276,36 +323,44 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
 
         // Get the downloads directory
         final directory = await getApplicationDocumentsDirectory();
+        final sanitizedName =
+            groupName.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_');
         final String fileName =
-            'jones_family_qr_${DateTime.now().millisecondsSinceEpoch}.png';
+            '${sanitizedName}_qr_${DateTime.now().millisecondsSinceEpoch}.png';
         final File file = File('${directory.path}/$fileName');
 
         await file.writeAsBytes(pngBytes);
 
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('QR code saved successfully'),
+              backgroundColor: appTheme.colorFF52D1,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('QR code saved successfully'),
-            backgroundColor: appTheme.colorFF52D1,
+            content: Text('Failed to download QR code'),
+            backgroundColor: appTheme.redCustom,
             duration: Duration(seconds: 2),
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to download QR code'),
-          backgroundColor: appTheme.redCustom,
-          duration: Duration(seconds: 2),
-        ),
-      );
     }
   }
 
   /// Share the group invitation link
-  void _shareLink() {
+  void _shareLink(String groupName, String url) {
+    ref.read(groupQRInviteNotifier.notifier).onShareLink();
+
     Share.share(
-      'Join the Jones Family group on Capsule! ${_urlController.text}',
-      subject: 'Join Jones Family on Capsule',
+      'Join the $groupName group on Capsule! $url',
+      subject: 'Join $groupName on Capsule',
     );
   }
 }

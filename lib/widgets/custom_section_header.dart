@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomSectionHeader - A reusable section header component that displays an icon with accompanying text

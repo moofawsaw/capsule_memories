@@ -1,4 +1,3 @@
-
 import '../core/app_export.dart';
 import './custom_button.dart';
 import './custom_image_view.dart';
@@ -113,9 +112,9 @@ class CustomBlockedUsersSettings extends StatelessWidget {
                   variant: CustomButtonVariant.outline,
                 ),
                 buttonTextStyle: CustomButtonTextStyle(
-                    color: appTheme.gray_50,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
+                  color: appTheme.gray_50,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],

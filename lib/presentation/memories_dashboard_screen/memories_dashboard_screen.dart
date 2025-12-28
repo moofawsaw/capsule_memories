@@ -1,4 +1,5 @@
 import '../../core/app_export.dart';
+import '../../core/utils/memory_navigation_wrapper.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart';
@@ -383,57 +384,15 @@ class _MemoriesDashboardScreenState
     notifier.updateSelectedTabIndex(index);
   }
 
+  /// CRITICAL FIX: Use validated navigation wrapper for navigation
   void _onMemoryTap(BuildContext context, MemoryItemModel memoryItem) {
-    print('🔍 NAVIGATION DEBUG: Memory tapped: ${memoryItem.id}');
-    print(
-        '🔍 NAVIGATION DEBUG: participantAvatars = ${memoryItem.participantAvatars}');
-    print(
-        '🔍 NAVIGATION DEBUG: categoryIconUrl = ${memoryItem.categoryIconUrl}');
+    print('🔍 NAVIGATION: Memory tapped: ${memoryItem.id}');
 
-    // CRITICAL FIX: Ensure memory ID is always passed for database queries
-    if (memoryItem.id == null || memoryItem.id!.isEmpty) {
-      print('❌ NAVIGATION ERROR: Cannot navigate without memory ID');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to open memory - missing ID'),
-          backgroundColor: appTheme.red_500,
-        ),
-      );
-      return;
-    }
-
-    // CRITICAL FIX: Use correct field names that match timeline expectations
-    final memoryData = {
-      'id': memoryItem.id,
-      'title': memoryItem.title,
-      'date': memoryItem.date, // Used for main display date
-      'eventDate': memoryItem.eventDate, // Start date
-      'eventTime': memoryItem.eventTime, // Start time
-      'endDate': memoryItem.endDate, // End date
-      'endTime': memoryItem.endTime, // End time
-      'location': memoryItem.location,
-      'category_icon': memoryItem.categoryIconUrl,
-      'contributor_avatars': memoryItem.participantAvatars,
-      'visibility': memoryItem.visibility,
-    };
-
-    print('✅ NAVIGATION DEBUG: Passing memory data with ID to timeline');
-    print('   - Memory ID: ${memoryData['id']}');
-    print('   - Title: ${memoryData['title']}');
-    print('   - Date: ${memoryData['date']}');
-
-    // Navigate based on memory status
-    if (memoryItem.isSealed == true) {
-      NavigatorService.pushNamed(
-        AppRoutes.appTimelineSealed,
-        arguments: memoryData,
-      );
-    } else {
-      NavigatorService.pushNamed(
-        AppRoutes.appTimeline,
-        arguments: memoryData,
-      );
-    }
+    // Use validated navigation wrapper
+    MemoryNavigationWrapper.navigateFromMemoryItem(
+      context: context,
+      memoryItem: memoryItem,
+    );
   }
 
   void _onNotificationTap(BuildContext context) {

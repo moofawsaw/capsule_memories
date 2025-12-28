@@ -34,6 +34,7 @@ import '../presentation/password_reset_screen/password_reset_screen.dart';
 import '../presentation/post_story_screen/post_story_screen.dart';
 import '../presentation/qr_code_share_screen/qr_code_share_screen.dart';
 import '../presentation/qr_code_share_screen_two_screen/qr_code_share_screen_two_screen.dart';
+import '../presentation/qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import '../presentation/report_story_screen/report_story_screen.dart';
 import '../presentation/share_story_screen/share_story_screen.dart';
 import '../presentation/splash_screen/splash_screen.dart';
@@ -102,6 +103,8 @@ class AppRoutes {
   // Other routes (alphabetically organized)
   static const String groupEditBottomSheet = '/group-edit-bottom-sheet';
   static const String splash = '/splash';
+  static const String qrCodeShareScreenTwo = '/qr-code-share-screen-two';
+  static const String qrTimelineShare = '/qr-timeline-share';
 
   static const String initialRoute = appFeed;
 
@@ -173,7 +176,7 @@ class AppRoutes {
       case appBsQrTimeline:
         return QRCodeShareScreen();
       case appBsQrFriend:
-        return QRCodeShareScreenTwo();
+        return QRCodeShareScreenTwoScreen();
       case appBsGroupCreate:
         return CreateGroupScreen();
       case appBsQrGroup:
@@ -320,6 +323,14 @@ class AppRoutes {
         authRegister: (context) => AccountRegistrationScreen(),
         authReset: (context) => PasswordResetScreen(),
         splash: (context) => SplashScreen(),
+        qrCodeShareScreenTwo: (context) => const QRCodeShareScreenTwoScreen(),
+        qrTimelineShare: (context) {
+          final memoryId =
+              ModalRoute.of(context)?.settings.arguments as String?;
+          return QRTimelineShareScreen(
+            memoryId: memoryId ?? '',
+          );
+        },
         // All app routes are handled by onGenerateRoute
       };
 }

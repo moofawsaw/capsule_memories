@@ -1,6 +1,6 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_switch.dart';
+import './custom_image_view.dart';
+import './custom_switch.dart';
 
 /**
  * CustomNotificationSettings - A comprehensive notification settings component that displays

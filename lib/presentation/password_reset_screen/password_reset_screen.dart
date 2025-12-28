@@ -133,9 +133,8 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
             CustomButton(
               text: 'Reset Password',
               width: double.infinity,
-              onPressed: (state.isLoading ?? false)
-                  ? null
-                  : () => _onSendResetLink(),
+              onPressed:
+                  (state.isLoading ?? false) ? null : () => _onSendResetLink(),
               buttonStyle: CustomButtonStyle.fillPrimary,
               buttonTextStyle: CustomButtonTextStyle.bodyMedium,
             ),

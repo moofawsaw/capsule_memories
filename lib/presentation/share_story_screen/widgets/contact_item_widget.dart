@@ -1,4 +1,3 @@
-
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../models/contact_model.dart';

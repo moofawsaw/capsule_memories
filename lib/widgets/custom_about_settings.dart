@@ -1,4 +1,3 @@
-
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 

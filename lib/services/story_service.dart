@@ -23,51 +23,7 @@ class StoryService {
     try {
       print('🔍 STORY SERVICE: Fetching stories for userId: $userId');
 
-      // CRITICAL FIX: Explicitly filter stories by user's memories
-      // Step 1: Get memory IDs where user is creator
-      final createdMemoriesResponse = await _supabase
-          ?.from('memories')
-          .select('id')
-          .eq('creator_id', userId);
-
-      final createdMemoryIds = (createdMemoriesResponse as List?)
-              ?.map((m) => m['id'] as String)
-              .toList() ??
-          [];
-
-      print(
-          '🔍 STORY SERVICE: User created ${createdMemoryIds.length} memories');
-
-      // Step 2: Get memory IDs where user is contributor
-      final contributorMemoriesResponse = await _supabase
-          ?.from('memory_contributors')
-          .select('memory_id')
-          .eq('user_id', userId);
-
-      final contributorMemoryIds = (contributorMemoriesResponse as List?)
-              ?.map((m) => m['memory_id'] as String)
-              .toList() ??
-          [];
-
-      print(
-          '🔍 STORY SERVICE: User is contributor to ${contributorMemoryIds.length} memories');
-
-      // Combine both lists (user's created memories + memories they contributed to)
-      final allUserMemoryIds = [
-        ...createdMemoryIds,
-        ...contributorMemoryIds,
-      ].toSet().toList(); // Use Set to remove duplicates
-
-      print(
-          '🔍 STORY SERVICE: Total memories user has access to: ${allUserMemoryIds.length}');
-
-      if (allUserMemoryIds.isEmpty) {
-        print(
-            '🔍 STORY SERVICE: User is not part of any memories, returning empty list');
-        return [];
-      }
-
-      // Step 3: Fetch stories ONLY from these memories with complete data
+      // CRITICAL FIX: Filter for public memories only when viewing user profile
       final response = await _supabase
           ?.from('stories')
           .select('''
@@ -93,26 +49,37 @@ class StoryService {
               title,
               visibility,
               state,
-              creator_id
+              creator_id,
+              category_id,
+              memory_categories (
+                name,
+                icon_name,
+                icon_url
+              )
             )
           ''')
-          .inFilter('memory_id', allUserMemoryIds)
+          .eq('contributor_id', userId) // CRITICAL: Only stories BY this user
+          .eq('memories.visibility',
+              'public') // NEW: Only show stories from public memories
           .order('created_at', ascending: false);
 
       final stories = List<Map<String, dynamic>>.from(response as List? ?? []);
 
-      print('🔍 STORY SERVICE: Fetched ${stories.length} stories total');
+      print(
+          '🔍 STORY SERVICE: Fetched ${stories.length} public stories created by user $userId');
 
-      // Enhanced logging for debugging thumbnail display
+      // Enhanced logging for debugging thumbnail display and category info
       for (var story in stories) {
         final memory = story['memories'] as Map<String, dynamic>?;
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
         print('📸 Story ${story['id']}: '
             'memory_id=${story['memory_id']}, '
             'memory_title=${memory?['title']}, '
+            'memory_visibility=${memory?['visibility']}, '
+            'category_name=${category?['name']}, '
+            'category_icon=${category?['icon_name']}, '
             'media_type=${story['media_type']}, '
             'thumbnail_url=${story['thumbnail_url']}, '
-            'image_url=${story['image_url']}, '
-            'video_url=${story['video_url']}, '
             'contributor=${story['user_profiles']?['display_name']}');
       }
 

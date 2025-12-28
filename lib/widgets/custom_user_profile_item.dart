@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomUserProfileItem - A reusable user profile list item component with avatar and name display.

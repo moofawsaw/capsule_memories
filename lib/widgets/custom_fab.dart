@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /// Custom Floating Action Button component that supports various positioning and styling options
 ///

@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomStoryList - A horizontal scrolling story list component that displays story items

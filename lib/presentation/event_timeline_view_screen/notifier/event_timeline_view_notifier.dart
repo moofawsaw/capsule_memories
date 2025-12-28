@@ -1,4 +1,5 @@
 import '../../../core/app_export.dart';
+import '../../../core/utils/memory_nav_args.dart';
 import '../../../services/avatar_helper_service.dart';
 import '../../../services/memory_cache_service.dart';
 import '../../../services/story_service.dart';
@@ -27,155 +28,303 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   // CRITICAL FIX: Add getter for story IDs to use in navigation
   List<String> get currentMemoryStoryIds => _currentMemoryStoryIds;
 
-  void initializeFromMemory(dynamic memoryData) async {
-    print('🚨 NOTIFIER DEBUG: initializeFromMemory called');
-    print('   - Argument type: ${memoryData.runtimeType}');
-    print('   - Is null: ${memoryData == null}');
+  /// DEBUG TOAST: Validate data passing to UI elements
+  Map<String, dynamic> validateDataPassing() {
+    final model = state.eventTimelineViewModel;
 
-    if (memoryData is Map<String, dynamic>) {
-      // CRITICAL: Extract memory ID - this is used to fetch actual data
-      final memoryId = memoryData['id'] as String? ?? '';
+    // Check each UI element for real vs static data
+    final validationResults = {
+      'eventTitle': _validateField(model?.eventTitle, 'Beach Day Adventure'),
+      'eventDate': _validateField(model?.eventDate, 'Dec 22'),
+      'memoryId': _validateField(model?.memoryId, ''),
+      'categoryIcon':
+          _validateField(model?.categoryIcon, ImageConstant.imgFrame13),
+      'participantImages': _validateList(model?.participantImages),
+      'customStoryItems': _validateList(model?.customStoryItems),
+      'location': _validateField(
+          model?.timelineDetail?.centerLocation, 'Unknown Location'),
+      'timelineStories': _validateList(model?.timelineDetail?.timelineStories),
+    };
 
-      print('🔍 NOTIFIER DEBUG: Processing memory data');
-      print('   - Memory ID: "$memoryId"');
-      print('   - Title: "${memoryData['title']}"');
-      print('   - Date: "${memoryData['date']}"');
-      print('   - Location: "${memoryData['location']}"');
-      print('   - Event Date: "${memoryData['eventDate']}"');
-      print('   - Event Time: "${memoryData['eventTime']}"');
-      print('   - End Date: "${memoryData['endDate']}"');
-      print('   - End Time: "${memoryData['endTime']}"');
+    // Count successful validations
+    final passedCount = validationResults.values.where((v) => v == true).length;
+    final totalCount = validationResults.length;
 
-      // Validate memory ID before proceeding
-      if (memoryId.isEmpty) {
-        print('❌ TIMELINE ERROR: No memory ID provided in arguments');
-        state = state.copyWith(
-          isLoading: false,
-          eventTimelineViewModel: EventTimelineViewModel(
-            eventTitle: 'Error',
-            eventDate: 'Invalid memory',
-            isPrivate: false,
-            participantImages: [],
-            customStoryItems: [],
-            timelineDetail: TimelineDetailModel(
-              centerLocation: 'Unknown',
-              centerDistance: '0km',
-            ),
-          ),
-        );
-        return;
+    return {
+      'results': validationResults,
+      'summary': '$passedCount/$totalCount UI elements have real data',
+      'passed': passedCount,
+      'total': totalCount,
+      'allValid': passedCount == totalCount,
+    };
+  }
+
+  /// Validate if field contains real data (not default/static)
+  bool _validateField(dynamic actual, dynamic staticDefault) {
+    if (actual == null) return false;
+    if (actual == staticDefault) return false;
+    if (actual is String && actual.isEmpty) return false;
+    return true;
+  }
+
+  /// Validate if list contains real data (not empty)
+  bool _validateList(List<dynamic>? list) {
+    if (list == null) return false;
+    return list.isNotEmpty;
+  }
+
+  /// CRITICAL: Real-time validation against Supabase data
+  /// Called before rendering any UI element to ensure data integrity
+  Future<bool> validateMemoryData(String memoryId) async {
+    try {
+      print(
+          '🔍 VALIDATION: Starting real-time validation for memory: $memoryId');
+
+      // Fetch fresh memory data from Supabase
+      final memoryResponse =
+          await SupabaseService.instance.client?.from('memories').select('''
+            id, title, created_at, start_time, end_time,
+            visibility, state, location_name,
+            category_id, creator_id,
+            memory_categories(icon_name, icon_url),
+            user_profiles!memories_creator_id_fkey(
+              id, avatar_url, display_name
+            )
+          ''').eq('id', memoryId).single();
+
+      if (memoryResponse == null) {
+        print('❌ VALIDATION FAILED: Memory does not exist in database');
+        setErrorState('Memory not found in database');
+        return false;
       }
 
-      print('🔍 TIMELINE DEBUG: Initializing from memory ID: $memoryId');
-      print('🔍 TIMELINE DEBUG: Full memory data: $memoryData');
+      // Fetch memory contributors for avatar list
+      final contributorsResponse = await SupabaseService.instance.client
+          ?.from('memory_contributors')
+          .select('user_id, user_profiles(avatar_url)')
+          .eq('memory_id', memoryId);
 
-      final memory = memoryData;
+      final contributorAvatars = (contributorsResponse as List?)
+              ?.map((c) {
+                final profile = c['user_profiles'] as Map<String, dynamic>?;
+                return AvatarHelperService.getAvatarUrl(
+                  profile?['avatar_url'] as String?,
+                );
+              })
+              .whereType<String>()
+              .toList() ??
+          [];
 
-      // Use category icon URL directly from database data
-      String? categoryIcon = memory['category_icon'] as String?;
+      // Fetch stories count for validation
+      final storiesResponse = await SupabaseService.instance.client
+          ?.from('stories')
+          .select('id')
+          .eq('memory_id', memoryId);
 
-      print('🔍 TIMELINE DEBUG: Category icon = "$categoryIcon"');
+      final storyCount = (storiesResponse as List?)?.length ?? 0;
 
-      // Get contributor avatars from memory data
-      final contributorAvatars = memory['contributor_avatars'];
-      print(
-          '🔍 TIMELINE DEBUG: Raw contributor_avatars type: ${contributorAvatars.runtimeType}');
-      print(
-          '🔍 TIMELINE DEBUG: Raw contributor_avatars content: $contributorAvatars');
+      // Validate against current state data
+      final currentModel = state.eventTimelineViewModel;
+      final validationResults = <String, bool>{};
 
-      List<String> participantImages = [];
+      // Compare title
+      final dbTitle = memoryResponse['title'] as String?;
+      validationResults['title'] = currentModel?.eventTitle == dbTitle &&
+          dbTitle != null &&
+          dbTitle.isNotEmpty;
 
-      if (contributorAvatars != null) {
-        if (contributorAvatars is List) {
-          participantImages = contributorAvatars
-              .map((e) => e.toString())
-              .where((url) => url.isNotEmpty)
-              .toList();
-          print(
-              '🔍 TIMELINE DEBUG: Processed ${participantImages.length} participant images from List');
-        } else if (contributorAvatars is String) {
-          participantImages = [contributorAvatars];
-          print('🔍 TIMELINE DEBUG: Processed 1 participant image from String');
+      // Compare memory ID
+      validationResults['memoryId'] = currentModel?.memoryId == memoryId;
+
+      // Compare location
+      final dbLocation = memoryResponse['location_name'] as String?;
+      validationResults['location'] =
+          currentModel?.timelineDetail?.centerLocation == dbLocation &&
+              dbLocation != null;
+
+      // Compare visibility
+      final dbVisibility = memoryResponse['visibility'] as String?;
+      validationResults['visibility'] =
+          currentModel?.isPrivate == (dbVisibility == 'private');
+
+      // Compare contributors count
+      validationResults['contributorCount'] =
+          (currentModel?.participantImages?.length ?? 0) ==
+              contributorAvatars.length;
+
+      // Compare stories count
+      validationResults['storiesCount'] =
+          (currentModel?.customStoryItems?.length ?? 0) == storyCount;
+
+      // Log validation results
+      final passedCount =
+          validationResults.values.where((v) => v == true).length;
+      final totalCount = validationResults.length;
+
+      print('📊 VALIDATION RESULTS: $passedCount/$totalCount checks passed');
+      validationResults.forEach((field, isValid) {
+        print(
+            '   ${isValid ? "✅" : "❌"} $field: ${isValid ? "MATCH" : "MISMATCH"}');
+      });
+
+      // If critical fields mismatch, refresh data
+      if (!validationResults['memoryId']! || !validationResults['title']!) {
+        print('⚠️ CRITICAL MISMATCH: Refreshing memory data from database');
+
+        // Force reload from database with validated data
+        await _reloadValidatedData(
+            memoryId, memoryResponse, contributorAvatars);
+        return true;
+      }
+
+      return passedCount == totalCount;
+    } catch (e, stackTrace) {
+      print('❌ VALIDATION ERROR: $e');
+      print('   Stack trace: $stackTrace');
+      setErrorState('Failed to validate memory data');
+      return false;
+    }
+  }
+
+  /// Reload memory data with validated Supabase data
+  Future<void> _reloadValidatedData(
+    String memoryId,
+    Map<String, dynamic> memoryData,
+    List<String> contributorAvatars,
+  ) async {
+    try {
+      // Extract validated data
+      final title = memoryData['title'] as String?;
+      final createdAt = memoryData['created_at'] as String?;
+      final startTime = memoryData['start_time'] as String?;
+      final endTime = memoryData['end_time'] as String?;
+      final visibility = memoryData['visibility'] as String?;
+      final location = memoryData['location_name'] as String?;
+
+      final category = memoryData['memory_categories'] as Map<String, dynamic>?;
+      final categoryIcon =
+          category?['icon_url'] as String? ?? ImageConstant.imgFrame13;
+
+      // Calculate date display
+      String dateDisplay = 'Unknown Date';
+      if (createdAt != null) {
+        final date = DateTime.parse(createdAt);
+        final now = DateTime.now();
+        final difference = now.difference(date);
+
+        if (difference.inDays < 1) {
+          dateDisplay = 'Today';
+        } else if (difference.inDays == 1) {
+          dateDisplay = 'Yesterday';
+        } else {
+          dateDisplay = 'Dec ${date.day}';
         }
       }
 
-      // Log each avatar URL for debugging
-      for (int i = 0; i < participantImages.length; i++) {
-        print(
-            '🔍 TIMELINE DEBUG: Participant avatar $i: ${participantImages[i]}');
-      }
-
-      // ONLY use fallback if we have NO avatars at all
-      if (participantImages.isEmpty) {
-        print(
-            '⚠️ TIMELINE DEBUG: No participant avatars found, using fallback images');
-        participantImages = [
-          ImageConstant.imgFrame2,
-          ImageConstant.imgFrame1,
-          ImageConstant.imgEllipse81,
-        ];
-      } else {
-        print(
-            '✅ TIMELINE DEBUG: Using ${participantImages.length} real participant images');
-      }
-
-      // Initialize timeline detail from memory data
-      TimelineDetailModel timelineDetail = TimelineDetailModel(
-        centerLocation: memory['location'] as String? ?? 'Unknown Location',
-        centerDistance: '0km',
-      );
-
-      print('🔍 TIMELINE DEBUG: Setting initial state with memory details');
-      print('   - Title: ${memory['title']}');
-      print('   - Date: ${memory['date']}');
-      print('   - Location: ${memory['location']}');
-
-      // Set initial state with memory details (before loading stories)
+      // Update state with validated database data
       state = state.copyWith(
-        eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
+        eventTimelineViewModel: EventTimelineViewModel(
           memoryId: memoryId,
-          eventTitle: memory['title'] as String? ?? 'Memory Event',
-          eventDate: memory['date'] as String? ?? 'Unknown Date',
-          isPrivate: false,
-          categoryIcon: categoryIcon ?? ImageConstant.imgFrame13,
-          participantImages: participantImages,
-          customStoryItems: [],
-          timelineDetail: timelineDetail,
+          eventTitle: title ?? 'Unknown Memory',
+          eventDate: dateDisplay,
+          isPrivate: visibility == 'private',
+          categoryIcon: categoryIcon,
+          participantImages: contributorAvatars,
+          customStoryItems:
+              state.eventTimelineViewModel?.customStoryItems ?? [],
+          timelineDetail: TimelineDetailModel(
+            centerLocation: location ?? 'Unknown Location',
+            centerDistance: '0km',
+            memoryStartTime:
+                startTime != null ? DateTime.parse(startTime) : null,
+            memoryEndTime: endTime != null ? DateTime.parse(endTime) : null,
+            timelineStories:
+                state.eventTimelineViewModel?.timelineDetail?.timelineStories ??
+                    [],
+          ),
         ),
-        isLoading: true,
       );
 
-      print('✅ TIMELINE DEBUG: Initial state set, now fetching stories...');
-
-      // CRITICAL: Fetch actual stories from database using memory ID
-      print('🔄 TIMELINE DEBUG: Fetching stories for memory $memoryId...');
-      await _loadMemoryStories(memoryId);
-
-      // CRITICAL: Trigger cache refresh after viewing timeline
-      print('🔄 TIMELINE DEBUG: Triggering cache refresh for /memories screen');
-      final currentUser = SupabaseService.instance.client?.auth.currentUser;
-      if (currentUser != null) {
-        await _cacheService.refreshMemoryCache(currentUser.id);
-        print('✅ TIMELINE DEBUG: Cache refresh complete');
-      }
-
-      state = state.copyWith(isLoading: false);
-      print('✅ TIMELINE DEBUG: Timeline initialization complete');
-      print('   - Final title: ${state.eventTimelineViewModel?.eventTitle}');
-      print('   - Final date: ${state.eventTimelineViewModel?.eventDate}');
-      print(
-          '   - Final location: ${state.eventTimelineViewModel?.timelineDetail?.centerLocation}');
-      print(
-          '   - Stories count: ${state.eventTimelineViewModel?.customStoryItems?.length ?? 0}');
-    } else {
-      print(
-          '❌ TIMELINE ERROR: Invalid memory data type: ${memoryData.runtimeType}');
-      print('   - Expected: Map<String, dynamic>');
-      print('   - Received: ${memoryData.runtimeType}');
-
-      // Fall back to default initialization
-      initialize();
+      print('✅ VALIDATION: Memory data reloaded with validated Supabase data');
+    } catch (e, stackTrace) {
+      print('❌ RELOAD ERROR: $e');
+      print('   Stack trace: $stackTrace');
     }
+  }
+
+  /// CRITICAL FIX: Accept only MemoryNavArgs - no more raw Map
+  void initializeFromMemory(MemoryNavArgs navArgs) async {
+    print('🚨 NOTIFIER: initializeFromMemory with MemoryNavArgs');
+    print('   - Memory ID: ${navArgs.memoryId}');
+    print('   - Has snapshot: ${navArgs.snapshot != null}');
+
+    // Validate memory ID
+    if (!navArgs.isValid) {
+      print('❌ NOTIFIER: Invalid memory ID');
+      setErrorState('Invalid memory ID provided');
+      return;
+    }
+
+    // Show snapshot immediately if available
+    if (navArgs.snapshot != null) {
+      print('✅ NOTIFIER: Displaying snapshot while loading full data');
+      _displaySnapshot(navArgs.snapshot!);
+    }
+
+    // Set loading state
+    state = state.copyWith(isLoading: true);
+
+    // Fetch actual data from database using memory ID
+    await _loadMemoryStories(navArgs.memoryId);
+
+    // CRITICAL: Validate loaded data against database before rendering
+    final isValid = await validateMemoryData(navArgs.memoryId);
+
+    if (!isValid) {
+      print(
+          '⚠️ VALIDATION: Data mismatch detected, but continuing with validated data');
+    }
+
+    // Trigger cache refresh
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    if (currentUser != null) {
+      await _cacheService.refreshMemoryCache(currentUser.id);
+    }
+
+    state = state.copyWith(isLoading: false);
+  }
+
+  /// Display snapshot data immediately
+  void _displaySnapshot(MemorySnapshot snapshot) {
+    state = state.copyWith(
+      eventTimelineViewModel: EventTimelineViewModel(
+        eventTitle: snapshot.title,
+        eventDate: snapshot.date,
+        isPrivate: snapshot.isPrivate,
+        categoryIcon: snapshot.categoryIcon ?? ImageConstant.imgFrame13,
+        participantImages: snapshot.participantAvatars ?? [],
+        customStoryItems: [],
+        timelineDetail: TimelineDetailModel(
+          centerLocation: snapshot.location ?? 'Unknown',
+          centerDistance: '0km',
+        ),
+      ),
+    );
+  }
+
+  /// Set error state
+  void setErrorState(String message) {
+    state = state.copyWith(
+      errorMessage: message,
+      isLoading: false,
+    );
+  }
+
+  // CRITICAL FIX: Remove or mark as deprecated the old initialize() method
+  @Deprecated('Use initializeFromMemory with MemoryNavArgs instead')
+  void initialize() {
+    print('⚠️ DEPRECATED: initialize() called - this should not happen');
+    setErrorState('Invalid initialization - missing memory data');
   }
 
   Future<void> _loadMemoryStories(String memoryId) async {
@@ -324,85 +473,6 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         isLoading: false,
       );
     }
-  }
-
-  void initialize() {
-    // Initialize story items as CustomStoryItem
-    List<CustomStoryItem> storyItems = [
-      CustomStoryItem(
-        backgroundImage: ImageConstant.imgImage8202x116,
-        profileImage: ImageConstant.imgEllipse826x26,
-        timestamp: '5 mins ago',
-      ),
-      CustomStoryItem(
-        backgroundImage: ImageConstant.imgImage8120x90,
-        profileImage: ImageConstant.imgFrame2,
-        timestamp: '12 mins ago',
-      ),
-      CustomStoryItem(
-        backgroundImage: ImageConstant.imgImage8,
-        profileImage: ImageConstant.imgFrame1,
-        timestamp: '23 mins ago',
-      ),
-      CustomStoryItem(
-        backgroundImage: ImageConstant.imgImg,
-        profileImage: ImageConstant.imgEllipse81,
-        timestamp: '1 hour ago',
-      ),
-      CustomStoryItem(
-        backgroundImage: ImageConstant.imgImage81,
-        profileImage: ImageConstant.imgEllipse826x26,
-        timestamp: '2 hours ago',
-      ),
-    ];
-
-    // Initialize timeline with positioned stories
-    final now = DateTime.now();
-    final memoryStart = now.subtract(Duration(hours: 2));
-    final memoryEnd = now;
-
-    final timelineStories = [
-      TimelineStoryItem(
-        backgroundImage: ImageConstant.imgImage9,
-        userAvatar: ImageConstant.imgEllipse826x26,
-        postedAt: memoryStart.add(Duration(minutes: 15)),
-        onTap: () {},
-      ),
-      TimelineStoryItem(
-        backgroundImage: ImageConstant.imgImage81,
-        userAvatar: ImageConstant.imgEllipse842x42,
-        postedAt: memoryStart.add(Duration(minutes: 45)),
-        onTap: () {},
-      ),
-      TimelineStoryItem(
-        backgroundImage: ImageConstant.imgImage8202x116,
-        userAvatar: ImageConstant.imgEllipse8DeepOrange100,
-        postedAt: memoryStart.add(Duration(minutes: 90)),
-        onTap: () {},
-      ),
-    ];
-
-    state = state.copyWith(
-      eventTimelineViewModel: EventTimelineViewModel(
-        eventTitle: 'Nixon Wedding 2025',
-        eventDate: 'Dec 4, 2025',
-        isPrivate: true,
-        participantImages: [
-          ImageConstant.imgFrame2,
-          ImageConstant.imgFrame1,
-          ImageConstant.imgEllipse81,
-        ],
-        customStoryItems: storyItems,
-        timelineDetail: TimelineDetailModel(
-          centerLocation: "Tillsonburg, ON",
-          centerDistance: "21km",
-          memoryStartTime: memoryStart,
-          memoryEndTime: memoryEnd,
-          timelineStories: timelineStories,
-        ),
-      ),
-      isLoading: false,
-    );
   }
 
   String _formatTimestamp(String timestamp) {

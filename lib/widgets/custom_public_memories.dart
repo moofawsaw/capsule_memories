@@ -1,9 +1,9 @@
 import '../core/app_export.dart';
-import './custom_image_view.dart';
 import '../presentation/event_timeline_view_screen/widgets/timeline_story_widget.dart';
-import '../services/story_service.dart';
 import '../services/avatar_helper_service.dart';
+import '../services/story_service.dart';
 import '../services/supabase_service.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomPublicMemories - A horizontal scrolling component that displays public memory cards
@@ -159,7 +159,6 @@ class CustomPublicMemories extends StatelessWidget {
                           fit: BoxFit.cover))));
         })));
   }
-
 
   Widget _buildMediaPreview(BuildContext context, CustomMediaItem item) {
     return Container(

@@ -1,5 +1,6 @@
 import '../../../core/app_export.dart';
 import '../models/notification_settings_model.dart';
+import '../../../services/notification_preferences_service.dart';
 
 part 'notification_settings_state.dart';
 
@@ -20,16 +21,45 @@ final notificationSettingsNotifier = StateNotifierProvider<
     allowMemoryInvitesEnabled: true,
     allowStoryReactionsEnabled: true,
     allowStorySharingEnabled: true,
-  )),
+  ))
+    ..loadPreferences(),
 );
 
 class NotificationSettingsNotifier
     extends StateNotifier<NotificationSettingsState> {
   NotificationSettingsNotifier(NotificationSettingsState state) : super(state);
 
-  void updatePushNotifications(bool value) {
-    // Master toggle: when turned off, turn off all nested toggles
-    // When turned on, turn on all nested toggles
+  final _preferencesService = NotificationPreferencesService.instance;
+
+  /// Load preferences from database on initialization
+  Future<void> loadPreferences() async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final prefs = await _preferencesService.loadPreferences();
+
+      if (prefs != null) {
+        state = state.copyWith(
+          pushNotificationsEnabled: prefs['push_notifications_enabled'] ?? true,
+          memoryInvitesEnabled: prefs['push_memory_invites'] ?? true,
+          memoryActivityEnabled: prefs['push_memory_activity'] ?? true,
+          memorySealedEnabled: prefs['push_memory_sealed'] ?? true,
+          reactionsEnabled: prefs['push_reactions'] ?? true,
+          newFollowersEnabled: prefs['push_new_followers'] ?? true,
+          friendRequestsEnabled: prefs['push_friend_requests'] ?? true,
+          groupInvitesEnabled: prefs['push_group_invites'] ?? true,
+          isLoading: false,
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
+    } catch (error) {
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
+  void updatePushNotifications(bool value) async {
+    // Update state immediately for UI responsiveness
     state = state.copyWith(
       pushNotificationsEnabled: value,
       memoryInvitesEnabled: value,
@@ -40,34 +70,44 @@ class NotificationSettingsNotifier
       friendRequestsEnabled: value,
       groupInvitesEnabled: value,
     );
+
+    // Persist to database
+    await _preferencesService.updatePushNotifications(value);
   }
 
-  void updateMemoryInvites(bool value) {
+  void updateMemoryInvites(bool value) async {
     state = state.copyWith(memoryInvitesEnabled: value);
+    await _preferencesService.updatePreference('push_memory_invites', value);
   }
 
-  void updateMemoryActivity(bool value) {
+  void updateMemoryActivity(bool value) async {
     state = state.copyWith(memoryActivityEnabled: value);
+    await _preferencesService.updatePreference('push_memory_activity', value);
   }
 
-  void updateMemorySealed(bool value) {
+  void updateMemorySealed(bool value) async {
     state = state.copyWith(memorySealedEnabled: value);
+    await _preferencesService.updatePreference('push_memory_sealed', value);
   }
 
-  void updateReactions(bool value) {
+  void updateReactions(bool value) async {
     state = state.copyWith(reactionsEnabled: value);
+    await _preferencesService.updatePreference('push_reactions', value);
   }
 
-  void updateNewFollowers(bool value) {
+  void updateNewFollowers(bool value) async {
     state = state.copyWith(newFollowersEnabled: value);
+    await _preferencesService.updatePreference('push_new_followers', value);
   }
 
-  void updateFriendRequests(bool value) {
+  void updateFriendRequests(bool value) async {
     state = state.copyWith(friendRequestsEnabled: value);
+    await _preferencesService.updatePreference('push_friend_requests', value);
   }
 
-  void updateGroupInvites(bool value) {
+  void updateGroupInvites(bool value) async {
     state = state.copyWith(groupInvitesEnabled: value);
+    await _preferencesService.updatePreference('push_group_invites', value);
   }
 
   void updatePrivateAccount(bool value) {

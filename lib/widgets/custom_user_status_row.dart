@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomUserStatusRow - A reusable user profile row component with status badge

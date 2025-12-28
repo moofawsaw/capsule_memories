@@ -212,7 +212,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
       // Get invited user IDs (from selected group members + manually invited users)
       final Set<String> invitedUserIds = {};
-      
+
       // Add group members if a group is selected
       if (state.createMemoryModel?.selectedGroup != null) {
         final groupMembers = state.createMemoryModel?.groupMembers ?? [];
@@ -223,13 +223,14 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
           }
         }
       }
-      
+
       // Add manually invited users
       final manuallyInvited = state.createMemoryModel?.invitedUserIds ?? {};
       invitedUserIds.addAll(manuallyInvited);
 
       // Determine visibility
-      final visibility = state.createMemoryModel?.isPublic == true ? 'public' : 'private';
+      final visibility =
+          state.createMemoryModel?.isPublic == true ? 'public' : 'private';
 
       // Create memory in database
       final memoryId = await _storyService.createMemory(

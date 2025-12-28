@@ -1,38 +1,48 @@
 part of 'qr_code_share_screen_two_notifier.dart';
 
-class QrCodeShareScreenTwoState extends Equatable {
-  final TextEditingController? urlController;
-  final bool? showCopySuccess;
-  final bool? isLoading;
-  final QrCodeShareScreenTwoModel? qrCodeShareScreenTwoModel;
-
-  QrCodeShareScreenTwoState({
-    this.urlController,
-    this.showCopySuccess = false,
-    this.isLoading = false,
+class QRCodeShareScreenTwoState extends Equatable {
+  QRCodeShareScreenTwoState({
     this.qrCodeShareScreenTwoModel,
+    this.isLoading,
+    this.isUrlCopied,
+    this.isDownloadSuccess,
+    this.isShareSuccess,
+    this.errorMessage,
   });
+
+  QRCodeShareScreenTwoModel? qrCodeShareScreenTwoModel;
+  bool? isLoading;
+  bool? isUrlCopied;
+  bool? isDownloadSuccess;
+  bool? isShareSuccess;
+  String? errorMessage;
 
   @override
   List<Object?> get props => [
-        urlController,
-        showCopySuccess,
-        isLoading,
         qrCodeShareScreenTwoModel,
+        isLoading,
+        isUrlCopied,
+        isDownloadSuccess,
+        isShareSuccess,
+        errorMessage,
       ];
 
-  QrCodeShareScreenTwoState copyWith({
-    TextEditingController? urlController,
-    bool? showCopySuccess,
+  QRCodeShareScreenTwoState copyWith({
+    QRCodeShareScreenTwoModel? qrCodeShareScreenTwoModel,
     bool? isLoading,
-    QrCodeShareScreenTwoModel? qrCodeShareScreenTwoModel,
+    bool? isUrlCopied,
+    bool? isDownloadSuccess,
+    bool? isShareSuccess,
+    String? errorMessage,
   }) {
-    return QrCodeShareScreenTwoState(
-      urlController: urlController ?? this.urlController,
-      showCopySuccess: showCopySuccess ?? this.showCopySuccess,
-      isLoading: isLoading ?? this.isLoading,
+    return QRCodeShareScreenTwoState(
       qrCodeShareScreenTwoModel:
           qrCodeShareScreenTwoModel ?? this.qrCodeShareScreenTwoModel,
+      isLoading: isLoading ?? this.isLoading,
+      isUrlCopied: isUrlCopied ?? this.isUrlCopied,
+      isDownloadSuccess: isDownloadSuccess ?? this.isDownloadSuccess,
+      isShareSuccess: isShareSuccess ?? this.isShareSuccess,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }

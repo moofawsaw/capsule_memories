@@ -1,5 +1,6 @@
-import '../models/group_qr_invite_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/groups_service.dart';
+import '../models/group_qr_invite_model.dart';
 
 part 'group_qr_invite_state.dart';
 
@@ -13,22 +14,45 @@ final groupQRInviteNotifier = StateNotifierProvider.autoDispose<
 );
 
 class GroupQRInviteNotifier extends StateNotifier<GroupQRInviteState> {
-  GroupQRInviteNotifier(GroupQRInviteState state) : super(state) {
-    initialize();
-  }
+  GroupQRInviteNotifier(GroupQRInviteState state) : super(state);
 
-  void initialize() {
-    state = state.copyWith(
-      isLoading: false,
-      groupQRInviteModel: GroupQRInviteModel(
-        groupName: "Jones Family",
-        invitationUrl:
-            ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08,
-        groupDescription: "Scan to join the group",
-        qrCodeData:
-            ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08,
-      ),
-    );
+  /// Initialize with group ID to load real data
+  Future<void> initialize(String groupId) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+
+    try {
+      final groupData = await GroupsService.fetchGroupById(groupId);
+
+      if (groupData != null && mounted) {
+        final inviteCode = groupData['invite_code'] as String;
+        final groupName = groupData['name'] as String;
+        final inviteUrl = 'https://capapp.co/group/join/$inviteCode';
+
+        state = state.copyWith(
+          isLoading: false,
+          groupQRInviteModel: GroupQRInviteModel(
+            id: groupData['id'] as String,
+            groupName: groupName,
+            invitationUrl: inviteUrl,
+            qrCodeData: inviteUrl,
+            groupDescription: 'Scan to join the group',
+            iconPath: ImageConstant.imgButtons,
+          ),
+        );
+      } else if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Failed to load group data',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Error loading group: ${e.toString()}',
+        );
+      }
+    }
   }
 
   void updateUrl(String newUrl) {

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import './supabase_service.dart';
+import './notification_preferences_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for handling push notifications using Flutter Local Notifications
@@ -16,6 +17,7 @@ class PushNotificationService {
       FlutterLocalNotificationsPlugin();
 
   final SupabaseClient? _client = SupabaseService.instance.client;
+  final _preferencesService = NotificationPreferencesService.instance;
 
   bool _isInitialized = false;
   String? _fcmToken;
@@ -141,13 +143,33 @@ class PushNotificationService {
     }
   }
 
-  /// Show local notification
+  /// Show local notification (checks preferences before showing)
   Future<void> showNotification({
     required String title,
     required String body,
     String? payload,
     int id = 0,
+    String? notificationType,
   }) async {
+    // Check if notifications are enabled for this type
+    final prefs = await _preferencesService.loadPreferences();
+    if (prefs != null) {
+      final pushEnabled = prefs['push_notifications_enabled'] ?? true;
+      if (!pushEnabled) {
+        debugPrint('⚠️ Push notifications disabled globally');
+        return;
+      }
+
+      // Check specific notification type preference
+      if (notificationType != null) {
+        final typeEnabled = prefs[notificationType] ?? true;
+        if (!typeEnabled) {
+          debugPrint('⚠️ Notification type $notificationType disabled');
+          return;
+        }
+      }
+    }
+
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
       'capsule_notifications',

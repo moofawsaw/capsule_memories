@@ -1,9 +1,9 @@
 part of 'memory_invitation_notifier.dart';
 
-class MemoryInvitationState extends Equatable {
+class MemoryInvitationState {
   final bool? isLoading;
   final bool? isJoined;
-  final MemoryInvitationModel? memoryInvitationModel;
+  final Map<String, dynamic>? memoryInvitationModel;
 
   MemoryInvitationState({
     this.isLoading = false,
@@ -11,7 +11,6 @@ class MemoryInvitationState extends Equatable {
     this.memoryInvitationModel,
   });
 
-  @override
   List<Object?> get props => [
         isLoading,
         isJoined,
@@ -21,7 +20,7 @@ class MemoryInvitationState extends Equatable {
   MemoryInvitationState copyWith({
     bool? isLoading,
     bool? isJoined,
-    MemoryInvitationModel? memoryInvitationModel,
+    Map<String, dynamic>? memoryInvitationModel,
   }) {
     return MemoryInvitationState(
       isLoading: isLoading ?? this.isLoading,

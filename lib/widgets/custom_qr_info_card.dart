@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_icon_button.dart';
+import './custom_icon_button.dart';
 
 /** 
  * CustomQrInfoCard - A reusable information card component for QR code related content

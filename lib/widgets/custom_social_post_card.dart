@@ -1,7 +1,7 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_button.dart';
-import 'custom_icon_button.dart';
+import './custom_button.dart';
+import './custom_icon_button.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomSocialPostCard - A comprehensive social media post component featuring user profile information,

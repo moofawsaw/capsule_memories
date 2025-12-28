@@ -260,4 +260,25 @@ class GroupsService {
       return false;
     }
   }
+
+  /// Fetches a single group by ID with invite code
+  static Future<Map<String, dynamic>?> fetchGroupById(String groupId) async {
+    try {
+      final response = await _client.from('groups').select('''
+            id,
+            name,
+            member_count,
+            creator_id,
+            invite_code,
+            qr_code_url,
+            created_at,
+            updated_at
+          ''').eq('id', groupId).single();
+
+      return response;
+    } catch (e) {
+      print('Error fetching group: $e');
+      return null;
+    }
+  }
 }

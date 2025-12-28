@@ -66,13 +66,15 @@ class CustomSwitch extends StatelessWidget {
       child: Switch(
         value: value,
         onChanged: isEnabled ? onChanged : null,
-        thumbColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
+        thumbColor: MaterialStateProperty.resolveWith<Color>(
+            (Set<MaterialState> states) {
           if (states.contains(MaterialState.selected)) {
             return activeColor ?? appTheme.whiteCustom;
           }
           return inactiveThumbColor ?? appTheme.whiteCustom;
         }),
-        trackColor: MaterialStateProperty.resolveWith<Color>((Set<MaterialState> states) {
+        trackColor: MaterialStateProperty.resolveWith<Color>(
+            (Set<MaterialState> states) {
           if (states.contains(MaterialState.selected)) {
             return activeColor?.withAlpha(128) ?? appTheme.deep_purple_A100;
           }

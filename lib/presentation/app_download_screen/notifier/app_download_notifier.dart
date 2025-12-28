@@ -1,6 +1,7 @@
 import 'package:share_plus/share_plus.dart';
-import '../models/app_download_model.dart';
+
 import '../../../core/app_export.dart';
+import '../models/app_download_model.dart';
 
 part 'app_download_state.dart';
 

@@ -1,6 +1,6 @@
 import '../../../core/app_export.dart';
-import 'story_item_model.dart';
-import 'memory_item_model.dart';
+import './memory_item_model.dart';
+import './story_item_model.dart';
 
 /// This class is used in the [memories_dashboard_screen] screen.
 

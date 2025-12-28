@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomNavigationDrawer - A flexible navigation drawer component that displays a vertical list of menu items

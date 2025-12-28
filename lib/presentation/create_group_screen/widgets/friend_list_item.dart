@@ -1,5 +1,5 @@
-import '../../../widgets/custom_image_view.dart';
 import '../../../core/app_export.dart';
+import '../../../widgets/custom_image_view.dart';
 import '../models/create_group_model.dart';
 
 class FriendListItem extends StatelessWidget {

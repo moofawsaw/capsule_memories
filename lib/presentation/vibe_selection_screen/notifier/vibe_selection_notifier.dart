@@ -1,6 +1,6 @@
+import '../../../core/app_export.dart';
 import '../../../widgets/custom_music_list.dart';
 import '../models/vibe_selection_model.dart';
-import '../../../core/app_export.dart';
 
 part 'vibe_selection_state.dart';
 

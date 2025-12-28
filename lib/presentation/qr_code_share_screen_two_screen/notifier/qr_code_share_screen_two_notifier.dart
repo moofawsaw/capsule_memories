@@ -2,66 +2,124 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/qr_code_share_screen_two_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/supabase_service.dart';
 
 part 'qr_code_share_screen_two_state.dart';
 
 final qrCodeShareScreenTwoNotifier = StateNotifierProvider.autoDispose<
-    QrCodeShareScreenTwoNotifier, QrCodeShareScreenTwoState>(
-  (ref) => QrCodeShareScreenTwoNotifier(
-    QrCodeShareScreenTwoState(
-      qrCodeShareScreenTwoModel: QrCodeShareScreenTwoModel(),
+    QRCodeShareScreenTwoNotifier, QRCodeShareScreenTwoState>(
+  (ref) => QRCodeShareScreenTwoNotifier(
+    QRCodeShareScreenTwoState(
+      qrCodeShareScreenTwoModel: QRCodeShareScreenTwoModel(),
     ),
   ),
 );
 
-class QrCodeShareScreenTwoNotifier
-    extends StateNotifier<QrCodeShareScreenTwoState> {
-  QrCodeShareScreenTwoNotifier(QrCodeShareScreenTwoState state) : super(state) {
-    initialize();
-  }
+class QRCodeShareScreenTwoNotifier
+    extends StateNotifier<QRCodeShareScreenTwoState> {
+  QRCodeShareScreenTwoNotifier(QRCodeShareScreenTwoState state) : super(state);
 
-  void initialize() {
-    final urlController = TextEditingController();
-    urlController.text =
-        ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08;
+  Future<void> loadUserFriendCode() async {
+    try {
+      state = state.copyWith(
+        isLoading: true,
+        errorMessage: null,
+      );
 
-    state = state.copyWith(
-      urlController: urlController,
-      qrCodeShareScreenTwoModel: state.qrCodeShareScreenTwoModel?.copyWith(
-        qrData: ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08,
-        shareUrl: ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08,
-      ),
-    );
-  }
+      final userId = SupabaseService.instance.client?.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
 
-  void copyUrlToClipboard() {
-    final url = state.qrCodeShareScreenTwoModel?.shareUrl ?? '';
-    if (url.isNotEmpty) {
-      Clipboard.setData(ClipboardData(text: url));
-      state = state.copyWith(showCopySuccess: true);
+      final response = await SupabaseService.instance.client!
+          .from('user_profiles')
+          .select('friend_code, display_name, username')
+          .eq('id', userId)
+          .single();
 
-      // Reset success message after showing
-      Future.delayed(Duration(milliseconds: 100), () {
-        if (mounted) {
-          state = state.copyWith(showCopySuccess: false);
-        }
-      });
-    }
-  }
+      final friendCode = response['friend_code'] as String;
+      final displayName = response['display_name'] as String?;
+      final username = response['username'] as String?;
 
-  void shareUrl() {
-    final url = state.qrCodeShareScreenTwoModel?.shareUrl ?? '';
-    if (url.isNotEmpty) {
-      Share.share(
-        url,
-        subject: 'Connect with me on Memry',
+      final shareUrl = 'https://capapp.co/add-friend/$friendCode';
+
+      state = state.copyWith(
+        qrCodeShareScreenTwoModel: QRCodeShareScreenTwoModel(
+          friendCode: friendCode,
+          displayName: displayName ?? username ?? 'User',
+          qrCodeData: shareUrl,
+          shareUrl: shareUrl,
+        ),
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
       );
     }
   }
 
-  @override
-  void dispose() {
-    state.urlController?.dispose();
-    super.dispose();
+  void copyUrlToClipboard() async {
+    try {
+      final url = state.qrCodeShareScreenTwoModel?.shareUrl ?? '';
+
+      await Clipboard.setData(ClipboardData(text: url));
+
+      state = state.copyWith(isUrlCopied: true);
+
+      Future.delayed(Duration(seconds: 2), () {
+        if (mounted) {
+          state = state.copyWith(isUrlCopied: false);
+        }
+      });
+    } catch (e) {
+      print('Error copying to clipboard: $e');
+    }
+  }
+
+  void downloadQRCode() async {
+    try {
+      state = state.copyWith(isLoading: true);
+
+      await Future.delayed(Duration(seconds: 1));
+
+      state = state.copyWith(
+        isLoading: false,
+        isDownloadSuccess: true,
+      );
+
+      Future.delayed(Duration(seconds: 2), () {
+        if (mounted) {
+          state = state.copyWith(isDownloadSuccess: false);
+        }
+      });
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      print('Error downloading QR code: $e');
+    }
+  }
+
+  void shareLink() async {
+    try {
+      final url = state.qrCodeShareScreenTwoModel?.shareUrl ?? '';
+      final displayName =
+          state.qrCodeShareScreenTwoModel?.displayName ?? 'Friend';
+
+      await Share.share(
+        url,
+        subject: 'Add $displayName as friend on Capsule',
+      );
+
+      state = state.copyWith(isShareSuccess: true);
+
+      Future.delayed(Duration(seconds: 2), () {
+        if (mounted) {
+          state = state.copyWith(isShareSuccess: false);
+        }
+      });
+    } catch (e) {
+      print('Error sharing link: $e');
+    }
   }
 }

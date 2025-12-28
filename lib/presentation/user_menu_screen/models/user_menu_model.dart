@@ -1,4 +1,3 @@
-
 class UserMenuModel {
   final String userName;
   final String userEmail;

@@ -1,6 +1,6 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_button.dart';
+import './custom_button.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomUserList - A flexible user list component that displays user profiles with customizable actions

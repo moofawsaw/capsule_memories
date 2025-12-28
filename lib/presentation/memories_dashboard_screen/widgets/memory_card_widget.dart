@@ -6,6 +6,7 @@ import '../../../widgets/custom_confirmation_dialog.dart';
 import '../../../widgets/custom_icon_button.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart';
+import '../../memory_invitation_screen/memory_invitation_screen.dart';
 import '../models/memory_item_model.dart';
 
 class MemoryCardWidget extends StatefulWidget {
@@ -74,8 +75,7 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
       // Fetch stories from database using memory ID
       final storiesData = await _storyService.fetchMemoryStories(memoryId);
 
-      print(
-          '🔍 MEMORY CARD: Loading timeline for memory $memoryId');
+      print('🔍 MEMORY CARD: Loading timeline for memory $memoryId');
       print('🔍 MEMORY CARD: Fetched ${storiesData.length} stories');
 
       if (storiesData.isEmpty) {
@@ -214,6 +214,27 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
     );
   }
 
+  /// Handle QR code icon tap - open memory QR bottom sheet
+  void _handleQRCodeTap(BuildContext context) {
+    final memoryId = widget.memoryItem.id;
+    if (memoryId == null || memoryId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Invalid memory ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => MemoryInvitationScreen(memoryId: memoryId),
+    );
+  }
+
   /// Build participant avatars using exact same pattern as feed
   Widget _buildParticipantAvatarsStack() {
     // Use actual participant avatars from cache service (already filtered)
@@ -270,6 +291,7 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
     );
   }
 
+  /// Handle delete icon tap
   Future<void> _handleDeleteTap(BuildContext context) async {
     final confirmed = await CustomConfirmationDialog.show(
       context: context,

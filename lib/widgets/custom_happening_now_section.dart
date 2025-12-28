@@ -1,6 +1,6 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
-import 'custom_button.dart';
+import './custom_button.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomHappeningNowSection - A section widget that displays a "Happening Now" header 

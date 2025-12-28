@@ -34,7 +34,8 @@ class MemoryFeedDashboardNotifier
       state = newState;
     } catch (e) {
       // Notifier was disposed, ignore BadState exception
-      if (e.toString().contains('dispose') || e.toString().contains('Bad state')) {
+      if (e.toString().contains('dispose') ||
+          e.toString().contains('Bad state')) {
         _isDisposed = true;
         print('⚠️ FEED NOTIFIER: Attempted to set state after dispose');
       } else {

@@ -1,11 +1,13 @@
 import '../../core/app_export.dart';
+import '../../core/utils/memory_nav_args.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_story_list.dart'
-    show CustomStoryList, CustomStoryItem;
-import '../../widgets/custom_story_viewer.dart' as story_viewer
-    show CustomStoryViewer, CustomStoryItem;
+import '../../widgets/custom_event_card.dart';
+import '../../widgets/custom_story_list.dart';
+import '../../widgets/custom_story_progress.dart';
+import '../../widgets/timeline_widget.dart';
 import '../add_memory_upload_screen/add_memory_upload_screen.dart';
+import '../event_stories_view_screen/models/event_stories_view_model.dart';
+import '../memory_members_screen/memory_members_screen.dart';
 import 'notifier/memory_details_view_notifier.dart';
 
 class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
@@ -18,274 +20,242 @@ class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
 class MemoryDetailsViewScreenState
     extends ConsumerState<MemoryDetailsViewScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Use same navigation contract as timeline screen
+      final rawArgs = ModalRoute.of(context)?.settings.arguments;
+
+      print('🚨 SEALED SCREEN: Processing navigation arguments');
+      print('   - Raw type: ${rawArgs.runtimeType}');
+
+      MemoryNavArgs? navArgs;
+
+      if (rawArgs is MemoryNavArgs) {
+        navArgs = rawArgs;
+        print('✅ SEALED SCREEN: Received typed MemoryNavArgs');
+      } else if (rawArgs is Map<String, dynamic>) {
+        navArgs = MemoryNavArgs.fromMap(rawArgs);
+        print('✅ SEALED SCREEN: Converted Map to MemoryNavArgs');
+      } else {
+        print(
+            '❌ SEALED SCREEN: Invalid argument type - expected MemoryNavArgs or Map');
+      }
+
+      // Validate arguments
+      if (navArgs == null || !navArgs.isValid) {
+        print('❌ SEALED SCREEN: Missing or invalid memory ID');
+        ref.read(memoryDetailsViewNotifier.notifier).setErrorState(
+              'Unable to load memory. Invalid navigation arguments.',
+            );
+        return;
+      }
+
+      print('✅ SEALED SCREEN: Valid MemoryNavArgs received');
+      print('   - Memory ID: ${navArgs.memoryId}');
+      print('   - Has snapshot: ${navArgs.snapshot != null}');
+
+      // Initialize with same approach as timeline
+      ref
+          .read(memoryDetailsViewNotifier.notifier)
+          .initializeFromMemory(navArgs);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // This screen is rendered inside `AppShell`, which already provides a
-    // `Scaffold` with a persistent header. To avoid duplicate app bars and
-    // layout overflow issues, we render only the content here and make it
-    // scrollable.
-    return Container(
-      color: appTheme.gray_900_02,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            SizedBox(height: 18.h),
-            _buildEventCard(context),
-            SizedBox(height: 18.h),
-            _buildTimelineSection(context),
-            SizedBox(height: 20.h),
-            _buildStoriesSection(context),
-            SizedBox(height: 19.h),
-            _buildStoriesList(context),
-            SizedBox(height: 23.h),
-            _buildActionButtons(context),
-            _buildFooterMessage(context),
-            SizedBox(height: 24.h),
-          ],
-        ),
-      ),
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryDetailsViewNotifier);
+
+        // Show error UI if navigation failed
+        if (state.errorMessage != null) {
+          return Container(
+            color: appTheme.gray_900_02,
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.h),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64.h,
+                      color: appTheme.red_500,
+                    ),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'Failed to Load Memory',
+                      style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 8.h),
+                    Text(
+                      state.errorMessage!,
+                      style: TextStyleHelper
+                          .instance.body14MediumPlusJakartaSans
+                          .copyWith(color: appTheme.gray_300),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 24.h),
+                    CustomButton(
+                      text: 'Go Back',
+                      width: double.infinity,
+                      buttonStyle: CustomButtonStyle.fillPrimary,
+                      buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                      onPressed: () {
+                        NavigatorService.goBack();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Show loading state
+        if (state.isLoading ?? false) {
+          return Container(
+            color: appTheme.gray_900_02,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: appTheme.deep_purple_A100,
+              ),
+            ),
+          );
+        }
+
+        // Display content with dynamic data
+        return Container(
+          color: appTheme.gray_900_02,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                SizedBox(height: 18.h),
+                _buildEventCard(context),
+                SizedBox(height: 18.h),
+                _buildTimelineSection(context),
+                SizedBox(height: 20.h),
+                _buildStoriesSection(context),
+                SizedBox(height: 19.h),
+                _buildStoriesList(context),
+                SizedBox(height: 23.h),
+                _buildActionButtons(context),
+                _buildFooterMessage(context),
+                SizedBox(height: 24.h),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
   /// Section Widget
   Widget _buildEventCard(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
-      padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 34.h),
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_01,
-        border: Border(
-          bottom: BorderSide(
-            color: appTheme.blue_gray_900,
-            width: 1.h,
-          ),
-        ),
-      ),
-      child: Row(
-        spacing: 16.h,
-        children: [
-          GestureDetector(
-            onTap: () {
-              NavigatorService.goBack();
-            },
-            child: CustomImageView(
-              imagePath: ImageConstant.imgArrowLeft,
-              height: 24.h,
-              width: 24.h,
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              ref.read(memoryDetailsViewNotifier.notifier).onEventOptionsTap();
-            },
-            child: Container(
-              height: 36.h,
-              width: 36.h,
-              padding: EdgeInsets.all(6.h),
-              decoration: BoxDecoration(
-                color: appTheme.color41C124,
-                borderRadius: BorderRadius.circular(18.h),
-              ),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgFrame13Red600,
-                height: 24.h,
-                width: 24.h,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              margin: EdgeInsets.only(bottom: 8.h),
-              child: Column(
-                spacing: 6.h,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Boyz Golf Trip',
-                    style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50),
-                  ),
-                  Container(
-                    margin: EdgeInsets.only(right: 8.h),
-                    child: Row(
-                      spacing: 6.h,
-                      children: [
-                        Text(
-                          'Sept 21, 2025',
-                          style: TextStyleHelper
-                              .instance.body12MediumPlusJakartaSans,
-                        ),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8.h,
-                            vertical: 2.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: appTheme.gray_900_03,
-                            borderRadius: BorderRadius.circular(6.h),
-                          ),
-                          child: Row(
-                            spacing: 4.h,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CustomImageView(
-                                imagePath: ImageConstant.imgIcon14x14,
-                                height: 14.h,
-                                width: 14.h,
-                              ),
-                              Text(
-                                'PUBLIC',
-                                style: TextStyleHelper
-                                    .instance.body12BoldPlusJakartaSans
-                                    .copyWith(color: appTheme.deep_purple_A100),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Container(
-            width: 84.h,
-            height: 36.h,
-            child: Stack(
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: CustomImageView(
-                    imagePath: ImageConstant.imgFrame2,
-                    height: 36.h,
-                    width: 36.h,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.center,
-                  child: CustomImageView(
-                    imagePath: ImageConstant.imgFrame1,
-                    height: 36.h,
-                    width: 36.h,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: CustomImageView(
-                    imagePath: ImageConstant.imgEllipse81,
-                    height: 36.h,
-                    width: 36.h,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryDetailsViewNotifier);
+
+        return CustomEventCard(
+          eventTitle: state.memoryDetailsViewModel?.eventTitle,
+          eventDate: state.memoryDetailsViewModel?.eventDate,
+          isPrivate: state.memoryDetailsViewModel?.isPrivate,
+          iconButtonImagePath: state.memoryDetailsViewModel?.categoryIcon ??
+              ImageConstant.imgFrame13,
+          participantImages: state.memoryDetailsViewModel?.participantImages,
+          onBackTap: () {
+            NavigatorService.goBack();
+          },
+          onIconButtonTap: () {
+            ref.read(memoryDetailsViewNotifier.notifier).onEventOptionsTap();
+          },
+          onAvatarTap: () {
+            onTapAvatars(context);
+          },
+        );
+      },
     );
   }
 
   /// Section Widget
   Widget _buildTimelineSection(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
-      padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 4.h),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: appTheme.blue_gray_900,
-            width: 1.h,
-          ),
-        ),
-      ),
-      child: Column(
-        spacing: 38.h,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          story_viewer.CustomStoryViewer(
-            storyItems: [
-              story_viewer.CustomStoryItem(
-                imagePath: ImageConstant.imgImage9,
-                showPlayButton: true,
-              ),
-              story_viewer.CustomStoryItem(
-                imagePath: ImageConstant.imgImage8,
-                showPlayButton: true,
-              ),
-            ],
-            profileImages: [
-              ImageConstant.imgEllipse826x26,
-              ImageConstant.imgFrame2,
-            ],
-            onStoryTap: (index) {
-              NavigatorService.pushNamed(AppRoutes.appVideoCall);
-            },
-            onPlayButtonTap: (index) {
-              NavigatorService.pushNamed(AppRoutes.appVideoCall);
-            },
-          ),
-          _buildTimelineDetails(context),
-        ],
-      ),
-    );
-  }
-
-  /// Section Widget
-  Widget _buildTimelineDetails(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
+        final state = ref.watch(memoryDetailsViewNotifier);
+        final timelineDetail = state.memoryDetailsViewModel?.timelineDetail;
+
+        // Fix null safety: Check isEmpty with proper null handling
+        if (timelineDetail == null ||
+            (timelineDetail.timelineStories?.isEmpty ?? true)) {
+          return SizedBox.shrink();
+        }
+
+        // Additional validation for required DateTime fields
+        if (timelineDetail.memoryStartTime == null ||
+            timelineDetail.memoryEndTime == null) {
+          return SizedBox.shrink();
+        }
+
         return Container(
-          margin: EdgeInsets.only(bottom: 12.h),
-          child: Row(
-            spacing: 78.h,
+          margin: EdgeInsets.only(top: 6.h),
+          child: Stack(
             children: [
-              Column(
-                spacing: 6.h,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Dec 4',
-                    style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50),
+              Container(
+                width: double.maxFinite,
+                padding: EdgeInsets.symmetric(horizontal: 16.h),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: appTheme.blue_gray_900,
+                      width: 1,
+                    ),
                   ),
-                  Text(
-                    '3:18pm',
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
-                  ),
-                ],
-              ),
-              Column(
-                spacing: 4.h,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tillsonburg, ON',
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
-                  ),
-                  Text(
-                    '21km',
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
-                  ),
-                ],
-              ),
-              Column(
-                spacing: 6.h,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Dec 4',
-                    style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50),
-                  ),
-                  Text(
-                    '3:18am',
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
-                  ),
-                ],
+                ),
+                child: Column(
+                  children: [
+                    _buildStoryProgress(context),
+                    SizedBox(height: 44.h),
+                    TimelineWidget(
+                      stories: timelineDetail.timelineStories!
+                          .map((s) => TimelineStoryItem(
+                                backgroundImage: s.backgroundImage,
+                                userAvatar: s.userAvatar,
+                                postedAt: s.postedAt,
+                                timeLabel: s.timeLabel,
+                                storyId: s.storyId,
+                              ))
+                          .toList(),
+                      // Now safe to use ! operator after null checks above
+                      memoryStartTime: timelineDetail.memoryStartTime!,
+                      memoryEndTime: timelineDetail.memoryEndTime!,
+                      variant: TimelineVariant.sealed,
+                      onStoryTap: (storyId) =>
+                          _handleTimelineStoryTap(context, storyId),
+                      onReplayAll: () {
+                        ref
+                            .read(memoryDetailsViewNotifier.notifier)
+                            .onReplayAllTap();
+                      },
+                      onAddMedia: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => Padding(
+                            padding: EdgeInsets.only(
+                              bottom: MediaQuery.of(context).viewInsets.bottom,
+                            ),
+                            child: AddMemoryUploadScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    SizedBox(height: 20.h),
+                  ],
+                ),
               ),
             ],
           ),
@@ -295,54 +265,91 @@ class MemoryDetailsViewScreenState
   }
 
   /// Section Widget
+  Widget _buildStoryProgress(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryDetailsViewNotifier);
+
+        return Container(
+          margin: EdgeInsets.symmetric(horizontal: 32.h),
+          child: CustomStoryProgress(
+            mainImagePath: ImageConstant.imgImage9,
+            progressValue: 0.6,
+            profileImagePath: ImageConstant.imgEllipse826x26,
+            actionIconPath: ImageConstant.imgFrame19,
+            showOverlayControls: true,
+            overlayIconPath: ImageConstant.imgImagesmode,
+            onActionTap: () {
+              // Handle action tap
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// Section Widget
   Widget _buildStoriesSection(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(left: 22.h),
-      child: Text(
-        'Stories (6)',
-        style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-            .copyWith(color: appTheme.gray_50),
+      width: double.maxFinite,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: EdgeInsets.only(left: 20.h),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final state = ref.watch(memoryDetailsViewNotifier);
+                final storyCount =
+                    state.memoryDetailsViewModel?.customStoryItems?.length ?? 0;
+
+                return Text(
+                  'Stories ($storyCount)',
+                  style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                );
+              },
+            ),
+          ),
+          SizedBox(height: 18.h),
+        ],
       ),
     );
   }
 
   /// Section Widget
   Widget _buildStoriesList(BuildContext context) {
-    return CustomStoryList(
-      storyItems: [
-        CustomStoryItem(
-          backgroundImage: ImageConstant.imgImage8202x116,
-          profileImage: ImageConstant.imgFrame2,
-          timestamp: '2 mins ago',
-          navigateTo: '1398:6774',
-        ),
-        CustomStoryItem(
-          backgroundImage: ImageConstant.imgImage8120x90,
-          profileImage: ImageConstant.imgFrame1,
-          timestamp: '2 mins ago',
-          navigateTo: '1398:6774',
-        ),
-        CustomStoryItem(
-          backgroundImage: ImageConstant.imgImage8,
-          profileImage: ImageConstant.imgFrame48x48,
-          timestamp: '2 mins ago',
-          navigateTo: '1398:6774',
-        ),
-        CustomStoryItem(
-          backgroundImage: ImageConstant.imgImg,
-          profileImage: ImageConstant.imgEllipse842x42,
-          timestamp: '2 mins ago',
-          navigateTo: '1398:6774',
-        ),
-        CustomStoryItem(
-          backgroundImage: ImageConstant.imgImage81,
-          profileImage: ImageConstant.imgEllipse81,
-          timestamp: '2 mins ago',
-          navigateTo: '1398:6774',
-        ),
-      ],
-      onStoryTap: (index) {
-        NavigatorService.pushNamed(AppRoutes.appVideoCall);
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryDetailsViewNotifier);
+        final storyItems = state.memoryDetailsViewModel?.customStoryItems ?? [];
+
+        if (storyItems.isEmpty) {
+          return Container(
+            margin: EdgeInsets.only(left: 20.h),
+            padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 16.h),
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_03,
+              borderRadius: BorderRadius.circular(12.h),
+            ),
+            child: Center(
+              child: Text(
+                'No stories yet',
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: appTheme.gray_300),
+              ),
+            ),
+          );
+        }
+
+        return CustomStoryList(
+          storyItems: storyItems,
+          onStoryTap: (index) {
+            onTapStoryItem(context, index);
+          },
+          itemGap: 8.h,
+          margin: EdgeInsets.only(left: 20.h),
+        );
       },
     );
   }
@@ -402,5 +409,59 @@ class MemoryDetailsViewScreenState
             .copyWith(color: appTheme.blue_gray_300, height: 1.21),
       ),
     );
+  }
+
+  void _handleTimelineStoryTap(BuildContext context, String storyId) {
+    final notifier = ref.read(memoryDetailsViewNotifier.notifier);
+
+    final feedContext = FeedStoryContext(
+      feedType: 'memory_timeline',
+      storyIds: notifier.currentMemoryStoryIds,
+      initialStoryId: storyId,
+    );
+
+    NavigatorService.pushNamed(
+      AppRoutes.appStoryView,
+      arguments: feedContext,
+    );
+  }
+
+  void onTapStoryItem(BuildContext context, int index) {
+    final notifier = ref.read(memoryDetailsViewNotifier.notifier);
+    final state = ref.read(memoryDetailsViewNotifier);
+    final storyItems = state.memoryDetailsViewModel?.customStoryItems ?? [];
+
+    if (index < storyItems.length) {
+      final storyItem = storyItems[index];
+
+      final feedContext = FeedStoryContext(
+        feedType: 'memory_timeline',
+        storyIds: notifier.currentMemoryStoryIds,
+        initialStoryId: storyItem.navigateTo ?? '',
+      );
+
+      NavigatorService.pushNamed(
+        AppRoutes.appStoryView,
+        arguments: feedContext,
+      );
+    }
+  }
+
+  void onTapAvatars(BuildContext context) {
+    final state = ref.read(memoryDetailsViewNotifier);
+    final memoryId = state.memoryDetailsViewModel?.memoryId;
+    final memoryTitle = state.memoryDetailsViewModel?.eventTitle;
+
+    if (memoryId != null) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => MemoryMembersScreen(
+          memoryId: memoryId,
+          memoryTitle: memoryTitle,
+        ),
+      );
+    }
   }
 }

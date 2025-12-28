@@ -2,42 +2,47 @@ part of 'memory_details_view_notifier.dart';
 
 class MemoryDetailsViewState extends Equatable {
   final bool? isLoading;
+  final String? errorMessage;
+  final MemoryDetailsViewModel? memoryDetailsViewModel;
   final bool? showEventOptions;
   final bool? isReplayingAll;
   final int? selectedStoryIndex;
-  final MemoryDetailsViewModel? memoryDetailsViewModel;
 
   MemoryDetailsViewState({
-    this.isLoading = false,
-    this.showEventOptions = false,
-    this.isReplayingAll = false,
-    this.selectedStoryIndex,
+    this.isLoading,
+    this.errorMessage,
     this.memoryDetailsViewModel,
+    this.showEventOptions,
+    this.isReplayingAll,
+    this.selectedStoryIndex,
   });
+
+  MemoryDetailsViewState copyWith({
+    bool? isLoading,
+    String? errorMessage,
+    MemoryDetailsViewModel? memoryDetailsViewModel,
+    bool? showEventOptions,
+    bool? isReplayingAll,
+    int? selectedStoryIndex,
+  }) {
+    return MemoryDetailsViewState(
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage,
+      memoryDetailsViewModel:
+          memoryDetailsViewModel ?? this.memoryDetailsViewModel,
+      showEventOptions: showEventOptions ?? this.showEventOptions,
+      isReplayingAll: isReplayingAll ?? this.isReplayingAll,
+      selectedStoryIndex: selectedStoryIndex ?? this.selectedStoryIndex,
+    );
+  }
 
   @override
   List<Object?> get props => [
         isLoading,
+        errorMessage,
+        memoryDetailsViewModel,
         showEventOptions,
         isReplayingAll,
         selectedStoryIndex,
-        memoryDetailsViewModel,
       ];
-
-  MemoryDetailsViewState copyWith({
-    bool? isLoading,
-    bool? showEventOptions,
-    bool? isReplayingAll,
-    int? selectedStoryIndex,
-    MemoryDetailsViewModel? memoryDetailsViewModel,
-  }) {
-    return MemoryDetailsViewState(
-      isLoading: isLoading ?? this.isLoading,
-      showEventOptions: showEventOptions ?? this.showEventOptions,
-      isReplayingAll: isReplayingAll ?? this.isReplayingAll,
-      selectedStoryIndex: selectedStoryIndex ?? this.selectedStoryIndex,
-      memoryDetailsViewModel:
-          memoryDetailsViewModel ?? this.memoryDetailsViewModel,
-    );
-  }
 }

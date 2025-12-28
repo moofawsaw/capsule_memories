@@ -1,5 +1,5 @@
-import '../models/video_call_interface_model.dart';
 import '../../../core/app_export.dart';
+import '../models/video_call_interface_model.dart';
 
 part 'video_call_interface_state.dart';
 

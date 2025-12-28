@@ -188,6 +188,14 @@ class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
   /// Handle member tap
   void _onTapMember(BuildContext context, String memberId) {
     ref.read(memoryMembersNotifier.notifier).selectMember(memberId);
-    // Could navigate to user profile here
+
+    // Close the bottom sheet first
+    Navigator.of(context).pop();
+
+    // Navigate to user profile with userId
+    NavigatorService.pushNamed(
+      AppRoutes.appProfileUser,
+      arguments: {'userId': memberId},
+    );
   }
 }

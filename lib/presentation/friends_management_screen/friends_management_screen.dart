@@ -100,7 +100,7 @@ class FriendsManagementScreenState
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => QRCodeShareScreenTwo(),
+      builder: (context) => QRCodeShareScreenTwoScreen(),
     );
   }
 

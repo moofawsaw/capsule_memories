@@ -135,8 +135,8 @@ class CustomProfileHeader extends StatelessWidget {
 
   /// Determines if letter avatar should be shown
   bool _shouldShowLetterAvatar() {
-    return avatarImagePath.isEmpty || 
-           avatarImagePath == ImageConstant.imgDefaultAvatar;
+    return avatarImagePath.isEmpty ||
+        avatarImagePath == ImageConstant.imgDefaultAvatar;
   }
 
   /// Gets the first letter of user name for avatar

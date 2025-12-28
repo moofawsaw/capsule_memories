@@ -233,12 +233,22 @@ class GroupsManagementScreenState
 
   /// Handles group QR code action
   void onTapGroupQR(BuildContext context, String groupName) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: appTheme.transparentCustom,
-      builder: (context) => GroupQRInviteScreen(),
+    // Find the group object to get the ID
+    final state = ref.read(groupsManagementNotifier);
+    final group = state.groups?.firstWhere(
+      (g) => g.name == groupName,
+      orElse: () => GroupModel(),
     );
+
+    if (group?.id != null) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: appTheme.transparentCustom,
+        builder: (context) => GroupQRInviteScreen(),
+        routeSettings: RouteSettings(arguments: group!.id),
+      );
+    }
   }
 
   /// Handles group editing for creators

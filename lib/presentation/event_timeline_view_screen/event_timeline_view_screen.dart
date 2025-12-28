@@ -1,4 +1,5 @@
 import '../../core/app_export.dart';
+import '../../core/utils/memory_nav_args.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_icon_button.dart';
@@ -6,7 +7,7 @@ import '../../widgets/custom_story_list.dart';
 import '../../widgets/custom_story_progress.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_members_screen/memory_members_screen.dart';
-import '../qr_code_share_screen/qr_code_share_screen.dart';
+import '../qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import './widgets/timeline_detail_widget.dart';
 import 'notifier/event_timeline_view_notifier.dart';
 
@@ -23,43 +24,97 @@ class EventTimelineViewScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Extract memory data from route arguments
-      final memory = ModalRoute.of(context)?.settings.arguments;
+      // CRITICAL FIX: Use typed navigation contract
+      final rawArgs = ModalRoute.of(context)?.settings.arguments;
 
-      // CRITICAL DEBUG: Log what we actually receive from navigation
-      print('🚨 TIMELINE SCREEN DEBUG: Route arguments received');
-      print('   - Type: ${memory.runtimeType}');
-      print('   - Is null: ${memory == null}');
-      print('   - Full content: $memory');
+      print('🚨 TIMELINE SCREEN: Processing navigation arguments');
+      print('   - Raw type: ${rawArgs.runtimeType}');
 
-      if (memory != null) {
-        if (memory is Map<String, dynamic>) {
-          print('✅ TIMELINE SCREEN: Valid Map received');
-          print('   - Memory ID: ${memory['id']}');
-          print('   - Title: ${memory['title']}');
-          print('   - Date: ${memory['date']}');
-          print('   - Location: ${memory['location']}');
+      MemoryNavArgs? navArgs;
 
-          // Initialize notifier with memory data
-          ref
-              .read(eventTimelineViewNotifier.notifier)
-              .initializeFromMemory(memory);
-        } else {
-          print(
-              '❌ TIMELINE SCREEN: Invalid argument type - expected Map<String, dynamic>');
-          print('   - Received type: ${memory.runtimeType}');
-
-          // Initialize with default data
-          ref.read(eventTimelineViewNotifier.notifier).initialize();
-        }
+      // Safely extract MemoryNavArgs from arguments
+      if (rawArgs is MemoryNavArgs) {
+        navArgs = rawArgs;
+        print('✅ TIMELINE SCREEN: Received typed MemoryNavArgs');
+      } else if (rawArgs is Map<String, dynamic>) {
+        navArgs = MemoryNavArgs.fromMap(rawArgs);
+        print('✅ TIMELINE SCREEN: Converted Map to MemoryNavArgs');
       } else {
         print(
-            '⚠️ TIMELINE SCREEN: No arguments provided, using default initialization');
-
-        // Initialize with default data if no arguments
-        ref.read(eventTimelineViewNotifier.notifier).initialize();
+            '❌ TIMELINE SCREEN: Invalid argument type - expected MemoryNavArgs or Map');
       }
+
+      // Validate arguments before proceeding
+      if (navArgs == null || !navArgs.isValid) {
+        print('❌ TIMELINE SCREEN: Missing or invalid memory ID');
+
+        // Show error state immediately - NEVER fall back to dummy data
+        ref.read(eventTimelineViewNotifier.notifier).setErrorState(
+              'Unable to load memory. Invalid navigation arguments.',
+            );
+        return;
+      }
+
+      print('✅ TIMELINE SCREEN: Valid MemoryNavArgs received');
+      print('   - Memory ID: ${navArgs.memoryId}');
+      print('   - Has snapshot: ${navArgs.snapshot != null}');
+
+      // Initialize with typed arguments
+      ref
+          .read(eventTimelineViewNotifier.notifier)
+          .initializeFromMemory(navArgs);
+
+      // DEBUG TOAST: Validate data passing after initialization completes
+      Future.delayed(Duration(milliseconds: 500), () {
+        _showDebugValidationToast();
+      });
+
+      // CRITICAL: Real-time validation against Supabase
+      Future.delayed(Duration(seconds: 1), () async {
+        final notifier = ref.read(eventTimelineViewNotifier.notifier);
+        final isValid = await notifier.validateMemoryData(navArgs!.memoryId);
+
+        if (!isValid) {
+          print('⚠️ TIMELINE: Data validation detected mismatches');
+          // Optionally show user feedback
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Memory data refreshed from database'),
+                duration: Duration(seconds: 2),
+                backgroundColor: appTheme.deep_purple_A100,
+              ),
+            );
+          }
+        }
+      });
     });
+  }
+
+  /// DEBUG TOAST: Show validation results for data passing
+  void _showDebugValidationToast() {
+    final notifier = ref.read(eventTimelineViewNotifier.notifier);
+    final validation = notifier.validateDataPassing();
+
+    final results = validation['results'] as Map<String, dynamic>;
+    final summary = validation['summary'] as String;
+    final allValid = validation['allValid'] as bool;
+
+    // Build detailed message
+    final detailsBuffer = StringBuffer();
+    detailsBuffer.writeln('🔍 TIMELINE DATA VALIDATION');
+    detailsBuffer.writeln('─' * 30);
+
+    results.forEach((field, isValid) {
+      final icon = isValid ? '✅' : '❌';
+      detailsBuffer
+          .writeln('$icon $field: ${isValid ? "REAL DATA" : "STATIC/EMPTY"}');
+    });
+
+    detailsBuffer.writeln('─' * 30);
+    detailsBuffer.writeln(summary);
+
+    print(detailsBuffer.toString());
   }
 
   @override
@@ -72,7 +127,7 @@ class EventTimelineViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
 
-        // Display error state if present
+        // CRITICAL FIX: Show clear error UI when args are invalid
         if (state.errorMessage != null) {
           return Container(
             color: appTheme.gray_900_02,
@@ -400,12 +455,20 @@ class EventTimelineViewScreenState
 
   /// Handles timeline options tap
   void onTapTimelineOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => QRCodeShareScreen(),
-    );
+    final state = ref.read(eventTimelineViewNotifier);
+    final memoryId = state.eventTimelineViewModel?.memoryId;
+
+    if (memoryId != null) {
+      print('🔍 TIMELINE: Opening QR share bottom sheet');
+      print('   - Memory ID: $memoryId');
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => QRTimelineShareScreen(memoryId: memoryId),
+      );
+    }
   }
 
   /// Navigates to hangout call

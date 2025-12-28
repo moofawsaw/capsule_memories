@@ -54,8 +54,8 @@ class IncomingRequestsSectionWidget extends ConsumerWidget {
     );
   }
 
-  void _showDeclineRequestConfirmation(
-      BuildContext context, WidgetRef ref, String requestId, String userName) async {
+  void _showDeclineRequestConfirmation(BuildContext context, WidgetRef ref,
+      String requestId, String userName) async {
     final result = await CustomConfirmationDialog.show(
       context: context,
       title: 'Decline Request',
@@ -64,7 +64,7 @@ class IncomingRequestsSectionWidget extends ConsumerWidget {
       confirmText: 'Decline',
       cancelText: 'Cancel',
     );
-    
+
     if (result == true) {
       ref
           .read(friendsManagementNotifier.notifier)

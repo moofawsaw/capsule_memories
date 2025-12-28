@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /**
  * CustomDropdown is a reusable dropdown component with customizable icons and styling.

@@ -1,7 +1,8 @@
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
-import '../../../widgets/custom_story_list.dart'
-    as story_list; // Modified: Added alias to resolve ambiguous import
+import '../../../widgets/custom_story_list.dart' as story_list;
+
+// Modified: Added alias to resolve ambiguous import
 
 class StoryItemWidget extends StatelessWidget {
   final story_list.CustomStoryItem

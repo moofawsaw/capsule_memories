@@ -519,16 +519,12 @@ class FeedService {
       }).toList();
 
       // Fetch stories for this memory - ORDER CHANGED TO ASCENDING TO MATCH STORY VIEWER
-      final storiesResponse = await _client!
-          .from('stories')
-          .select('''
+      final storiesResponse = await _client!.from('stories').select('''
             id,
             thumbnail_url,
             video_url,
             created_at
-          ''')
-          .eq('memory_id', memoryId)
-          .order('created_at', ascending: true);
+          ''').eq('memory_id', memoryId).order('created_at', ascending: true);
 
       final stories = (storiesResponse as List).map((s) {
         return {

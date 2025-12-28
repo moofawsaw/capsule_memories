@@ -1,9 +1,12 @@
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/app_export.dart';
+import '../../../core/utils/image_constant.dart';
+import '../../../services/avatar_helper_service.dart';
 import '../../../services/blocked_users_service.dart';
 import '../../../services/follows_service.dart';
 import '../../../services/friends_service.dart';
+import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/user_profile_service.dart';
 import '../models/story_item_model.dart';
@@ -25,6 +28,7 @@ class UserProfileScreenTwoNotifier
   final FollowsService _followsService = FollowsService();
   final FriendsService _friendsService = FriendsService();
   final BlockedUsersService _blockedUsersService = BlockedUsersService();
+  final StoryService _storyService = StoryService();
 
   UserProfileScreenTwoNotifier(UserProfileScreenTwoState state) : super(state);
 
@@ -57,40 +61,44 @@ class UserProfileScreenTwoNotifier
           await _loadRelationshipStatus(userId);
         }
 
-        final storyItems = [
-          StoryItemModel(
-            userName: 'Kelly Jones',
-            userAvatar: ImageConstant.imgFrame2,
-            backgroundImage: ImageConstant.imgImg,
-            categoryText: 'Vacation',
-            categoryIcon: ImageConstant.imgVector,
-            timestamp: '2 mins ago',
-          ),
-          StoryItemModel(
-            userName: 'Mac Hollins',
-            userAvatar: ImageConstant.imgEllipse826x26,
-            backgroundImage: ImageConstant.imgImage8,
-            categoryText: 'Vacation',
-            categoryIcon: ImageConstant.imgVector,
-            timestamp: '2 mins ago',
-          ),
-          StoryItemModel(
-            userName: 'Beth Way',
-            userAvatar: ImageConstant.imgFrame48x48,
-            backgroundImage: ImageConstant.imgImage8202x116,
-            categoryText: 'Vacation',
-            categoryIcon: ImageConstant.imgVector,
-            timestamp: '2 mins ago',
-          ),
-          StoryItemModel(
-            userName: 'Elliott Freisen',
-            userAvatar: ImageConstant.imgEllipse81,
-            backgroundImage: ImageConstant.imgImage81,
-            categoryText: 'Vacation',
-            categoryIcon: ImageConstant.imgVector,
-            timestamp: '2 mins ago',
-          ),
-        ];
+        // Set stories loading state before fetching
+        state = state.copyWith(isLoadingStories: true);
+
+        // Fetch stories
+        final stories = await _storyService.fetchUserStories(
+          userId ?? SupabaseService.instance.client?.auth.currentUser?.id ?? '',
+        );
+
+        // Transform database stories into StoryItemModel instances with ACTUAL category data
+        final storyItems = stories.map((story) {
+          final contributor = story['user_profiles'] as Map<String, dynamic>?;
+          final memory = story['memories'] as Map<String, dynamic>?;
+          final category =
+              memory?['memory_categories'] as Map<String, dynamic>?;
+
+          // Extract actual category information from database
+          final categoryName = category?['name'] ?? 'Memory';
+          final categoryIconUrl = category?['icon_url'] as String?;
+
+          return StoryItemModel(
+            storyId: story['id'] as String?,
+            userName: contributor?['display_name'] ??
+                contributor?['username'] ??
+                'Unknown User',
+            userAvatar: AvatarHelperService.getAvatarUrl(
+              contributor?['avatar_url'],
+            ),
+            backgroundImage: _storyService.getStoryMediaUrl(story),
+            categoryText:
+                categoryName, // Use actual category name from database
+            categoryIcon: categoryIconUrl ??
+                ImageConstant.imgVector, // Use actual category icon URL
+            timestamp: _storyService.getTimeAgo(
+              DateTime.parse(
+                  story['created_at'] ?? DateTime.now().toIso8601String()),
+            ),
+          );
+        }).toList();
 
         state = state.copyWith(
           userProfileScreenTwoModel: UserProfileScreenTwoModel(
@@ -106,44 +114,10 @@ class UserProfileScreenTwoNotifier
           ),
           isUploading: false,
           isLoading: false,
+          isLoadingStories: false,
         );
       } else {
-        // User not found or not authenticated - show placeholder data
-        final storyItems = [
-          StoryItemModel(
-            userName: 'Kelly Jones',
-            userAvatar: ImageConstant.imgFrame2,
-            backgroundImage: ImageConstant.imgImg,
-            categoryText: 'Vacation',
-            categoryIcon: ImageConstant.imgVector,
-            timestamp: '2 mins ago',
-          ),
-          StoryItemModel(
-            userName: 'Mac Hollins',
-            userAvatar: ImageConstant.imgEllipse826x26,
-            backgroundImage: ImageConstant.imgImage8,
-            categoryText: 'Vacation',
-            categoryIcon: ImageConstant.imgVector,
-            timestamp: '2 mins ago',
-          ),
-          StoryItemModel(
-            userName: 'Beth Way',
-            userAvatar: ImageConstant.imgFrame48x48,
-            backgroundImage: ImageConstant.imgImage8202x116,
-            categoryText: 'Vacation',
-            categoryIcon: ImageConstant.imgVector,
-            timestamp: '2 mins ago',
-          ),
-          StoryItemModel(
-            userName: 'Elliott Freisen',
-            userAvatar: ImageConstant.imgEllipse81,
-            backgroundImage: ImageConstant.imgImage81,
-            categoryText: 'Vacation',
-            categoryIcon: ImageConstant.imgVector,
-            timestamp: '2 mins ago',
-          ),
-        ];
-
+        // User not found or not authenticated - show empty state
         state = state.copyWith(
           userProfileScreenTwoModel: UserProfileScreenTwoModel(
             avatarImagePath: ImageConstant.imgEllipse896x96,
@@ -153,26 +127,18 @@ class UserProfileScreenTwoNotifier
                 : 'Please login to see your profile',
             followersCount: '0',
             followingCount: '0',
-            storyItems: storyItems,
+            storyItems: [],
           ),
           isUploading: false,
           isLoading: false,
+          isLoadingStories: false,
         );
       }
     } catch (e) {
-      print('❌ Error initializing profile: $e');
-      // On error, show placeholder with error message
+      print('❌ ERROR initializing user profile: $e');
       state = state.copyWith(
-        userProfileScreenTwoModel: UserProfileScreenTwoModel(
-          avatarImagePath: ImageConstant.imgEllipse896x96,
-          userName: 'Error Loading Profile',
-          email: 'Please try again',
-          followersCount: '0',
-          followingCount: '0',
-          storyItems: [],
-        ),
-        isUploading: false,
         isLoading: false,
+        isLoadingStories: false,
       );
     }
   }

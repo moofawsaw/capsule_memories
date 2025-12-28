@@ -1,5 +1,5 @@
-import '../models/color_selection_model.dart';
 import '../../../core/app_export.dart';
+import '../models/color_selection_model.dart';
 
 part 'color_selection_state.dart';
 

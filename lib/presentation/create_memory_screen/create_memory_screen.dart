@@ -649,7 +649,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             if (current.shouldNavigateBack ?? false) {
               NavigatorService.goBack();
             }
-            if (current.errorMessage != null && previous?.errorMessage != current.errorMessage) {
+            if (current.errorMessage != null &&
+                previous?.errorMessage != current.errorMessage) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(current.errorMessage!),

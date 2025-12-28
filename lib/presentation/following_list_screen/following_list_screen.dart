@@ -198,7 +198,9 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     );
 
     if (confirmed == true) {
-      await ref.read(followingListNotifier.notifier).unfollowUser(user.id ?? '');
+      await ref
+          .read(followingListNotifier.notifier)
+          .unfollowUser(user.id ?? '');
     }
   }
 }

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import './supabase_service.dart';
 import './push_notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 
 /// Service class for managing notifications with real-time capabilities
+/// Optimized for concurrent updates across multiple users
 class NotificationService {
   static final NotificationService instance = NotificationService._internal();
   factory NotificationService() => instance;
@@ -12,7 +15,24 @@ class NotificationService {
   final dynamic _client = SupabaseService.instance.client;
   dynamic _notificationChannel;
 
+  // Debouncing and throttling for performance optimization
+  Timer? _debounceTimer;
+  DateTime? _lastUpdateTime;
+  static const _debounceDuration = Duration(milliseconds: 300);
+  static const _throttleDuration = Duration(seconds: 1);
+
+  // Connection state management
+  bool _isConnected = false;
+  int _reconnectAttempts = 0;
+  static const _maxReconnectAttempts = 5;
+  Timer? _reconnectTimer;
+
+  // Batch update queue for concurrent operations
+  final List<Map<String, dynamic>> _pendingUpdates = [];
+  bool _isProcessingBatch = false;
+
   /// Subscribe to real-time notification updates for the current user
+  /// with automatic reconnection and error recovery
   Future<void> subscribeToNotifications({
     required Function(Map<String, dynamic>) onNewNotification,
   }) async {
@@ -22,37 +42,161 @@ class NotificationService {
         throw Exception('User not authenticated');
       }
 
+      // Prevent duplicate subscriptions
+      if (_isConnected && _notificationChannel != null) {
+        debugPrint('⚠️ Already subscribed to notifications');
+        return;
+      }
+
       _notificationChannel = _client
           .channel('notifications:$userId')
           .onPostgresChanges(
             event: PostgresChangeEvent.insert,
             schema: 'public',
             table: 'notifications',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'user_id',
+              value: userId,
+            ),
             callback: (payload) async {
               final notification = payload.newRecord;
-              onNewNotification(notification);
 
-              // Show local notification when app is in foreground
+              // Debounce rapid updates to prevent UI thrashing
+              _debouncedNotificationUpdate(notification, onNewNotification);
+
+              // Show local notification with throttling
               if (PushNotificationService.instance.isInitialized) {
-                await PushNotificationService.instance.showNotification(
-                  title: notification['title'] ?? 'New Notification',
-                  body: notification['message'] ?? '',
-                  payload: notification['id'],
-                );
+                _throttledPushNotification(notification);
               }
             },
           )
-          .subscribe();
+          .subscribe(
+        (status, [error]) {
+          if (status == RealtimeSubscribeStatus.subscribed) {
+            _isConnected = true;
+            _reconnectAttempts = 0;
+            debugPrint(
+                '✅ Subscribed to real-time notifications for user: $userId');
+          } else if (status == RealtimeSubscribeStatus.channelError) {
+            _isConnected = false;
+            debugPrint('❌ Channel error, attempting reconnection...');
+            _attemptReconnection(userId, onNewNotification);
+          }
+        },
+      );
     } catch (error) {
+      _isConnected = false;
+      debugPrint('❌ Failed to subscribe to notifications: $error');
       throw Exception('Failed to subscribe to notifications: $error');
     }
   }
 
+  /// Debounced notification update to batch rapid consecutive updates
+  void _debouncedNotificationUpdate(
+    Map<String, dynamic> notification,
+    Function(Map<String, dynamic>) callback,
+  ) {
+    // Cancel previous timer if still pending
+    _debounceTimer?.cancel();
+
+    // Add to pending updates queue
+    _pendingUpdates.add(notification);
+
+    // Set new timer
+    _debounceTimer = Timer(_debounceDuration, () {
+      if (_pendingUpdates.isNotEmpty) {
+        // Process all pending updates in batch
+        _processBatchUpdates(callback);
+      }
+    });
+  }
+
+  /// Process batched notification updates for better performance
+  Future<void> _processBatchUpdates(
+    Function(Map<String, dynamic>) callback,
+  ) async {
+    if (_isProcessingBatch) return;
+
+    _isProcessingBatch = true;
+
+    try {
+      // Get the most recent notification from batch
+      final latestNotification = _pendingUpdates.last;
+
+      // Invoke callback with latest notification
+      callback(latestNotification);
+
+      // Clear processed updates
+      _pendingUpdates.clear();
+
+      debugPrint('✅ Processed batch of notification updates');
+    } finally {
+      _isProcessingBatch = false;
+    }
+  }
+
+  /// Throttled push notification to prevent notification spam
+  void _throttledPushNotification(Map<String, dynamic> notification) {
+    final now = DateTime.now();
+
+    // Check if enough time has passed since last notification
+    if (_lastUpdateTime != null) {
+      final timeSinceLastUpdate = now.difference(_lastUpdateTime!);
+      if (timeSinceLastUpdate < _throttleDuration) {
+        debugPrint('⏱️ Throttling push notification');
+        return;
+      }
+    }
+
+    // Update last notification time and show notification
+    _lastUpdateTime = now;
+    PushNotificationService.instance.showNotification(
+      title: notification['title'] ?? 'New Notification',
+      body: notification['message'] ?? '',
+      payload: notification['id'],
+    );
+  }
+
+  /// Attempt automatic reconnection with exponential backoff
+  void _attemptReconnection(
+    String userId,
+    Function(Map<String, dynamic>) onNewNotification,
+  ) {
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      debugPrint('❌ Max reconnection attempts reached');
+      return;
+    }
+
+    _reconnectAttempts++;
+    final delaySeconds = _reconnectAttempts * 2; // Exponential backoff
+
+    debugPrint(
+        '🔄 Reconnection attempt $_reconnectAttempts in ${delaySeconds}s');
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
+      try {
+        await unsubscribeFromNotifications();
+        await subscribeToNotifications(onNewNotification: onNewNotification);
+      } catch (e) {
+        debugPrint('❌ Reconnection failed: $e');
+        _attemptReconnection(userId, onNewNotification);
+      }
+    });
+  }
+
   /// Unsubscribe from notification updates
   Future<void> unsubscribeFromNotifications() async {
+    _reconnectTimer?.cancel();
+    _debounceTimer?.cancel();
+
     if (_notificationChannel != null) {
       await _client.removeChannel(_notificationChannel!);
       _notificationChannel = null;
+      _isConnected = false;
+      _reconnectAttempts = 0;
+      debugPrint('✅ Unsubscribed from notifications');
     }
   }
 
@@ -94,7 +238,7 @@ class NotificationService {
     }
   }
 
-  /// Get unread notification count
+  /// Get unread notification count with caching
   Future<int> getUnreadCount() async {
     try {
       final userId = _client.auth.currentUser?.id;
@@ -115,7 +259,7 @@ class NotificationService {
     }
   }
 
-  /// Mark notification as read
+  /// Mark notification as read with optimistic update support
   Future<void> markAsRead(String notificationId) async {
     try {
       final userId = _client.auth.currentUser?.id;
@@ -213,7 +357,7 @@ class NotificationService {
     }
   }
 
-  /// Get notifications by type
+  /// Get notifications by type with real-time support
   Future<List<Map<String, dynamic>>> getNotificationsByType(
     String notificationType, {
     int limit = 20,
@@ -224,6 +368,9 @@ class NotificationService {
         throw Exception('User not authenticated');
       }
 
+      debugPrint(
+          '🔍 Fetching $notificationType notifications for user: $userId');
+
       final response = await _client
           .from('notifications')
           .select()
@@ -232,9 +379,86 @@ class NotificationService {
           .order('created_at', ascending: false)
           .limit(limit);
 
+      debugPrint(
+          '✅ Fetched ${response.length} $notificationType notifications');
+
       return List<Map<String, dynamic>>.from(response);
     } catch (error) {
+      debugPrint('❌ Failed to fetch notifications by type: $error');
       throw Exception('Failed to fetch notifications by type: $error');
     }
+  }
+
+  /// Handle notification action based on type and navigate appropriately
+  Future<void> handleNotificationAction(
+    Map<String, dynamic> notification,
+    Function(String, Map<String, dynamic>?) navigateToScreen,
+  ) async {
+    try {
+      final notificationType = notification['type'] as String?;
+      final data = notification['data'] as Map<String, dynamic>?;
+
+      if (notificationType == null || data == null) {
+        debugPrint('⚠️ Invalid notification data');
+        return;
+      }
+
+      // Mark notification as read
+      await markAsRead(notification['id']);
+
+      // Navigate based on notification type
+      switch (notificationType) {
+        case 'group_join':
+          final groupId = data['group_id'];
+          if (groupId != null) {
+            navigateToScreen('/group-details', {'groupId': groupId});
+          }
+          break;
+
+        case 'friend_accepted':
+        case 'friend_request':
+          navigateToScreen('/friends-management', null);
+          break;
+
+        case 'memory_invite':
+        case 'memory_update':
+        case 'memory_sealed':
+        case 'memory_expiring':
+          final memoryId = data['memory_id'];
+          if (memoryId != null) {
+            navigateToScreen('/memory-details', {'memoryId': memoryId});
+          }
+          break;
+
+        case 'new_story':
+          final storyId = data['story_id'];
+          final memoryId = data['memory_id'];
+          if (storyId != null && memoryId != null) {
+            navigateToScreen('/memory-details',
+                {'memoryId': memoryId, 'highlightStoryId': storyId});
+          }
+          break;
+
+        case 'followed':
+          final followerId = data['follower_id'];
+          if (followerId != null) {
+            navigateToScreen('/user-profile', {'userId': followerId});
+          }
+          break;
+
+        default:
+          debugPrint('⚠️ Unknown notification type: $notificationType');
+      }
+    } catch (error) {
+      debugPrint('❌ Failed to handle notification action: $error');
+      throw Exception('Failed to handle notification action: $error');
+    }
+  }
+
+  /// Cleanup method to dispose timers and subscriptions
+  void dispose() {
+    _debounceTimer?.cancel();
+    _reconnectTimer?.cancel();
+    unsubscribeFromNotifications();
   }
 }

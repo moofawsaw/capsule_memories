@@ -1,19 +1,29 @@
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/app_export.dart';
-import '../../widgets/custom_edit_text.dart';
+import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_qr_info_card.dart';
+import '../../widgets/custom_notification_card.dart';
 import 'notifier/qr_code_share_screen_two_notifier.dart';
 
-class QRCodeShareScreenTwo extends ConsumerStatefulWidget {
-  QRCodeShareScreenTwo({Key? key}) : super(key: key);
+class QRCodeShareScreenTwoScreen extends ConsumerStatefulWidget {
+  const QRCodeShareScreenTwoScreen({Key? key}) : super(key: key);
 
   @override
-  QRCodeShareScreenTwoState createState() => QRCodeShareScreenTwoState();
+  QRCodeShareScreenTwoScreenState createState() =>
+      QRCodeShareScreenTwoScreenState();
 }
 
-class QRCodeShareScreenTwoState extends ConsumerState<QRCodeShareScreenTwo> {
+class QRCodeShareScreenTwoScreenState
+    extends ConsumerState<QRCodeShareScreenTwoScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(qrCodeShareScreenTwoNotifier.notifier).loadUserFriendCode();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -31,7 +41,6 @@ class QRCodeShareScreenTwoState extends ConsumerState<QRCodeShareScreenTwo> {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(height: 12.h),
-            // Drag handle indicator
             Container(
               width: 48.h,
               height: 5.h,
@@ -58,7 +67,44 @@ class QRCodeShareScreenTwoState extends ConsumerState<QRCodeShareScreenTwo> {
       builder: (context, ref, _) {
         final state = ref.watch(qrCodeShareScreenTwoNotifier);
 
+        if (state.isLoading ?? false) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 100.h),
+              child: CircularProgressIndicator(
+                color: appTheme.colorFF52D1,
+              ),
+            ),
+          );
+        }
+
+        if (state.errorMessage != null) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 100.h),
+              child: Column(
+                children: [
+                  Text(
+                    'Unable to load friend code',
+                    style: TextStyleHelper.instance.body16RegularPlusJakartaSans
+                        .copyWith(color: appTheme.red_500),
+                  ),
+                  SizedBox(height: 12.h),
+                  CustomButton(
+                    text: 'Retry',
+                    onPressed: () => ref
+                        .read(qrCodeShareScreenTwoNotifier.notifier)
+                        .loadUserFriendCode(),
+                    buttonStyle: CustomButtonStyle.fillPrimary,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 116.h,
@@ -69,38 +115,42 @@ class QRCodeShareScreenTwoState extends ConsumerState<QRCodeShareScreenTwo> {
               ),
             ),
             SizedBox(height: 20.h),
-            CustomQrInfoCard(
-              title: "Share QR code",
-              description:
-                  "Share this QR code to become friends with other Memry users",
-              textAlign: TextAlign.center,
-              margin: EdgeInsets.symmetric(horizontal: 26.h),
+            CustomNotificationCard(
+              iconPath: ImageConstant.imgFrameDeepPurpleA100,
+              title:
+                  state.qrCodeShareScreenTwoModel?.displayName ?? 'Add Friend',
+              description: 'Scan to add me as friend',
+              isRead: true,
+              onToggleRead: () {},
+              titleFontSize: 20.0,
+              descriptionAlignment: TextAlign.center,
+              margin: EdgeInsets.zero,
             ),
             SizedBox(height: 16.h),
             _buildQRCodeSection(context),
             SizedBox(height: 20.h),
             _buildUrlSection(context),
             SizedBox(height: 20.h),
-            _buildDescriptionText(context),
+            _buildActionButtons(context),
+            SizedBox(height: 20.h),
+            _buildInfoText(context),
           ],
         );
       },
     );
   }
 
-  /// Section Widget
   Widget _buildQRCodeSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(qrCodeShareScreenTwoNotifier);
 
         return Container(
-          margin: EdgeInsets.symmetric(horizontal: 36.h),
+          margin: EdgeInsets.symmetric(horizontal: 68.h),
           child: QrImageView(
-            data: state.qrCodeShareScreenTwoModel?.qrData ??
-                ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08,
+            data: state.qrCodeShareScreenTwoModel?.qrCodeData ?? '',
             version: QrVersions.auto,
-            size: 200.h,
+            size: 254.h,
             backgroundColor: appTheme.whiteCustom,
             foregroundColor: appTheme.blackCustom,
           ),
@@ -109,23 +159,19 @@ class QRCodeShareScreenTwoState extends ConsumerState<QRCodeShareScreenTwo> {
     );
   }
 
-  /// Section Widget
   Widget _buildUrlSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(qrCodeShareScreenTwoNotifier);
-        final notifier = ref.read(qrCodeShareScreenTwoNotifier.notifier);
 
-        // Listen for copy success message
         ref.listen(
           qrCodeShareScreenTwoNotifier,
           (previous, current) {
-            if (current.showCopySuccess ?? false) {
+            if (current.isUrlCopied ?? false) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Link copied to clipboard'),
                   backgroundColor: appTheme.colorFF52D1,
-                  duration: Duration(seconds: 2),
                 ),
               );
             }
@@ -133,24 +179,30 @@ class QRCodeShareScreenTwoState extends ConsumerState<QRCodeShareScreenTwo> {
         );
 
         return Container(
-          margin: EdgeInsets.only(right: 12.h),
+          margin: EdgeInsets.only(left: 4.h, right: 16.h),
           child: Row(
+            spacing: 22.h,
             children: [
               Expanded(
-                child: CustomEditText(
-                  controller: state.urlController,
-                  hintText: ImageConstant
-                      .imgNetworkR812309r72309r572093t722323t23t23t08,
-                  textStyle: TextStyleHelper
-                      .instance.title16RegularPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-                  fillColor: appTheme.gray_900,
-                  borderRadius: 8.h,
-                  contentPadding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 10.h),
-                  readOnly: true,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.h,
+                    vertical: 16.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900,
+                    borderRadius: BorderRadius.circular(8.h),
+                  ),
+                  child: Text(
+                    state.qrCodeShareScreenTwoModel?.shareUrl ?? '',
+                    style: TextStyleHelper
+                        .instance.title16RegularPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
                 ),
               ),
-              SizedBox(width: 22.h),
               GestureDetector(
                 onTap: () => onTapCopyUrl(context),
                 child: CustomImageView(
@@ -166,28 +218,86 @@ class QRCodeShareScreenTwoState extends ConsumerState<QRCodeShareScreenTwo> {
     );
   }
 
-  /// Section Widget
-  Widget _buildDescriptionText(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      child: Text(
-        "People who scan this code will automatically add you to their friends list",
-        textAlign: TextAlign.center,
-        style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-            .copyWith(color: appTheme.blue_gray_300, height: 1.21),
-      ),
+  Widget _buildActionButtons(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(qrCodeShareScreenTwoNotifier);
+
+        ref.listen(
+          qrCodeShareScreenTwoNotifier,
+          (previous, current) {
+            if (current.isDownloadSuccess ?? false) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('QR Code downloaded successfully'),
+                  backgroundColor: appTheme.colorFF52D1,
+                ),
+              );
+            }
+            if (current.isShareSuccess ?? false) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Link shared successfully'),
+                  backgroundColor: appTheme.colorFF52D1,
+                ),
+              );
+            }
+          },
+        );
+
+        return Row(
+          spacing: 12.h,
+          children: [
+            Expanded(
+              child: CustomButton(
+                text: 'Download QR',
+                leftIcon: ImageConstant.imgIcon15,
+                onPressed: () => onTapDownloadQR(context),
+                buttonStyle: CustomButtonStyle.fillDark,
+                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                padding: EdgeInsets.symmetric(
+                  horizontal: 22.h,
+                  vertical: 12.h,
+                ),
+              ),
+            ),
+            Expanded(
+              child: CustomButton(
+                text: 'Share Link',
+                leftIcon: ImageConstant.imgIcon16,
+                onPressed: () => onTapShareLink(context),
+                buttonStyle: CustomButtonStyle.fillPrimary,
+                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                padding: EdgeInsets.symmetric(
+                  horizontal: 30.h,
+                  vertical: 12.h,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  /// Copies the QR code URL to clipboard
-  void onTapCopyUrl(BuildContext context) {
-    final notifier = ref.read(qrCodeShareScreenTwoNotifier.notifier);
-    notifier.copyUrlToClipboard();
+  Widget _buildInfoText(BuildContext context) {
+    return Text(
+      'People who scan this code or open the link will be added as your friend automatically',
+      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+          .copyWith(color: appTheme.blue_gray_300, height: 1.21),
+      textAlign: TextAlign.center,
+    );
   }
 
-  /// Shares the QR code URL using share functionality
-  void onTapShareUrl(BuildContext context) {
-    final notifier = ref.read(qrCodeShareScreenTwoNotifier.notifier);
-    notifier.shareUrl();
+  void onTapCopyUrl(BuildContext context) {
+    ref.read(qrCodeShareScreenTwoNotifier.notifier).copyUrlToClipboard();
+  }
+
+  void onTapDownloadQR(BuildContext context) {
+    ref.read(qrCodeShareScreenTwoNotifier.notifier).downloadQRCode();
+  }
+
+  void onTapShareLink(BuildContext context) {
+    ref.read(qrCodeShareScreenTwoNotifier.notifier).shareLink();
   }
 }

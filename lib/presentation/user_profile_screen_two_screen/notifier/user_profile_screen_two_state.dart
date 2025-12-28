@@ -5,6 +5,7 @@ class UserProfileScreenTwoState extends Equatable {
     this.userProfileScreenTwoModel,
     this.isUploading = false,
     this.isLoading = false,
+    this.isLoadingStories = false,
     this.isFollowing = false,
     this.isFriend = false,
     this.hasPendingFriendRequest = false,
@@ -15,6 +16,7 @@ class UserProfileScreenTwoState extends Equatable {
   UserProfileScreenTwoModel? userProfileScreenTwoModel;
   bool isUploading;
   bool isLoading;
+  bool isLoadingStories;
   bool isFollowing;
   bool isFriend;
   bool hasPendingFriendRequest;
@@ -26,6 +28,7 @@ class UserProfileScreenTwoState extends Equatable {
         userProfileScreenTwoModel,
         isUploading,
         isLoading,
+        isLoadingStories,
         isFollowing,
         isFriend,
         hasPendingFriendRequest,
@@ -37,6 +40,7 @@ class UserProfileScreenTwoState extends Equatable {
     UserProfileScreenTwoModel? userProfileScreenTwoModel,
     bool? isUploading,
     bool? isLoading,
+    bool? isLoadingStories,
     bool? isFollowing,
     bool? isFriend,
     bool? hasPendingFriendRequest,
@@ -48,6 +52,7 @@ class UserProfileScreenTwoState extends Equatable {
           userProfileScreenTwoModel ?? this.userProfileScreenTwoModel,
       isUploading: isUploading ?? this.isUploading,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingStories: isLoadingStories ?? this.isLoadingStories,
       isFollowing: isFollowing ?? this.isFollowing,
       isFriend: isFriend ?? this.isFriend,
       hasPendingFriendRequest:

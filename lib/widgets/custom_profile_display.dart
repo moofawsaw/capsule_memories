@@ -1,5 +1,5 @@
 import '../core/app_export.dart';
-import 'custom_image_view.dart';
+import './custom_image_view.dart';
 
 /** 
  * CustomProfileDisplay - A reusable profile display component that shows a circular profile image with name text below.
