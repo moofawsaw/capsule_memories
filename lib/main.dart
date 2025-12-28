@@ -3,12 +3,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './core/utils/theme_provider.dart';
 import './services/notification_service.dart';
+import './services/push_notification_service.dart';
 import './services/supabase_service.dart';
 import 'core/app_export.dart';
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Supabase
@@ -17,6 +18,10 @@ void main() async {
   } catch (e) {
     debugPrint('Failed to initialize Supabase: $e');
   }
+
+  // Initialize push notifications
+  await PushNotificationService.instance.initialize();
+  await PushNotificationService.instance.createNotificationChannel();
 
   _setupGlobalNotificationListener();
 
@@ -55,8 +60,8 @@ class MyApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
-      theme: ThemeHelper().getThemeData(ThemeMode.light),
-      darkTheme: ThemeHelper().getThemeData(ThemeMode.dark),
+      theme: theme,
+      darkTheme: theme,
       themeMode: themeMode,
       title: 'capsule_memories',
       // 🚨 CRITICAL: NEVER REMOVE OR MODIFY

@@ -10,6 +10,8 @@ extension ResponsiveExtension on num {
 
   double get h => ((this * _width) / FIGMA_DESIGN_WIDTH);
 
+  double get w => ((this * _width) / FIGMA_DESIGN_WIDTH);
+
   double get fSize => ((this * _width) / FIGMA_DESIGN_WIDTH);
 }
 

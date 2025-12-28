@@ -163,6 +163,7 @@ class EventTimelineViewScreenState
 
         return TimelineDetailWidget(
           model: state.eventTimelineViewModel?.timelineDetail,
+          onStoryTap: (storyId) => _handleTimelineStoryTap(context, storyId),
         );
       },
     );
@@ -265,6 +266,28 @@ class EventTimelineViewScreenState
     );
   }
 
+  /// CRITICAL FIX: Handle timeline story card tap - Navigate to story viewer
+  void _handleTimelineStoryTap(BuildContext context, String storyId) {
+    final notifier = ref.read(eventTimelineViewNotifier.notifier);
+
+    // Get memory-specific story array for proper cycling
+    final feedContext = FeedStoryContext(
+      feedType: 'memory_timeline',
+      storyIds: notifier.currentMemoryStoryIds,
+      initialStoryId: storyId,
+    );
+
+    print('🔍 TIMELINE NAV: Opening story from timeline card');
+    print('   - Story ID: $storyId');
+    print('   - Context IDs: ${feedContext.storyIds}');
+    print('   - Total stories: ${feedContext.storyIds.length}');
+
+    NavigatorService.pushNamed(
+      AppRoutes.appStoryView,
+      arguments: feedContext,
+    );
+  }
+
   /// Navigates back to the previous screen
   void onTapBackButton(BuildContext context) {
     NavigatorService.goBack();
@@ -314,7 +337,8 @@ class EventTimelineViewScreenState
       final feedContext = FeedStoryContext(
         feedType: 'memory_timeline',
         storyIds: notifier.currentMemoryStoryIds, // Use memory-specific IDs
-        initialStoryId: storyItem.navigateTo ?? '', // Add null check with default empty string
+        initialStoryId: storyItem.navigateTo ??
+            '', // Add null check with default empty string
       );
 
       print('🔍 TIMELINE DEBUG: Opening story viewer with context:');

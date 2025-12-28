@@ -76,7 +76,7 @@ class CustomDropdown<T> extends StatelessWidget {
     return Container(
       margin: margin ?? EdgeInsets.only(top: 20.h),
       child: DropdownButtonFormField<T>(
-        initialValue: value,
+        value: value,
         items: items,
         onChanged: onChanged,
         validator: validator,

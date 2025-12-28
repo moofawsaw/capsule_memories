@@ -164,6 +164,14 @@ class MemoryCacheService {
         final sealedAt = memoryData['sealed_at'] != null
             ? DateTime.parse(memoryData['sealed_at'] as String)
             : null;
+        
+        // Use start_time/end_time if available, otherwise fall back to created_at/expires_at
+        final startTime = memoryData['start_time'] != null
+            ? DateTime.parse(memoryData['start_time'] as String)
+            : createdAt;
+        final endTime = memoryData['end_time'] != null
+            ? DateTime.parse(memoryData['end_time'] as String)
+            : expiresAt ?? createdAt.add(Duration(hours: 12));
 
         final memoryThumbnails = stories
                 ?.map((story) {
@@ -246,9 +254,10 @@ class MemoryCacheService {
           id: memoryData['id'] as String,
           title: memoryData['title'] as String,
           date: _storyService.getTimeAgo(createdAt),
-          eventDate: createdAt.day.toString(),
-          eventTime:
-              '${createdAt.hour}:${createdAt.minute.toString().padLeft(2, '0')}',
+          eventDate: _formatDate(startTime),
+          eventTime: _formatTime(startTime),
+          endDate: _formatDate(endTime),
+          endTime: _formatTime(endTime),
           location: memoryData['location_name'] as String? ?? '',
           state: memoryData['state'] as String,
           visibility: memoryData['visibility'] as String,
@@ -277,6 +286,40 @@ class MemoryCacheService {
       print('❌ CACHE: Error loading user memories: $e');
       return [];
     }
+  }
+
+  /// Format date as "Dec 4" format
+  String _formatDate(DateTime dateTime) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return '${months[dateTime.month - 1]} ${dateTime.day}';
+  }
+
+  /// Format time as "3:18pm" format
+  String _formatTime(DateTime dateTime) {
+    var hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final period = hour >= 12 ? 'pm' : 'am';
+    
+    if (hour == 0) {
+      hour = 12;
+    } else if (hour > 12) {
+      hour -= 12;
+    }
+    
+    return '$hour:${minute.toString().padLeft(2, '0')}$period';
   }
 
   /// Dispose streams

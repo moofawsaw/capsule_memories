@@ -1,6 +1,9 @@
 import '../models/create_memory_model.dart';
 import '../../../core/app_export.dart';
 import '../../../services/groups_service.dart';
+import '../../../services/story_service.dart';
+import '../../../services/memory_cache_service.dart';
+import '../../../services/supabase_service.dart';
 
 part 'create_memory_state.dart';
 
@@ -14,6 +17,9 @@ final createMemoryNotifier =
 );
 
 class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
+  final _storyService = StoryService();
+  final _cacheService = MemoryCacheService();
+
   CreateMemoryNotifier(CreateMemoryState state) : super(state) {
     initialize();
   }
@@ -186,12 +192,63 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     // Open camera or image picker
   }
 
-  void createMemory() {
+  Future<void> createMemory() async {
+    // Validate memory name
+    final memoryName = state.memoryNameController?.text.trim();
+    if (memoryName == null || memoryName.isEmpty) {
+      print('❌ CREATE MEMORY: Memory name is required');
+      return;
+    }
+
     // Set loading state
     state = state.copyWith(isLoading: true);
 
-    // Simulate memory creation
-    Future.delayed(Duration(seconds: 1), () {
+    try {
+      // Get current user
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Get invited user IDs (from selected group members + manually invited users)
+      final Set<String> invitedUserIds = {};
+      
+      // Add group members if a group is selected
+      if (state.createMemoryModel?.selectedGroup != null) {
+        final groupMembers = state.createMemoryModel?.groupMembers ?? [];
+        for (final member in groupMembers) {
+          final userId = member['id'] as String?;
+          if (userId != null && userId != currentUser.id) {
+            invitedUserIds.add(userId);
+          }
+        }
+      }
+      
+      // Add manually invited users
+      final manuallyInvited = state.createMemoryModel?.invitedUserIds ?? {};
+      invitedUserIds.addAll(manuallyInvited);
+
+      // Determine visibility
+      final visibility = state.createMemoryModel?.isPublic == true ? 'public' : 'private';
+
+      // Create memory in database
+      final memoryId = await _storyService.createMemory(
+        title: memoryName,
+        creatorId: currentUser.id,
+        visibility: visibility,
+        duration: '12_hours', // Default duration
+        invitedUserIds: invitedUserIds.toList(),
+      );
+
+      if (memoryId == null) {
+        throw Exception('Failed to create memory');
+      }
+
+      print('✅ CREATE MEMORY: Memory created successfully with ID: $memoryId');
+
+      // Refresh cache to include new memory
+      await _cacheService.refreshMemoryCache(currentUser.id);
+
       // Reset state and close bottom sheet
       state.memoryNameController?.clear();
 
@@ -210,7 +267,13 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       Future.delayed(Duration.zero, () {
         state = state.copyWith(shouldNavigateBack: false);
       });
-    });
+    } catch (e) {
+      print('❌ CREATE MEMORY: Error creating memory: $e');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Failed to create memory: ${e.toString()}',
+      );
+    }
   }
 
   void onCancelPressed() {

@@ -1,10 +1,14 @@
 import '../../../core/app_export.dart';
+import '../../../services/avatar_helper_service.dart';
+import '../../../services/story_service.dart';
+import '../../../services/supabase_service.dart';
 import '../../../widgets/custom_confirmation_dialog.dart';
 import '../../../widgets/custom_icon_button.dart';
 import '../../../widgets/custom_image_view.dart';
+import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart';
 import '../models/memory_item_model.dart';
 
-class MemoryCardWidget extends StatelessWidget {
+class MemoryCardWidget extends StatefulWidget {
   final MemoryItemModel memoryItem;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
@@ -17,9 +21,115 @@ class MemoryCardWidget extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<MemoryCardWidget> createState() => _MemoryCardWidgetState();
+}
+
+class _MemoryCardWidgetState extends State<MemoryCardWidget> {
+  final _storyService = StoryService();
+  List<TimelineStoryItem> _timelineStories = [];
+  DateTime? _memoryStartTime;
+  DateTime? _memoryEndTime;
+  bool _isLoadingTimeline = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTimelineData();
+  }
+
+  /// CRITICAL FIX: Load actual timeline data from database
+  Future<void> _loadTimelineData() async {
+    try {
+      final memoryId = widget.memoryItem.id ?? '';
+      if (memoryId.isEmpty) {
+        setState(() {
+          _isLoadingTimeline = false;
+          _timelineStories = [];
+        });
+        return;
+      }
+
+      // Fetch memory's start_time and end_time from database (same as timeline detail screen)
+      final memoryResponse = await SupabaseService.instance.client
+          ?.from('memories')
+          .select('start_time, end_time')
+          .eq('id', memoryId)
+          .single();
+
+      DateTime memoryStart;
+      DateTime memoryEnd;
+
+      if (memoryResponse != null &&
+          memoryResponse['start_time'] != null &&
+          memoryResponse['end_time'] != null) {
+        // Use actual event window from database (same as timeline detail screen)
+        memoryStart = DateTime.parse(memoryResponse['start_time'] as String);
+        memoryEnd = DateTime.parse(memoryResponse['end_time'] as String);
+      } else {
+        // Fallback: parse from string dates if database columns not available
+        memoryStart = _parseMemoryStartTime();
+        memoryEnd = _parseMemoryEndTime();
+      }
+
+      // Fetch stories from database using memory ID
+      final storiesData = await _storyService.fetchMemoryStories(memoryId);
+
+      print(
+          '🔍 MEMORY CARD: Loading timeline for memory $memoryId');
+      print('🔍 MEMORY CARD: Fetched ${storiesData.length} stories');
+
+      if (storiesData.isEmpty) {
+        setState(() {
+          _isLoadingTimeline = false;
+          _timelineStories = [];
+          _memoryStartTime = memoryStart;
+          _memoryEndTime = memoryEnd;
+        });
+        return;
+      }
+
+      // Convert stories to TimelineStoryItem format
+      final timelineStories = storiesData.map((storyData) {
+        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final createdAt = DateTime.parse(storyData['created_at'] as String);
+        final storyId = storyData['id'] as String;
+
+        final backgroundImage = _storyService.getStoryMediaUrl(storyData);
+        final profileImage = AvatarHelperService.getAvatarUrl(
+          contributor?['avatar_url'] as String?,
+        );
+
+        return TimelineStoryItem(
+          backgroundImage: backgroundImage,
+          userAvatar: profileImage,
+          postedAt: createdAt,
+          timeLabel: _storyService.getTimeAgo(createdAt),
+          storyId: storyId,
+        );
+      }).toList();
+
+      setState(() {
+        _timelineStories = timelineStories;
+        _memoryStartTime = memoryStart;
+        _memoryEndTime = memoryEnd;
+        _isLoadingTimeline = false;
+      });
+
+      print(
+          '✅ MEMORY CARD: Timeline loaded with ${timelineStories.length} stories');
+    } catch (e) {
+      print('❌ MEMORY CARD: Error loading timeline: $e');
+      setState(() {
+        _isLoadingTimeline = false;
+        _timelineStories = [];
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         width: 300.h,
         decoration: BoxDecoration(
@@ -29,7 +139,7 @@ class MemoryCardWidget extends StatelessWidget {
         child: Column(
           children: [
             _buildEventHeader(),
-            _buildMemoryTimeline(),
+            _buildTimelineStoryWidget(),
             _buildEventInfo(),
           ],
         ),
@@ -51,9 +161,9 @@ class MemoryCardWidget extends StatelessWidget {
         children: [
           // Use actual category icon if available, otherwise use fallback
           CustomIconButton(
-            iconPath: memoryItem.categoryIconUrl != null &&
-                    memoryItem.categoryIconUrl!.isNotEmpty
-                ? memoryItem.categoryIconUrl!
+            iconPath: widget.memoryItem.categoryIconUrl != null &&
+                    widget.memoryItem.categoryIconUrl!.isNotEmpty
+                ? widget.memoryItem.categoryIconUrl!
                 : ImageConstant.imgFrame13Red600,
             backgroundColor: appTheme.color41C124,
             borderRadius: 18.h,
@@ -68,13 +178,13 @@ class MemoryCardWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  memoryItem.title ?? 'Nixon Wedding 2025',
+                  widget.memoryItem.title ?? 'Nixon Wedding 2025',
                   style: TextStyleHelper.instance.title16BoldPlusJakartaSans
                       .copyWith(color: appTheme.gray_50),
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  memoryItem.date ?? 'Dec 4, 2025',
+                  widget.memoryItem.date ?? 'Dec 4, 2025',
                   style: TextStyleHelper.instance.body12MediumPlusJakartaSans,
                 ),
               ],
@@ -83,7 +193,7 @@ class MemoryCardWidget extends StatelessWidget {
           SizedBox(width: 8.h),
           // Participant avatars section - using exact feed pattern
           _buildParticipantAvatarsStack(),
-          if (onDelete != null) ...[
+          if (widget.onDelete != null) ...[
             SizedBox(width: 8.h),
             Builder(
               builder: (context) => GestureDetector(
@@ -107,7 +217,7 @@ class MemoryCardWidget extends StatelessWidget {
   /// Build participant avatars using exact same pattern as feed
   Widget _buildParticipantAvatarsStack() {
     // Use actual participant avatars from cache service (already filtered)
-    final avatars = memoryItem.participantAvatars ?? [];
+    final avatars = widget.memoryItem.participantAvatars ?? [];
 
     // Return empty container if no avatars to display
     if (avatars.isEmpty) {
@@ -165,163 +275,142 @@ class MemoryCardWidget extends StatelessWidget {
       context: context,
       title: 'Delete Memory?',
       message:
-          'Are you sure you want to delete "${memoryItem.title ?? 'this memory'}"? All stories and content will be permanently removed.',
+          'Are you sure you want to delete "${widget.memoryItem.title ?? 'this memory'}"? All stories and content will be permanently removed.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       icon: Icons.delete_outline,
     );
 
-    if (confirmed == true && onDelete != null) {
-      onDelete!();
+    if (confirmed == true && widget.onDelete != null) {
+      widget.onDelete!();
     }
   }
 
-  Widget _buildMemoryTimeline() {
-    // Use actual thumbnails from database like feed does
-    final thumbnails = memoryItem.memoryThumbnails ?? [];
+  /// CRITICAL FIX: Use TimelineStoryWidget with actual database data
+  Widget _buildTimelineStoryWidget() {
+    if (_isLoadingTimeline) {
+      return Container(
+        margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
+        height: 112.h,
+        child: Center(
+          child: SizedBox(
+            width: 24.h,
+            height: 24.h,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.0,
+              valueColor:
+                  AlwaysStoppedAnimation<Color>(appTheme.deep_purple_A100),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_timelineStories.isEmpty) {
+      return Container(
+        margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
+        height: 112.h,
+        child: Center(
+          child: Text(
+            'No stories yet',
+            style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300),
+          ),
+        ),
+      );
+    }
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 4.h),
-      child: Stack(
-        children: [
-          Container(
-            height: 112.h,
-            child: Column(
-              children: [
-                // Show actual story thumbnails from database
-                if (thumbnails.isNotEmpty)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (thumbnails.length > 1)
-                        _buildMemoryThumbnail(thumbnails[1]),
-                      if (thumbnails.length > 1) SizedBox(width: 8.h),
-                      _buildMemoryThumbnail(thumbnails[0]),
-                    ],
-                  )
-                else
-                  // Fallback placeholder if no thumbnails
-                  SizedBox(height: 56.h),
-                SizedBox(height: 16.h),
-                Container(
-                  height: 4.h,
-                  decoration: BoxDecoration(
-                    color: appTheme.deep_purple_A100,
-                    borderRadius: BorderRadius.circular(2.h),
-                  ),
-                ),
-                SizedBox(height: 16.h),
-                _buildTimelineAvatars(),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 0,
-            left: 0,
-            child: Text(
-              'now',
-              style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-                  .copyWith(color: appTheme.transparentCustom),
-            ),
-          ),
-        ],
+      child: TimelineStoryWidget(
+        stories: _timelineStories,
+        memoryStartTime:
+            _memoryStartTime ?? DateTime.now().subtract(Duration(hours: 2)),
+        memoryEndTime: _memoryEndTime ?? DateTime.now(),
+        timelineHeight: 112,
+        onStoryTap: (storyId) {
+          // Navigate with full memory context when timeline card is tapped
+          if (widget.onTap != null) {
+            widget.onTap!();
+          }
+        },
       ),
     );
   }
 
-  Widget _buildMemoryThumbnail(String imagePath) {
-    // Accept any image URL from database - no hardcoded paths
-    return Container(
-      width: 40.h,
-      height: 56.h,
-      decoration: BoxDecoration(
-        border: Border.all(color: appTheme.deep_purple_A200, width: 1.h),
-        borderRadius: BorderRadius.circular(6.h),
-        color: appTheme.gray_900_01,
-      ),
-      child: Stack(
-        children: [
-          CustomImageView(
-            imagePath: imagePath, // Use actual database URL
-            width: double.infinity,
-            height: double.infinity,
-            fit: BoxFit.cover,
-            radius: BorderRadius.circular(6.h),
-          ),
-          Positioned(
-            top: 4.h,
-            left: 4.h,
-            child: Container(
-              padding: EdgeInsets.all(4.h),
-              decoration: BoxDecoration(
-                color: appTheme.color3BD81E,
-                borderRadius: BorderRadius.circular(6.h),
-              ),
-              child: Container(
-                width: 16.h,
-                height: 16.h,
-                decoration: BoxDecoration(
-                  color: appTheme.color3BD81E,
-                  borderRadius: BorderRadius.circular(8.h),
-                ),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgPlayCircle,
-                  height: 12.h,
-                  width: 12.h,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  /// Convert memory start time from eventDate + eventTime
+  DateTime _parseMemoryStartTime() {
+    try {
+      final dateStr = widget.memoryItem.eventDate ?? 'Dec 4';
+      final timeStr = widget.memoryItem.eventTime ?? '3:18pm';
+
+      // Parse date (format: "Dec 4")
+      final now = DateTime.now();
+      final parts = dateStr.split(' ');
+      final month = _monthToNumber(parts[0]);
+      final day = int.tryParse(parts[1]) ?? now.day;
+
+      // Parse time (format: "3:18pm")
+      final timeParts =
+          timeStr.toLowerCase().replaceAll(RegExp(r'[ap]m'), '').split(':');
+      var hour = int.tryParse(timeParts[0]) ?? 0;
+      final minute =
+          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+
+      if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
+      if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
+
+      return DateTime(now.year, month, day, hour, minute);
+    } catch (e) {
+      return DateTime.now().subtract(Duration(hours: 2));
+    }
   }
 
-  Widget _buildTimelineAvatars() {
-    // Use actual contributor avatars (excluding current user, already filtered in notifier)
-    final avatars = memoryItem.participantAvatars ?? [];
+  /// Parse memory end time from endDate + endTime
+  DateTime _parseMemoryEndTime() {
+    try {
+      final dateStr = widget.memoryItem.endDate ?? 'Dec 4';
+      final timeStr = widget.memoryItem.endTime ?? '3:18am';
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        SizedBox(width: 50.h),
-        // Show actual contributor avatars on timeline
-        if (avatars.isNotEmpty)
-          Column(
-            children: [
-              Container(
-                width: 2.h,
-                height: 16.h,
-                color: appTheme.deep_purple_A100,
-              ),
-              SizedBox(height: 4.h),
-              CustomImageView(
-                imagePath: avatars[0], // Use actual database avatar URL
-                height: 28.h,
-                width: 28.h,
-                radius: BorderRadius.circular(14.h),
-              ),
-            ],
-          ),
-        if (avatars.length > 1)
-          Column(
-            children: [
-              Container(
-                width: 2.h,
-                height: 16.h,
-                color: appTheme.deep_purple_A100,
-              ),
-              SizedBox(height: 4.h),
-              CustomImageView(
-                imagePath: avatars[1], // Use actual database avatar URL
-                height: 28.h,
-                width: 28.h,
-                radius: BorderRadius.circular(14.h),
-              ),
-            ],
-          ),
-      ],
-    );
+      // Parse date (format: "Dec 4")
+      final now = DateTime.now();
+      final parts = dateStr.split(' ');
+      final month = _monthToNumber(parts[0]);
+      final day = int.tryParse(parts[1]) ?? now.day;
+
+      // Parse time (format: "3:18am")
+      final timeParts =
+          timeStr.toLowerCase().replaceAll(RegExp(r'[ap]m'), '').split(':');
+      var hour = int.tryParse(timeParts[0]) ?? 0;
+      final minute =
+          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+
+      if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
+      if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
+
+      return DateTime(now.year, month, day, hour, minute);
+    } catch (e) {
+      return DateTime.now();
+    }
+  }
+
+  /// Convert month name to number
+  int _monthToNumber(String month) {
+    const months = {
+      'jan': 1,
+      'feb': 2,
+      'mar': 3,
+      'apr': 4,
+      'may': 5,
+      'jun': 6,
+      'jul': 7,
+      'aug': 8,
+      'sep': 9,
+      'oct': 10,
+      'nov': 11,
+      'dec': 12,
+    };
+    return months[month.toLowerCase().substring(0, 3)] ?? DateTime.now().month;
   }
 
   Widget _buildEventInfo() {
@@ -334,13 +423,13 @@ class MemoryCardWidget extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                memoryItem.eventDate ?? 'Dec 4',
+                widget.memoryItem.eventDate ?? 'Dec 4',
                 style: TextStyleHelper.instance.body14BoldPlusJakartaSans
                     .copyWith(color: appTheme.gray_50),
               ),
               SizedBox(height: 6.h),
               Text(
-                memoryItem.eventTime ?? '3:18pm',
+                widget.memoryItem.eventTime ?? '3:18pm',
                 style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
@@ -349,13 +438,13 @@ class MemoryCardWidget extends StatelessWidget {
           Column(
             children: [
               Text(
-                memoryItem.location ?? 'Tillsonburg, ON',
+                widget.memoryItem.location ?? 'Tillsonburg, ON',
                 style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
               SizedBox(height: 4.h),
               Text(
-                memoryItem.distance ?? '21km',
+                widget.memoryItem.distance ?? '21km',
                 style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
@@ -365,13 +454,13 @@ class MemoryCardWidget extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                memoryItem.endDate ?? 'Dec 4',
+                widget.memoryItem.endDate ?? 'Dec 4',
                 style: TextStyleHelper.instance.body14BoldPlusJakartaSans
                     .copyWith(color: appTheme.gray_50),
               ),
               SizedBox(height: 6.h),
               Text(
-                memoryItem.endTime ?? '3:18am',
+                widget.memoryItem.endTime ?? '3:18am',
                 style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),

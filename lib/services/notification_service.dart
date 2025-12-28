@@ -1,4 +1,5 @@
 import './supabase_service.dart';
+import './push_notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 
@@ -27,9 +28,18 @@ class NotificationService {
             event: PostgresChangeEvent.insert,
             schema: 'public',
             table: 'notifications',
-            callback: (payload) {
+            callback: (payload) async {
               final notification = payload.newRecord;
               onNewNotification(notification);
+
+              // Show local notification when app is in foreground
+              if (PushNotificationService.instance.isInitialized) {
+                await PushNotificationService.instance.showNotification(
+                  title: notification['title'] ?? 'New Notification',
+                  body: notification['message'] ?? '',
+                  payload: notification['id'],
+                );
+              }
             },
           )
           .subscribe();

@@ -140,7 +140,6 @@ class FeedService {
               avatar_url
             )
           ''')
-          .eq('is_disabled', false)
           .eq('memories.visibility', 'public')
           .gte('created_at',
               DateTime.now().subtract(Duration(hours: 24)).toIso8601String())
@@ -334,7 +333,6 @@ class FeedService {
               avatar_url
             )
           ''')
-          .eq('is_disabled', false)
           .eq('memories.visibility', 'public')
           .gte('created_at',
               DateTime.now().subtract(Duration(days: 7)).toIso8601String())
@@ -417,7 +415,6 @@ class FeedService {
           .from('stories')
           .select('id, created_at, memory_id')
           .inFilter('memory_id', memoryIds)
-          .eq('is_disabled', false)
           .order('created_at', ascending: false);
 
       if (response.isEmpty) {
@@ -531,7 +528,6 @@ class FeedService {
             created_at
           ''')
           .eq('memory_id', memoryId)
-          .eq('is_disabled', false)
           .order('created_at', ascending: true);
 
       final stories = (storiesResponse as List).map((s) {
@@ -580,7 +576,7 @@ class FeedService {
               avatar_url,
               username
             )
-          ''').eq('id', storyId).eq('is_disabled', false).single();
+          ''').eq('id', storyId).single();
 
       final contributor = response['user_profiles'] as Map<String, dynamic>?;
       final textOverlays = response['text_overlays'] as List? ?? [];
@@ -631,7 +627,6 @@ class FeedService {
           .from('stories')
           .select('id')
           .eq('memory_id', memoryId)
-          .eq('is_disabled', false)
           .order('created_at', ascending: true);
 
       return (response as List).map((item) => item['id'] as String).toList();

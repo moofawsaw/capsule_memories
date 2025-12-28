@@ -1,7 +1,7 @@
 import '../core/app_export.dart';
-import './custom_button.dart';
-import './custom_icon_button.dart';
-import './custom_image_view.dart';
+import 'custom_image_view.dart';
+import 'custom_button.dart';
+import 'custom_icon_button.dart';
 
 /**
  * CustomMemoryCard - A comprehensive memory/story card component that displays category information,
@@ -77,7 +77,7 @@ class CustomMemoryCard extends StatelessWidget {
       margin: margin,
       padding: padding ?? EdgeInsets.fromLTRB(20.h, 28.h, 20.h, 28.h),
       decoration: BoxDecoration(
-        color: backgroundColor ?? appTheme.gray_900_01,
+        color: backgroundColor ?? Color(0xFF12151D),
         borderRadius: BorderRadius.circular(0),
       ),
       child: Column(

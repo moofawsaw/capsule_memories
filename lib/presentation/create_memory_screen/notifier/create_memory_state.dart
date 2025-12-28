@@ -8,6 +8,7 @@ class CreateMemoryState {
   final int? currentStep;
   final bool? shouldNavigateToInvite;
   final bool? shouldNavigateBack;
+  final String? errorMessage;
 
   CreateMemoryState({
     this.createMemoryModel,
@@ -17,6 +18,7 @@ class CreateMemoryState {
     this.currentStep = 1,
     this.shouldNavigateToInvite = false,
     this.shouldNavigateBack = false,
+    this.errorMessage,
   });
 
   CreateMemoryState copyWith({
@@ -27,6 +29,7 @@ class CreateMemoryState {
     int? currentStep,
     bool? shouldNavigateToInvite,
     bool? shouldNavigateBack,
+    String? errorMessage,
   }) {
     return CreateMemoryState(
       createMemoryModel: createMemoryModel ?? this.createMemoryModel,
@@ -37,6 +40,7 @@ class CreateMemoryState {
       shouldNavigateToInvite:
           shouldNavigateToInvite ?? this.shouldNavigateToInvite,
       shouldNavigateBack: shouldNavigateBack ?? this.shouldNavigateBack,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }

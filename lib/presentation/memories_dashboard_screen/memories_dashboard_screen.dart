@@ -390,9 +390,22 @@ class _MemoriesDashboardScreenState
     print(
         '🔍 NAVIGATION DEBUG: categoryIconUrl = ${memoryItem.categoryIconUrl}');
 
+    // CRITICAL FIX: Ensure memory ID is always passed for database queries
+    if (memoryItem.id == null || memoryItem.id!.isEmpty) {
+      print('❌ NAVIGATION ERROR: Cannot navigate without memory ID');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to open memory - missing ID'),
+          backgroundColor: appTheme.red_500,
+        ),
+      );
+      return;
+    }
+
     // Convert MemoryItemModel to Map for timeline screen
     final memoryData = {
-      'id': memoryItem.id,
+      'id': memoryItem
+          .id, // CRITICAL: This ID is used by timeline to fetch actual data
       'title': memoryItem.title,
       'date': memoryItem.date,
       'start_date': memoryItem.eventDate,
@@ -400,25 +413,23 @@ class _MemoriesDashboardScreenState
       'end_date': memoryItem.endDate,
       'end_time': memoryItem.endTime,
       'location': memoryItem.location,
-      'category_icon': memoryItem
-          .categoryIconUrl, // FIXED: Use categoryIconUrl instead of categoryName
-      'contributor_avatars': memoryItem
-          .participantAvatars, // FIXED: Already contains actual filtered avatars from database (excluding current user)
-      'media_items': [], // Empty for now, will be loaded by timeline screen
+      'category_icon': memoryItem.categoryIconUrl,
+      'contributor_avatars': memoryItem.participantAvatars,
+      'media_items': [], // Empty - timeline will fetch from database using ID
       'visibility': memoryItem.visibility,
     };
 
-    print('🔍 NAVIGATION DEBUG: Final memoryData = $memoryData');
+    print('✅ NAVIGATION DEBUG: Passing memory data with ID to timeline');
+    print('   - Memory ID: ${memoryData['id']}');
+    print('   - Title: ${memoryData['title']}');
 
-    // Conditional navigation based on memory status
+    // Navigate based on memory status
     if (memoryItem.isSealed == true) {
-      // Navigate to detail view screen for sealed memories with data
       NavigatorService.pushNamed(
         AppRoutes.appTimelineSealed,
         arguments: memoryData,
       );
     } else {
-      // Navigate to timeline screen for open memories with data
       NavigatorService.pushNamed(
         AppRoutes.appTimeline,
         arguments: memoryData,

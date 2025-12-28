@@ -19,10 +19,34 @@ class MemoryFeedDashboardNotifier
   }
 
   final _feedService = FeedService();
+  bool _isDisposed = false;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
+  /// Safely set state only if notifier is not disposed
+  void _safeSetState(MemoryFeedDashboardState newState) {
+    if (_isDisposed) return;
+    try {
+      state = newState;
+    } catch (e) {
+      // Notifier was disposed, ignore BadState exception
+      if (e.toString().contains('dispose') || e.toString().contains('Bad state')) {
+        _isDisposed = true;
+        print('⚠️ FEED NOTIFIER: Attempted to set state after dispose');
+      } else {
+        rethrow;
+      }
+    }
+  }
 
   /// Load all feed data from the database
   Future<void> loadFeedData() async {
-    state = state.copyWith(isLoading: true);
+    if (_isDisposed) return;
+    _safeSetState(state.copyWith(isLoading: true));
 
     try {
       // Fetch data from database
@@ -104,6 +128,8 @@ class MemoryFeedDashboardNotifier
               ))
           .toList();
 
+      if (_isDisposed) return;
+
       final model = MemoryFeedDashboardModel(
         happeningNowStories: happeningNowStories.isNotEmpty
             ? happeningNowStories.cast<HappeningNowStoryData>()
@@ -114,66 +140,83 @@ class MemoryFeedDashboardNotifier
             : null,
       );
 
-      state = state.copyWith(
+      _safeSetState(state.copyWith(
         memoryFeedDashboardModel: model,
         isLoading: false,
-      );
+      ));
     } catch (e) {
       print('Error loading feed data: $e');
-      state = state.copyWith(isLoading: false);
+      if (!_isDisposed) {
+        _safeSetState(state.copyWith(isLoading: false));
+      }
     }
   }
 
   Future<void> refreshFeed() async {
-    state = state.copyWith(isLoading: true);
+    if (_isDisposed) return;
+    _safeSetState(state.copyWith(isLoading: true));
 
     try {
       // Re-fetch all data
       await loadFeedData();
 
-      state = state.copyWith(
-        isLoading: false,
-        isRefreshed: true,
-      );
+      if (!_isDisposed) {
+        _safeSetState(state.copyWith(
+          isLoading: false,
+          isRefreshed: true,
+        ));
+      }
     } catch (e) {
       print('Error refreshing feed: $e');
-      state = state.copyWith(isLoading: false);
+      if (!_isDisposed) {
+        _safeSetState(state.copyWith(isLoading: false));
+      }
     }
   }
 
   void markStoryAsViewed(String storyId) {
-    final currentModel = state.memoryFeedDashboardModel;
-    if (currentModel != null && currentModel.happeningNowStories != null) {
-      final updatedStories = currentModel.happeningNowStories!.map((story) {
-        if (story.id == storyId) {
-          return story.copyWith(isViewed: true);
-        }
-        return story;
-      }).toList();
+    if (_isDisposed) return;
+    try {
+      final currentModel = state.memoryFeedDashboardModel;
+      if (currentModel != null && currentModel.happeningNowStories != null) {
+        final updatedStories = currentModel.happeningNowStories!.map((story) {
+          if (story.id == storyId) {
+            return story.copyWith(isViewed: true);
+          }
+          return story;
+        }).toList();
 
-      final updatedModel = currentModel.copyWith(
-        happeningNowStories: updatedStories,
-      );
+        final updatedModel = currentModel.copyWith(
+          happeningNowStories: updatedStories,
+        );
 
-      state = state.copyWith(memoryFeedDashboardModel: updatedModel);
+        _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
+      }
+    } catch (e) {
+      // Notifier was disposed, ignore
     }
   }
 
   void toggleMemoryLike(String memoryId) {
-    final currentModel = state.memoryFeedDashboardModel;
-    if (currentModel != null && currentModel.publicMemories != null) {
-      final updatedMemories = currentModel.publicMemories!.map((memory) {
-        if (memory.id == memoryId) {
-          return memory.copyWith(isLiked: !(memory.isLiked ?? false));
-        }
-        return memory;
-      }).toList();
+    if (_isDisposed) return;
+    try {
+      final currentModel = state.memoryFeedDashboardModel;
+      if (currentModel != null && currentModel.publicMemories != null) {
+        final updatedMemories = currentModel.publicMemories!.map((memory) {
+          if (memory.id == memoryId) {
+            return memory.copyWith(isLiked: !(memory.isLiked ?? false));
+          }
+          return memory;
+        }).toList();
 
-      final updatedModel = currentModel.copyWith(
-        publicMemories: updatedMemories,
-      );
+        final updatedModel = currentModel.copyWith(
+          publicMemories: updatedMemories,
+        );
 
-      state = state.copyWith(memoryFeedDashboardModel: updatedModel);
+        _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
+      }
+    } catch (e) {
+      // Notifier was disposed, ignore
     }
   }
 
@@ -197,6 +240,8 @@ class MemoryFeedDashboardNotifier
     try {
       final stories = await _feedService.fetchHappeningNowStories();
 
+      if (_isDisposed) return;
+
       final transformedStories = stories.map((story) {
         return HappeningNowStoryData(
           id: story['id'] as String? ?? '',
@@ -211,11 +256,11 @@ class MemoryFeedDashboardNotifier
         );
       }).toList();
 
-      state = state.copyWith(
+      _safeSetState(state.copyWith(
         memoryFeedDashboardModel: state.memoryFeedDashboardModel?.copyWith(
           happeningNowStories: transformedStories.cast<HappeningNowStoryData>(),
         ),
-      );
+      ));
     } catch (e) {
       print('Error loading happening now stories: $e');
     }

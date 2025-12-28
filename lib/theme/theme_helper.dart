@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+// Global theme accessors
+ThemeColors get appTheme => ThemeHelper().themeColor();
+ThemeData get theme => ThemeHelper().themeData();
+
 /// Helper class for managing themes and colors.
 class ThemeHelper {
   // Singleton pattern to ensure single instance
@@ -11,66 +15,61 @@ class ThemeHelper {
   var _themeMode = ThemeMode.dark;
 
   // Map of custom color themes
-  final Map<String, ThemeColors> _supportedCustomColor = {
+  Map<String, ThemeColors> _supportedCustomColor = {
     'dark': DarkModeColors(),
     'light': LightModeColors()
   };
 
-  // Map of color schemes
-  final Map<String, ColorScheme> _supportedColorScheme = {
-    'dark': ColorScheme.dark(
-      primary: Color(0xFFA78BFA),
-      surface: Color(0xFF0c0d13),
-    ),
-    'light': ColorScheme.light(
-      primary: Color(0xFF7C3AED),
-      surface: Color(0xFFFFFFFF),
-    )
-  };
+  // Map of color schemes - initialized lazily to avoid circular dependency
+  Map<String, ColorScheme>? _supportedColorScheme;
+
+  Map<String, ColorScheme> get supportedColorScheme {
+    if (_supportedColorScheme == null) {
+      _supportedColorScheme = {
+        'dark': ColorScheme.dark(
+          primary: Color(0xFFA78BFA),
+          surface: Color(0xFF0c0d13),
+        ),
+        'light': ColorScheme.light(
+          primary: Color(0xFF7C3AED),
+          surface: Color(0xFFFFFFFF),
+        )
+      };
+    }
+    return _supportedColorScheme!;
+  }
 
   /// Set theme mode
   void setThemeMode(ThemeMode mode) {
     _themeMode = mode;
   }
 
-  /// Get current theme mode
-  ThemeMode get currentThemeMode => _themeMode;
-
-  /// Returns the colors for the specified theme mode.
-  ThemeColors getThemeColors([ThemeMode? mode]) {
-    final effectiveMode = mode ?? _themeMode;
-    final isDark = effectiveMode == ThemeMode.dark;
+  /// Returns the colors for the current theme.
+  ThemeColors _getThemeColors() {
+    final isDark = _themeMode == ThemeMode.dark;
     return _supportedCustomColor[isDark ? 'dark' : 'light'] ?? DarkModeColors();
   }
 
-  /// Returns theme data for the specified theme mode.
-  ThemeData getThemeData([ThemeMode? mode]) {
-    final effectiveMode = mode ?? _themeMode;
-    final isDark = effectiveMode == ThemeMode.dark;
-    final colors = getThemeColors(effectiveMode);
-    final colorScheme = _supportedColorScheme[isDark ? 'dark' : 'light'] ??
-        _supportedColorScheme['dark']!;
+  /// Returns the current theme data.
+  ThemeData _getThemeData() {
+    final isDark = _themeMode == ThemeMode.dark;
+    final colors = _getThemeColors();
+    var colorScheme = supportedColorScheme[isDark ? 'dark' : 'light'] ??
+        supportedColorScheme['dark']!;
 
     return ThemeData(
       visualDensity: VisualDensity.standard,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colors.gray_900_02,
-      useMaterial3: true,
     );
   }
 
-  /// Returns the colors for the current theme (backward compatibility).
-  ThemeColors themeColor() => getThemeColors();
+  /// Returns the colors for the current theme.
+  ThemeColors themeColor() => _getThemeColors();
 
-  /// Returns the current theme data (backward compatibility).
-  ThemeData themeData() => getThemeData();
+  /// Returns the current theme data.
+  ThemeData themeData() => _getThemeData();
 }
-
-// Global theme accessors that respect current theme mode
-ThemeColors get appTheme => ThemeHelper().getThemeColors();
-ThemeData get theme => ThemeHelper().getThemeData();
-
-// ... rest of code ...
 
 class ColorSchemes {
   static final darkColorScheme = ColorScheme.dark(

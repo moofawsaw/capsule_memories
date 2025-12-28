@@ -642,12 +642,20 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
       builder: (context, ref, _) {
         final state = ref.watch(createMemoryNotifier);
 
-        // Listen for navigation
+        // Listen for navigation and errors
         ref.listen(
           createMemoryNotifier,
           (previous, current) {
             if (current.shouldNavigateBack ?? false) {
               NavigatorService.goBack();
+            }
+            if (current.errorMessage != null && previous?.errorMessage != current.errorMessage) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(current.errorMessage!),
+                  backgroundColor: appTheme.colorFFD81E,
+                ),
+              );
             }
           },
         );
