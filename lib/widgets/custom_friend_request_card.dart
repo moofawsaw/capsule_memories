@@ -102,16 +102,14 @@ class CustomFriendRequestCard extends StatelessWidget {
       onTap: onProfileTap,
       child: Container(
         margin: EdgeInsets.only(left: 16.h),
-        padding: EdgeInsets.all(10.h),
-        decoration: BoxDecoration(
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(24.h),
-          color: profileBackgroundColor ?? Color(0x41C1242F),
-        ),
-        child: CustomImageView(
-          imagePath: profileImagePath ?? ImageConstant.imgFrame2,
-          height: 28.h,
-          width: 28.h,
-          fit: BoxFit.cover,
+          child: CustomImageView(
+            imagePath: profileImagePath ?? ImageConstant.imgFrame2,
+            height: 48.h,
+            width: 48.h,
+            fit: BoxFit.cover,
+          ),
         ),
       ),
     );

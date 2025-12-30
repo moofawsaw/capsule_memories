@@ -43,7 +43,7 @@ class CustomHeaderSection extends StatelessWidget {
           ),
       width: double.infinity,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             title,

@@ -1,5 +1,6 @@
 import '../../../core/app_export.dart';
 import '../../../services/follows_service.dart';
+import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/story_item_model.dart';
 import '../models/user_profile_model.dart';
@@ -17,57 +18,77 @@ final userProfileNotifier =
 
 class UserProfileNotifier extends StateNotifier<UserProfileState> {
   final FollowsService _followsService = FollowsService();
+  final StoryService _storyService = StoryService();
 
   UserProfileNotifier(UserProfileState state) : super(state) {
     initialize();
   }
 
-  void initialize() {
-    List<StoryItemModel> storyItems = [
-      StoryItemModel(
-        userName: 'Kelly Jones',
-        userAvatar: ImageConstant.imgFrame2,
-        backgroundImage: ImageConstant.imgImg,
-        categoryText: 'Vacation',
-        categoryIcon: ImageConstant.imgVector,
-        timestamp: '2 mins ago',
-      ),
-      StoryItemModel(
-        userName: 'Mac Hollins',
-        userAvatar: ImageConstant.imgEllipse826x26,
-        backgroundImage: ImageConstant.imgImage8,
-        categoryText: 'Vacation',
-        categoryIcon: ImageConstant.imgVector,
-        timestamp: '2 mins ago',
-      ),
-      StoryItemModel(
-        userName: 'Beth Way',
-        userAvatar: ImageConstant.imgFrame48x48,
-        backgroundImage: ImageConstant.imgImage8202x116,
-        categoryText: 'Vacation',
-        categoryIcon: ImageConstant.imgVector,
-        timestamp: '2 mins ago',
-      ),
-      StoryItemModel(
-        userName: 'Elliott Freisen',
-        userAvatar: ImageConstant.imgEllipse81,
-        backgroundImage: ImageConstant.imgImage81,
-        categoryText: 'Vacation',
-        categoryIcon: ImageConstant.imgVector,
-        timestamp: '2 mins ago',
-      ),
-    ];
+  Future<void> initialize({String? userId}) async {
+    // Set loading state
+    state = state.copyWith(isLoading: true);
 
-    state = state.copyWith(
-      userProfileModel: UserProfileModel(
-        profileImage: ImageConstant.imgEllipse864x64,
-        userName: 'Lucy Ball',
-        followersCount: '29',
-        followingCount: '6',
-        storyItems: storyItems,
-      ),
-      isLoading: false,
-    );
+    try {
+      // Use current user's ID if not provided
+      final targetUserId =
+          userId ?? SupabaseService.instance.client?.auth.currentUser?.id;
+
+      if (targetUserId == null) {
+        print('❌ USER PROFILE: No user ID available');
+        state = state.copyWith(isLoading: false);
+        return;
+      }
+
+      print('🔍 USER PROFILE: Fetching stories for user: $targetUserId');
+
+      // Fetch real stories from database using StoryService
+      final storiesData = await _storyService.fetchUserStories(targetUserId);
+
+      // Map database stories to StoryItemModel
+      final storyItems = storiesData.map((story) {
+        final memory = story['memories'] as Map<String, dynamic>?;
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
+        final contributor = story['user_profiles'] as Map<String, dynamic>?;
+
+        return StoryItemModel(
+          userName: contributor?['display_name'] ?? 'Unknown User',
+          userAvatar: _storyService.getContributorAvatar(story),
+          backgroundImage: _storyService.getStoryMediaUrl(story),
+          categoryText: category?['name'] ?? 'Unknown',
+          categoryIcon: category?['icon_url'] ?? '',
+          timestamp: _storyService.getTimeAgo(
+            DateTime.parse(story['created_at'] as String),
+          ),
+        );
+      }).toList();
+
+      print(
+          '✅ USER PROFILE: Loaded ${storyItems.length} stories from database');
+
+      state = state.copyWith(
+        userProfileModel: UserProfileModel(
+          profileImage: ImageConstant.imgEllipse864x64,
+          userName: 'Lucy Ball',
+          followersCount: '29',
+          followingCount: '6',
+          storyItems: storyItems,
+        ),
+        isLoading: false,
+      );
+    } catch (e) {
+      print('❌ USER PROFILE: Error loading stories: $e');
+      // Set empty list on error
+      state = state.copyWith(
+        userProfileModel: UserProfileModel(
+          profileImage: ImageConstant.imgEllipse864x64,
+          userName: 'Lucy Ball',
+          followersCount: '29',
+          followingCount: '6',
+          storyItems: [],
+        ),
+        isLoading: false,
+      );
+    }
   }
 
   Future<void> onFollowButtonPressed(String targetUserId) async {

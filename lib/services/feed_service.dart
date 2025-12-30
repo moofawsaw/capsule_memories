@@ -11,6 +11,9 @@ class FeedService {
 
   SupabaseClient? get _client => SupabaseService.instance.client;
 
+  // Pagination constants
+  static const int _pageSize = 10;
+
   /// 🛡️ VALIDATION: Validates story data completeness before rendering
   /// Returns true if all critical data is present, false if validation fails
   bool _validateStoryData(Map<String, dynamic> item, String context) {
@@ -94,26 +97,15 @@ class FeedService {
     return true;
   }
 
-  /// Fetch recent stories for "Happening Now" section
+  /// Fetch recent stories for "Happening Now" section with pagination
   /// Returns stories from the last 24 hours sorted by creation time
-  Future<List<Map<String, dynamic>>> fetchHappeningNowStories() async {
+  Future<List<Map<String, dynamic>>> fetchHappeningNowStories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
     if (_client == null) return [];
 
     try {
-      // First, validate category icons exist in memory_categories table
-      print('🔍 VALIDATION: Checking memory_categories table for icon data...');
-      final categoriesValidation = await _client!
-          .from('memory_categories')
-          .select('id, name, icon_url')
-          .limit(10);
-
-      print(
-          '🔍 VALIDATION: Found ${(categoriesValidation as List).length} categories in database:');
-      for (final cat in categoriesValidation) {
-        print(
-            '  - Category: ${cat['name']}, Icon URL: "${cat['icon_url']}", ID: ${cat['id']}');
-      }
-
       final response = await _client!
           .from('stories')
           .select('''
@@ -144,11 +136,7 @@ class FeedService {
           .gte('created_at',
               DateTime.now().subtract(Duration(hours: 24)).toIso8601String())
           .order('created_at', ascending: false)
-          .limit(10);
-
-      // Debug logging for happening now stories
-      print(
-          '🔍 DEBUG: Fetched ${(response as List).length} happening now stories');
+          .range(offset, offset + limit - 1);
 
       // 🛡️ VALIDATION: Filter out stories with incomplete data
       final validatedStories = <Map<String, dynamic>>[];
@@ -186,9 +174,11 @@ class FeedService {
     }
   }
 
-  /// Fetch public memories for "Public Memories" section
-  /// Returns public memories with their first story thumbnail
-  Future<List<Map<String, dynamic>>> fetchPublicMemories() async {
+  /// Fetch public memories for "Public Memories" section with pagination
+  Future<List<Map<String, dynamic>>> fetchPublicMemories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
     if (_client == null) return [];
 
     try {
@@ -217,7 +207,7 @@ class FeedService {
           .eq('visibility', 'public')
           .eq('state', 'open')
           .order('created_at', ascending: false)
-          .limit(20);
+          .range(offset, offset + limit - 1);
 
       // Debug logging for category data
       print('🔍 DEBUG: Fetched ${(response as List).length} public memories');
@@ -301,9 +291,11 @@ class FeedService {
     }
   }
 
-  /// Fetch trending stories based on view count
-  /// Returns most viewed stories from the last 7 days
-  Future<List<Map<String, dynamic>>> fetchTrendingStories() async {
+  /// Fetch trending stories with pagination
+  Future<List<Map<String, dynamic>>> fetchTrendingStories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
     if (_client == null) return [];
 
     try {
@@ -337,7 +329,7 @@ class FeedService {
           .gte('created_at',
               DateTime.now().subtract(Duration(days: 7)).toIso8601String())
           .order('view_count', ascending: false)
-          .limit(10);
+          .range(offset, offset + limit - 1);
 
       // 🛡️ VALIDATION: Filter out stories with incomplete data
       final validatedStories = <Map<String, dynamic>>[];
@@ -371,6 +363,281 @@ class FeedService {
       return validatedStories;
     } catch (e) {
       print('Error fetching trending stories: $e');
+      return [];
+    }
+  }
+
+  /// Fetch longest streak stories with pagination
+  Future<List<Map<String, dynamic>>> fetchLongestStreakStories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
+    if (_client == null) return [];
+
+    try {
+      final response = await _client!
+          .from('stories')
+          .select('''
+            id,
+            video_url,
+            thumbnail_url,
+            created_at,
+            contributor_id,
+            memory_id,
+            memories!inner(
+              title,
+              state,
+              visibility,
+              category_id,
+              memory_categories:category_id(
+                id,
+                name,
+                icon_url
+              )
+            ),
+            user_profiles!stories_contributor_id_fkey(
+              id,
+              display_name,
+              avatar_url,
+              posting_streak
+            )
+          ''')
+          .eq('memories.visibility', 'public')
+          .gte('created_at',
+              DateTime.now().subtract(Duration(days: 30)).toIso8601String())
+          .order('user_profiles(posting_streak)', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      // 🛡️ VALIDATION: Filter out stories with incomplete data
+      final validatedStories = <Map<String, dynamic>>[];
+
+      for (final item in response) {
+        if (_validateStoryData(item, 'LongestStreaks')) {
+          final memory = item['memories'] as Map<String, dynamic>?;
+          final contributor =
+              item['user_profiles'] as Map<String, dynamic>? ?? {};
+          final category =
+              memory?['memory_categories'] as Map<String, dynamic>?;
+
+          validatedStories.add({
+            'id': item['id'] ?? '',
+            'thumbnail_url': item['thumbnail_url'] ?? '',
+            'created_at': item['created_at'] ?? '',
+            'memory_id': item['memory_id'] ?? '',
+            'contributor_name': contributor['display_name'] ?? 'Unknown User',
+            'contributor_avatar': AvatarHelperService.getAvatarUrl(
+              contributor['avatar_url'],
+            ),
+            'posting_streak': contributor['posting_streak'] ?? 0,
+            'memory_title': memory?['title'] ?? 'Untitled Memory',
+            'category_name': category?['name'] ?? 'Custom',
+            'category_icon': category?['icon_url'] ?? '',
+          });
+        }
+      }
+
+      print(
+          '✅ VALIDATION: ${validatedStories.length} longest streak stories passed validation');
+      return validatedStories;
+    } catch (e) {
+      print('❌ ERROR fetching longest streak stories: $e');
+      return [];
+    }
+  }
+
+  /// Fetch popular user stories with pagination
+  Future<List<Map<String, dynamic>>> fetchPopularUserStories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
+    if (_client == null) return [];
+
+    try {
+      final response = await _client!
+          .from('stories')
+          .select('''
+            id,
+            video_url,
+            thumbnail_url,
+            created_at,
+            contributor_id,
+            memory_id,
+            memories!inner(
+              title,
+              state,
+              visibility,
+              category_id,
+              memory_categories:category_id(
+                id,
+                name,
+                icon_url
+              )
+            ),
+            user_profiles!stories_contributor_id_fkey(
+              id,
+              display_name,
+              avatar_url,
+              popularity_score
+            )
+          ''')
+          .eq('memories.visibility', 'public')
+          .gte('created_at',
+              DateTime.now().subtract(Duration(days: 30)).toIso8601String())
+          .order('user_profiles(popularity_score)', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      // 🛡️ VALIDATION: Filter out stories with incomplete data
+      final validatedStories = <Map<String, dynamic>>[];
+
+      for (final item in response) {
+        if (_validateStoryData(item, 'PopularUsers')) {
+          final memory = item['memories'] as Map<String, dynamic>?;
+          final contributor =
+              item['user_profiles'] as Map<String, dynamic>? ?? {};
+          final category =
+              memory?['memory_categories'] as Map<String, dynamic>?;
+
+          validatedStories.add({
+            'id': item['id'] ?? '',
+            'thumbnail_url': item['thumbnail_url'] ?? '',
+            'created_at': item['created_at'] ?? '',
+            'memory_id': item['memory_id'] ?? '',
+            'contributor_name': contributor['display_name'] ?? 'Unknown User',
+            'contributor_avatar': AvatarHelperService.getAvatarUrl(
+              contributor['avatar_url'],
+            ),
+            'popularity_score': contributor['popularity_score'] ?? 0,
+            'memory_title': memory?['title'] ?? 'Untitled Memory',
+            'category_name': category?['name'] ?? 'Custom',
+            'category_icon': category?['icon_url'] ?? '',
+          });
+        }
+      }
+
+      print(
+          '✅ VALIDATION: ${validatedStories.length} popular user stories passed validation');
+      return validatedStories;
+    } catch (e) {
+      print('❌ ERROR fetching popular user stories: $e');
+      return [];
+    }
+  }
+
+  /// Fetch popular memories with pagination
+  Future<List<Map<String, dynamic>>> fetchPopularMemories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
+    if (_client == null) return [];
+
+    try {
+      final response = await _client!
+          .from('memories')
+          .select('''
+            id,
+            title,
+            created_at,
+            expires_at,
+            location_name,
+            contributor_count,
+            state,
+            visibility,
+            creator_id,
+            category_id,
+            popularity_score,
+            memory_categories:category_id(
+              name,
+              icon_url
+            ),
+            stories(
+              thumbnail_url,
+              video_url
+            )
+          ''')
+          .eq('visibility', 'public')
+          .eq('state', 'open')
+          .order('popularity_score', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      // Debug logging for category data
+      print('🔍 DEBUG: Fetched ${(response as List).length} popular memories');
+
+      final List<Map<String, dynamic>> transformedMemories = [];
+
+      for (final memory in response) {
+        // 🛡️ VALIDATION: Validate memory data before processing
+        if (!_validateMemoryData(memory, 'PopularMemories')) {
+          continue; // Skip this memory if validation fails
+        }
+
+        final category = memory['memory_categories'] as Map<String, dynamic>?;
+        final categoryIconUrl = category?['icon_url'] ?? '';
+
+        // Debug log for category icon
+        print(
+            '🔍 DEBUG: Popular Memory "${memory['title']}" - Category: ${category?['name']}, Icon URL: "$categoryIconUrl", Popularity Score: ${memory['popularity_score']}');
+
+        // Fetch contributors for this memory
+        final contributorsResponse = await _client!
+            .from('memory_contributors')
+            .select('user_id, user_profiles!inner(avatar_url)')
+            .eq('memory_id', memory['id'])
+            .limit(3);
+
+        final contributorAvatars = (contributorsResponse as List)
+            .map((c) {
+              final profile = c['user_profiles'] as Map<String, dynamic>?;
+              return AvatarHelperService.getAvatarUrl(
+                profile?['avatar_url'],
+              );
+            })
+            .where((url) => url.isNotEmpty)
+            .toList();
+
+        final stories = memory['stories'] as List? ?? [];
+        final mediaItems = stories
+            .where((s) =>
+                s['thumbnail_url'] != null &&
+                s['thumbnail_url'].toString().isNotEmpty)
+            .take(2)
+            .map((s) => {
+                  'thumbnail_url': s['thumbnail_url'],
+                  'video_url': s['video_url'],
+                })
+            .toList();
+
+        // 🛡️ VALIDATION: Skip memory if no valid media items
+        if (mediaItems.isEmpty) {
+          print(
+              '⚠️ WARNING: Skipping popular memory "${memory['title']}" - no valid media items');
+          continue;
+        }
+
+        final createdAt = DateTime.parse(memory['created_at']);
+        final expiresAt = DateTime.parse(memory['expires_at']);
+
+        transformedMemories.add({
+          'id': memory['id'],
+          'title': memory['title'] ?? 'Untitled Memory',
+          'date': _formatDate(createdAt),
+          'category_icon': categoryIconUrl,
+          'contributor_avatars': contributorAvatars,
+          'media_items': mediaItems,
+          'start_date': _formatDate(createdAt),
+          'start_time': _formatTime(createdAt),
+          'end_date': _formatDate(expiresAt),
+          'end_time': _formatTime(expiresAt),
+          'location': memory['location_name'] ?? '',
+          'state': memory['state'] ?? 'open',
+          'popularity_score': memory['popularity_score'] ?? 0,
+        });
+      }
+
+      print(
+          '✅ VALIDATION: ${transformedMemories.length} popular memories passed validation');
+      return transformedMemories;
+    } catch (e) {
+      print('❌ ERROR fetching popular memories: $e');
       return [];
     }
   }
@@ -432,6 +699,72 @@ class FeedService {
       return storyIds;
     } catch (e) {
       print('❌ ERROR fetching latest story IDs: $e');
+      return [];
+    }
+  }
+
+  /// Fetch user's active memories where they are a contributor
+  /// Returns memories with state='open' that haven't expired
+  Future<List<Map<String, dynamic>>> fetchUserActiveMemories() async {
+    if (_client == null) return [];
+
+    try {
+      final currentUserId = _client!.auth.currentUser?.id;
+      if (currentUserId == null) {
+        print('❌ ERROR: No authenticated user');
+        return [];
+      }
+
+      // Get memory IDs where user is a contributor
+      final contributorResponse = await _client!
+          .from('memory_contributors')
+          .select('memory_id')
+          .eq('user_id', currentUserId);
+
+      if (contributorResponse.isEmpty) {
+        print('⚠️ INFO: User is not a contributor to any memories');
+        return [];
+      }
+
+      final memoryIds = (contributorResponse as List)
+          .map((c) => c['memory_id'] as String)
+          .toList();
+
+      // Fetch active (open) memories that haven't expired
+      final response = await _client!
+          .from('memories')
+          .select('''
+            id,
+            title,
+            state,
+            expires_at,
+            category_id,
+            memory_categories:category_id(
+              name,
+              icon_url
+            )
+          ''')
+          .inFilter('id', memoryIds)
+          .eq('state', 'open')
+          .gt('expires_at', DateTime.now().toIso8601String())
+          .order('created_at', ascending: false);
+
+      final activeMemories = (response as List).map((memory) {
+        final category = memory['memory_categories'] as Map<String, dynamic>?;
+        return {
+          'id': memory['id'] ?? '',
+          'title': memory['title'] ?? 'Untitled Memory',
+          'category_name': category?['name'] ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+          'expires_at': memory['expires_at'] ?? '',
+        };
+      }).toList();
+
+      print(
+          '✅ SUCCESS: Fetched ${activeMemories.length} active memories for user');
+      return activeMemories;
+    } catch (e) {
+      print('❌ ERROR fetching user active memories: $e');
       return [];
     }
   }

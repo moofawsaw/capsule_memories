@@ -8,26 +8,41 @@ class MemoryFeedDashboardModel extends Equatable {
     this.happeningNowStories,
     this.publicMemories,
     this.trendingStories,
+    this.longestStreakStories,
+    this.popularUserStories,
+    this.popularMemories,
   }) {
     happeningNowStories =
         happeningNowStories ?? _getDefaultHappeningNowStories();
     publicMemories = publicMemories ?? _getDefaultPublicMemories();
     trendingStories = trendingStories ?? _getDefaultTrendingStories();
+    longestStreakStories = longestStreakStories ?? [];
+    popularUserStories = popularUserStories ?? [];
+    popularMemories = popularMemories ?? [];
   }
 
   List<HappeningNowStoryData>? happeningNowStories;
   List<CustomMemoryItem>? publicMemories;
   List<HappeningNowStoryData>? trendingStories;
+  List<HappeningNowStoryData>? longestStreakStories;
+  List<HappeningNowStoryData>? popularUserStories;
+  List<CustomMemoryItem>? popularMemories;
 
   MemoryFeedDashboardModel copyWith({
     List<HappeningNowStoryData>? happeningNowStories,
     List<CustomMemoryItem>? publicMemories,
     List<HappeningNowStoryData>? trendingStories,
+    List<HappeningNowStoryData>? longestStreakStories,
+    List<HappeningNowStoryData>? popularUserStories,
+    List<CustomMemoryItem>? popularMemories,
   }) {
     return MemoryFeedDashboardModel(
       happeningNowStories: happeningNowStories ?? this.happeningNowStories,
       publicMemories: publicMemories ?? this.publicMemories,
       trendingStories: trendingStories ?? this.trendingStories,
+      longestStreakStories: longestStreakStories ?? this.longestStreakStories,
+      popularUserStories: popularUserStories ?? this.popularUserStories,
+      popularMemories: popularMemories ?? this.popularMemories,
     );
   }
 
@@ -36,6 +51,9 @@ class MemoryFeedDashboardModel extends Equatable {
         happeningNowStories,
         publicMemories,
         trendingStories,
+        longestStreakStories,
+        popularUserStories,
+        popularMemories,
       ];
 
   static List<HappeningNowStoryData> _getDefaultHappeningNowStories() {

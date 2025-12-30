@@ -179,7 +179,7 @@ class DarkModeColors implements ThemeColors {
   Color get blue_gray_300 => Color(0xFF94A3B8);
   Color get gray_900 => Color(0xFF1B181E);
   Color get white_A700 => Color(0xFFFFFFFF);
-  Color get gray_900_01 => Color(0xFF151319);
+  Color get gray_900_01 => Color(0xFF1D2636);
   Color get blue_gray_900 => Color(0xFF1E293B);
   Color get gray_900_02 => Color(0xFF0c0d13);
   Color get gray_900_03 => Color(0xFF221730);

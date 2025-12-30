@@ -17,51 +17,69 @@ class UserMenuScreen extends ConsumerStatefulWidget {
 class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: SafeArea(
-        child: Align(
-          alignment: Alignment.centerLeft,
+    return Stack(
+      children: [
+        // Background overlay - tapping dismisses menu
+        GestureDetector(
+          onTap: () => onTapCloseButton(context),
+          behavior: HitTestBehavior.opaque,
           child: Container(
-            width: 310.h,
+            width: double.infinity,
             height: double.infinity,
-            decoration: BoxDecoration(color: appTheme.color5B0000),
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                Container(
+            color: Colors.black.withAlpha(128),
+          ),
+        ),
+        // Menu content - prevent tap propagation
+        GestureDetector(
+          onTap: () {}, // Absorb taps on menu to prevent dismissal
+          child: Material(
+            color: Colors.transparent,
+            child: SafeArea(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
                   width: 310.h,
                   height: double.infinity,
-                  decoration: BoxDecoration(color: appTheme.gray_900_02),
-                ),
-                Container(
-                  width: 310.h,
-                  padding: EdgeInsets.fromLTRB(12.h, 28.h, 12.h, 16.h),
                   decoration: BoxDecoration(color: appTheme.color5B0000),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
                     children: [
-                      _buildProfileSection(context),
-                      SizedBox(height: 30.h),
-                      _buildNavigationMenu(context),
-                      SizedBox(height: 26.h),
-                      _buildDivider(context),
-                      SizedBox(height: 20.h),
-                      _buildDarkModeSection(context),
-                      SizedBox(height: 22.h),
-                      _buildBottomDivider(context),
-                      Spacer(),
-                      _buildActionButtons(context),
-                      SizedBox(height: 16.h),
-                      _buildSignOutSection(context),
+                      Container(
+                        width: 310.h,
+                        height: double.infinity,
+                        decoration: BoxDecoration(color: appTheme.gray_900_02),
+                      ),
+                      Container(
+                        width: 310.h,
+                        padding: EdgeInsets.fromLTRB(12.h, 28.h, 12.h, 16.h),
+                        decoration: BoxDecoration(color: appTheme.color5B0000),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildProfileSection(context),
+                            SizedBox(height: 30.h),
+                            _buildNavigationMenu(context),
+                            SizedBox(height: 26.h),
+                            _buildDivider(context),
+                            SizedBox(height: 20.h),
+                            _buildDarkModeSection(context),
+                            SizedBox(height: 22.h),
+                            _buildBottomDivider(context),
+                            Spacer(),
+                            _buildActionButtons(context),
+                            SizedBox(height: 16.h),
+                            _buildSignOutSection(context),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 

@@ -95,50 +95,99 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
         // 🔥 Watch global avatar state for real-time updates (only for current user)
         final avatarState = ref.watch(avatarStateProvider);
 
-        return GestureDetector(
-          onTap: isCurrentUser
-              ? () {
-                  ref
-                      .read(userProfileScreenTwoNotifier.notifier)
-                      .uploadAvatar();
-                }
-              : null,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              CustomProfileHeader(
-                // Use avatar from global state if current user, otherwise use model avatar
-                avatarImagePath:
-                    (isCurrentUser ? avatarState.avatarUrl : null) ??
-                        model?.avatarImagePath ??
-                        ImageConstant.imgEllipse896x96,
-                userName: model?.userName ?? 'Loading...',
-                email: model?.email ?? 'Fetching data...',
-                onEditTap: isCurrentUser
-                    ? () {
-                        onTapEditProfile(context);
-                      }
-                    : null,
-                margin: EdgeInsets.symmetric(horizontal: 68.h),
-              ),
-              if (state.isUploading && isCurrentUser)
-                Positioned(
-                  child: Container(
-                    width: 96.h,
-                    height: 96.h,
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
+        return Stack(
+          children: [
+            GestureDetector(
+              onTap: isCurrentUser
+                  ? () {
+                      ref
+                          .read(userProfileScreenTwoNotifier.notifier)
+                          .uploadAvatar();
+                    }
+                  : null,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomProfileHeader(
+                    // Use avatar from global state if current user, otherwise use model avatar
+                    avatarImagePath:
+                        (isCurrentUser ? avatarState.avatarUrl : null) ??
+                            model?.avatarImagePath ??
+                            ImageConstant.imgEllipse896x96,
+                    userName: model?.userName ?? 'Loading...',
+                    email: model?.email ?? 'Fetching data...',
+                    onEditTap: isCurrentUser
+                        ? () {
+                            onTapEditProfile(context);
+                          }
+                        : null,
+                    allowUsernameEdit: isCurrentUser,
+                    onUserNameChanged: isCurrentUser
+                        ? (newUsername) {
+                            ref
+                                .read(userProfileScreenTwoNotifier.notifier)
+                                .updateUsername(newUsername);
+                          }
+                        : null,
+                    margin: EdgeInsets.symmetric(horizontal: 68.h),
+                  ),
+                  if (state.isUploading && isCurrentUser)
+                    Positioned(
+                      child: Container(
+                        width: 96.h,
+                        height: 96.h,
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
+                    ),
+                ],
+              ),
+            ),
+            // Block icon button positioned in top right (only for other users)
+            if (!isCurrentUser)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: () {
+                    final notifier =
+                        ref.read(userProfileScreenTwoNotifier.notifier);
+                    _showBlockConfirmationDialog(context, state.isBlocked, () {
+                      notifier.toggleBlock();
+                    });
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(8.0),
+                    decoration: BoxDecoration(
+                      color: state.isBlocked
+                          ? appTheme.gray_900_01
+                          : appTheme.red_500.withAlpha(26),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: state.isBlocked
+                            ? appTheme.blue_gray_300
+                            : appTheme.red_500,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Icon(
+                      state.isBlocked ? Icons.lock_open : Icons.block,
+                      color: state.isBlocked
+                          ? appTheme.blue_gray_300
+                          : appTheme.red_500,
+                      size: 20.0,
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         );
       },
     );
@@ -169,7 +218,7 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     );
   }
 
-  /// Action Buttons Section (Follow, Add Friend, Block)
+  /// Action Buttons Section (Follow, Add Friend)
   Widget _buildActionButtons(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -197,40 +246,29 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             Expanded(
               child: CustomButton(
                 text: state.isFriend
-                    ? 'Friends'
+                    ? 'Unfriend'
                     : state.hasPendingFriendRequest
                         ? 'Pending'
                         : 'Add Friend',
                 leftIcon: state.isFriend
-                    ? 'https://img.icons8.com/ios-filled/50/FFFFFF/friends.png'
+                    ? 'https://img.icons8.com/ios-filled/50/FFFFFF/remove-user-male.png'
                     : state.hasPendingFriendRequest
                         ? 'https://img.icons8.com/ios-filled/50/FFFFFF/clock.png'
                         : 'https://img.icons8.com/ios-filled/50/FFFFFF/add-user-group-man-man.png',
-                buttonStyle: state.isFriend || state.hasPendingFriendRequest
+                buttonStyle: state.hasPendingFriendRequest
                     ? CustomButtonStyle.fillGray
                     : CustomButtonStyle.fillDeepPurpleA,
-                onPressed: state.isFriend || state.hasPendingFriendRequest
+                onPressed: state.hasPendingFriendRequest
                     ? null
                     : () {
-                        notifier.sendFriendRequest();
+                        if (state.isFriend) {
+                          _showUnfriendConfirmationDialog(context, () {
+                            notifier.unfriendUser();
+                          });
+                        } else {
+                          notifier.sendFriendRequest();
+                        }
                       },
-              ),
-            ),
-            SizedBox(width: 8.h),
-            Expanded(
-              child: CustomButton(
-                text: state.isBlocked ? 'Unblock' : 'Block',
-                leftIcon: state.isBlocked
-                    ? 'https://img.icons8.com/ios-filled/50/FFFFFF/lock-2.png'
-                    : 'https://img.icons8.com/ios-filled/50/FFFFFF/block-user.png',
-                buttonStyle: state.isBlocked
-                    ? CustomButtonStyle.fillGray
-                    : CustomButtonStyle.fillRed,
-                onPressed: () {
-                  _showBlockConfirmationDialog(context, state.isBlocked, () {
-                    notifier.toggleBlock();
-                  });
-                },
               ),
             ),
           ],
@@ -298,6 +336,63 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     );
   }
 
+  void _showUnfriendConfirmationDialog(
+      BuildContext context, VoidCallback onConfirm) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: appTheme.gray_900_02,
+          title: Text(
+            'Unfriend User?',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
+          ),
+          content: Text(
+            'This will remove your friendship connection. You can send a friend request again later if you change your mind.',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.normal,
+              color: Colors.grey[300],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[300],
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onConfirm();
+              },
+              child: Text(
+                'Unfriend',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.deepPurpleAccent[100],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   /// Stories Grid Section
   Widget _buildStoriesGrid(BuildContext context) {
     return Consumer(
@@ -307,29 +402,19 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
 
         // Show loading placeholders while stories are fetching
         if (state.isLoadingStories) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // First row with 3 skeleton placeholders
-              Row(
-                children: [
-                  Expanded(child: CustomStorySkeleton()),
-                  SizedBox(width: 1.h),
-                  Expanded(child: CustomStorySkeleton()),
-                  SizedBox(width: 1.h),
-                  Expanded(child: CustomStorySkeleton()),
-                ],
-              ),
-              SizedBox(height: 1.h),
-              // Second row with 1 skeleton placeholder
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 116.h,
-                  child: CustomStorySkeleton(),
-                ),
-              ),
-            ],
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 1.h,
+              mainAxisSpacing: 1.h,
+              childAspectRatio: 0.75,
+            ),
+            itemCount: 3,
+            itemBuilder: (context, index) {
+              return CustomStorySkeleton();
+            },
           );
         }
 
@@ -338,94 +423,30 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
           return _buildEmptyStoriesState(context);
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // First row with 3 stories
-            Row(
-              children: [
-                if (stories.isNotEmpty)
-                  Expanded(
-                    child: CustomStoryCard(
-                      userName: stories[0].userName ?? 'User',
-                      userAvatar: stories[0].userAvatar ??
-                          ImageConstant.imgEllipse896x96,
-                      backgroundImage:
-                          stories[0].backgroundImage ?? ImageConstant.imgImg,
-                      categoryText: stories[0].categoryText ?? 'Memory',
-                      categoryIcon:
-                          stories[0].categoryIcon ?? ImageConstant.imgVector,
-                      timestamp: stories[0].timestamp ?? 'Just now',
-                      onTap: () {
-                        onTapStoryCard(context, 0);
-                      },
-                    ),
-                  ),
-                if (stories.length > 1) ...[
-                  SizedBox(width: 1.h),
-                  Expanded(
-                    child: CustomStoryCard(
-                      userName: stories[1].userName ?? 'User',
-                      userAvatar: stories[1].userAvatar ??
-                          ImageConstant.imgEllipse896x96,
-                      backgroundImage:
-                          stories[1].backgroundImage ?? ImageConstant.imgImage8,
-                      categoryText: stories[1].categoryText ?? 'Memory',
-                      categoryIcon:
-                          stories[1].categoryIcon ?? ImageConstant.imgVector,
-                      timestamp: stories[1].timestamp ?? 'Just now',
-                      onTap: () {
-                        onTapStoryCard(context, 1);
-                      },
-                    ),
-                  ),
-                ],
-                if (stories.length > 2) ...[
-                  SizedBox(width: 1.h),
-                  Expanded(
-                    child: CustomStoryCard(
-                      userName: stories[2].userName ?? 'User',
-                      userAvatar: stories[2].userAvatar ??
-                          ImageConstant.imgEllipse896x96,
-                      backgroundImage: stories[2].backgroundImage ??
-                          ImageConstant.imgImage8202x116,
-                      categoryText: stories[2].categoryText ?? 'Memory',
-                      categoryIcon:
-                          stories[2].categoryIcon ?? ImageConstant.imgVector,
-                      timestamp: stories[2].timestamp ?? 'Just now',
-                      onTap: () {
-                        onTapStoryCard(context, 2);
-                      },
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            if (stories.length > 3) ...[
-              SizedBox(height: 1.h),
-              // Second row with additional stories
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 116.h,
-                  child: CustomStoryCard(
-                    userName: stories[3].userName ?? 'User',
-                    userAvatar:
-                        stories[3].userAvatar ?? ImageConstant.imgEllipse896x96,
-                    backgroundImage:
-                        stories[3].backgroundImage ?? ImageConstant.imgImage81,
-                    categoryText: stories[3].categoryText ?? 'Memory',
-                    categoryIcon:
-                        stories[3].categoryIcon ?? ImageConstant.imgVector,
-                    timestamp: stories[3].timestamp ?? 'Just now',
-                    onTap: () {
-                      onTapStoryCard(context, 3);
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ],
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 1.h,
+            mainAxisSpacing: 1.h,
+            childAspectRatio: 0.75,
+          ),
+          itemCount: stories.length,
+          itemBuilder: (context, index) {
+            final story = stories[index];
+            return CustomStoryCard(
+              userName: story.userName ?? 'User',
+              userAvatar: story.userAvatar ?? ImageConstant.imgEllipse896x96,
+              backgroundImage: story.backgroundImage ?? ImageConstant.imgImg,
+              categoryText: story.categoryText ?? 'Memory',
+              categoryIcon: story.categoryIcon ?? ImageConstant.imgVector,
+              timestamp: story.timestamp ?? 'Just now',
+              onTap: () {
+                onTapStoryCard(context, index);
+              },
+            );
+          },
         );
       },
     );

@@ -8,13 +8,25 @@ import './widgets/member_item_widget.dart';
 import 'notifier/memory_details_notifier.dart';
 
 class MemoryDetailsScreen extends ConsumerStatefulWidget {
-  MemoryDetailsScreen({Key? key}) : super(key: key);
+  final String memoryId;
+
+  const MemoryDetailsScreen({Key? key, required this.memoryId})
+      : super(key: key);
 
   @override
   MemoryDetailsScreenState createState() => MemoryDetailsScreenState();
 }
 
 class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load memory data when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(memoryDetailsNotifier.notifier).loadMemoryData(widget.memoryId);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -42,21 +54,59 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
             ),
             SizedBox(height: 20.h),
             Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 20.h),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context),
-                    SizedBox(height: 24.h),
-                    _buildMemoryInfo(context),
-                    SizedBox(height: 24.h),
-                    _buildMembersList(context),
-                    SizedBox(height: 24.h),
-                    _buildActionButtons(context),
-                    SizedBox(height: 20.h),
-                  ],
-                ),
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final state = ref.watch(memoryDetailsNotifier);
+
+                  if (state.isLoading) {
+                    return Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            appTheme.deep_purple_A100),
+                      ),
+                    );
+                  }
+
+                  if (state.errorMessage != null) {
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.h),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline,
+                                size: 48.h, color: Colors.red),
+                            SizedBox(height: 16.h),
+                            Text(
+                              state.errorMessage!,
+                              style: TextStyleHelper
+                                  .instance.body14RegularPlusJakartaSans
+                                  .copyWith(color: appTheme.gray_50),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(horizontal: 20.h),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(context),
+                        SizedBox(height: 24.h),
+                        _buildMemoryInfo(context),
+                        SizedBox(height: 24.h),
+                        _buildMembersList(context),
+                        SizedBox(height: 24.h),
+                        if (state.isCreator) _buildActionButtons(context),
+                        SizedBox(height: 20.h),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ],
@@ -73,6 +123,21 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Memory Details',
+                  style: TextStyleHelper.instance.title20BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Icon(Icons.close, color: appTheme.gray_50, size: 24.h),
+                ),
+              ],
+            ),
+            SizedBox(height: 24.h),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -84,13 +149,23 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
             SizedBox(height: 12.h),
             CustomEditText(
               controller: state.titleController,
-              hintText: 'Family Xmas 2025',
-              suffixIcon: ImageConstant.imgIconGray5018x20,
+              hintText: 'Memory Title',
+              suffixIcon:
+                  state.isCreator ? ImageConstant.imgIconGray5018x20 : null,
               fillColor: appTheme.gray_900,
               borderRadius: 8.h,
               textStyle: TextStyleHelper.instance.title16RegularPlusJakartaSans
                   .copyWith(color: appTheme.gray_50),
+              readOnly: !state.isCreator,
             ),
+            if (!state.isCreator) ...[
+              SizedBox(height: 12.h),
+              Text(
+                'View-only mode - Only the creator can edit this memory',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
           ],
         );
       },

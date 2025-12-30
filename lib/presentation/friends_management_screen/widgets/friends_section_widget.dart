@@ -56,6 +56,7 @@ class FriendsSectionWidget extends ConsumerWidget {
             return CustomFriendItem(
               profileImagePath: friend.profileImagePath ?? '',
               userName: friend.displayName ?? friend.userName ?? '',
+              onTap: () => _navigateToUserProfile(context, friend.id),
               onActionTap: () {
                 _showRemoveFriendConfirmation(
                     context,
@@ -68,6 +69,15 @@ class FriendsSectionWidget extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  void _navigateToUserProfile(BuildContext context, String? userId) {
+    if (userId != null && userId.isNotEmpty) {
+      NavigatorService.pushNamed(
+        AppRoutes.appProfileUser,
+        arguments: userId,
+      );
+    }
   }
 
   void _showRemoveFriendConfirmation(BuildContext context, WidgetRef ref,

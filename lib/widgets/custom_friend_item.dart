@@ -17,6 +17,7 @@ class CustomFriendItem extends StatelessWidget {
     this.statusText,
     this.onActionTap,
     this.onProfileTap,
+    this.onTap,
     this.backgroundColor,
     this.margin,
   }) : super(key: key);
@@ -36,6 +37,9 @@ class CustomFriendItem extends StatelessWidget {
   /// Callback function when profile image is tapped
   final VoidCallback? onProfileTap;
 
+  /// Callback function when the entire item is tapped
+  final VoidCallback? onTap;
+
   /// Background color of the item container
   final Color? backgroundColor;
 
@@ -44,69 +48,72 @@ class CustomFriendItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: margin,
-      padding: EdgeInsets.symmetric(vertical: 6.h),
-      decoration: BoxDecoration(
-        color: backgroundColor ?? Color(0xFF151319),
-        borderRadius: BorderRadius.circular(12.h),
-      ),
-      child: Row(
-        children: [
-          // Profile Image with proper circular clipping
-          GestureDetector(
-            onTap: onProfileTap,
-            child: Container(
-              margin: EdgeInsets.only(left: 16.h),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24.h),
-                child: CustomImageView(
-                  imagePath: profileImagePath.isNotEmpty
-                      ? profileImagePath
-                      : ImageConstant.imgEllipse842x42,
-                  height: 48.h,
-                  width: 48.h,
-                  fit: BoxFit.cover,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: margin,
+        padding: EdgeInsets.symmetric(vertical: 6.h),
+        decoration: BoxDecoration(
+          color: backgroundColor ?? Color(0xFF151319),
+          borderRadius: BorderRadius.circular(12.h),
+        ),
+        child: Row(
+          children: [
+            // Profile Image with proper circular clipping
+            GestureDetector(
+              onTap: onProfileTap ?? onTap,
+              child: Container(
+                margin: EdgeInsets.only(left: 16.h),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24.h),
+                  child: CustomImageView(
+                    imagePath: profileImagePath.isNotEmpty
+                        ? profileImagePath
+                        : ImageConstant.imgEllipse842x42,
+                    height: 48.h,
+                    width: 48.h,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // User Name
-          Expanded(
-            child: Container(
-              margin: EdgeInsets.only(left: 16.h),
-              child: Text(
-                userName,
-                style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
+            // User Name
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.only(left: 16.h),
+                child: Text(
+                  userName,
+                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                ),
               ),
             ),
-          ),
 
-          // Status Button (if status text is provided)
-          if (statusText != null) ...[
-            CustomButton(
-              text: statusText!,
-              buttonStyle: CustomButtonStyle.fillDark,
-              buttonTextStyle: CustomButtonTextStyle.bodySmallPrimary,
-              padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 2.h),
+            // Status Button (if status text is provided)
+            if (statusText != null) ...[
+              CustomButton(
+                text: statusText!,
+                buttonStyle: CustomButtonStyle.fillDark,
+                buttonTextStyle: CustomButtonTextStyle.bodySmallPrimary,
+                padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 2.h),
+              ),
+            ],
+
+            // Action Icon Button
+            Container(
+              margin: EdgeInsets.only(left: 16.h, right: 14.h),
+              child: CustomIconButton(
+                iconPath: ImageConstant.imgIconBlueGray30028x28,
+                height: 28.h,
+                width: 28.h,
+                padding: EdgeInsets.all(2.h),
+                backgroundColor: appTheme.transparentCustom,
+                onTap: onActionTap,
+              ),
             ),
           ],
-
-          // Action Icon Button
-          Container(
-            margin: EdgeInsets.only(left: 16.h, right: 14.h),
-            child: CustomIconButton(
-              iconPath: ImageConstant.imgIconBlueGray30028x28,
-              height: 28.h,
-              width: 28.h,
-              padding: EdgeInsets.all(2.h),
-              backgroundColor: appTheme.transparentCustom,
-              onTap: onActionTap,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

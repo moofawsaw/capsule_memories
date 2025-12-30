@@ -106,15 +106,6 @@ class QRCodeShareScreenTwoScreenState
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 116.h,
-              height: 12.h,
-              decoration: BoxDecoration(
-                color: appTheme.color3BD81E,
-                borderRadius: BorderRadius.circular(6.h),
-              ),
-            ),
-            SizedBox(height: 20.h),
             CustomNotificationCard(
               iconPath: ImageConstant.imgFrameDeepPurpleA100,
               title:

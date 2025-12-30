@@ -1,4 +1,5 @@
 import '../../core/app_export.dart';
+import '../../services/blocked_users_service.dart';
 import '../../widgets/custom_about_settings.dart';
 import '../../widgets/custom_account_settings.dart';
 import '../../widgets/custom_blocked_users_settings.dart';
@@ -19,6 +20,83 @@ class NotificationSettingsScreen extends ConsumerStatefulWidget {
 
 class NotificationSettingsScreenState
     extends ConsumerState<NotificationSettingsScreen> {
+  final BlockedUsersService _blockedUsersService = BlockedUsersService();
+  List<Map<String, dynamic>> _blockedUsers = [];
+  bool _isLoadingBlockedUsers = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBlockedUsers();
+  }
+
+  Future<void> _loadBlockedUsers() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoadingBlockedUsers = true;
+    });
+
+    try {
+      final users = await _blockedUsersService.getBlockedUsers();
+      if (mounted) {
+        setState(() {
+          _blockedUsers = users;
+          _isLoadingBlockedUsers = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading blocked users: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingBlockedUsers = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleUnblockUser(String userId, String username) async {
+    try {
+      final success = await _blockedUsersService.unblockUser(userId);
+
+      if (success && mounted) {
+        // Remove from local list immediately for better UX
+        setState(() {
+          _blockedUsers.removeWhere((user) => user['user_id'] == userId);
+        });
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$username has been unblocked'),
+            backgroundColor: appTheme.color3BD81E,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else if (mounted) {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to unblock user'),
+            backgroundColor: appTheme.red_500,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error unblocking user: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('An error occurred'),
+            backgroundColor: appTheme.red_500,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -265,17 +343,22 @@ class NotificationSettingsScreenState
 
   /// Section Widget - Blocked Users
   Widget _buildBlockedUsersSettings(BuildContext context) {
+    final blockedUserItems = _blockedUsers.map((user) {
+      return BlockedUserItem(
+        username: user['display_name'] ?? user['username'] ?? 'Unknown',
+        avatarUrl: user['avatar_url'] ?? '',
+        onUnblock: () => _showUnblockUserWarning(
+          context,
+          user['user_id'] as String,
+          user['display_name'] ?? user['username'] ?? 'this user',
+        ),
+      );
+    }).toList();
+
     return CustomBlockedUsersSettings(
       headerIcon: ImageConstant.imgIcon3,
       headerTitle: 'Blocked Users',
-      blockedUsers: [
-        BlockedUserItem(
-          username: 'Sarah Smith',
-          avatarUrl:
-              'https://images.unsplash.com/photo-1494790108377-be9c29b29330',
-          onUnblock: () => _showUnblockUserWarning(context, 'Sarah Smith'),
-        ),
-      ],
+      blockedUsers: _isLoadingBlockedUsers ? null : blockedUserItems,
     );
   }
 
@@ -375,7 +458,8 @@ class NotificationSettingsScreenState
   }
 
   /// Shows warning modal for unblocking user
-  void _showUnblockUserWarning(BuildContext context, String username) {
+  void _showUnblockUserWarning(
+      BuildContext context, String userId, String username) {
     CustomWarningModal.show(
       context: context,
       title: 'Unblock User?',
@@ -385,8 +469,7 @@ class NotificationSettingsScreenState
       confirmButtonColor: appTheme.color3BD81E,
       icon: Icons.person_add_rounded,
       onConfirm: () {
-        // Handle unblock user action
-        // TODO: Implement unblock user logic
+        _handleUnblockUser(userId, username);
       },
     );
   }

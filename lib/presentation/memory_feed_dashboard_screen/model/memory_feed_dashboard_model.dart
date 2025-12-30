@@ -5,28 +5,41 @@ class MemoryFeedDashboardModel extends Equatable {
   final List<HappeningNowStoryData>? happeningNowStories;
   final List<CustomMemoryItem>? publicMemories;
   final List<HappeningNowStoryData>? trendingStories;
+  final List<HappeningNowStoryData>? longestStreakStories;
+  final List<HappeningNowStoryData>? popularUserStories;
 
   MemoryFeedDashboardModel({
     this.happeningNowStories,
     this.publicMemories,
     this.trendingStories,
+    this.longestStreakStories,
+    this.popularUserStories,
   });
 
   MemoryFeedDashboardModel copyWith({
     List<HappeningNowStoryData>? happeningNowStories,
     List<CustomMemoryItem>? publicMemories,
     List<HappeningNowStoryData>? trendingStories,
+    List<HappeningNowStoryData>? longestStreakStories,
+    List<HappeningNowStoryData>? popularUserStories,
   }) {
     return MemoryFeedDashboardModel(
       happeningNowStories: happeningNowStories ?? this.happeningNowStories,
       publicMemories: publicMemories ?? this.publicMemories,
       trendingStories: trendingStories ?? this.trendingStories,
+      longestStreakStories: longestStreakStories ?? this.longestStreakStories,
+      popularUserStories: popularUserStories ?? this.popularUserStories,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [happeningNowStories, publicMemories, trendingStories];
+  List<Object?> get props => [
+        happeningNowStories,
+        publicMemories,
+        trendingStories,
+        longestStreakStories,
+        popularUserStories
+      ];
 }
 
 /// Data model for happening now stories and trending stories

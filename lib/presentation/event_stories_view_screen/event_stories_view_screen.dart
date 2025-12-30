@@ -523,6 +523,9 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
   @override
   void dispose() {
+    // CRITICAL: Stop video playback IMMEDIATELY before disposal
+    _videoController?.pause();
+
     _timerController?.dispose();
     _videoController?.dispose();
     _pageController?.dispose();
@@ -588,7 +591,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
             _dragCurrentY = details.globalPosition.dy;
           });
         },
-        onVerticalDragEnd: (details) {
+        onVerticalDragEnd: (details) async {
           final dragDistance = _dragCurrentY - _dragStartY;
           final velocity = details.primaryVelocity ?? 0;
 
@@ -596,6 +599,10 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
           if (dragDistance > 100 || velocity > 500) {
             // Trigger vibration on swipe down gesture
             _triggerHapticFeedback(HapticFeedbackType.medium);
+
+            // CRITICAL FIX: Stop and dispose video BEFORE navigation
+            await _stopAndDisposeVideo();
+
             Navigator.of(context).pop();
           }
 
@@ -642,6 +649,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                   ),
                   // Volume control positioned ABOVE tap zones
                   _buildVolumeControl(),
+                  // Explicitly position tappable user profile section on top layer
+                  _buildTappableUserProfile(),
                 ],
               );
             },
@@ -657,7 +666,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       child: Column(
         children: [
           // Reserve space for header (timer bars + top bar) - no tap detection here
-          SizedBox(height: 100.h),
+          SizedBox(
+              height: 120.h), // Increased from 100.h to fully clear header area
           // Tap zones only cover content area below header
           Expanded(
             child: GestureDetector(
@@ -895,12 +905,82 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     );
   }
 
-  Widget _buildTopBar() {
+  /// Builds tappable user profile section positioned on top layer to ensure tap detection
+  Widget _buildTappableUserProfile() {
     final userName = _storyData?['user_name'] as String? ?? 'Unknown User';
     final userAvatar = _storyData?['user_avatar'] as String?;
-    final createdAt = _storyData?['created_at'] as String? ?? '';
-    final timeAgo = _formatTimeAgo(createdAt);
+    final userId = _storyData?['user_id'] as String?;
 
+    return Positioned(
+      top: MediaQuery.of(context).padding.top +
+          20.h, // Position below timer bars
+      left: 68
+          .h, // Position after back button (40.h width + 16.h padding + 12.h gap)
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          print('🔍 DEBUG: User profile tapped - userId: $userId');
+          if (userId != null && userId.isNotEmpty) {
+            Navigator.pushNamed(
+              context,
+              AppRoutes.appProfileUser,
+              arguments: userId,
+            );
+          } else {
+            print('⚠️ WARNING: userId is null or empty, cannot navigate');
+          }
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40.h,
+                height: 40.h,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: appTheme.whiteCustom, width: 2),
+                ),
+                child: ClipOval(
+                  child: CustomImageView(
+                    imagePath: userAvatar ?? ImageConstant.imgEllipse842x42,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              SizedBox(width: 12.h),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 180.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      userName,
+                      style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                          .copyWith(color: appTheme.whiteCustom),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      _formatTimeAgo(
+                          _storyData?['created_at'] as String? ?? ''),
+                      style: TextStyleHelper
+                          .instance.body14RegularPlusJakartaSans
+                          .copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
       child: Row(
@@ -912,48 +992,17 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
             height: 40.h,
             width: 40.h,
             padding: EdgeInsets.all(10.h),
-            onTap: () {
+            onTap: () async {
+              // CRITICAL FIX: Stop and dispose video BEFORE navigation
+              await _stopAndDisposeVideo();
+
               // Close modal route if opened as modal, otherwise pop normally
               if (ModalRoute.of(context)?.isActive == true) {
                 Navigator.of(context).pop();
               }
             },
           ),
-          SizedBox(width: 12.h),
-          Container(
-            width: 40.h,
-            height: 40.h,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: appTheme.whiteCustom, width: 2),
-            ),
-            child: ClipOval(
-              child: CustomImageView(
-                imagePath: userAvatar ?? ImageConstant.imgEllipse842x42,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-          SizedBox(width: 12.h),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  userName,
-                  style: TextStyleHelper.instance.body16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.whiteCustom),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  timeAgo,
-                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                      .copyWith(color: Colors.white70),
-                ),
-              ],
-            ),
-          ),
+          Spacer(),
           CustomIconButton(
             iconPath: ImageConstant.imgIcon,
             backgroundColor: appTheme.blackCustom.withAlpha(128),
@@ -1082,6 +1131,29 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         ),
       ),
     );
+  }
+
+  /// NEW METHOD: Properly stops and disposes video controller
+  Future<void> _stopAndDisposeVideo() async {
+    try {
+      // Stop playback immediately
+      if (_videoController != null) {
+        await _videoController!.pause();
+        await _videoController!.seekTo(Duration.zero); // Reset video position
+
+        // Dispose controller
+        await _videoController!.dispose();
+        _videoController = null;
+        _isVideoInitialized = false;
+      }
+
+      // Stop timer
+      _timerController?.stop();
+      _timerController?.reset();
+    } catch (e) {
+      print('⚠️ WARNING: Error stopping video: $e');
+      // Continue with navigation even if there's an error
+    }
   }
 
   void _showMoreOptions() {

@@ -146,15 +146,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
       ref.listen(createGroupNotifier, (previous, current) {
         if (current.isSuccess ?? false) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Group created successfully!'),
-              backgroundColor: appTheme.colorFF52D1));
           NavigatorService.goBack();
-        } else if (current.isSuccess == false &&
-            (previous?.isLoading ?? false)) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Failed to create group. Please try again.'),
-              backgroundColor: Colors.red));
         }
       });
 

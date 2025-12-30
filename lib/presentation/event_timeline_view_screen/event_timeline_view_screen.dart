@@ -4,7 +4,6 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_story_list.dart';
-import '../../widgets/custom_story_progress.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import '../qr_timeline_share_screen/qr_timeline_share_screen.dart';
@@ -47,11 +46,22 @@ class EventTimelineViewScreenState
       // Validate arguments before proceeding
       if (navArgs == null || !navArgs.isValid) {
         print('❌ TIMELINE SCREEN: Missing or invalid memory ID');
+        print('   - Redirecting to memories list...');
 
-        // Show error state immediately - NEVER fall back to dummy data
-        ref.read(eventTimelineViewNotifier.notifier).setErrorState(
-              'Unable to load memory. Invalid navigation arguments.',
+        // Redirect to memories list if no memory ID provided
+        // This handles cases where user navigates directly to /app/timeline
+        Future.delayed(Duration(milliseconds: 100), () {
+          if (mounted) {
+            NavigatorService.popAndPushNamed(AppRoutes.appMemories);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Please select a memory to view its timeline'),
+                backgroundColor: appTheme.deep_purple_A100,
+                duration: Duration(seconds: 3),
+              ),
             );
+          }
+        });
         return;
       }
 
@@ -284,20 +294,7 @@ class EventTimelineViewScreenState
 
   /// Section Widget
   Widget _buildStoryProgress(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 32.h),
-      child: CustomStoryProgress(
-        mainImagePath: ImageConstant.imgImage9,
-        progressValue: 0.6,
-        profileImagePath: ImageConstant.imgEllipse826x26,
-        actionIconPath: ImageConstant.imgFrame19,
-        showOverlayControls: true,
-        overlayIconPath: ImageConstant.imgImagesmode,
-        onActionTap: () {
-          onTapHangoutCall(context);
-        },
-      ),
-    );
+    return SizedBox();
   }
 
   /// Section Widget

@@ -39,7 +39,9 @@ class CustomBlockedUsersSettings extends StatelessWidget {
         children: [
           _buildHeader(),
           SizedBox(height: 24.h),
-          _buildBlockedUsersList(),
+          blockedUsers == null
+              ? _buildLoadingState()
+              : _buildBlockedUsersList(),
         ],
       ),
     );
@@ -61,6 +63,23 @@ class CustomBlockedUsersSettings extends StatelessWidget {
               .copyWith(color: appTheme.gray_50),
         ),
       ],
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 20.h),
+      child: Center(
+        child: SizedBox(
+          width: 24.h,
+          height: 24.h,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor:
+                AlwaysStoppedAnimation<Color>(appTheme.deep_purple_A100),
+          ),
+        ),
+      ),
     );
   }
 
@@ -87,12 +106,34 @@ class CustomBlockedUsersSettings extends StatelessWidget {
           margin: EdgeInsets.only(bottom: index < users.length - 1 ? 16.h : 0),
           child: Row(
             children: [
-              CustomImageView(
-                imagePath: user.avatarUrl,
-                height: 42.h,
-                width: 42.h,
-                radius: BorderRadius.circular(21.h),
-              ),
+              // User avatar with fallback
+              user.avatarUrl.isNotEmpty
+                  ? CustomImageView(
+                      imagePath: user.avatarUrl,
+                      height: 42.h,
+                      width: 42.h,
+                      radius: BorderRadius.circular(21.h),
+                    )
+                  : Container(
+                      width: 42.h,
+                      height: 42.h,
+                      decoration: BoxDecoration(
+                        color: appTheme.deep_purple_A100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          user.username.isNotEmpty
+                              ? user.username[0].toUpperCase()
+                              : 'U',
+                          style: TextStyle(
+                            color: appTheme.white_A700,
+                            fontSize: 18.h,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
               SizedBox(width: 12.h),
               Expanded(
                 child: Text(

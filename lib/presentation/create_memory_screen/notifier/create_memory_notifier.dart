@@ -36,15 +36,35 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         isPublic: true,
         memoryName: null,
         selectedGroup: null,
+        selectedCategory: null,
         searchQuery: null,
         searchResults: [],
         invitedUserIds: {},
         groupMembers: [],
         availableGroups: [],
+        availableCategories: [],
       ),
     );
-    // Fetch available groups on initialization
+    // Fetch available groups and categories on initialization
     _fetchAvailableGroups();
+    _fetchAvailableCategories();
+  }
+
+  /// NEW: Initialize with pre-selected category
+  void initializeWithCategory(String categoryId) {
+    // Wait for categories to be loaded before setting selection
+    Future.delayed(Duration(milliseconds: 100), () {
+      final categories = state.createMemoryModel?.availableCategories ?? [];
+      final categoryExists = categories.any((cat) => cat['id'] == categoryId);
+
+      if (categoryExists) {
+        state = state.copyWith(
+          createMemoryModel: state.createMemoryModel?.copyWith(
+            selectedCategory: categoryId,
+          ),
+        );
+      }
+    });
   }
 
   /// Fetch available groups from Supabase
@@ -62,12 +82,52 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     }
   }
 
+  /// NEW: Fetch available categories from Supabase
+  Future<void> _fetchAvailableCategories() async {
+    try {
+      final supabase = SupabaseService.instance.client;
+      if (supabase == null) return;
+
+      final response = await supabase
+          .from('memory_categories')
+          .select('id, name, tagline, icon_name, icon_url')
+          .eq('is_active', true)
+          .order('display_order', ascending: true);
+
+      final categories = (response as List)
+          .map<Map<String, dynamic>>((category) => {
+                'id': category['id'] as String,
+                'name': category['name'] as String,
+                'tagline': category['tagline'] as String?,
+                'icon_name': category['icon_name'] as String?,
+                'icon_url': category['icon_url'] as String?,
+              })
+          .toList();
+
+      state = state.copyWith(
+        createMemoryModel: state.createMemoryModel?.copyWith(
+          availableCategories: categories,
+        ),
+      );
+    } catch (e) {
+      print('Error fetching categories: $e');
+    }
+  }
+
   String? validateMemoryName(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Memory name is required';
     }
     if (value.trim().length < 3) {
       return 'Memory name must be at least 3 characters';
+    }
+    return null;
+  }
+
+  /// NEW: Validate category selection
+  String? validateCategory(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please select a category';
     }
     return null;
   }
@@ -80,8 +140,26 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     );
   }
 
+  /// NEW: Update selected category
+  void updateSelectedCategory(String? categoryId) {
+    state = state.copyWith(
+      createMemoryModel: state.createMemoryModel?.copyWith(
+        selectedCategory: categoryId,
+      ),
+    );
+  }
+
   void moveToStep2() {
+    // Validate memory name
     if (state.memoryNameController?.text.trim().isEmpty ?? true) {
+      return;
+    }
+
+    // Validate category selection
+    if (state.createMemoryModel?.selectedCategory == null) {
+      state = state.copyWith(
+        errorMessage: 'Please select a category for your memory',
+      );
       return;
     }
 
@@ -91,6 +169,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         memoryName: state.memoryNameController?.text.trim(),
       ),
       currentStep: 2,
+      errorMessage: null,
     );
   }
 
@@ -200,6 +279,15 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       return;
     }
 
+    // Validate category selection
+    final categoryId = state.createMemoryModel?.selectedCategory;
+    if (categoryId == null || categoryId.isEmpty) {
+      state = state.copyWith(
+        errorMessage: 'Please select a category',
+      );
+      return;
+    }
+
     // Set loading state
     state = state.copyWith(isLoading: true);
 
@@ -213,31 +301,49 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       // Get invited user IDs (from selected group members + manually invited users)
       final Set<String> invitedUserIds = {};
 
+      // Helper function to validate UUID format
+      bool isValidUUID(String? value) {
+        if (value == null || value.isEmpty) return false;
+        final uuidRegex = RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+          caseSensitive: false,
+        );
+        return uuidRegex.hasMatch(value);
+      }
+
       // Add group members if a group is selected
       if (state.createMemoryModel?.selectedGroup != null) {
         final groupMembers = state.createMemoryModel?.groupMembers ?? [];
         for (final member in groupMembers) {
           final userId = member['id'] as String?;
-          if (userId != null && userId != currentUser.id) {
+          // Only add valid UUIDs and exclude current user
+          if (userId != null && 
+              userId != currentUser.id && 
+              isValidUUID(userId)) {
             invitedUserIds.add(userId);
           }
         }
       }
 
-      // Add manually invited users
+      // Add manually invited users (filter out invalid UUIDs like mock user IDs)
       final manuallyInvited = state.createMemoryModel?.invitedUserIds ?? {};
-      invitedUserIds.addAll(manuallyInvited);
+      for (final userId in manuallyInvited) {
+        if (isValidUUID(userId) && userId != currentUser.id) {
+          invitedUserIds.add(userId);
+        }
+      }
 
       // Determine visibility
       final visibility =
           state.createMemoryModel?.isPublic == true ? 'public' : 'private';
 
-      // Create memory in database
+      // Create memory in database with category_id
       final memoryId = await _storyService.createMemory(
         title: memoryName,
         creatorId: currentUser.id,
         visibility: visibility,
         duration: '12_hours', // Default duration
+        categoryId: categoryId, // Pass category ID
         invitedUserIds: invitedUserIds.toList(),
       );
 
@@ -261,6 +367,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
           isPublic: true,
           memoryName: null,
           selectedGroup: null,
+          selectedCategory: null,
         ),
       );
 

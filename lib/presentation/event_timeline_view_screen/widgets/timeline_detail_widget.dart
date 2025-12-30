@@ -30,22 +30,26 @@ class TimelineDetailWidget extends StatelessWidget {
     return Container(
       child: Column(
         children: [
-          // Location and distance info
-          Text(
-            model?.centerLocation ?? "Tillsonburg, ON",
-            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            model?.centerDistance ?? "21km",
-            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
-          ),
+          // Only show location if real data exists
+          if (model?.centerLocation != null)
+            Text(
+              model!.centerLocation!,
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+            ),
+          if (model?.centerLocation != null) SizedBox(height: 4.h),
+
+          // Only show distance if real data exists
+          if (model?.centerDistance != null)
+            Text(
+              model!.centerDistance!,
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+            ),
 
           SizedBox(height: 24.h),
 
-          // Timeline with positioned story cards
+          // Timeline with positioned story cards - dynamic widget using database data
           if (model?.timelineStories != null &&
               model!.timelineStories!.isNotEmpty)
             TimelineStoryWidget(

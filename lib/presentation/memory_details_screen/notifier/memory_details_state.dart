@@ -1,57 +1,61 @@
 part of 'memory_details_notifier.dart';
 
-class MemoryDetailsState extends Equatable {
+class MemoryDetailsState {
+  final MemoryDetailsModel? memoryDetailsModel;
   final TextEditingController? titleController;
   final TextEditingController? inviteLinkController;
-  final bool? isPublic;
-  final bool? showSuccessMessage;
-  final String? successMessage;
+  final bool isPublic;
   final bool isSaving;
   final bool isSharing;
-  final MemoryDetailsModel? memoryDetailsModel;
+  final bool showSuccessMessage;
+  final String? successMessage;
+  final bool isLoading;
+  final String? errorMessage;
+  final bool isCreator;
+  final String? memoryId;
 
   MemoryDetailsState({
+    this.memoryDetailsModel,
     this.titleController,
     this.inviteLinkController,
-    this.isPublic = true,
-    this.showSuccessMessage = false,
-    this.successMessage,
+    this.isPublic = false,
     this.isSaving = false,
     this.isSharing = false,
-    this.memoryDetailsModel,
+    this.showSuccessMessage = false,
+    this.successMessage,
+    this.isLoading = false,
+    this.errorMessage,
+    this.isCreator = false,
+    this.memoryId,
   });
 
-  @override
-  List<Object?> get props => [
-        titleController,
-        inviteLinkController,
-        isPublic,
-        showSuccessMessage,
-        successMessage,
-        isSaving,
-        isSharing,
-        memoryDetailsModel,
-      ];
-
   MemoryDetailsState copyWith({
+    MemoryDetailsModel? memoryDetailsModel,
     TextEditingController? titleController,
     TextEditingController? inviteLinkController,
     bool? isPublic,
-    bool? showSuccessMessage,
-    String? successMessage,
     bool? isSaving,
     bool? isSharing,
-    MemoryDetailsModel? memoryDetailsModel,
+    bool? showSuccessMessage,
+    String? successMessage,
+    bool? isLoading,
+    String? errorMessage,
+    bool? isCreator,
+    String? memoryId,
   }) {
     return MemoryDetailsState(
+      memoryDetailsModel: memoryDetailsModel ?? this.memoryDetailsModel,
       titleController: titleController ?? this.titleController,
       inviteLinkController: inviteLinkController ?? this.inviteLinkController,
       isPublic: isPublic ?? this.isPublic,
-      showSuccessMessage: showSuccessMessage ?? this.showSuccessMessage,
-      successMessage: successMessage ?? this.successMessage,
       isSaving: isSaving ?? this.isSaving,
       isSharing: isSharing ?? this.isSharing,
-      memoryDetailsModel: memoryDetailsModel ?? this.memoryDetailsModel,
+      showSuccessMessage: showSuccessMessage ?? this.showSuccessMessage,
+      successMessage: successMessage ?? this.successMessage,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage ?? this.errorMessage,
+      isCreator: isCreator ?? this.isCreator,
+      memoryId: memoryId ?? this.memoryId,
     );
   }
 }

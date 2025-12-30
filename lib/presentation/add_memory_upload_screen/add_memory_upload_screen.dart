@@ -68,14 +68,6 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
 
         return Column(
           children: [
-            Container(
-              width: 116.h,
-              height: 12.h,
-              decoration: BoxDecoration(
-                color: appTheme.color3BD81E,
-                borderRadius: BorderRadius.circular(6.h),
-              ),
-            ),
             CustomHeaderSection(
               title: 'Add to Memory',
               description:

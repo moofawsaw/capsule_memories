@@ -31,14 +31,6 @@ class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(height: 12.h),
-              Container(
-                width: 116.h,
-                height: 12.h,
-                decoration: BoxDecoration(
-                  color: appTheme.background_transparent,
-                  borderRadius: BorderRadius.circular(6.h),
-                ),
-              ),
               _buildAppInfoSection(context),
               _buildQRCodeSection(context),
               _buildShareButton(context),

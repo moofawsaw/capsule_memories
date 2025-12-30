@@ -3,10 +3,12 @@ import '../../widgets/custom_icon_button_row.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
 import '../qr_code_share_screen_two_screen/qr_code_share_screen_two_screen.dart';
+import './notifier/friends_management_notifier.dart';
+import './widgets/camera_scanner_screen.dart';
 import './widgets/friends_section_widget.dart';
 import './widgets/incoming_requests_section_widget.dart';
 import './widgets/sent_requests_section_widget.dart';
-import 'notifier/friends_management_notifier.dart';
+import './widgets/user_search_results_widget.dart';
 
 class FriendsManagementScreen extends ConsumerStatefulWidget {
   const FriendsManagementScreen({Key? key}) : super(key: key);
@@ -26,7 +28,36 @@ class FriendsManagementScreenState
   }
 
   @override
+  void dispose() {
+    // Clean up camera when leaving screen
+    ref.read(friendsManagementNotifier.notifier).closeCamera();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Listen to camera permission status and show dialogs
+    ref.listen<FriendsManagementState>(
+      friendsManagementNotifier,
+      (previous, next) {
+        if (next.cameraPermissionStatus ==
+                CameraPermissionStatus.permanentlyDenied &&
+            previous?.cameraPermissionStatus !=
+                CameraPermissionStatus.permanentlyDenied) {
+          _showPermissionDeniedDialog(context);
+        }
+
+        if (next.isCameraActive == true && previous?.isCameraActive != true) {
+          _openCameraScanner(context);
+        }
+
+        if (next.errorMessage != null &&
+            next.errorMessage != previous?.errorMessage) {
+          _showErrorSnackBar(context, next.errorMessage!);
+        }
+      },
+    );
+
     return SafeArea(
         child: Scaffold(
             backgroundColor: appTheme.gray_900_02,
@@ -43,20 +74,30 @@ class FriendsManagementScreenState
 
   /// Main content section with friends management
   Widget _buildMainContentSection(BuildContext context) {
-    return Container(
-        margin:
-            EdgeInsets.only(left: 16.h, top: 24.h, right: 20.h, bottom: 14.h),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _buildFriendsHeaderSection(context),
-          SizedBox(height: 16.h),
-          _buildSearchSection(context),
-          SizedBox(height: 20.h),
-          FriendsSectionWidget(),
-          SizedBox(height: 20.h),
-          SentRequestsSectionWidget(),
-          SizedBox(height: 20.h),
-          IncomingRequestsSectionWidget(),
-        ]));
+    return Consumer(builder: (context, ref, _) {
+      final state = ref.watch(friendsManagementNotifier);
+      final isSearching = (state.searchQuery?.isNotEmpty ?? false);
+
+      return Container(
+          margin:
+              EdgeInsets.only(left: 16.h, top: 24.h, right: 20.h, bottom: 14.h),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _buildFriendsHeaderSection(context),
+            SizedBox(height: 16.h),
+            _buildSearchSection(context),
+            SizedBox(height: 20.h),
+            if (isSearching) ...[
+              UserSearchResultsWidget(),
+            ] else ...[
+              FriendsSectionWidget(),
+              SizedBox(height: 20.h),
+              SentRequestsSectionWidget(),
+              SizedBox(height: 20.h),
+              IncomingRequestsSectionWidget(),
+            ]
+          ]));
+    });
   }
 
   /// Friends header with count and action buttons
@@ -150,5 +191,66 @@ class FriendsManagementScreenState
   /// Handle camera action
   void onTapCameraButton(BuildContext context) {
     ref.read(friendsManagementNotifier.notifier).onCameraTap();
+  }
+
+  /// Show permission denied dialog
+  void _showPermissionDeniedDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: appTheme.gray_900_01,
+        title: Text(
+          'Camera Permission Required',
+          style: TextStyleHelper.instance.title16BoldPlusJakartaSans,
+        ),
+        content: Text(
+          'Camera permission is required to scan QR codes. Please enable it in app settings.',
+          style: TextStyleHelper.instance.body14MediumPlusJakartaSans,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyleHelper.instance.body14Regular,
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(friendsManagementNotifier.notifier).openAppSettings();
+            },
+            child: Text(
+              'Open Settings',
+              style: TextStyleHelper.instance.body14Bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Open camera scanner
+  void _openCameraScanner(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CameraScannerScreen(),
+      ),
+    ).then((_) {
+      // Close camera when returning
+      ref.read(friendsManagementNotifier.notifier).closeCamera();
+    });
+  }
+
+  /// Show error snackbar
+  void _showErrorSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: appTheme.red_500,
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 }

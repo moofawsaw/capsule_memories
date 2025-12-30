@@ -42,19 +42,26 @@ class CustomStoryList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: margin ?? EdgeInsets.only(top: 18.h, left: 20.h),
+      margin: margin,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: List.generate(
-            storyItems.length,
-            (index) => Container(
-              margin: EdgeInsets.only(
-                right: index < storyItems.length - 1 ? (itemGap ?? 8.h) : 0,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Add left padding to first item
+            SizedBox(width: 20.h),
+            ...List.generate(
+              storyItems.length,
+              (index) => Container(
+                margin: EdgeInsets.only(
+                  right: itemGap ?? 8.h,
+                ),
+                child: _buildStoryItem(context, storyItems[index], index),
               ),
-              child: _buildStoryItem(context, storyItems[index], index),
             ),
-          ),
+            // Add right padding to last item
+            SizedBox(width: 12.h),
+          ],
         ),
       ),
     );

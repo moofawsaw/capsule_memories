@@ -1,7 +1,6 @@
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/app_export.dart';
-import '../../../core/utils/image_constant.dart';
 import '../../../services/avatar_helper_service.dart';
 import '../../../services/blocked_users_service.dart';
 import '../../../services/follows_service.dart';
@@ -206,6 +205,21 @@ class UserProfileScreenTwoNotifier
     }
   }
 
+  /// Unfriends the target user
+  Future<void> unfriendUser() async {
+    final targetUserId = state.targetUserId;
+    if (targetUserId == null) return;
+
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    if (currentUser == null) return;
+
+    final success =
+        await _friendsService.unfriendUser(currentUser.id, targetUserId);
+    if (success) {
+      state = state.copyWith(isFriend: false);
+    }
+  }
+
   Future<void> toggleBlock() async {
     final targetUserId = state.targetUserId;
     if (targetUserId == null) return;
@@ -286,14 +300,6 @@ class UserProfileScreenTwoNotifier
               isUploading: false,
             );
 
-            // 🔥 CRITICAL: Broadcast avatar update to all widgets across the app
-            // Remove ref.read - ref is not available in this context
-            // final avatarNotifier = ref.read(avatarStateProvider.notifier);
-            // avatarNotifier.updateAvatar(
-            //   signedUrl,
-            //   userEmail: state.userProfileScreenTwoModel?.email,
-            // );
-
             print('✅ Avatar updated successfully');
           }
         }
@@ -303,6 +309,39 @@ class UserProfileScreenTwoNotifier
     } catch (e) {
       print('❌ Error uploading avatar: $e');
       state = state.copyWith(isUploading: false);
+    }
+  }
+
+  /// Update username in Supabase and local state
+  Future<void> updateUsername(String newUsername) async {
+    try {
+      // Validate username
+      if (newUsername.trim().isEmpty) {
+        print('⚠️ Username cannot be empty');
+        return;
+      }
+
+      final trimmedUsername = newUsername.trim();
+
+      // Update in database
+      final success = await UserProfileService.instance.updateUserProfile(
+        displayName: trimmedUsername,
+      );
+
+      if (success) {
+        // Update local state
+        state = state.copyWith(
+          userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
+            userName: trimmedUsername,
+          ),
+        );
+
+        print('✅ Username updated successfully to: $trimmedUsername');
+      } else {
+        print('❌ Failed to update username in database');
+      }
+    } catch (e) {
+      print('❌ Error updating username: $e');
     }
   }
 

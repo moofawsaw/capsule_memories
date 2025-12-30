@@ -380,6 +380,24 @@ class FriendsService {
     }
   }
 
+  /// Unfriends a user by their user ID (removes bidirectional friendship)
+  Future<bool> unfriendUser(String currentUserId, String friendUserId) async {
+    try {
+      if (_supabase == null) {
+        throw Exception('Supabase not initialized');
+      }
+
+      // Delete both friendship records (bidirectional)
+      await _supabase!.from('friends').delete().or(
+          'and(user_id.eq.$currentUserId,friend_id.eq.$friendUserId),and(user_id.eq.$friendUserId,friend_id.eq.$currentUserId)');
+
+      return true;
+    } catch (e) {
+      debugPrint('Error unfriending user: $e');
+      return false;
+    }
+  }
+
   /// Checks if two users are friends
   Future<bool> areFriends(String userId1, String userId2) async {
     try {
@@ -435,6 +453,114 @@ class FriendsService {
     } catch (e) {
       debugPrint('Error sending friend request: $e');
       return false;
+    }
+  }
+
+  /// Searches for all users in the database by username or display name
+  Future<List<Map<String, dynamic>>> searchAllUsers(String query) async {
+    try {
+      if (_supabase == null) {
+        throw Exception('Supabase not initialized');
+      }
+
+      final currentUserId = _supabase!.auth.currentUser?.id;
+
+      if (currentUserId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      if (query.isEmpty) {
+        return [];
+      }
+
+      // Search users by username or display_name, excluding current user
+      final response = await _supabase!
+          .from('user_profiles')
+          .select('id, username, display_name, avatar_url, bio')
+          .neq('id', currentUserId)
+          .or('username.ilike.%$query%,display_name.ilike.%$query%')
+          .limit(20);
+
+      // Transform results with proper avatar URL conversion
+      return (response as List).map((user) {
+        final avatarPath = user['avatar_url'];
+        String avatarUrl = '';
+
+        if (avatarPath != null && avatarPath.isNotEmpty) {
+          if (avatarPath.startsWith('http://') ||
+              avatarPath.startsWith('https://')) {
+            avatarUrl = avatarPath;
+          } else {
+            try {
+              final cleanPath = avatarPath.startsWith('/')
+                  ? avatarPath.substring(1)
+                  : avatarPath;
+              avatarUrl =
+                  _supabase!.storage.from('avatars').getPublicUrl(cleanPath);
+            } catch (e) {
+              debugPrint('Error generating avatar URL: $e');
+            }
+          }
+        }
+
+        return {
+          'id': user['id'],
+          'username': user['username'],
+          'display_name': user['display_name'],
+          'avatar_url': avatarUrl,
+          'bio': user['bio'],
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Error searching users: $e');
+      return [];
+    }
+  }
+
+  /// Gets friendship status between current user and another user
+  Future<String> getFriendshipStatus(String otherUserId) async {
+    try {
+      if (_supabase == null) return 'none';
+
+      final currentUserId = _supabase!.auth.currentUser?.id;
+
+      if (currentUserId == null) return 'none';
+
+      // Check if already friends
+      final friendCheck = await _supabase!
+          .from('friends')
+          .select('id')
+          .or('and(user_id.eq.$currentUserId,friend_id.eq.$otherUserId),and(user_id.eq.$otherUserId,friend_id.eq.$currentUserId)')
+          .maybeSingle();
+
+      if (friendCheck != null) return 'friends';
+
+      // Check if pending request sent
+      final sentRequestCheck = await _supabase!
+          .from('friend_requests')
+          .select('id')
+          .eq('sender_id', currentUserId)
+          .eq('receiver_id', otherUserId)
+          .eq('status', 'pending')
+          .maybeSingle();
+
+      if (sentRequestCheck != null) return 'request_sent';
+
+      // Check if pending request received
+      final receivedRequestCheck = await _supabase!
+          .from('friend_requests')
+          .select('id')
+          .eq('sender_id', otherUserId)
+          .eq('receiver_id', currentUserId)
+          .eq('status', 'pending')
+          .maybeSingle();
+
+      if (receivedRequestCheck != null) return 'request_received';
+
+      return 'none';
+    } catch (e) {
+      debugPrint('Error checking friendship status: $e');
+      return 'none';
     }
   }
 }

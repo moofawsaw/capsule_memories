@@ -28,6 +28,7 @@ import '../presentation/memory_details_view_screen/memory_details_view_screen.da
 import '../presentation/memory_feed_dashboard_screen/memory_feed_dashboard_screen.dart';
 import '../presentation/memory_invitation_screen/memory_invitation_screen.dart';
 import '../presentation/memory_members_screen/memory_members_screen.dart';
+import '../presentation/memory_share_options_screen/memory_share_options_screen.dart';
 import '../presentation/notification_settings_screen/notification_settings_screen.dart';
 import '../presentation/notifications_screen/notifications_screen.dart';
 import '../presentation/password_reset_screen/password_reset_screen.dart';
@@ -105,6 +106,7 @@ class AppRoutes {
   static const String splash = '/splash';
   static const String qrCodeShareScreenTwo = '/qr-code-share-screen-two';
   static const String qrTimelineShare = '/qr-timeline-share';
+  static const String memoryShareOptionsScreen = '/memory-share-options-screen';
 
   static const String initialRoute = appFeed;
 
@@ -128,7 +130,7 @@ class AppRoutes {
       case appFeed:
         return const MemoryFeedDashboardScreen();
       case appMemories:
-        return MemoriesDashboardScreen();
+        return const MemoriesDashboardScreen();
       case appProfile:
         return UserProfileScreen();
       case appProfileUser:
@@ -186,7 +188,11 @@ class AppRoutes {
       case appBsUpload:
         return AddMemoryUploadScreen();
       case appBsDetails:
-        return MemoryDetailsScreen();
+        // Add this line: Extract memoryId from route settings
+        final memoryId = NavigatorService.navigatorKey.currentContext != null
+            ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)?.settings.arguments as String?
+            : null;
+        return MemoryDetailsScreen(memoryId: memoryId ?? '');
       case appBsVibes:
         return VibeSelectionScreen();
       case appBsQrMemory:
@@ -331,6 +337,6 @@ class AppRoutes {
             memoryId: memoryId ?? '',
           );
         },
-        // All app routes are handled by onGenerateRoute
+        memoryShareOptionsScreen: (context) => const MemoryShareOptionsScreen(),
       };
 }

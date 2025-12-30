@@ -124,15 +124,6 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 116.h,
-              height: 12.h,
-              decoration: BoxDecoration(
-                color: appTheme.color3BD81E,
-                borderRadius: BorderRadius.circular(6.h),
-              ),
-            ),
-            SizedBox(height: 20.h),
             CustomQrInfoCard(
               title: model.groupName ?? "Group",
               description: model.groupDescription ?? "Scan to join",

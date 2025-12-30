@@ -157,3 +157,43 @@ class IncomingRequestModel extends Equatable {
   List<Object?> get props =>
       [id, userId, profileImagePath, userName, displayName, bio, buttonText];
 }
+
+class SearchUserModel extends Equatable {
+  SearchUserModel({
+    this.id,
+    this.profileImagePath,
+    this.userName,
+    this.displayName,
+    this.bio,
+    this.friendshipStatus = 'none',
+  });
+
+  String? id;
+  String? profileImagePath;
+  String? userName;
+  String? displayName;
+  String? bio;
+  String friendshipStatus;
+
+  SearchUserModel copyWith({
+    String? id,
+    String? profileImagePath,
+    String? userName,
+    String? displayName,
+    String? bio,
+    String? friendshipStatus,
+  }) {
+    return SearchUserModel(
+      id: id ?? this.id,
+      profileImagePath: profileImagePath ?? this.profileImagePath,
+      userName: userName ?? this.userName,
+      displayName: displayName ?? this.displayName,
+      bio: bio ?? this.bio,
+      friendshipStatus: friendshipStatus ?? this.friendshipStatus,
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, profileImagePath, userName, displayName, bio, friendshipStatus];
+}

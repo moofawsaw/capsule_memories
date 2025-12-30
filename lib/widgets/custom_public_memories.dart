@@ -58,7 +58,8 @@ class CustomPublicMemories extends StatelessWidget {
       CustomImageView(
           imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
           height: 22.h,
-          width: 22.h),
+          width: 22.h,
+          color: appTheme.deep_purple_A100),
       SizedBox(width: 8.h),
       Text(sectionTitle ?? 'Public Memories',
           style: TextStyleHelper.instance.title16BoldPlusJakartaSans

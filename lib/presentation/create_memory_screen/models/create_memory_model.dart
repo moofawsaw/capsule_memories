@@ -5,45 +5,54 @@ class CreateMemoryModel {
   String? memoryName;
   bool isPublic;
   String? selectedGroup;
+  String? selectedCategory;
   String? searchQuery;
   List<Map<String, dynamic>> searchResults;
   Set<String> invitedUserIds;
   List<Map<String, dynamic>> groupMembers;
   List<Map<String, dynamic>> availableGroups;
+  List<Map<String, dynamic>> availableCategories;
 
   CreateMemoryModel({
     this.memoryName,
     this.isPublic = true,
     this.selectedGroup,
+    this.selectedCategory,
     this.searchQuery,
     List<Map<String, dynamic>>? searchResults,
     Set<String>? invitedUserIds,
     List<Map<String, dynamic>>? groupMembers,
     List<Map<String, dynamic>>? availableGroups,
+    List<Map<String, dynamic>>? availableCategories,
   })  : searchResults = searchResults ?? [],
         invitedUserIds = invitedUserIds ?? {},
         groupMembers = groupMembers ?? [],
-        availableGroups = availableGroups ?? [];
+        availableGroups = availableGroups ?? [],
+        availableCategories = availableCategories ?? [];
 
   CreateMemoryModel copyWith({
     String? memoryName,
     bool? isPublic,
     String? selectedGroup,
+    String? selectedCategory,
     String? searchQuery,
     List<Map<String, dynamic>>? searchResults,
     Set<String>? invitedUserIds,
     List<Map<String, dynamic>>? groupMembers,
     List<Map<String, dynamic>>? availableGroups,
+    List<Map<String, dynamic>>? availableCategories,
   }) {
     return CreateMemoryModel(
       memoryName: memoryName ?? this.memoryName,
       isPublic: isPublic ?? this.isPublic,
       selectedGroup: selectedGroup ?? this.selectedGroup,
+      selectedCategory: selectedCategory ?? this.selectedCategory,
       searchQuery: searchQuery ?? this.searchQuery,
       searchResults: searchResults ?? this.searchResults,
       invitedUserIds: invitedUserIds ?? this.invitedUserIds,
       groupMembers: groupMembers ?? this.groupMembers,
       availableGroups: availableGroups ?? this.availableGroups,
+      availableCategories: availableCategories ?? this.availableCategories,
     );
   }
 

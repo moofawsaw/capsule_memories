@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/friends_management_model.dart';
 import '../../../core/app_export.dart';
 import '../../../services/friends_service.dart';
@@ -17,6 +18,7 @@ final friendsManagementNotifier = StateNotifierProvider.autoDispose<
 
 class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
   final FriendsService _friendsService = FriendsService();
+  CameraController? _cameraController;
 
   FriendsManagementNotifier(FriendsManagementState state) : super(state) {
     initialize();
@@ -108,7 +110,49 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
   void onSearchChanged(String query) {
     state = state.copyWith(searchQuery: query);
-    _filterFriends(query);
+    if (query.isEmpty) {
+      state = state.copyWith(
+        searchResults: [],
+        isSearching: false,
+      );
+      _filterFriends(query);
+    } else {
+      _searchUsers(query);
+    }
+  }
+
+  Future<void> _searchUsers(String query) async {
+    try {
+      state = state.copyWith(isSearching: true);
+
+      final usersData = await _friendsService.searchAllUsers(query);
+
+      // Get friendship status for each user
+      final searchResults = await Future.wait(
+        usersData.map((user) async {
+          final status = await _friendsService.getFriendshipStatus(user['id']);
+          return SearchUserModel(
+            id: user['id'] ?? '',
+            userName: user['username'] ?? '',
+            displayName: user['display_name'] ?? user['username'] ?? '',
+            profileImagePath: user['avatar_url'] ?? '',
+            bio: user['bio'] ?? '',
+            friendshipStatus: status,
+          );
+        }),
+      );
+
+      state = state.copyWith(
+        searchResults: searchResults,
+        isSearching: false,
+      );
+    } catch (e) {
+      debugPrint('Error searching users: $e');
+      state = state.copyWith(
+        errorMessage: 'Failed to search users',
+        isSearching: false,
+      );
+    }
   }
 
   void _filterFriends(String query) {
@@ -270,24 +314,107 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
   Future<void> onCameraTap() async {
     try {
-      final cameraStatus = await Permission.camera.request();
-      if (cameraStatus.isGranted) {
-        final cameras = await availableCameras();
-        if (cameras.isNotEmpty) {
-          state = state.copyWith(isCameraActive: true);
-          // Camera functionality would be implemented here
+      // Check if user has previously granted/denied permission
+      final prefs = await SharedPreferences.getInstance();
+      final hasAskedBefore = prefs.getBool('camera_permission_asked') ?? false;
+
+      // Request camera permission
+      PermissionStatus cameraStatus = await Permission.camera.status;
+
+      if (cameraStatus.isDenied && !hasAskedBefore) {
+        // First time asking - request permission
+        cameraStatus = await Permission.camera.request();
+        await prefs.setBool('camera_permission_asked', true);
+
+        if (cameraStatus.isGranted) {
+          await prefs.setBool('camera_permission_granted', true);
+        } else if (cameraStatus.isPermanentlyDenied) {
+          await prefs.setBool('camera_permission_permanently_denied', true);
         }
+      } else if (cameraStatus.isDenied) {
+        // User has been asked before - request again
+        cameraStatus = await Permission.camera.request();
+
+        if (cameraStatus.isGranted) {
+          await prefs.setBool('camera_permission_granted', true);
+          await prefs.setBool('camera_permission_permanently_denied', false);
+        } else if (cameraStatus.isPermanentlyDenied) {
+          await prefs.setBool('camera_permission_permanently_denied', true);
+        }
+      }
+
+      if (cameraStatus.isGranted) {
+        // Permission granted - initialize camera
+        final cameras = await availableCameras();
+        if (cameras.isEmpty) {
+          state = state.copyWith(
+            errorMessage: 'No cameras available on this device',
+          );
+          return;
+        }
+
+        // Use rear camera for scanning
+        final camera = cameras.firstWhere(
+          (cam) => cam.lensDirection == CameraLensDirection.back,
+          orElse: () => cameras.first,
+        );
+
+        _cameraController = CameraController(
+          camera,
+          ResolutionPreset.high,
+          enableAudio: false,
+        );
+
+        await _cameraController!.initialize();
+
+        state = state.copyWith(
+          isCameraActive: true,
+          cameraController: _cameraController,
+          cameraPermissionStatus: CameraPermissionStatus.granted,
+        );
+      } else if (cameraStatus.isPermanentlyDenied) {
+        // User permanently denied - show settings dialog
+        state = state.copyWith(
+          cameraPermissionStatus: CameraPermissionStatus.permanentlyDenied,
+          errorMessage:
+              'Camera permission is required for scanning. Please enable it in app settings.',
+        );
       } else {
-        state = state.copyWith(errorMessage: 'Camera permission is required');
+        // User denied permission
+        state = state.copyWith(
+          cameraPermissionStatus: CameraPermissionStatus.denied,
+          errorMessage: 'Camera permission is required to scan QR codes',
+        );
       }
     } catch (e) {
-      state = state.copyWith(errorMessage: 'Failed to open camera');
+      debugPrint('Error opening camera: $e');
+      state = state.copyWith(
+        errorMessage: 'Failed to open camera. Please try again.',
+        isCameraActive: false,
+      );
     }
+  }
+
+  Future<void> openAppSettings() async {
+    await openAppSettings();
+  }
+
+  Future<void> closeCamera() async {
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+      _cameraController = null;
+    }
+
+    state = state.copyWith(
+      isCameraActive: false,
+      cameraController: null,
+    );
   }
 
   @override
   void dispose() {
     state.searchController?.dispose();
+    _cameraController?.dispose();
     super.dispose();
   }
 }

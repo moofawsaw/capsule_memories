@@ -6,6 +6,7 @@ import '../../../widgets/custom_confirmation_dialog.dart';
 import '../../../widgets/custom_icon_button.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart';
+import '../../memory_details_screen/memory_details_screen.dart';
 import '../../memory_invitation_screen/memory_invitation_screen.dart';
 import '../models/memory_item_model.dart';
 
@@ -174,20 +175,23 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
           ),
           SizedBox(width: 12.h),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.memoryItem.title ?? 'Nixon Wedding 2025',
-                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  widget.memoryItem.date ?? 'Dec 4, 2025',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans,
-                ),
-              ],
+            child: GestureDetector(
+              onTap: () => _handleTitleTap(context),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.memoryItem.title ?? 'Nixon Wedding 2025',
+                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    widget.memoryItem.date ?? 'Dec 4, 2025',
+                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans,
+                  ),
+                ],
+              ),
             ),
           ),
           SizedBox(width: 8.h),
@@ -211,6 +215,27 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
           ],
         ],
       ),
+    );
+  }
+
+  /// Handle title tap - open memory details bottom sheet
+  void _handleTitleTap(BuildContext context) {
+    final memoryId = widget.memoryItem.id;
+    if (memoryId == null || memoryId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Invalid memory ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => MemoryDetailsScreen(memoryId: memoryId),
     );
   }
 

@@ -117,7 +117,6 @@ class _MemoriesDashboardScreenState
             CustomStoryList(
               storyItems: (state.memoriesDashboardModel?.storyItems ?? [])
                   .map((item) => CustomStoryItem(
-                        // Use backgroundImage directly - notifier already handles media URL selection
                         backgroundImage: item.backgroundImage ?? '',
                         profileImage: item.profileImage ?? '',
                         timestamp: item.timestamp ?? '2 mins ago',
@@ -125,7 +124,6 @@ class _MemoriesDashboardScreenState
                       ))
                   .toList(),
               onStoryTap: (index) => _onStoryTap(context, index),
-              margin: EdgeInsets.only(left: 20.h),
             ),
           ],
         );

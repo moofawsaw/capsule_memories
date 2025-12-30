@@ -11,7 +11,9 @@ import '../../widgets/custom_settings_row.dart';
 import 'notifier/create_memory_notifier.dart';
 
 class CreateMemoryScreen extends ConsumerStatefulWidget {
-  CreateMemoryScreen({Key? key}) : super(key: key);
+  final String? preSelectedCategoryId;
+
+  CreateMemoryScreen({Key? key, this.preSelectedCategoryId}) : super(key: key);
 
   @override
   CreateMemoryScreenState createState() => CreateMemoryScreenState();
@@ -19,6 +21,19 @@ class CreateMemoryScreen extends ConsumerStatefulWidget {
 
 class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with pre-selected category if provided
+    if (widget.preSelectedCategoryId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(createMemoryNotifier.notifier)
+            .initializeWithCategory(widget.preSelectedCategoryId!);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,11 +111,176 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
           margin: EdgeInsets.only(left: 10.h, right: 10.h),
         ),
         _buildNameSection(context),
+        _buildCategorySection(context),
         _buildPrivacySettings(context),
         _buildFeatureCard(context),
         _buildStep1ActionButtons(context),
         SizedBox(height: 20.h),
       ],
+    );
+  }
+
+  /// NEW: Category Selection Section
+  Widget _buildCategorySection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(createMemoryNotifier);
+        final availableCategories =
+            state.createMemoryModel?.availableCategories ?? [];
+        final selectedCategory = state.createMemoryModel?.selectedCategory;
+
+        return Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(top: 20.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Category',
+                    style: TextStyleHelper
+                        .instance.title16RegularPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300),
+                  ),
+                  SizedBox(width: 4.h),
+                  Text(
+                    '*',
+                    style: TextStyleHelper
+                        .instance.title16RegularPlusJakartaSans
+                        .copyWith(color: appTheme.colorFFD81E),
+                  ),
+                ],
+              ),
+              SizedBox(height: 10.h),
+              availableCategories.isEmpty
+                  ? Container(
+                      padding: EdgeInsets.all(16.h),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_900,
+                        borderRadius: BorderRadius.circular(8.h),
+                      ),
+                      child: Text(
+                        'Loading categories...',
+                        style: TextStyleHelper
+                            .instance.body14RegularPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    )
+                  : CustomDropdown<String>(
+                      items: _buildCategoryDropdownItems(availableCategories),
+                      onChanged: (value) {
+                        ref
+                            .read(createMemoryNotifier.notifier)
+                            .updateSelectedCategory(value);
+                      },
+                      value: selectedCategory,
+                      placeholder: 'Select a category...',
+                      leftIcon: selectedCategory != null
+                          ? ImageConstant.imgEmojiMemorycategory
+                          : null,
+                      rightIcon: ImageConstant.imgIconBlueGray30022x18,
+                      margin: EdgeInsets.zero,
+                    ),
+              if (selectedCategory != null)
+                Padding(
+                  padding: EdgeInsets.only(top: 8.h),
+                  child: _buildCategoryPreview(
+                      context, availableCategories, selectedCategory),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// NEW: Build category dropdown items
+  List<DropdownMenuItem<String>> _buildCategoryDropdownItems(
+      List<Map<String, dynamic>> categories) {
+    return categories.map((category) {
+      return DropdownMenuItem<String>(
+        value: category['id'] as String,
+        child: Row(
+          children: [
+            if (category['icon_url'] != null)
+              Padding(
+                padding: EdgeInsets.only(right: 8.h),
+                child: CustomImageView(
+                  imagePath: category['icon_url'] as String,
+                  height: 20.h,
+                  width: 20.h,
+                ),
+              ),
+            Expanded(
+              child: Text(
+                category['name'] as String,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+  }
+
+  /// NEW: Build category preview
+  Widget _buildCategoryPreview(BuildContext context,
+      List<Map<String, dynamic>> categories, String selectedCategoryId) {
+    final category = categories.firstWhere(
+      (cat) => cat['id'] == selectedCategoryId,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (category.isEmpty) return SizedBox.shrink();
+
+    return Container(
+      padding: EdgeInsets.all(12.h),
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_01,
+        borderRadius: BorderRadius.circular(8.h),
+        border: Border.all(color: appTheme.deep_purple_A100.withAlpha(77)),
+      ),
+      child: Row(
+        children: [
+          if (category['icon_url'] != null)
+            Container(
+              margin: EdgeInsets.only(right: 12.h),
+              child: CustomImageView(
+                imagePath: category['icon_url'] as String,
+                height: 32.h,
+                width: 32.h,
+              ),
+            ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  category['name'] as String,
+                  style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                      .copyWith(
+                    color: appTheme.gray_50,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (category['tagline'] != null)
+                  Padding(
+                    padding: EdgeInsets.only(top: 4.h),
+                    child: Text(
+                      category['tagline'] as String,
+                      style: TextStyleHelper
+                          .instance.body12MediumPlusJakartaSans
+                          .copyWith(
+                        color: appTheme.blue_gray_300,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
