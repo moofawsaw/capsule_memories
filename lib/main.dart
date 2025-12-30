@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './core/utils/theme_provider.dart';
 import './presentation/notifications_screen/notifier/notifications_notifier.dart';
 import './services/notification_service.dart';
+import './services/push_notification_service.dart';
 import './services/supabase_service.dart';
 import 'core/app_export.dart';
 
@@ -17,6 +19,9 @@ late ProviderContainer _globalContainer;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp();
 
   // Initialize global provider container once
   _globalContainer = ProviderContainer();
@@ -34,6 +39,15 @@ Future<void> main() async {
     debugPrint(
         '   flutter run --dart-define=SUPABASE_URL=your_url --dart-define=SUPABASE_ANON_KEY=your_key');
   }
+
+  await Supabase.initialize(
+    url: const String.fromEnvironment('SUPABASE_URL'),
+    anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
+  );
+
+  // Initialize push notifications
+  await PushNotificationService.instance.initialize();
+  await PushNotificationService.instance.createNotificationChannel();
 
   runApp(
     ProviderScope(

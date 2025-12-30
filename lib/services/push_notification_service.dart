@@ -1,11 +1,20 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import './supabase_service.dart';
 import './notification_preferences_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Service for handling push notifications using Flutter Local Notifications
+/// Top-level function for handling background messages
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  debugPrint('📱 Handling background message: ${message.messageId}');
+  // Handle the background message
+  await PushNotificationService.instance.handleBackgroundMessage(message);
+}
+
+/// Service for handling push notifications using Firebase Cloud Messaging
 /// This service manages FCM tokens and displays notifications when app is in foreground/background
 class PushNotificationService {
   static final PushNotificationService instance =
@@ -15,6 +24,7 @@ class PushNotificationService {
 
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
   final SupabaseClient? _client = SupabaseService.instance.client;
   final _preferencesService = NotificationPreferencesService.instance;
@@ -50,44 +60,102 @@ class PushNotificationService {
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
 
-      // Request permissions
+      // Request FCM permissions
       await _requestPermissions();
 
-      // Generate device ID (in production, use a proper device ID package)
+      // Setup Firebase Messaging handlers
+      await _setupFirebaseMessaging();
+
+      // Generate device ID
       _deviceId = await _generateDeviceId();
 
+      // Get and register FCM token
+      _fcmToken = await _firebaseMessaging.getToken();
+      if (_fcmToken != null) {
+        await registerToken(_fcmToken!);
+      }
+
+      // Listen for token refresh
+      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+        _fcmToken = newToken;
+        registerToken(newToken);
+      });
+
       _isInitialized = true;
-      debugPrint('✅ Push notification service initialized');
+      debugPrint('✅ Push notification service initialized with FCM');
     } catch (error) {
       debugPrint('❌ Error initializing push notifications: $error');
     }
   }
 
+  /// Setup Firebase Messaging handlers
+  Future<void> _setupFirebaseMessaging() async {
+    // Handle background messages
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('📱 Received foreground message: ${message.messageId}');
+      _handleForegroundMessage(message);
+    });
+
+    // Handle notification taps when app is in background
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint(
+          '📱 Notification tapped from background: ${message.messageId}');
+      _handleNotificationTap(message);
+    });
+
+    // Check for initial message (when app opened from terminated state)
+    RemoteMessage? initialMessage =
+        await _firebaseMessaging.getInitialMessage();
+    if (initialMessage != null) {
+      debugPrint(
+          '📱 App opened from notification: ${initialMessage.messageId}');
+      _handleNotificationTap(initialMessage);
+    }
+  }
+
   /// Request notification permissions
   Future<void> _requestPermissions() async {
-    if (Platform.isIOS) {
-      await _flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>()
-          ?.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
-    } else if (Platform.isAndroid) {
-      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          _flutterLocalNotificationsPlugin
-              .resolvePlatformSpecificImplementation<
-                  AndroidFlutterLocalNotificationsPlugin>();
+    if (Platform.isIOS || Platform.isAndroid) {
+      // Request FCM permissions
+      NotificationSettings settings =
+          await _firebaseMessaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
 
-      await androidImplementation?.requestNotificationsPermission();
+      debugPrint('✅ FCM permission status: ${settings.authorizationStatus}');
+
+      // Request local notification permissions
+      if (Platform.isIOS) {
+        await _flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>()
+            ?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+      } else if (Platform.isAndroid) {
+        final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+            _flutterLocalNotificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                    AndroidFlutterLocalNotificationsPlugin>();
+
+        await androidImplementation?.requestNotificationsPermission();
+      }
     }
   }
 
   /// Generate a unique device ID
   Future<String> _generateDeviceId() async {
-    // In production, use device_info_plus package to get actual device ID
-    // For now, generate a simple unique ID
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final platform = Platform.isAndroid ? 'android' : 'ios';
     return '$platform-$timestamp';
@@ -106,7 +174,6 @@ class PushNotificationService {
 
       final deviceType = Platform.isAndroid ? 'android' : 'ios';
 
-      // Upsert token in database
       await _client?.from('fcm_tokens').upsert({
         'user_id': userId,
         'token': token,
@@ -136,11 +203,43 @@ class PushNotificationService {
           .eq('device_id', _deviceId!)
           .eq('user_id', userId);
 
+      // Delete FCM token from device
+      await _firebaseMessaging.deleteToken();
+
       _fcmToken = null;
       debugPrint('✅ FCM token unregistered');
     } catch (error) {
       debugPrint('❌ Error unregistering FCM token: $error');
     }
+  }
+
+  /// Handle foreground message
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    final notification = message.notification;
+    final data = message.data;
+
+    if (notification != null) {
+      await showNotification(
+        title: notification.title ?? 'Notification',
+        body: notification.body ?? '',
+        payload: data['payload'],
+        notificationType: data['notification_type'],
+      );
+    }
+  }
+
+  /// Handle background message
+  Future<void> handleBackgroundMessage(RemoteMessage message) async {
+    debugPrint('📱 Processing background message: ${message.messageId}');
+    // Background messages are automatically handled by FCM
+    // This method is for additional processing if needed
+  }
+
+  /// Handle notification tap
+  void _handleNotificationTap(RemoteMessage message) {
+    final data = message.data;
+    debugPrint('📱 Notification tapped with data: $data');
+    // Navigate to appropriate screen based on data
   }
 
   /// Show local notification (checks preferences before showing)
@@ -151,7 +250,6 @@ class PushNotificationService {
     int id = 0,
     String? notificationType,
   }) async {
-    // Check if notifications are enabled for this type
     final prefs = await _preferencesService.loadPreferences();
     if (prefs != null) {
       final pushEnabled = prefs['push_notifications_enabled'] ?? true;
@@ -160,7 +258,6 @@ class PushNotificationService {
         return;
       }
 
-      // Check specific notification type preference
       if (notificationType != null) {
         final typeEnabled = prefs[notificationType] ?? true;
         if (!typeEnabled) {
@@ -200,11 +297,9 @@ class PushNotificationService {
     );
   }
 
-  /// Handle notification tap
+  /// Handle notification tap from local notifications
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('📱 Notification tapped with payload: ${response.payload}');
-    // Navigate to appropriate screen based on payload
-    // This will be handled by the app's navigation logic
   }
 
   /// Create notification channel (Android only)
