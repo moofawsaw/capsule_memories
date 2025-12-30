@@ -116,7 +116,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
       }
 
       // Sign in with Google OAuth
-      // Deep link callback handling is managed by Supabase SDK
+      // Supabase Flutter SDK v2.12.0+ handles deep link callbacks automatically
       // The auth state change listener in main.dart will handle success
       await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.google,

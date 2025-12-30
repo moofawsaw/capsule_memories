@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uni_links/uni_links.dart';
 
 import './core/utils/theme_provider.dart';
 import './presentation/notifications_screen/notifier/notifications_notifier.dart';
@@ -26,9 +25,8 @@ Future<void> main() async {
   final bool supabaseReady = await _initSupabaseSafely();
 
   if (supabaseReady) {
-    // Setup notification and OAuth deep link listeners
+    // Setup notification listener
     _setupGlobalNotificationListener();
-    _setupDeepLinkListener();
   } else {
     // Provide clear feedback when Supabase is not initialized
     debugPrint('⚠️ Supabase not initialized. App will run in limited mode.');
@@ -67,67 +65,6 @@ Future<bool> _initSupabaseSafely() async {
     debugPrint('❌ Failed to initialize Supabase: $e');
     debugPrint('Stack trace: $st');
     return false;
-  }
-}
-
-/// Setup deep link listener for OAuth callbacks
-void _setupDeepLinkListener() {
-  try {
-    final client = SupabaseService.instance.client;
-    if (client == null) {
-      debugPrint(
-          '⚠️ Cannot setup deep link listener - Supabase client is null');
-      return;
-    }
-
-    // Listen for incoming deep links
-    uriLinkStream.listen(
-      (Uri? uri) async {
-        if (uri == null) return;
-
-        debugPrint('📱 Deep link received: ${uri.toString()}');
-
-        // Check if this is an OAuth callback
-        if (uri.scheme == 'io.supabase.capsulememories' &&
-            uri.host == 'login-callback') {
-          debugPrint('🔐 Processing OAuth callback...');
-
-          try {
-            // Extract tokens from URI fragment
-            final fragment = uri.fragment;
-            if (fragment.isEmpty) {
-              debugPrint('⚠️ OAuth callback missing tokens');
-              return;
-            }
-
-            // Parse fragment parameters
-            final params = Uri.splitQueryString(fragment);
-            final accessToken = params['access_token'];
-            final refreshToken = params['refresh_token'];
-
-            if (accessToken == null) {
-              debugPrint('❌ OAuth callback missing access token');
-              return;
-            }
-
-            debugPrint('✅ OAuth tokens received successfully');
-
-            // The Supabase SDK automatically handles token storage
-            // Auth state listener will trigger navigation
-          } catch (e) {
-            debugPrint('❌ Error processing OAuth callback: $e');
-          }
-        }
-      },
-      onError: (err) {
-        debugPrint('❌ Deep link error: $err');
-      },
-    );
-
-    debugPrint('✅ Deep link listener initialized');
-  } catch (e, st) {
-    debugPrint('❌ Error setting up deep link listener: $e');
-    debugPrint('Stack trace: $st');
   }
 }
 
