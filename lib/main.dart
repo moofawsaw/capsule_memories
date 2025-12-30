@@ -19,12 +19,18 @@ Future<void> main() async {
   // Initialize global provider container once
   _globalContainer = ProviderContainer();
 
+  // Initialize Supabase with improved error handling
   final bool supabaseReady = await _initSupabaseSafely();
 
   if (supabaseReady) {
+    // Only setup listeners if Supabase is ready
     _setupGlobalNotificationListener();
   } else {
-    debugPrint('Supabase not initialized. Skipping auth listener setup.');
+    // Provide clear feedback when Supabase is not initialized
+    debugPrint('⚠️ Supabase not initialized. App will run in limited mode.');
+    debugPrint('   To enable full functionality, set environment variables:');
+    debugPrint(
+        '   flutter run --dart-define=SUPABASE_URL=your_url --dart-define=SUPABASE_ANON_KEY=your_key');
   }
 
   runApp(
@@ -43,41 +49,59 @@ Future<bool> _initSupabaseSafely() async {
   try {
     await SupabaseService.initialize();
 
-    // Hard assertion: ensures the client exists right now
-    Supabase.instance.client;
+    // Verify the client is accessible
+    final client = SupabaseService.instance.client;
+    if (client == null) {
+      debugPrint('⚠️ Supabase client is null after initialization');
+      return false;
+    }
+
+    // Additional verification
+    debugPrint('✅ Supabase client verified and ready');
     return true;
   } catch (e, st) {
-    debugPrint('Failed to initialize Supabase: $e');
-    debugPrint('$st');
+    debugPrint('❌ Failed to initialize Supabase: $e');
+    debugPrint('Stack trace: $st');
     return false;
   }
 }
 
 void _setupGlobalNotificationListener() {
-  final notificationService = NotificationService.instance;
-
-  Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
-    if (data.event == AuthChangeEvent.signedIn) {
-      // 🔥 STEP 1: Load initial notification count on login
-      await _loadInitialNotificationCount();
-
-      // 🔥 STEP 2: Subscribe to real-time updates with optimized callback
-      notificationService.subscribeToNotifications(
-        onNewNotification: (notification) async {
-          debugPrint('New notification: ${notification['title']}');
-          // 🔥 STEP 3: Reload notification count when new notification arrives
-          // This is now debounced in NotificationService to prevent excessive updates
-          await _loadInitialNotificationCount();
-        },
-      );
-    } else if (data.event == AuthChangeEvent.signedOut) {
-      notificationService.unsubscribeFromNotifications();
+  try {
+    final client = SupabaseService.instance.client;
+    if (client == null) {
+      debugPrint(
+          '⚠️ Cannot setup notification listener - Supabase client is null');
+      return;
     }
-  });
 
-  // 🔥 STEP 4: Load notification count if user is already logged in
-  if (Supabase.instance.client.auth.currentUser != null) {
-    _loadInitialNotificationCount();
+    final notificationService = NotificationService.instance;
+
+    client.auth.onAuthStateChange.listen((data) async {
+      if (data.event == AuthChangeEvent.signedIn) {
+        // 🔥 STEP 1: Load initial notification count on login
+        await _loadInitialNotificationCount();
+
+        // 🔥 STEP 2: Subscribe to real-time updates with optimized callback
+        notificationService.subscribeToNotifications(
+          onNewNotification: (notification) async {
+            debugPrint('New notification: ${notification['title']}');
+            // 🔥 STEP 3: Reload notification count when new notification arrives
+            await _loadInitialNotificationCount();
+          },
+        );
+      } else if (data.event == AuthChangeEvent.signedOut) {
+        notificationService.unsubscribeFromNotifications();
+      }
+    });
+
+    // 🔥 STEP 4: Load notification count if user is already logged in
+    if (client.auth.currentUser != null) {
+      _loadInitialNotificationCount();
+    }
+  } catch (e, st) {
+    debugPrint('❌ Error setting up notification listener: $e');
+    debugPrint('Stack trace: $st');
   }
 }
 

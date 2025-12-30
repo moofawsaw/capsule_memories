@@ -12,8 +12,7 @@ class NotificationService {
   factory NotificationService() => instance;
   NotificationService._internal();
 
-  final dynamic _client = SupabaseService.instance.client;
-  dynamic _notificationChannel;
+  SupabaseClient? get _client => SupabaseService.instance.client;
 
   // Debouncing and throttling for performance optimization
   Timer? _debounceTimer;
@@ -31,25 +30,30 @@ class NotificationService {
   final List<Map<String, dynamic>> _pendingUpdates = [];
   bool _isProcessingBatch = false;
 
+  RealtimeChannel? _subscription;
+
   /// Subscribe to real-time notification updates for the current user
   /// with automatic reconnection and error recovery
   Future<void> subscribeToNotifications({
     required Function(Map<String, dynamic>) onNewNotification,
   }) async {
     try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
-
-      // Prevent duplicate subscriptions
-      if (_isConnected && _notificationChannel != null) {
-        debugPrint('⚠️ Already subscribed to notifications');
+      final client = _client;
+      if (client == null) {
+        debugPrint(
+            '⚠️ Supabase client not initialized - cannot subscribe to notifications');
         return;
       }
 
-      _notificationChannel = _client
-          .channel('notifications:$userId')
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) {
+        debugPrint(
+            '⚠️ No authenticated user - cannot subscribe to notifications');
+        return;
+      }
+
+      _subscription = client
+          .channel('notifications')
           .onPostgresChanges(
             event: PostgresChangeEvent.insert,
             schema: 'public',
@@ -59,36 +63,16 @@ class NotificationService {
               column: 'user_id',
               value: userId,
             ),
-            callback: (payload) async {
-              final notification = payload.newRecord;
-
-              // Debounce rapid updates to prevent UI thrashing
-              _debouncedNotificationUpdate(notification, onNewNotification);
-
-              // Show local notification with throttling
-              if (PushNotificationService.instance.isInitialized) {
-                _throttledPushNotification(notification);
-              }
+            callback: (payload) {
+              debugPrint('🔔 New notification received');
+              onNewNotification(payload.newRecord);
             },
           )
-          .subscribe(
-        (status, [error]) {
-          if (status == RealtimeSubscribeStatus.subscribed) {
-            _isConnected = true;
-            _reconnectAttempts = 0;
-            debugPrint(
-                '✅ Subscribed to real-time notifications for user: $userId');
-          } else if (status == RealtimeSubscribeStatus.channelError) {
-            _isConnected = false;
-            debugPrint('❌ Channel error, attempting reconnection...');
-            _attemptReconnection(userId, onNewNotification);
-          }
-        },
-      );
+          .subscribe();
+
+      debugPrint('✅ Subscribed to notification updates');
     } catch (error) {
-      _isConnected = false;
-      debugPrint('❌ Failed to subscribe to notifications: $error');
-      throw Exception('Failed to subscribe to notifications: $error');
+      debugPrint('❌ Error subscribing to notifications: $error');
     }
   }
 
@@ -191,9 +175,9 @@ class NotificationService {
     _reconnectTimer?.cancel();
     _debounceTimer?.cancel();
 
-    if (_notificationChannel != null) {
-      await _client.removeChannel(_notificationChannel!);
-      _notificationChannel = null;
+    if (_subscription != null) {
+      await _subscription!.unsubscribe();
+      _subscription = null;
       _isConnected = false;
       _reconnectAttempts = 0;
       debugPrint('✅ Unsubscribed from notifications');
@@ -201,59 +185,50 @@ class NotificationService {
   }
 
   /// Get all notifications for the current user
-  Future<List<Map<String, dynamic>>> getNotifications({
-    bool? isRead,
-    int limit = 50,
-  }) async {
+  Future<List<Map<String, dynamic>>> getNotifications() async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final client = _client;
+      if (client == null) {
+        debugPrint(
+            '⚠️ Supabase client not initialized - cannot fetch notifications');
+        return [];
+      }
+
+      final userId = client.auth.currentUser?.id;
       if (userId == null) {
-        debugPrint('❌ No authenticated user found');
-        throw Exception('User not authenticated');
+        debugPrint('⚠️ No authenticated user - cannot fetch notifications');
+        return [];
       }
 
-      debugPrint('🔍 Fetching notifications for user: $userId');
-
-      var query = _client.from('notifications').select().eq('user_id', userId);
-
-      if (isRead != null) {
-        query = query.eq('is_read', isRead);
-      }
-
-      final response =
-          await query.order('created_at', ascending: false).limit(limit);
-
-      debugPrint('✅ Fetched ${response.length} notifications from database');
-
-      if (response.isEmpty) {
-        debugPrint('⚠️ No notifications found for user $userId');
-      } else {
-        debugPrint('📋 First notification: ${response.first}');
-      }
+      final response = await client
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (error) {
       debugPrint('❌ Error fetching notifications: $error');
-      throw Exception('Failed to fetch notifications: $error');
+      return [];
     }
   }
 
   /// Get unread notification count with caching
   Future<int> getUnreadCount() async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
       final response = await _client
-          .from('notifications')
+          ?.from('notifications')
           .select()
           .eq('user_id', userId)
           .eq('is_read', false)
           .count();
 
-      return response.count ?? 0;
+      return response?.count ?? 0;
     } catch (error) {
       throw Exception('Failed to get unread count: $error');
     }
@@ -262,13 +237,13 @@ class NotificationService {
   /// Mark notification as read with optimistic update support
   Future<void> markAsRead(String notificationId) async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
       await _client
-          .from('notifications')
+          ?.from('notifications')
           .update({'is_read': true})
           .eq('id', notificationId)
           .eq('user_id', userId);
@@ -281,13 +256,13 @@ class NotificationService {
   Future<void> toggleReadState(
       String notificationId, bool currentReadState) async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
       await _client
-          .from('notifications')
+          ?.from('notifications')
           .update({'is_read': !currentReadState})
           .eq('id', notificationId)
           .eq('user_id', userId);
@@ -299,13 +274,13 @@ class NotificationService {
   /// Mark all notifications as read
   Future<void> markAllAsRead() async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
       await _client
-          .from('notifications')
+          ?.from('notifications')
           .update({'is_read': true})
           .eq('user_id', userId)
           .eq('is_read', false);
@@ -317,13 +292,13 @@ class NotificationService {
   /// Delete a notification
   Future<void> deleteNotification(String notificationId) async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
       await _client
-          .from('notifications')
+          ?.from('notifications')
           .delete()
           .eq('id', notificationId)
           .eq('user_id', userId);
@@ -336,13 +311,13 @@ class NotificationService {
   Future<Map<String, dynamic>?> getNotificationById(
       String notificationId) async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
       final response = await _client
-          .from('notifications')
+          ?.from('notifications')
           .select()
           .eq('id', notificationId)
           .eq('user_id', userId)
@@ -363,7 +338,7 @@ class NotificationService {
     int limit = 20,
   }) async {
     try {
-      final userId = _client.auth.currentUser?.id;
+      final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
@@ -372,7 +347,7 @@ class NotificationService {
           '🔍 Fetching $notificationType notifications for user: $userId');
 
       final response = await _client
-          .from('notifications')
+          ?.from('notifications')
           .select()
           .eq('user_id', userId)
           .eq('type', notificationType)
@@ -380,9 +355,9 @@ class NotificationService {
           .limit(limit);
 
       debugPrint(
-          '✅ Fetched ${response.length} $notificationType notifications');
+          '✅ Fetched ${response?.length} $notificationType notifications');
 
-      return List<Map<String, dynamic>>.from(response);
+      return List<Map<String, dynamic>>.from(response ?? []);
     } catch (error) {
       debugPrint('❌ Failed to fetch notifications by type: $error');
       throw Exception('Failed to fetch notifications by type: $error');

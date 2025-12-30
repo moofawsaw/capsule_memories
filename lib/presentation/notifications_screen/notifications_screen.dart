@@ -33,7 +33,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   Future<void> _setupRealtimeSubscription() async {
     try {
-      await _notificationService.subscribeToNotifications(
+      _notificationService.subscribeToNotifications(
         onNewNotification: (notification) {
           _loadNotifications();
           if (mounted) {

@@ -19,6 +19,10 @@ class SupabaseService {
     try {
       if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
         print('⚠️ Supabase credentials not configured');
+        print(
+            '   Make sure to set SUPABASE_URL and SUPABASE_ANON_KEY environment variables');
+        print(
+            '   Run: flutter run --dart-define=SUPABASE_URL=your_url --dart-define=SUPABASE_ANON_KEY=your_key');
         return;
       }
 
@@ -33,8 +37,10 @@ class SupabaseService {
 
       instance.markAsInitialized();
       print('✅ Supabase initialized successfully');
+      print('   URL: $supabaseUrl');
     } catch (e) {
       print('❌ Failed to initialize Supabase: $e');
+      print('   Check your SUPABASE_URL and SUPABASE_ANON_KEY values');
       rethrow;
     }
   }
@@ -44,10 +50,11 @@ class SupabaseService {
     _isInitialized = true;
   }
 
-  // Get Supabase client (returns null if not initialized)
+  // Get Supabase client safely (returns null if not initialized)
   SupabaseClient? get client {
     if (!_isInitialized) {
       print('⚠️ Supabase not initialized - returning null');
+      print('   Call SupabaseService.initialize() before using the client');
       return null;
     }
     try {
@@ -56,6 +63,16 @@ class SupabaseService {
       print('❌ Error getting Supabase client: $e');
       return null;
     }
+  }
+
+  // Get Supabase client with exception if not initialized
+  SupabaseClient get clientOrThrow {
+    final client = this.client;
+    if (client == null) {
+      throw Exception(
+          'Supabase client not initialized. Call SupabaseService.initialize() first.');
+    }
+    return client;
   }
 
   // Check if user session exists (session restoration check)
