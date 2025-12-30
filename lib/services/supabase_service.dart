@@ -38,6 +38,8 @@ class SupabaseService {
       instance.markAsInitialized();
       print('✅ Supabase initialized successfully');
       print('   URL: $supabaseUrl');
+      print(
+          '   OAuth Deep Link: io.supabase.capsulememories://login-callback/');
     } catch (e) {
       print('❌ Failed to initialize Supabase: $e');
       print('   Check your SUPABASE_URL and SUPABASE_ANON_KEY values');

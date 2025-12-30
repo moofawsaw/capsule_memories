@@ -116,25 +116,37 @@ class LoginNotifier extends StateNotifier<LoginState> {
       }
 
       // Sign in with Google OAuth
-      // Note: OAuth requires proper configuration in Supabase dashboard
+      // Deep link callback handling is managed by Supabase SDK
+      // The auth state change listener in main.dart will handle success
       await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
+        authScreenLaunchMode: LaunchMode.externalApplication,
       );
 
-      // Note: OAuth flow will redirect to browser/app, so we don't set success here
-      // The auth state change listener in main.dart will handle the success case
-      // Don't set loading to false here as the OAuth flow is async
-    } catch (e) {
-      String errorMessage =
-          'Google login failed. Please ensure Google OAuth is configured in Supabase dashboard.';
-      if (e.toString().isNotEmpty && !e.toString().contains('Exception: ')) {
-        errorMessage = e.toString();
+      // Note: Don't set loading to false here as OAuth flow redirects
+      // The auth state listener will update UI when user returns
+    } on AuthException catch (e) {
+      String errorMessage = 'Google login failed. Please try again.';
+
+      if (e.message.contains('User cancelled')) {
+        errorMessage = 'Google login was cancelled.';
+      } else if (e.message.contains('popup_closed_by_user')) {
+        errorMessage = 'Sign-in popup was closed. Please try again.';
+      } else if (e.message.contains('network')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else {
+        errorMessage = 'Google login failed: ${e.message}';
       }
 
       state = state.copyWith(
         isLoading: false,
         errorMessage: errorMessage,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'An unexpected error occurred during Google login.',
       );
     }
   }
