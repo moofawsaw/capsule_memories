@@ -49,19 +49,25 @@
         <true />
     </dict>
     
-    <!-- Deep link configuration for Supabase OAuth callback -->
+    <!-- Camera permission for QR scanning -->
+    <key>NSCameraUsageDescription</key>
+    <string>Capsule needs camera access to scan QR codes</string>
+    
+    <!-- URL schemes for deep linking -->
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
-            <key>CFBundleTypeRole</key>
-            <string>Editor</string>
-            <key>CFBundleURLName</key>
-            <string>io.supabase.capsulememories</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>io.supabase.capsulememories</string>
+                <string>capsule</string>
             </array>
         </dict>
+    </array>
+    
+    <!-- Universal Links for HTTPS deep links -->
+    <key>com.apple.developer.associated-domains</key>
+    <array>
+        <string>applinks:capsule.app</string>
     </array>
 </dict>
 </plist>

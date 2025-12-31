@@ -10,6 +10,7 @@ import '../presentation/app_shell/app_shell.dart';
 import '../presentation/color_selection_screen/color_selection_screen.dart';
 import '../presentation/create_group_screen/create_group_screen.dart';
 import '../presentation/create_memory_screen/create_memory_screen.dart';
+import '../presentation/deep_link_handler_screen/deep_link_handler_screen.dart';
 import '../presentation/event_stories_view_screen/event_stories_view_screen.dart';
 import '../presentation/event_timeline_view_screen/event_timeline_view_screen.dart';
 import '../presentation/feature_request_screen/feature_request_screen.dart';
@@ -44,6 +45,8 @@ import '../presentation/user_profile_screen/user_profile_screen.dart';
 import '../presentation/user_profile_screen_two_screen/user_profile_screen_two_screen.dart';
 import '../presentation/vibe_selection_screen/vibe_selection_screen.dart';
 import '../presentation/video_call_interface_screen/video_call_interface_screen.dart';
+import '../presentation/qr_scanner_screen/qr_scanner_screen.dart';
+import '../presentation/friend_request_confirmation_dialog/friend_request_confirmation_dialog.dart';
 
 class AppRoutes {
   // App shell route - renders AppShell with persistent header
@@ -107,6 +110,10 @@ class AppRoutes {
   static const String qrCodeShareScreenTwo = '/qr-code-share-screen-two';
   static const String qrTimelineShare = '/qr-timeline-share';
   static const String memoryShareOptionsScreen = '/memory-share-options-screen';
+  static const String qrScannerScreen = '/qr-scanner-screen';
+  static const String friendRequestConfirmationDialog =
+      '/friend-request-confirmation-dialog';
+  static const String deepLinkHandler = '/deep-link-handler';
 
   static const String initialRoute = appFeed;
 
@@ -190,7 +197,9 @@ class AppRoutes {
       case appBsDetails:
         // Add this line: Extract memoryId from route settings
         final memoryId = NavigatorService.navigatorKey.currentContext != null
-            ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)?.settings.arguments as String?
+            ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)
+                ?.settings
+                .arguments as String?
             : null;
         return MemoryDetailsScreen(memoryId: memoryId ?? '');
       case appBsVibes:
@@ -223,6 +232,19 @@ class AppRoutes {
   /// Custom route generator for nested routing
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     final routeName = settings.name ?? '';
+
+    // Handle join deep link routes
+    if (routeName.startsWith('/join/')) {
+      final uri = Uri.parse(routeName);
+      if (uri.pathSegments.length >= 3) {
+        return MaterialPageRoute(
+          builder: (context) => DeepLinkHandlerScreen(
+            type: uri.pathSegments[1],
+            code: uri.pathSegments[2],
+          ),
+        );
+      }
+    }
 
     // Auth routes (no header)
     if (routeName == authLogin) {
@@ -338,5 +360,8 @@ class AppRoutes {
           );
         },
         memoryShareOptionsScreen: (context) => const MemoryShareOptionsScreen(),
+        qrScannerScreen: (context) => const QRScannerScreen(),
+        friendRequestConfirmationDialog: (context) =>
+            const FriendRequestConfirmationDialog(),
       };
 }

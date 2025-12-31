@@ -76,3 +76,5 @@ flutter:
   # 🚨 CRITICAL FONTS RULE:
   # - DO NOT ADD NEW LOCAL FONTS TO assets/fonts/ 
   # - ONLY USE EXISTING LOCAL FONTS FROM assets/fonts/
+
+# Note: app_links package is NOT compatible with current Dart SDK 3.6.0 - deep linking implemented using native method channels instead

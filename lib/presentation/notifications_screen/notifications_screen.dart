@@ -393,24 +393,93 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           final isRead = notification['is_read'] as bool? ?? false;
           final notificationId = notification['id'] as String;
 
-          return CustomNotificationCard(
-            iconPath:
-                _getNotificationIconPath(notification['type'] as String? ?? ''),
-            title: notification['title'] as String? ?? 'Notification',
-            description: notification['message'] as String? ?? '',
-            isRead: isRead,
-            backgroundColor: _getNotificationBackgroundColor(isRead),
-            titleColor: _getNotificationTextColor(isRead),
-            descriptionColor: _getNotificationDescriptionColor(isRead),
-            onTap: () {
-              debugPrint('🎯 Card tapped at index $index');
-              _handleNotificationTap(notification);
+          return Dismissible(
+            key: Key(notificationId),
+            direction: DismissDirection.endToStart,
+            confirmDismiss: (direction) async {
+              // Show delete confirmation
+              return await CustomConfirmationDialog.show(
+                context: context,
+                title: 'Delete Notification?',
+                message: 'Are you sure you want to delete this notification?',
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                icon: Icons.delete_outline,
+              );
             },
-            onToggleRead: () {
-              debugPrint(
-                  '🔄 Toggle read state for notification $notificationId');
-              _toggleReadState(notificationId, isRead);
+            onDismissed: (direction) async {
+              // Delete notification from database
+              try {
+                await _notificationService.deleteNotification(notificationId);
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Notification deleted'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+
+                // Reload notifications to update UI
+                await _loadNotifications();
+              } catch (error) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete notification: $error'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
             },
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: EdgeInsets.only(right: 20.w),
+              decoration: BoxDecoration(
+                color: appTheme.red_500,
+                borderRadius: BorderRadius.circular(12.h),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.delete_outline,
+                    color: appTheme.white_A700,
+                    size: 28.h,
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'Delete',
+                    style: TextStyle(
+                      color: appTheme.white_A700,
+                      fontSize: 12.fSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            child: CustomNotificationCard(
+              iconPath: _getNotificationIconPath(
+                  notification['type'] as String? ?? ''),
+              title: notification['title'] as String? ?? 'Notification',
+              description: notification['message'] as String? ?? '',
+              isRead: isRead,
+              backgroundColor: _getNotificationBackgroundColor(isRead),
+              titleColor: _getNotificationTextColor(isRead),
+              descriptionColor: _getNotificationDescriptionColor(isRead),
+              onTap: () {
+                debugPrint('🎯 Card tapped at index $index');
+                _handleNotificationTap(notification);
+              },
+              onToggleRead: () {
+                debugPrint(
+                    '🔄 Toggle read state for notification $notificationId');
+                _toggleReadState(notificationId, isRead);
+              },
+            ),
           );
         },
       ),

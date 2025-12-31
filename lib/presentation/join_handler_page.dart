@@ -1,0 +1,141 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/app_export.dart';
+
+class JoinHandlerPage extends StatefulWidget {
+  final String type;
+  final String code;
+
+  const JoinHandlerPage({
+    Key? key,
+    required this.type,
+    required this.code,
+  }) : super(key: key);
+
+  @override
+  State<JoinHandlerPage> createState() => _JoinHandlerPageState();
+}
+
+class _JoinHandlerPageState extends State<JoinHandlerPage> {
+  bool _isProcessing = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _processJoinRequest();
+  }
+
+  Future<void> _processJoinRequest() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase.functions.invoke(
+        'handle-qr-scan',
+        body: {
+          'type': widget.type,
+          'code': widget.code,
+        },
+      );
+
+      if (response.status == 200) {
+        // Success - navigate based on type
+        if (mounted) {
+          if (widget.type == 'friend') {
+            Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.appFriends,
+            );
+          } else if (widget.type == 'memory') {
+            Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.appMemories,
+            );
+          } else {
+            Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.app,
+            );
+          }
+        }
+      } else {
+        throw Exception(response.data?['error'] ?? 'Failed to process request');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isProcessing = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: Center(
+        child: _isProcessing
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Processing your request...',
+                    style: TextStyle(
+                      color: Colors.white.withAlpha(204),
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              )
+            : Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, color: Colors.red, size: 64),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Error',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _errorMessage ?? 'Unknown error occurred',
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(204),
+                        fontSize: 16,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(
+                          context,
+                          AppRoutes.app,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                      ),
+                      child: const Text(
+                        'Go to Home',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+}

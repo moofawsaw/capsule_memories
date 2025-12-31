@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import './core/services/deep_link_service.dart';
 import './core/utils/theme_provider.dart';
 import './firebase_options.dart';
 import './presentation/notifications_screen/notifier/notifications_notifier.dart';
@@ -53,6 +54,9 @@ Future<void> main() async {
 
   // 🎯 Initialize push notifications with FCM token registration
   await PushNotificationService.instance.initialize();
+
+  // 🎯 Initialize deep link service for QR code handling
+  await DeepLinkService().initialize();
 
   runApp(
     ProviderScope(

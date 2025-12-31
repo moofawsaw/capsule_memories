@@ -22,15 +22,18 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   void initState() {
     super.initState();
     _barcodeScanner = BarcodeScanner();
-    _startImageStream();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startImageStream();
+    });
   }
 
   void _startImageStream() {
-    final notifierState = ref.read(friendsManagementNotifier);
-    final notifier = ref.read(friendsManagementNotifier.notifier);
-    final cameraController = notifierState.cameraController;
-    if (cameraController == null || !cameraController.value.isInitialized)
+    final state = ref.read(friendsManagementNotifier);
+    final cameraController = state.cameraController;
+
+    if (cameraController == null || !cameraController.value.isInitialized) {
       return;
+    }
 
     cameraController.startImageStream((CameraImage image) {
       if (isScanning) return;
@@ -86,15 +89,16 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   }
 
   Future<void> _handleScannedCode(String code) async {
-    final notifierState = ref.read(friendsManagementNotifier);
-    final notifier = ref.read(friendsManagementNotifier.notifier);
-    final cameraController = notifierState.cameraController;
-    if (cameraController != null) {
+    final state = ref.read(friendsManagementNotifier);
+    final cameraController = state.cameraController;
+
+    if (cameraController != null && cameraController.value.isStreamingImages) {
       await cameraController.stopImageStream();
     }
 
     if (!mounted) return;
 
+    // Process the QR code
     await ref
         .read(friendsManagementNotifier.notifier)
         .processScannedQRCode(code);
@@ -113,7 +117,6 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(friendsManagementNotifier);
-    final notifier = ref.read(friendsManagementNotifier.notifier);
     final cameraController = state.cameraController;
 
     if (cameraController == null || !cameraController.value.isInitialized) {
@@ -143,7 +146,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
             ),
           ),
 
-          // Top bar with close button
+          // Top bar with close and flash buttons
           Positioned(
             top: 0,
             left: 0,
@@ -157,17 +160,19 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
                     CustomIconButton(
                       height: 44.h,
                       width: 44.h,
-                      iconPath: '',
+                      iconPath: ImageConstant.imgArrowLeft,
                       backgroundColor: appTheme.gray_900_01.withAlpha(179),
                       borderRadius: 22.h,
                       iconSize: 24.h,
                       onTap: () => Navigator.pop(context),
                     ),
-                    if (!kIsWeb) // Flash not supported on web
+                    if (!kIsWeb)
                       CustomIconButton(
                         height: 44.h,
                         width: 44.h,
-                        iconPath: '',
+                        iconPath: isFlashOn
+                            ? ImageConstant.imgButtonsVolume
+                            : ImageConstant.imgButtonsGray50,
                         backgroundColor: appTheme.gray_900_01.withAlpha(179),
                         borderRadius: 22.h,
                         iconSize: 24.h,
@@ -236,17 +241,57 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
               ),
             ),
           ),
+
+          // Success/Error messages
+          if (state.successMessage != null && state.successMessage!.isNotEmpty)
+            Positioned(
+              top: 120.h,
+              left: 16.h,
+              right: 16.h,
+              child: Container(
+                padding: EdgeInsets.all(16.h),
+                decoration: BoxDecoration(
+                  color: Colors.green.withAlpha(230),
+                  borderRadius: BorderRadius.circular(12.h),
+                ),
+                child: Text(
+                  state.successMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                      .copyWith(color: Colors.white),
+                ),
+              ),
+            ),
+
+          if (state.errorMessage != null && state.errorMessage!.isNotEmpty)
+            Positioned(
+              top: 120.h,
+              left: 16.h,
+              right: 16.h,
+              child: Container(
+                padding: EdgeInsets.all(16.h),
+                decoration: BoxDecoration(
+                  color: Colors.red.withAlpha(230),
+                  borderRadius: BorderRadius.circular(12.h),
+                ),
+                child: Text(
+                  state.errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                      .copyWith(color: Colors.white),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
   Future<void> _toggleFlash() async {
-    if (kIsWeb) return; // Flash not supported on web
+    if (kIsWeb) return;
 
-    final notifierState = ref.read(friendsManagementNotifier);
-    final notifier = ref.read(friendsManagementNotifier.notifier);
-    final cameraController = notifierState.cameraController;
+    final state = ref.read(friendsManagementNotifier);
+    final cameraController = state.cameraController;
     if (cameraController == null) return;
 
     try {
@@ -259,11 +304,6 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
     } catch (e) {
       debugPrint('Error toggling flash: $e');
     }
-  }
-
-  CameraController? _getCameraController() {
-    final notifierState = ref.read(friendsManagementNotifier);
-    return notifierState.cameraController;
   }
 }
 
