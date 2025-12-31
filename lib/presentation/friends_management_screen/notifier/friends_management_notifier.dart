@@ -20,9 +20,11 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
   final FriendsService _friendsService = FriendsService();
   CameraController? _cameraController;
   String _searchQuery = '';
+  final TextEditingController searchController = TextEditingController();
 
   FriendsManagementNotifier(FriendsManagementState state) : super(state) {
     initialize();
+    searchController.addListener(_onSearchTextChanged);
   }
 
   Future<void> initialize() async {
@@ -36,6 +38,11 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
     state = state.copyWith(
       isLoading: false,
     );
+  }
+
+  void _onSearchTextChanged() {
+    final query = searchController.text;
+    onSearchChanged(query);
   }
 
   Future<void> _fetchAllFriendsData() async {
@@ -514,6 +521,8 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
   @override
   void dispose() {
+    searchController.removeListener(_onSearchTextChanged);
+    searchController.dispose();
     _cameraController?.dispose();
     super.dispose();
   }
