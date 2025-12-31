@@ -12,7 +12,7 @@ class UserSearchResultsWidget extends ConsumerWidget {
     final state = ref.watch(friendsManagementNotifier);
     final searchResults = state.searchResults ?? [];
 
-    if (state.isSearching ?? false) {
+    if (state.isSearching) {
       return Center(
         child: CircularProgressIndicator(
           color: appTheme.deep_purple_A100,
@@ -20,7 +20,7 @@ class UserSearchResultsWidget extends ConsumerWidget {
       );
     }
 
-    if (searchResults.isEmpty && (state.searchQuery?.isNotEmpty ?? false)) {
+    if (searchResults.isEmpty && state.searchQuery.isNotEmpty) {
       return Container(
         padding: EdgeInsets.symmetric(vertical: 20.h),
         child: Center(

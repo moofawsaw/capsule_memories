@@ -28,7 +28,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   void _startImageStream() {
     final notifierState = ref.read(friendsManagementNotifier);
     final notifier = ref.read(friendsManagementNotifier.notifier);
-    final cameraController = notifier._cameraController;
+    final cameraController = notifierState.cameraController;
     if (cameraController == null || !cameraController.value.isInitialized)
       return;
 
@@ -88,7 +88,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   Future<void> _handleScannedCode(String code) async {
     final notifierState = ref.read(friendsManagementNotifier);
     final notifier = ref.read(friendsManagementNotifier.notifier);
-    final cameraController = notifier._cameraController;
+    final cameraController = notifierState.cameraController;
     if (cameraController != null) {
       await cameraController.stopImageStream();
     }
@@ -114,7 +114,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(friendsManagementNotifier);
     final notifier = ref.read(friendsManagementNotifier.notifier);
-    final cameraController = notifier._cameraController;
+    final cameraController = state.cameraController;
 
     if (cameraController == null || !cameraController.value.isInitialized) {
       return Scaffold(
@@ -246,7 +246,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
 
     final notifierState = ref.read(friendsManagementNotifier);
     final notifier = ref.read(friendsManagementNotifier.notifier);
-    final cameraController = notifier._cameraController;
+    final cameraController = notifierState.cameraController;
     if (cameraController == null) return;
 
     try {
@@ -262,8 +262,8 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   }
 
   CameraController? _getCameraController() {
-    final notifier = ref.read(friendsManagementNotifier.notifier);
-    return notifier._cameraController;
+    final notifierState = ref.read(friendsManagementNotifier);
+    return notifierState.cameraController;
   }
 }
 

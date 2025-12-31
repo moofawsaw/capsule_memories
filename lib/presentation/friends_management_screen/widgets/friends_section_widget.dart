@@ -13,7 +13,7 @@ class FriendsSectionWidget extends ConsumerWidget {
         state.friendsManagementModel?.friendsList ??
         [];
 
-    if (state.isLoading ?? false) {
+    if (state.isLoading) {
       return Center(
         child: CircularProgressIndicator(
           color: appTheme.deep_purple_A100,

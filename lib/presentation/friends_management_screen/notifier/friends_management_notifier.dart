@@ -1,11 +1,11 @@
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/friends_management_model.dart';
+
 import '../../../core/app_export.dart';
 import '../../../services/friends_service.dart';
-
-part 'friends_management_state.dart';
+import '../models/friends_management_model.dart';
+import './friends_management_state.dart';
 
 final friendsManagementNotifier = StateNotifierProvider.autoDispose<
     FriendsManagementNotifier, FriendsManagementState>(

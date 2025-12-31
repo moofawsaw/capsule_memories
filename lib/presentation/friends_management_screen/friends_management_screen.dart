@@ -42,8 +42,8 @@ class FriendsManagementScreenState
         final state = ref.watch(friendsManagementNotifier);
         final notifier = ref.read(friendsManagementNotifier.notifier);
 
-        final isSearching = (state.searchResults?.isNotEmpty ?? false) ||
-            (state.searchQuery?.isNotEmpty ?? false);
+        final isSearching = (state.searchResults.isNotEmpty) ||
+            (state.searchQuery.isNotEmpty);
 
         return Scaffold(
           backgroundColor: theme.colorScheme.onPrimaryContainer,
@@ -54,7 +54,7 @@ class FriendsManagementScreenState
             children: [
               _buildSearchBar(context, state, notifier),
               Expanded(
-                child: (state.isLoading ?? false)
+                child: state.isLoading
                     ? Center(child: CircularProgressIndicator())
                     : _buildContent(context, state, notifier, isSearching),
               ),
@@ -67,7 +67,7 @@ class FriendsManagementScreenState
 
   Widget _buildContent(
     BuildContext context,
-    FriendsManagementState state,
+    dynamic state,
     FriendsManagementNotifier notifier,
     bool isSearching,
   ) {
@@ -87,7 +87,7 @@ class FriendsManagementScreenState
   }
 
   /// Search bar with search query and results
-  Widget _buildSearchBar(BuildContext context, FriendsManagementState state,
+  Widget _buildSearchBar(BuildContext context, dynamic state,
       FriendsManagementNotifier notifier) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
@@ -101,7 +101,7 @@ class FriendsManagementScreenState
               },
             ),
           ),
-          if (state.searchQuery?.isNotEmpty ?? false)
+          if (state.searchQuery.isNotEmpty)
             IconButton(
               icon: Icon(Icons.close,
                   color: theme.colorScheme.onPrimaryContainer),
@@ -118,8 +118,8 @@ class FriendsManagementScreenState
   Widget _buildMainContentSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(friendsManagementNotifier);
-      final isSearching = (state.searchResults?.isNotEmpty ?? false) ||
-          (state.searchQuery?.isNotEmpty ?? false);
+      final isSearching = (state.searchResults.isNotEmpty) ||
+          (state.searchQuery.isNotEmpty);
 
       return Container(
           margin:

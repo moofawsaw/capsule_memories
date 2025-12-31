@@ -1,4 +1,7 @@
-part of 'friends_management_notifier.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:camera/camera.dart';
+import '../models/friends_management_model.dart';
+
 part 'friends_management_state.freezed.dart';
 
 enum CameraPermissionStatus {
