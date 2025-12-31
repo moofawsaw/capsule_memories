@@ -28,6 +28,52 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   // CRITICAL FIX: Add getter for story IDs to use in navigation
   List<String> get currentMemoryStoryIds => _currentMemoryStoryIds;
 
+  /// CHECK USER MEMBERSHIP: Verify if current user is a member of the memory
+  Future<bool> _checkCurrentUserMembership(String memoryId) async {
+    try {
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+
+      if (currentUser == null) {
+        print('❌ MEMBERSHIP CHECK: No authenticated user');
+        return false;
+      }
+
+      print(
+          '🔍 MEMBERSHIP CHECK: Verifying user ${currentUser.id} for memory $memoryId');
+
+      // Check if user is the creator
+      final memoryResponse = await SupabaseService.instance.client
+          ?.from('memories')
+          .select('creator_id')
+          .eq('id', memoryId)
+          .single();
+
+      if (memoryResponse != null &&
+          memoryResponse['creator_id'] == currentUser.id) {
+        print('✅ MEMBERSHIP CHECK: User is memory creator');
+        return true;
+      }
+
+      // Check if user is a contributor
+      final contributorResponse = await SupabaseService.instance.client
+          ?.from('memory_contributors')
+          .select('id')
+          .eq('memory_id', memoryId)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+      final isMember = contributorResponse != null;
+      print(
+          '${isMember ? "✅" : "❌"} MEMBERSHIP CHECK: User ${isMember ? "is" : "is NOT"} a contributor');
+
+      return isMember;
+    } catch (e, stackTrace) {
+      print('❌ MEMBERSHIP CHECK ERROR: $e');
+      print('   Stack trace: $stackTrace');
+      return false;
+    }
+  }
+
   /// DEBUG TOAST: Validate data passing to UI elements
   Map<String, dynamic> validateDataPassing() {
     final model = state.eventTimelineViewModel;
@@ -273,6 +319,15 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
     // Set loading state
     state = state.copyWith(isLoading: true);
+
+    // CRITICAL: Check user membership BEFORE loading data
+    final isMember = await _checkCurrentUserMembership(navArgs.memoryId);
+
+    // Update state with membership status
+    state = state.copyWith(isCurrentUserMember: isMember);
+
+    print(
+        '🔒 MEMBERSHIP: QR button ${isMember ? "will be shown" : "will be hidden"}');
 
     // Fetch actual data from database using memory ID
     await _loadMemoryStories(navArgs.memoryId);

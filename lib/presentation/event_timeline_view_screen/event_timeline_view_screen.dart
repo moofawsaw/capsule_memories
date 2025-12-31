@@ -244,51 +244,63 @@ class EventTimelineViewScreenState
     );
   }
 
-  /// Section Widget
+  /// Section Widget - UPDATED to conditionally show QR button
   Widget _buildTimelineSection(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(top: 6.h),
-      child: Stack(
-        children: [
-          Container(
-            width: double.maxFinite,
-            padding: EdgeInsets.symmetric(horizontal: 16.h),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: appTheme.blue_gray_900,
-                  width: 1,
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(eventTimelineViewNotifier);
+        final isCurrentUserMember = state.isCurrentUserMember;
+
+        print(
+            '🔍 TIMELINE QR BUTTON: isCurrentUserMember = $isCurrentUserMember');
+
+        return Container(
+          margin: EdgeInsets.only(top: 6.h),
+          child: Stack(
+            children: [
+              Container(
+                width: double.maxFinite,
+                padding: EdgeInsets.symmetric(horizontal: 16.h),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: appTheme.blue_gray_900,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    _buildStoryProgress(context),
+                    SizedBox(height: 44.h),
+                    _buildTimelineDetails(context),
+                    SizedBox(height: 20.h),
+                  ],
                 ),
               ),
-            ),
-            child: Column(
-              children: [
-                _buildStoryProgress(context),
-                SizedBox(height: 44.h),
-                _buildTimelineDetails(context),
-                SizedBox(height: 20.h),
-              ],
-            ),
+              // CONDITIONAL QR BUTTON: Only show if current user is a member
+              if (isCurrentUserMember)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Container(
+                    margin: EdgeInsets.only(right: 16.h),
+                    child: CustomIconButton(
+                      iconPath: ImageConstant.imgButtons,
+                      backgroundColor: appTheme.gray_900_03,
+                      borderRadius: 24.h,
+                      height: 48.h,
+                      width: 48.h,
+                      padding: EdgeInsets.all(12.h),
+                      onTap: () {
+                        onTapTimelineOptions(context);
+                      },
+                    ),
+                  ),
+                ),
+            ],
           ),
-          Align(
-            alignment: Alignment.topRight,
-            child: Container(
-              margin: EdgeInsets.only(right: 16.h),
-              child: CustomIconButton(
-                iconPath: ImageConstant.imgButtons,
-                backgroundColor: appTheme.gray_900_03,
-                borderRadius: 24.h,
-                height: 48.h,
-                width: 48.h,
-                padding: EdgeInsets.all(12.h),
-                onTap: () {
-                  onTapTimelineOptions(context);
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
