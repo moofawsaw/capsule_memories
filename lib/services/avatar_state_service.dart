@@ -94,6 +94,7 @@ class AvatarStateNotifier extends StateNotifier<AvatarState> {
     state = state.copyWith(
       avatarUrl: newAvatarUrl,
       userEmail: userEmail ?? state.userEmail,
+      isLoading: false,
     );
     print('✅ Avatar updated in cache');
   }

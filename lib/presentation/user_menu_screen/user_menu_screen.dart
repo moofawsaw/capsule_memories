@@ -1,5 +1,8 @@
+import 'package:image_picker/image_picker.dart';
+
 import '../../core/app_export.dart';
 import '../../services/avatar_state_service.dart';
+import '../../services/user_profile_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_menu_item.dart';
@@ -110,37 +113,63 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
             Expanded(
                 flex: 7,
                 child: GestureDetector(
-                  onTap: () => onTapProfile(context),
+                  onTap: () => _handleAvatarTap(context, ref),
                   child: Row(
                     children: [
-                      // Avatar - show letter or image
-                      Container(
-                        width: 52.h,
-                        height: 52.h,
-                        decoration: BoxDecoration(
-                          color: showLetterAvatar
-                              ? appTheme.deep_purple_A100
-                              : null,
-                          shape: BoxShape.circle,
-                          image: !showLetterAvatar
-                              ? DecorationImage(
-                                  image: NetworkImage(avatarUrl),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: showLetterAvatar
-                            ? Center(
-                                child: Text(
-                                  avatarLetter,
-                                  style: TextStyle(
-                                    color: appTheme.white_A700,
-                                    fontSize: 24.h,
-                                    fontWeight: FontWeight.bold,
+                      // Avatar - show letter or image with loading indicator
+                      Stack(
+                        children: [
+                          Container(
+                            width: 52.h,
+                            height: 52.h,
+                            decoration: BoxDecoration(
+                              color: showLetterAvatar
+                                  ? appTheme.deep_purple_A100
+                                  : null,
+                              shape: BoxShape.circle,
+                              image: !showLetterAvatar
+                                  ? DecorationImage(
+                                      image: NetworkImage(avatarUrl),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
+                            ),
+                            child: showLetterAvatar
+                                ? Center(
+                                    child: Text(
+                                      avatarLetter,
+                                      style: TextStyle(
+                                        color: appTheme.white_A700,
+                                        fontSize: 24.h,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          // Loading overlay
+                          if (avatarState.isLoading)
+                            Container(
+                              width: 52.h,
+                              height: 52.h,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withAlpha(128),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 24.h,
+                                  height: 24.h,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      appTheme.white_A700,
+                                    ),
                                   ),
                                 ),
-                              )
-                            : null,
+                              ),
+                            ),
+                        ],
                       ),
                       SizedBox(width: 12.h),
                       // User info
@@ -182,6 +211,87 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
                     width: 26.h)),
           ]));
     });
+  }
+
+  /// Handle avatar tap - show image picker and upload
+  Future<void> _handleAvatarTap(BuildContext context, WidgetRef ref) async {
+    try {
+      // Show image picker
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      // Set loading state
+      final avatarNotifier = ref.read(avatarStateProvider.notifier);
+
+      // Read image bytes
+      final imageBytes = await image.readAsBytes();
+
+      // Upload to Supabase Storage
+      final storagePath = await UserProfileService.instance.uploadAvatar(
+        imageBytes,
+        image.name,
+      );
+
+      if (storagePath == null) {
+        _showErrorSnackbar(context, 'Failed to upload image');
+        return;
+      }
+
+      // Update user profile in database
+      final success = await UserProfileService.instance.updateUserProfile(
+        avatarUrl: storagePath,
+      );
+
+      if (!success) {
+        _showErrorSnackbar(context, 'Failed to update profile');
+        return;
+      }
+
+      // Get signed URL for display
+      final signedUrl =
+          await UserProfileService.instance.getAvatarUrl(storagePath);
+
+      if (signedUrl != null) {
+        // Update global avatar state - this will refresh all widgets showing the avatar
+        avatarNotifier.updateAvatar(signedUrl);
+
+        // Refresh local menu state
+        await ref.read(userMenuNotifier.notifier).refreshProfile();
+
+        _showSuccessSnackbar(context, 'Profile picture updated successfully');
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating avatar: $e');
+      _showErrorSnackbar(
+          context, 'An error occurred while updating profile picture');
+    }
+  }
+
+  void _showSuccessSnackbar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showErrorSnackbar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   /// Main navigation menu items
