@@ -42,7 +42,7 @@ class FriendsManagementScreenState
         final state = ref.watch(friendsManagementNotifier);
         final notifier = ref.read(friendsManagementNotifier.notifier);
 
-        final isSearching = (state.searchResults.isNotEmpty) ||
+        final isSearching = (state.searchResults?.isNotEmpty ?? false) ||
             (state.searchQuery.isNotEmpty);
 
         return Scaffold(
@@ -118,7 +118,7 @@ class FriendsManagementScreenState
   Widget _buildMainContentSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(friendsManagementNotifier);
-      final isSearching = (state.searchResults.isNotEmpty) ||
+      final isSearching = (state.searchResults?.isNotEmpty ?? false) ||
           (state.searchQuery.isNotEmpty);
 
       return Container(
