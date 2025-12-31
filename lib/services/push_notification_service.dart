@@ -1,10 +1,14 @@
 import 'dart:io';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import './supabase_service.dart';
-import './notification_preferences_service.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../core/utils/navigator_service.dart';
+import './notification_preferences_service.dart';
+import './supabase_service.dart';
 
 /// Top-level function for handling background messages
 @pragma('vm:entry-point')
@@ -213,18 +217,113 @@ class PushNotificationService {
     }
   }
 
-  /// Handle foreground message
+  /// Initialize notification channels for Android
+  Future<void> initNotificationChannels() async {
+    if (Platform.isAndroid) {
+      final androidImplementation = _flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      if (androidImplementation != null) {
+        const List<AndroidNotificationChannel> channels = [
+          AndroidNotificationChannel(
+            'memories',
+            'Memories',
+            description: 'Notifications about memories and stories',
+            importance: Importance.high,
+            playSound: true,
+          ),
+          AndroidNotificationChannel(
+            'social',
+            'Social',
+            description: 'Friend requests and social updates',
+            importance: Importance.high,
+            playSound: true,
+          ),
+          AndroidNotificationChannel(
+            'system',
+            'System',
+            description: 'System notifications',
+            importance: Importance.defaultImportance,
+          ),
+        ];
+
+        for (final channel in channels) {
+          await androidImplementation.createNotificationChannel(channel);
+        }
+
+        debugPrint('✅ Created ${channels.length} notification channels');
+      }
+    }
+  }
+
+  /// Handle foreground message with image support
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     final notification = message.notification;
     final data = message.data;
 
-    if (notification != null) {
-      await showNotification(
-        title: notification.title ?? 'Notification',
-        body: notification.body ?? '',
-        payload: data['payload'],
-        notificationType: data['notification_type'],
-      );
+    if (notification == null) return;
+
+    // Check if there's an image
+    String? imageUrl =
+        notification.android?.imageUrl ?? notification.apple?.imageUrl;
+
+    BigPictureStyleInformation? bigPictureStyle;
+
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      try {
+        // Download the image
+        final response = await http.get(Uri.parse(imageUrl));
+        if (response.statusCode == 200) {
+          bigPictureStyle = BigPictureStyleInformation(
+            ByteArrayAndroidBitmap(response.bodyBytes),
+            contentTitle: notification.title,
+            summaryText: notification.body,
+            hideExpandedLargeIcon: false,
+          );
+        }
+      } catch (e) {
+        debugPrint('Failed to download notification image: $e');
+      }
+    }
+
+    // Get channel from data
+    final channelId = data['channel_id'] ?? 'system';
+    final channelName = _getChannelName(channelId);
+
+    await _flutterLocalNotificationsPlugin.show(
+      message.hashCode,
+      notification.title,
+      notification.body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          importance: Importance.high,
+          priority: Priority.high,
+          styleInformation: bigPictureStyle,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: data['deep_link'],
+    );
+  }
+
+  /// Get channel name from channel ID
+  String _getChannelName(String channelId) {
+    switch (channelId) {
+      case 'memories':
+        return 'Memories';
+      case 'social':
+        return 'Social';
+      case 'system':
+        return 'System';
+      default:
+        return 'System';
     }
   }
 
@@ -235,11 +334,68 @@ class PushNotificationService {
     // This method is for additional processing if needed
   }
 
-  /// Handle notification tap
+  /// Handle notification tap with deep link navigation
   void _handleNotificationTap(RemoteMessage message) {
     final data = message.data;
-    debugPrint('📱 Notification tapped with data: $data');
-    // Navigate to appropriate screen based on data
+    final deepLink = data['deep_link'];
+
+    if (deepLink != null && deepLink.isNotEmpty) {
+      debugPrint('📱 Navigating to deep link: $deepLink');
+      _handleDeepLink(deepLink);
+    } else {
+      debugPrint('📱 Notification tapped with data: $data');
+    }
+  }
+
+  /// Handle notification tap from local notifications
+  void _onNotificationTapped(NotificationResponse response) {
+    final deepLink = response.payload;
+
+    if (deepLink != null && deepLink.isNotEmpty) {
+      debugPrint('📱 Navigating to deep link: $deepLink');
+      _handleDeepLink(deepLink);
+    } else {
+      debugPrint('📱 Notification tapped with payload: ${response.payload}');
+    }
+  }
+
+  /// Handle deep link navigation
+  void _handleDeepLink(String deepLink) {
+    try {
+      final uri = Uri.parse(deepLink);
+      final navigatorKey = NavigatorService.navigatorKey;
+
+      if (navigatorKey.currentState == null) {
+        debugPrint('⚠️ Navigator not ready, cannot handle deep link');
+        return;
+      }
+
+      switch (uri.host) {
+        case 'memory':
+          final memoryId =
+              uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+          if (memoryId != null) {
+            navigatorKey.currentState
+                ?.pushNamed('/memory_details/$memoryId', arguments: memoryId);
+          }
+          break;
+        case 'profile':
+          final userId =
+              uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+          if (userId != null) {
+            navigatorKey.currentState
+                ?.pushNamed('/user_profile/$userId', arguments: userId);
+          }
+          break;
+        case 'friends':
+          navigatorKey.currentState?.pushNamed('/friends_management');
+          break;
+        default:
+          debugPrint('⚠️ Unknown deep link host: ${uri.host}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling deep link: $e');
+    }
   }
 
   /// Show local notification (checks preferences before showing)
@@ -295,11 +451,6 @@ class PushNotificationService {
       details,
       payload: payload,
     );
-  }
-
-  /// Handle notification tap from local notifications
-  void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('📱 Notification tapped with payload: ${response.payload}');
   }
 
   /// Create notification channel (Android only)

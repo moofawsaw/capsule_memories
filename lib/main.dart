@@ -48,10 +48,11 @@ Future<void> main() async {
     anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
   );
 
+  // 🎯 Initialize notification channels
+  await PushNotificationService.instance.initNotificationChannels();
+
   // 🎯 Initialize push notifications with FCM token registration
-  // This requests permission and registers the FCM token with Supabase
   await PushNotificationService.instance.initialize();
-  await PushNotificationService.instance.createNotificationChannel();
 
   runApp(
     ProviderScope(
