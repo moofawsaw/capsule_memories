@@ -1,6 +1,5 @@
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
 import '../qr_code_share_screen_two_screen/qr_code_share_screen_two_screen.dart';
 import './notifier/friends_management_notifier.dart';
@@ -46,9 +45,13 @@ class FriendsManagementScreenState
         return Scaffold(
           backgroundColor: theme.colorScheme.onPrimaryContainer,
           appBar: CustomAppBar(
-            title: "Manage Friends",
+            layoutType: CustomAppBarLayoutType.titleWithLeading,
+            title: "Friends",
             leadingIcon: ImageConstant.imgButtons,
             onLeadingTap: () => _openQRShareBottomSheet(context),
+            actionIcons: [
+              ImageConstant.imgIconGray5042x42, // Camera scan icon
+            ],
           ),
           body: Column(
             children: [
