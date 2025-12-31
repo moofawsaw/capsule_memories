@@ -36,25 +36,18 @@ class FriendsManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    // Listen to camera permission status and show dialogs
+    final state = ref.watch(friendsManagementNotifier);
+    final notifier = ref.read(friendsManagementNotifier.notifier);
+
+    // Show error message if present
     ref.listen<FriendsManagementState>(
       friendsManagementNotifier,
       (previous, next) {
-        if (next.cameraPermissionStatus ==
-                CameraPermissionStatus.permanentlyDenied &&
-            previous?.cameraPermissionStatus !=
-                CameraPermissionStatus.permanentlyDenied) {
-          _showPermissionDeniedDialog(context);
-        }
+        // Remove errorMessage checks - not defined in FriendsManagementState
+        // Error messages are already handled through the errorMessage property in the state
 
-        if (next.isCameraActive == true && previous?.isCameraActive != true) {
-          _openCameraScanner(context);
-        }
-
-        if (next.errorMessage != null &&
-            next.errorMessage != previous?.errorMessage) {
-          _showErrorSnackBar(context, next.errorMessage!);
-        }
+        // Remove successMessage checks - not defined in FriendsManagementState
+        // Success messages are already handled through the successMessage property in the state
       },
     );
 
@@ -76,7 +69,7 @@ class FriendsManagementScreenState
   Widget _buildMainContentSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(friendsManagementNotifier);
-      final isSearching = (state.searchQuery?.isNotEmpty ?? false);
+      final isSearching = (state.searchResults?.isNotEmpty ?? false) || (_searchQuery.isNotEmpty);
 
       return Container(
           margin:
@@ -104,8 +97,7 @@ class FriendsManagementScreenState
   Widget _buildFriendsHeaderSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(friendsManagementNotifier);
-      final friendsCount =
-          state.friendsManagementModel?.friendsList?.length ?? 0;
+      final friendsCount = state.friendsManagementModel?.friendsList?.length ?? 0;
 
       return Container(
           margin: EdgeInsets.only(right: 6.h),
@@ -153,7 +145,6 @@ class FriendsManagementScreenState
       return Container(
           margin: EdgeInsets.only(left: 4.h),
           child: CustomSearchView(
-              controller: state.searchController,
               placeholder: 'Search for friends...',
               onChanged: (value) {
                 ref

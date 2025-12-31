@@ -1,11 +1,13 @@
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import '../models/friends_management_model.dart';
 import '../../../core/app_export.dart';
 import '../../../services/friends_service.dart';
 
 part 'friends_management_state.dart';
+part 'friends_management_notifier.freezed.dart';
 
 final friendsManagementNotifier = StateNotifierProvider.autoDispose<
     FriendsManagementNotifier, FriendsManagementState>(
@@ -19,6 +21,7 @@ final friendsManagementNotifier = StateNotifierProvider.autoDispose<
 class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
   final FriendsService _friendsService = FriendsService();
   CameraController? _cameraController;
+  String _searchQuery = '';
 
   FriendsManagementNotifier(FriendsManagementState state) : super(state) {
     initialize();
@@ -26,13 +29,15 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
   Future<void> initialize() async {
     state = state.copyWith(
-      searchController: TextEditingController(),
+      friendsManagementModel: FriendsManagementModel(),
       isLoading: true,
     );
 
     await _fetchAllFriendsData();
 
-    state = state.copyWith(isLoading: false);
+    state = state.copyWith(
+      isLoading: false,
+    );
   }
 
   Future<void> _fetchAllFriendsData() async {
@@ -57,7 +62,7 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
         ),
       );
 
-      _filterFriends(state.searchQuery ?? '');
+      _filterFriends(_searchQuery);
     } catch (e) {
       debugPrint('Error fetching friends data: $e');
       state = state.copyWith(
@@ -109,7 +114,9 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
   }
 
   void onSearchChanged(String query) {
+    _searchQuery = query;
     state = state.copyWith(searchQuery: query);
+
     if (query.isEmpty) {
       state = state.copyWith(
         searchResults: [],
@@ -228,11 +235,13 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
           ),
         );
 
-        _filterFriends(state.searchQuery ?? '');
+        _filterFriends(_searchQuery);
       }
     } catch (e) {
       debugPrint('Error removing sent request: $e');
-      state = state.copyWith(errorMessage: 'Failed to cancel request');
+      state = state.copyWith(
+        errorMessage: 'Failed to cancel request',
+      );
     }
   }
 
@@ -246,7 +255,9 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
       }
     } catch (e) {
       debugPrint('Error accepting request: $e');
-      state = state.copyWith(errorMessage: 'Failed to accept request');
+      state = state.copyWith(
+        errorMessage: 'Failed to accept request',
+      );
     }
   }
 
@@ -265,11 +276,13 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
           ),
         );
 
-        _filterFriends(state.searchQuery ?? '');
+        _filterFriends(_searchQuery);
       }
     } catch (e) {
       debugPrint('Error declining request: $e');
-      state = state.copyWith(errorMessage: 'Failed to decline request');
+      state = state.copyWith(
+        errorMessage: 'Failed to decline request',
+      );
     }
   }
 
@@ -288,11 +301,13 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
           ),
         );
 
-        _filterFriends(state.searchQuery ?? '');
+        _filterFriends(_searchQuery);
       }
     } catch (e) {
       debugPrint('Error removing friend: $e');
-      state = state.copyWith(errorMessage: 'Failed to remove friend');
+      state = state.copyWith(
+        errorMessage: 'Failed to remove friend',
+      );
     }
   }
 
@@ -301,14 +316,19 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
       final status = await Permission.camera.request();
       if (status.isGranted) {
         // Initialize QR scanner
-        state = state.copyWith(isQRScannerActive: true);
+        state = state.copyWith(
+          isQRScannerActive: true,
+        );
         // QR scanning logic would be implemented here
       } else {
         state = state.copyWith(
-            errorMessage: 'Camera permission is required for QR scanning');
+          errorMessage: 'Camera permission is required for QR scanning',
+        );
       }
     } catch (e) {
-      state = state.copyWith(errorMessage: 'Failed to open QR scanner');
+      state = state.copyWith(
+        errorMessage: 'Failed to open QR scanner',
+      );
     }
   }
 
@@ -395,12 +415,91 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
     }
   }
 
+  Future<void> processScannedQRCode(String qrCode) async {
+    try {
+      debugPrint('Processing QR code: $qrCode');
+
+      // Parse the QR code data - expecting format: capsule://friend-request/USER_ID
+      final uri = Uri.tryParse(qrCode);
+
+      if (uri == null ||
+          uri.scheme != 'capsule' ||
+          uri.host != 'friend-request') {
+        state = state.copyWith(
+          errorMessage:
+              'Invalid QR code format. Please scan a valid friend request QR code.',
+        );
+        return;
+      }
+
+      final userId =
+          uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+
+      if (userId == null || userId.isEmpty) {
+        state = state.copyWith(
+          errorMessage: 'Invalid user ID in QR code.',
+        );
+        return;
+      }
+
+      // Check if user is already a friend or has pending request
+      final friendshipStatus =
+          await _friendsService.getFriendshipStatus(userId);
+
+      if (friendshipStatus == 'friends') {
+        state = state.copyWith(
+          errorMessage: 'You are already friends with this user.',
+        );
+        return;
+      }
+
+      if (friendshipStatus == 'pending_sent') {
+        state = state.copyWith(
+          errorMessage: 'Friend request already sent to this user.',
+        );
+        return;
+      }
+
+      if (friendshipStatus == 'pending_received') {
+        state = state.copyWith(
+          errorMessage:
+              'This user has already sent you a friend request. Check your incoming requests.',
+        );
+        return;
+      }
+
+      // Send friend request - pass empty string as second parameter
+      final success = await _friendsService.sendFriendRequest(userId, '');
+
+      if (success) {
+        state = state.copyWith(
+          successMessage: 'Friend request sent successfully!',
+        );
+
+        // Refresh data to show the new sent request
+        await _fetchAllFriendsData();
+      } else {
+        state = state.copyWith(
+          errorMessage: 'Failed to send friend request. Please try again.',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error processing QR code: $e');
+      state = state.copyWith(
+        errorMessage: 'An error occurred while processing the QR code.',
+      );
+    }
+  }
+
   Future<void> openAppSettings() async {
     await openAppSettings();
   }
 
   Future<void> closeCamera() async {
     if (_cameraController != null) {
+      if (_cameraController!.value.isStreamingImages) {
+        await _cameraController!.stopImageStream();
+      }
       await _cameraController!.dispose();
       _cameraController = null;
     }
@@ -413,7 +512,6 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
   @override
   void dispose() {
-    state.searchController?.dispose();
     _cameraController?.dispose();
     super.dispose();
   }

@@ -264,32 +264,54 @@ class PushNotificationService {
 
     if (notification == null) return;
 
-    // Check if there's an image
-    String? imageUrl =
-        notification.android?.imageUrl ?? notification.apple?.imageUrl;
+    // Extract image type and URL from data payload
+    final String? imageType = data['image_type'];
+    final String? imageUrl = data['image_url'];
+    final String? notificationIcon = data['notification_icon'];
 
-    BigPictureStyleInformation? bigPictureStyle;
+    // Get channel from data
+    final channelId = data['channel_id'] ?? 'system';
+    final channelName = _getChannelName(channelId);
 
+    StyleInformation? styleInformation;
+    AndroidBitmap? largeIcon;
+
+    // Handle different image types
     if (imageUrl != null && imageUrl.isNotEmpty) {
       try {
         // Download the image
         final response = await http.get(Uri.parse(imageUrl));
         if (response.statusCode == 200) {
-          bigPictureStyle = BigPictureStyleInformation(
-            ByteArrayAndroidBitmap(response.bodyBytes),
-            contentTitle: notification.title,
-            summaryText: notification.body,
-            hideExpandedLargeIcon: false,
-          );
+          final imageBytes = response.bodyBytes;
+
+          if (imageType == 'avatar') {
+            // For avatars: Use as largeIcon (small circular icon)
+            largeIcon = ByteArrayAndroidBitmap(imageBytes) as AndroidBitmap<Object>;
+            debugPrint('✅ Avatar set as largeIcon for notification');
+          } else if (imageType == 'cover' || imageType == 'thumbnail') {
+            // For covers/thumbnails: Use BigPicture (expanded large image)
+            styleInformation = BigPictureStyleInformation(
+              ByteArrayAndroidBitmap(imageBytes),
+              contentTitle: notification.title,
+              summaryText: notification.body,
+              hideExpandedLargeIcon: false,
+            );
+            debugPrint('✅ Cover/Thumbnail set as BigPicture for notification');
+          } else {
+            // Default behavior for unknown types
+            styleInformation = BigPictureStyleInformation(
+              ByteArrayAndroidBitmap(imageBytes),
+              contentTitle: notification.title,
+              summaryText: notification.body,
+              hideExpandedLargeIcon: false,
+            );
+            debugPrint('✅ Default BigPicture style applied');
+          }
         }
       } catch (e) {
-        debugPrint('Failed to download notification image: $e');
+        debugPrint('❌ Failed to download notification image: $e');
       }
     }
-
-    // Get channel from data
-    final channelId = data['channel_id'] ?? 'system';
-    final channelName = _getChannelName(channelId);
 
     await _flutterLocalNotificationsPlugin.show(
       message.hashCode,
@@ -301,7 +323,8 @@ class PushNotificationService {
           channelName,
           importance: Importance.high,
           priority: Priority.high,
-          styleInformation: bigPictureStyle,
+          styleInformation: styleInformation,
+          largeIcon: largeIcon,
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,

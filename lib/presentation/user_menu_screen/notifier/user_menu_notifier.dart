@@ -2,6 +2,8 @@ import '../models/user_menu_model.dart';
 import '../../../core/app_export.dart';
 import '../../../services/supabase_service.dart';
 import '../../../core/utils/theme_provider.dart';
+import '../../../services/avatar_state_service.dart';
+import '../../../services/memory_cache_service.dart';
 
 part 'user_menu_state.dart';
 
@@ -108,6 +110,21 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
       if (client != null) {
         await client.auth.signOut();
       }
+
+      // 🔥 CRITICAL: Clear all cached user data on sign out
+      // This prevents previous user data from displaying for new login
+      print('🧹 CACHE CLEAR: Starting comprehensive cache cleanup on sign out');
+
+      // Clear avatar state (profile pictures, user info)
+      ref.read(avatarStateProvider.notifier).clearAvatar();
+      print('✅ CACHE CLEAR: Avatar state cleared');
+
+      // Clear memory and story caches
+      MemoryCacheService().clearCache();
+      print('✅ CACHE CLEAR: Memory/story cache cleared');
+
+      print(
+          '✅ CACHE CLEAR: All user data cache successfully cleared on sign out');
 
       state = state.copyWith(
         isLoading: false,

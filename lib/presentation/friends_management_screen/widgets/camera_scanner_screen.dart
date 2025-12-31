@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_icon_button.dart';
@@ -14,9 +15,96 @@ class CameraScannerScreen extends ConsumerStatefulWidget {
 
 class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   bool isFlashOn = false;
+  bool isScanning = false;
+  BarcodeScanner? _barcodeScanner;
+
+  @override
+  void initState() {
+    super.initState();
+    _barcodeScanner = BarcodeScanner();
+    _startImageStream();
+  }
+
+  void _startImageStream() {
+    final notifierState = ref.read(friendsManagementNotifier);
+    final cameraController = notifierState.cameraController;
+    if (cameraController == null || !cameraController.value.isInitialized)
+      return;
+
+    cameraController.startImageStream((CameraImage image) {
+      if (isScanning) return;
+      _processCameraImage(image);
+    });
+  }
+
+  Future<void> _processCameraImage(CameraImage image) async {
+    if (isScanning || _barcodeScanner == null) return;
+
+    setState(() => isScanning = true);
+
+    try {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      final Size imageSize =
+          Size(image.width.toDouble(), image.height.toDouble());
+
+      final InputImageRotation imageRotation = InputImageRotation.rotation0deg;
+
+      final InputImageFormat inputImageFormat = InputImageFormat.nv21;
+
+      final inputImageMetadata = InputImageMetadata(
+        size: imageSize,
+        rotation: imageRotation,
+        format: inputImageFormat,
+        bytesPerRow: image.planes.first.bytesPerRow,
+      );
+
+      final inputImage = InputImage.fromBytes(
+        bytes: bytes,
+        metadata: inputImageMetadata,
+      );
+
+      final List<Barcode> barcodes =
+          await _barcodeScanner!.processImage(inputImage);
+
+      if (barcodes.isNotEmpty) {
+        final barcode = barcodes.first;
+        if (barcode.rawValue != null && barcode.rawValue!.isNotEmpty) {
+          await _handleScannedCode(barcode.rawValue!);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error processing image: $e');
+    } finally {
+      setState(() => isScanning = false);
+    }
+  }
+
+  Future<void> _handleScannedCode(String code) async {
+    final notifierState = ref.read(friendsManagementNotifier);
+    final cameraController = notifierState.cameraController;
+    if (cameraController != null) {
+      await cameraController.stopImageStream();
+    }
+
+    if (!mounted) return;
+
+    await ref
+        .read(friendsManagementNotifier.notifier)
+        .processScannedQRCode(code);
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
 
   @override
   void dispose() {
+    _barcodeScanner?.close();
     super.dispose();
   }
 
@@ -88,6 +176,39 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
             ),
           ),
 
+          // Scanning indicator
+          if (isScanning)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withAlpha(64),
+                child: Center(
+                  child: Container(
+                    padding: EdgeInsets.all(20.h),
+                    decoration: BoxDecoration(
+                      color: appTheme.gray_900_01.withAlpha(230),
+                      borderRadius: BorderRadius.circular(12.h),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(
+                            color: appTheme.deep_purple_A100),
+                        SizedBox(height: 12.h),
+                        Text(
+                          'Processing QR code...',
+                          style: TextStyleHelper
+                              .instance.body14RegularPlusJakartaSans
+                              .copyWith(
+                            color: appTheme.white_A700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           // Instructions
           Positioned(
             bottom: 80.h,
@@ -98,7 +219,8 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
               child: Text(
                 'Position QR code within the frame to scan',
                 textAlign: TextAlign.center,
-                style: TextStyleHelper.instance.body16MediumPlusJakartaSans.copyWith(
+                style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                    .copyWith(
                   color: appTheme.white_A700,
                   shadows: [
                     Shadow(
@@ -119,8 +241,8 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   Future<void> _toggleFlash() async {
     if (kIsWeb) return; // Flash not supported on web
 
-    final cameraController =
-        ref.read(friendsManagementNotifier).cameraController;
+    final notifierState = ref.read(friendsManagementNotifier);
+    final cameraController = notifierState.cameraController;
     if (cameraController == null) return;
 
     try {
@@ -133,6 +255,10 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
     } catch (e) {
       debugPrint('Error toggling flash: $e');
     }
+  }
+
+  CameraController? _getCameraController() {
+    return ref.read(friendsManagementNotifier).cameraController;
   }
 }
 
