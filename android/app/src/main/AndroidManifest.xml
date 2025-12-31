@@ -12,12 +12,7 @@
             android:icon="@mipmap/ic_launcher">
         
         <!-- Firebase Cloud Messaging notification icon and color -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_notification" />
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/notification_color" />
+        <!-- Removed ic_notification drawable references - files do not exist -->
         
         <activity
                 android:name=".MainActivity"
