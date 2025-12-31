@@ -101,6 +101,7 @@ class _MemoriesDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoriesDashboardNotifier);
+        final storyItems = state.memoriesDashboardModel?.storyItems ?? [];
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,26 +109,69 @@ class _MemoriesDashboardScreenState
             Container(
               margin: EdgeInsets.fromLTRB(20.h, 22.h, 20.h, 0),
               child: Text(
-                'Latest Stories (${state.memoriesDashboardModel?.storyItems?.length ?? 0})',
+                'Latest Stories (${storyItems.length})',
                 style: TextStyleHelper.instance.body14BoldPlusJakartaSans
                     .copyWith(color: appTheme.gray_50),
               ),
             ),
             SizedBox(height: 18.h),
-            CustomStoryList(
-              storyItems: (state.memoriesDashboardModel?.storyItems ?? [])
-                  .map((item) => CustomStoryItem(
-                        backgroundImage: item.backgroundImage ?? '',
-                        profileImage: item.profileImage ?? '',
-                        timestamp: item.timestamp ?? '2 mins ago',
-                        navigateTo: item.navigateTo,
-                      ))
-                  .toList(),
-              onStoryTap: (index) => _onStoryTap(context, index),
-            ),
+            storyItems.isEmpty
+                ? _buildStoriesEmptyState(context)
+                : CustomStoryList(
+                    storyItems: storyItems
+                        .map((item) => CustomStoryItem(
+                              backgroundImage: item.backgroundImage ?? '',
+                              profileImage: item.profileImage ?? '',
+                              timestamp: item.timestamp ?? '2 mins ago',
+                              navigateTo: item.navigateTo,
+                            ))
+                        .toList(),
+                    onStoryTap: (index) => _onStoryTap(context, index),
+                  ),
           ],
         );
       },
+    );
+  }
+
+  /// Empty State - Stories Feed
+  Widget _buildStoriesEmptyState(BuildContext context) {
+    return Container(
+      height: 120.h,
+      margin: EdgeInsets.symmetric(horizontal: 20.h),
+      padding: EdgeInsets.all(20.h),
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02.withAlpha(128),
+        borderRadius: BorderRadius.circular(16.h),
+        border: Border.all(
+          color: appTheme.blue_gray_300.withAlpha(51),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CustomImageView(
+            imagePath: ImageConstant.imgPlayCircle,
+            height: 32.h,
+            width: 32.h,
+            color: appTheme.blue_gray_300,
+          ),
+          SizedBox(height: 12.h),
+          Text(
+            'No stories yet',
+            style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            'Be the first to share a story',
+            style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
@@ -286,36 +330,18 @@ class _MemoriesDashboardScreenState
         }
 
         return Container(
-          margin: EdgeInsets.fromLTRB(16.h, 20.h, 0, 0),
-          child: _buildMemoryList(context, filteredMemories),
+          margin: EdgeInsets.fromLTRB(16.h, 20.h, 16.h, 0),
+          child: _buildMemoryList(context, filteredMemories, selectedIndex),
         );
       },
     );
   }
 
   /// Section Widget - Memory List
-  Widget _buildMemoryList(
-      BuildContext context, List<MemoryItemModel> memoryItems) {
+  Widget _buildMemoryList(BuildContext context,
+      List<MemoryItemModel> memoryItems, int selectedIndex) {
     if (memoryItems.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CustomImageView(
-              imagePath: ImageConstant.imgIcon10,
-              height: 48.h,
-              width: 48.h,
-              color: appTheme.blue_gray_300,
-            ),
-            SizedBox(height: 16.h),
-            Text(
-              'No memories found',
-              style: TextStyleHelper.instance.title16MediumPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
-            ),
-          ],
-        ),
-      );
+      return _buildMemoriesEmptyState(context, selectedIndex);
     }
 
     return ListView.separated(
@@ -331,6 +357,68 @@ class _MemoriesDashboardScreenState
           onTap: () => _onMemoryTap(context, memoryItem),
         );
       },
+    );
+  }
+
+  /// Empty State - Memories Feed
+  Widget _buildMemoriesEmptyState(BuildContext context, int selectedIndex) {
+    String title;
+    String subtitle;
+    String iconPath = ImageConstant.imgIcon10;
+
+    switch (selectedIndex) {
+      case 1: // Live
+        title = 'No live memories';
+        subtitle = 'Create a memory to start capturing moments';
+        break;
+      case 2: // Sealed
+        title = 'No sealed memories';
+        subtitle = 'Sealed memories will appear here';
+        break;
+      default: // All
+        title = 'No memories yet';
+        subtitle = 'Start creating memories to preserve your moments';
+    }
+
+    return Center(
+      child: Container(
+        padding: EdgeInsets.all(32.h),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CustomImageView(
+              imagePath: iconPath,
+              height: 64.h,
+              width: 64.h,
+              color: appTheme.blue_gray_300,
+            ),
+            SizedBox(height: 24.h),
+            Text(
+              title,
+              style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              subtitle,
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 24.h),
+            CustomButton(
+              text: 'Create Memory',
+              leftIcon: ImageConstant.imgIcon20x20,
+              onPressed: () => _onCreateMemoryTap(context),
+              buttonStyle: CustomButtonStyle.fillPrimary,
+              buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+              height: 44.h,
+              width: 200.h,
+              padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 12.h),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
