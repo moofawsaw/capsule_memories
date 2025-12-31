@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Capsule brand purple color for notifications -->
+    <color name="notification_color">#8B5CF6</color>
+</resources>
