@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import './core/utils/navigator_service.dart';
 import './core/utils/size_utils.dart';
 import './core/utils/theme_provider.dart';
+import './firebase_options.dart';
 import './presentation/notifications_screen/notifier/notifications_notifier.dart';
 import './routes/app_routes.dart';
 import './services/notification_service.dart';
@@ -24,8 +25,10 @@ late ProviderContainer _globalContainer;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp();
+  // Initialize Firebase with platform-specific configuration
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Initialize global provider container once
   _globalContainer = ProviderContainer();
