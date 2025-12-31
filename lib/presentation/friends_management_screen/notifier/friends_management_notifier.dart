@@ -1,13 +1,11 @@
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import '../models/friends_management_model.dart';
 import '../../../core/app_export.dart';
 import '../../../services/friends_service.dart';
 
 part 'friends_management_state.dart';
-part 'friends_management_notifier.freezed.dart';
 
 final friendsManagementNotifier = StateNotifierProvider.autoDispose<
     FriendsManagementNotifier, FriendsManagementState>(
@@ -115,7 +113,9 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
   void onSearchChanged(String query) {
     _searchQuery = query;
-    state = state.copyWith(searchQuery: query);
+    state = state.copyWith(
+      searchQuery: query,
+    );
 
     if (query.isEmpty) {
       state = state.copyWith(
@@ -130,7 +130,9 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
   Future<void> _searchUsers(String query) async {
     try {
-      state = state.copyWith(isSearching: true);
+      state = state.copyWith(
+        isSearching: true,
+      );
 
       final usersData = await _friendsService.searchAllUsers(query);
 

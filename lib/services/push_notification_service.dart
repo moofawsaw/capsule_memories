@@ -274,7 +274,7 @@ class PushNotificationService {
     final channelName = _getChannelName(channelId);
 
     StyleInformation? styleInformation;
-    AndroidBitmap? largeIcon;
+    AndroidBitmap<Object>? largeIcon;
 
     // Handle different image types
     if (imageUrl != null && imageUrl.isNotEmpty) {
@@ -286,7 +286,7 @@ class PushNotificationService {
 
           if (imageType == 'avatar') {
             // For avatars: Use as largeIcon (small circular icon)
-            largeIcon = ByteArrayAndroidBitmap(imageBytes) as AndroidBitmap<Object>;
+            largeIcon = ByteArrayAndroidBitmap(imageBytes);
             debugPrint('✅ Avatar set as largeIcon for notification');
           } else if (imageType == 'cover' || imageType == 'thumbnail') {
             // For covers/thumbnails: Use BigPicture (expanded large image)

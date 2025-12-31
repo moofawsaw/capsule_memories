@@ -1,4 +1,5 @@
 import '../../core/app_export.dart';
+import '../../widgets/custom_app_bar.dart';
 import '../../widgets/custom_icon_button_row.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
@@ -36,40 +37,89 @@ class FriendsManagementScreenState
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(friendsManagementNotifier);
-    final notifier = ref.read(friendsManagementNotifier.notifier);
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(friendsManagementNotifier);
+        final notifier = ref.read(friendsManagementNotifier.notifier);
 
-    // Show error message if present
-    ref.listen<FriendsManagementState>(
-      friendsManagementNotifier,
-      (previous, next) {
-        // Remove errorMessage checks - not defined in FriendsManagementState
-        // Error messages are already handled through the errorMessage property in the state
+        final isSearching = (state.searchResults?.isNotEmpty ?? false) ||
+            (state.searchQuery?.isNotEmpty ?? false);
 
-        // Remove successMessage checks - not defined in FriendsManagementState
-        // Success messages are already handled through the successMessage property in the state
+        return Scaffold(
+          backgroundColor: theme.colorScheme.onPrimaryContainer,
+          appBar: CustomAppBar(
+            title: "Manage Friends",
+          ),
+          body: Column(
+            children: [
+              _buildSearchBar(context, state, notifier),
+              Expanded(
+                child: (state.isLoading ?? false)
+                    ? Center(child: CircularProgressIndicator())
+                    : _buildContent(context, state, notifier, isSearching),
+              ),
+            ],
+          ),
+        );
       },
     );
+  }
 
-    return SafeArea(
-        child: Scaffold(
-            backgroundColor: appTheme.gray_900_02,
-            body: Container(
-                width: double.infinity,
-                child: Column(children: [
-                  Expanded(
-                      child: SingleChildScrollView(
-                          child: Column(spacing: 24.h, children: [
-                    _buildMainContentSection(context),
-                  ]))),
-                ]))));
+  Widget _buildContent(
+    BuildContext context,
+    FriendsManagementState state,
+    FriendsManagementNotifier notifier,
+    bool isSearching,
+  ) {
+    if (isSearching) {
+      return UserSearchResultsWidget();
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          FriendsSectionWidget(),
+          SentRequestsSectionWidget(),
+          IncomingRequestsSectionWidget(),
+        ],
+      ),
+    );
+  }
+
+  /// Search bar with search query and results
+  Widget _buildSearchBar(BuildContext context, FriendsManagementState state,
+      FriendsManagementNotifier notifier) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+      child: Row(
+        children: [
+          Expanded(
+            child: CustomSearchView(
+              placeholder: 'Search for friends...',
+              onChanged: (value) {
+                notifier.onSearchChanged(value);
+              },
+            ),
+          ),
+          if (state.searchQuery?.isNotEmpty ?? false)
+            IconButton(
+              icon: Icon(Icons.close,
+                  color: theme.colorScheme.onPrimaryContainer),
+              onPressed: () {
+                notifier.onSearchChanged('');
+              },
+            ),
+        ],
+      ),
+    );
   }
 
   /// Main content section with friends management
   Widget _buildMainContentSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(friendsManagementNotifier);
-      final isSearching = (state.searchResults?.isNotEmpty ?? false) || (_searchQuery.isNotEmpty);
+      final isSearching = (state.searchResults?.isNotEmpty ?? false) ||
+          (state.searchQuery?.isNotEmpty ?? false);
 
       return Container(
           margin:
@@ -97,7 +147,8 @@ class FriendsManagementScreenState
   Widget _buildFriendsHeaderSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(friendsManagementNotifier);
-      final friendsCount = state.friendsManagementModel?.friendsList?.length ?? 0;
+      final friendsCount =
+          state.friendsManagementModel?.friendsList?.length ?? 0;
 
       return Container(
           margin: EdgeInsets.only(right: 6.h),

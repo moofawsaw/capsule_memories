@@ -1,4 +1,5 @@
 part of 'friends_management_notifier.dart';
+part 'friends_management_state.freezed.dart';
 
 enum CameraPermissionStatus {
   notDetermined,
