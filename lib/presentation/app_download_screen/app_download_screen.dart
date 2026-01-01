@@ -1,7 +1,6 @@
-import 'package:qr_flutter/qr_flutter.dart';
-
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_qr_info_card.dart';
 import 'notifier/app_download_notifier.dart';
 
@@ -45,8 +44,9 @@ class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
   /// Section Widget
   Widget _buildAppInfoSection(BuildContext context) {
     return CustomQrInfoCard(
-      title: 'Download memry App',
-      description: 'Show this QR code with your phone to download the app',
+      title: 'Download Capsule App',
+      description:
+          'Scan this QR code with your phone to download the Capsule App',
       textAlign: TextAlign.center,
       margin: EdgeInsets.only(
         top: 40.h,
@@ -58,41 +58,18 @@ class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
 
   /// Section Widget
   Widget _buildQRCodeSection(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(appDownloadNotifier);
-
-        return Container(
-          margin: EdgeInsets.only(
-            top: 14.h,
-            left: 62.h,
-            right: 62.h,
-          ),
-          child: QrImageView(
-            data: state.appDownloadModel?.qrData ??
-                ImageConstant.imgNetworkDownload,
-            version: QrVersions.auto,
-            size: 200.h,
-            backgroundColor: appTheme.whiteCustom,
-            foregroundColor: appTheme.blackCustom,
-            gapless: false,
-            errorStateBuilder: (cxt, err) {
-              return Container(
-                width: 200.h,
-                height: 200.h,
-                color: appTheme.whiteCustom,
-                child: Center(
-                  child: Text(
-                    'QR Code Error',
-                    style: TextStyleHelper.instance.body14
-                        .copyWith(color: appTheme.blackCustom),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
+    return Container(
+      margin: EdgeInsets.only(
+        top: 14.h,
+        left: 62.h,
+        right: 62.h,
+      ),
+      child: CustomImageView(
+        imagePath: 'assets/images/image-1767240579108.png',
+        height: 200.h,
+        width: 200.h,
+        fit: BoxFit.contain,
+      ),
     );
   }
 

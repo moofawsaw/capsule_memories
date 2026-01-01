@@ -12,7 +12,7 @@ class AppDownloadModel extends Equatable {
   }) {
     qrData = qrData ?? ImageConstant.imgNetworkDownload;
     shareText = shareText ??
-        "Download the memry App and start creating memories together! https://memry.app/download";
+        "Download the Capsule App and start creating memories together! https://capapp.co/download";
     isLoading = isLoading ?? false;
     id = id ?? "";
   }
