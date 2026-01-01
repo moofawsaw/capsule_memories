@@ -54,7 +54,7 @@ class DeepLinkService {
     try {
       final uri = Uri.parse(link);
 
-      // Handle capsule.app/join/{type}/{code} URLs
+      // Handle capapp.co/join/{type}/{code} URLs
       if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'join') {
         if (uri.pathSegments.length >= 3) {
           final type = uri.pathSegments[1];

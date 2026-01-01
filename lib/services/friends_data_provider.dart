@@ -255,4 +255,45 @@ class FriendsDataProvider {
     _incomingRequestsController.close();
     _sentRequestsController.close();
   }
+
+  /// Search users by username or display name
+  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    try {
+      return await _friendsService.searchAllUsers(query);
+    } catch (e) {
+      debugPrint('Error searching users: $e');
+      return [];
+    }
+  }
+
+  /// Check friendship status with another user
+  Future<String> checkFriendshipStatus(String userId) async {
+    try {
+      return await _friendsService.getFriendshipStatus(userId);
+    } catch (e) {
+      debugPrint('Error checking friendship status: $e');
+      return 'none';
+    }
+  }
+
+  /// Send friend request to another user
+  Future<bool> addFriendRequest(String receiverId, String message) async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) return false;
+
+      final currentUserId = client.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      final success =
+          await _friendsService.sendFriendRequest(currentUserId, receiverId);
+      if (success) {
+        await refreshAllData();
+      }
+      return success;
+    } catch (e) {
+      debugPrint('Error adding friend request: $e');
+      return false;
+    }
+  }
 }
