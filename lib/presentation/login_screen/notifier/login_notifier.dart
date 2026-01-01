@@ -147,13 +147,16 @@ class LoginNotifier extends StateNotifier<LoginState> {
             'Supabase is not initialized. Please check your configuration.');
       }
 
-      // Sign in with Google OAuth
+      // Sign in with Google OAuth with forced account picker
       // Supabase Flutter SDK v2.12.0+ handles deep link callbacks automatically
       // The auth state change listener in main.dart will handle success
       final authResponse = await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
         authScreenLaunchMode: LaunchMode.externalApplication,
+        queryParams: {
+          'prompt': 'select_account', // Forces account picker
+        },
       );
 
       // Verify OAuth URL was generated successfully
@@ -209,11 +212,15 @@ class LoginNotifier extends StateNotifier<LoginState> {
             'Supabase is not initialized. Please check your configuration.');
       }
 
-      // Sign in with Facebook OAuth
+      // Sign in with Facebook OAuth with forced re-authentication
       // Note: OAuth requires proper configuration in Supabase dashboard
       await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.facebook,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
+        authScreenLaunchMode: LaunchMode.externalApplication,
+        queryParams: {
+          'auth_type': 'reauthenticate', // Forces Facebook to re-authenticate
+        },
       );
 
       // Note: OAuth flow will redirect to browser/app, so we don't set success here

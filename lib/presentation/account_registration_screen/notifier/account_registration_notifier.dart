@@ -209,11 +209,15 @@ class AccountRegistrationNotifier
             'Supabase is not initialized. Please check your configuration.');
       }
 
-      // Sign in with Google OAuth
+      // Sign in with Google OAuth with forced account picker
       // Note: OAuth requires proper configuration in Supabase dashboard
       await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
+        authScreenLaunchMode: LaunchMode.externalApplication,
+        queryParams: {
+          'prompt': 'select_account', // Forces account picker
+        },
       );
 
       // Note: OAuth flow will redirect to browser/app, so we don't set success here
@@ -248,11 +252,15 @@ class AccountRegistrationNotifier
             'Supabase is not initialized. Please check your configuration.');
       }
 
-      // Sign in with Facebook OAuth
+      // Sign in with Facebook OAuth with forced re-authentication
       // Note: OAuth requires proper configuration in Supabase dashboard
       await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.facebook,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
+        authScreenLaunchMode: LaunchMode.externalApplication,
+        queryParams: {
+          'auth_type': 'reauthenticate', // Forces Facebook to re-authenticate
+        },
       );
 
       // Note: OAuth flow will redirect to browser/app, so we don't set success here
