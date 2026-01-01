@@ -5,16 +5,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './core/services/deep_link_service.dart';
-import './core/utils/navigator_service.dart';
-import './core/utils/size_utils.dart';
 import './core/utils/theme_provider.dart';
 import './firebase_options.dart';
 import './presentation/notifications_screen/notifier/notifications_notifier.dart';
-import './routes/app_routes.dart';
 import './services/notification_service.dart';
 import './services/push_notification_service.dart';
 import './services/supabase_service.dart';
-import './theme/theme_helper.dart';
 import 'core/app_export.dart';
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();

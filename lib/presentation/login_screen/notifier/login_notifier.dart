@@ -1,9 +1,9 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
 import '../../../core/services/deep_link_service.dart';
-import '../../../core/utils/navigator_service.dart';
-import '../../../routes/app_routes.dart';
 import '../../../services/supabase_service.dart';
 import '../models/login_model.dart';
 
@@ -19,8 +19,11 @@ final loginNotifier =
 );
 
 class LoginNotifier extends StateNotifier<LoginState> {
+  StreamSubscription<AuthState>? _authSubscription;
+
   LoginNotifier(LoginState state) : super(state) {
     initialize();
+    _setupAuthListener();
   }
 
   void initialize() {
@@ -31,6 +34,31 @@ class LoginNotifier extends StateNotifier<LoginState> {
       isSuccess: false,
       errorMessage: null,
     );
+  }
+
+  /// Setup auth state listener to reset loading state after OAuth callback
+  void _setupAuthListener() {
+    final supabaseClient = SupabaseService.instance.client;
+    if (supabaseClient == null) return;
+
+    _authSubscription = supabaseClient.auth.onAuthStateChange.listen((data) {
+      // Reset loading state when auth succeeds or fails
+      if (data.event == AuthChangeEvent.signedIn) {
+        debugPrint('✅ OAuth sign-in successful - resetting loading state');
+        state = state.copyWith(
+          isLoading: false,
+          isSuccess: true,
+          errorMessage: null,
+        );
+      } else if (data.event == AuthChangeEvent.signedOut ||
+          data.event == AuthChangeEvent.userDeleted) {
+        debugPrint('👋 Auth state changed - resetting loading state');
+        state = state.copyWith(
+          isLoading: false,
+          isSuccess: false,
+        );
+      }
+    });
   }
 
   /// Validate email field
@@ -267,6 +295,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
   void dispose() {
     state.emailController?.dispose();
     state.passwordController?.dispose();
+    _authSubscription?.cancel();
     super.dispose();
   }
 }
