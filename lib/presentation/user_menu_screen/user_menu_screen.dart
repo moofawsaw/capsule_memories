@@ -7,7 +7,6 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_menu_item.dart';
 import '../../widgets/custom_navigation_drawer.dart';
-import '../../widgets/custom_settings_row.dart';
 import 'notifier/user_menu_notifier.dart';
 
 class UserMenuScreen extends ConsumerStatefulWidget {
@@ -64,10 +63,6 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
                             _buildNavigationMenu(context),
                             SizedBox(height: 26.h),
                             _buildDivider(context),
-                            SizedBox(height: 20.h),
-                            _buildDarkModeSection(context),
-                            SizedBox(height: 22.h),
-                            _buildBottomDivider(context),
                             Spacer(),
                             _buildActionButtons(context),
                             SizedBox(height: 16.h),
@@ -329,28 +324,6 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
 
   /// Divider line
   Widget _buildDivider(BuildContext context) {
-    return Container(width: 304.h, height: 1.h, color: appTheme.color41C124);
-  }
-
-  /// Dark mode toggle section
-  Widget _buildDarkModeSection(BuildContext context) {
-    return Consumer(builder: (context, ref, _) {
-      final state = ref.watch(userMenuNotifier);
-
-      return CustomSettingsRow(
-          iconPath: ImageConstant.imgIcon5,
-          // Modified: Added required parameters for CustomSettingsRow
-          title: 'Dark mode',
-          description: 'Toggle dark mode on or off',
-          switchValue: state.userMenuModel?.isDarkModeEnabled ?? true,
-          onSwitchChanged: (value) =>
-              ref.read(userMenuNotifier.notifier).toggleDarkMode(),
-          margin: EdgeInsets.only(right: 12.h, left: 12.h));
-    });
-  }
-
-  /// Bottom divider line
-  Widget _buildBottomDivider(BuildContext context) {
     return Container(width: 304.h, height: 1.h, color: appTheme.color41C124);
   }
 

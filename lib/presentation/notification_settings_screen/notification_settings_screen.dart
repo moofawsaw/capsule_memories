@@ -1,4 +1,5 @@
 import '../../core/app_export.dart';
+import '../../presentation/user_menu_screen/notifier/user_menu_notifier.dart';
 import '../../services/blocked_users_service.dart';
 import '../../widgets/custom_about_settings.dart';
 import '../../widgets/custom_account_settings.dart';
@@ -6,6 +7,7 @@ import '../../widgets/custom_blocked_users_settings.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_notification_settings.dart';
 import '../../widgets/custom_privacy_settings.dart';
+import '../../widgets/custom_settings_row.dart';
 import '../../widgets/custom_support_settings.dart';
 import '../../widgets/custom_warning_modal.dart';
 import 'notifier/notification_settings_notifier.dart';
@@ -110,6 +112,7 @@ class NotificationSettingsScreenState
               spacing: 30.h,
               children: [
                 _buildSettingsHeader(context),
+                _buildDarkModeSection(context),
                 _buildNotificationSettings(context),
                 _buildPrivacySettings(context),
                 _buildAccountSettings(context),
@@ -143,6 +146,23 @@ class NotificationSettingsScreenState
         ],
       ),
     );
+  }
+
+  /// Dark mode toggle section - moved from user menu
+  Widget _buildDarkModeSection(BuildContext context) {
+    return Consumer(builder: (context, ref, _) {
+      final state = ref.watch(userMenuNotifier);
+
+      return CustomSettingsRow(
+        iconPath: ImageConstant.imgIcon5,
+        title: 'Dark mode',
+        description: 'Toggle dark mode on or off',
+        switchValue: state.userMenuModel?.isDarkModeEnabled ?? true,
+        onSwitchChanged: (value) =>
+            ref.read(userMenuNotifier.notifier).toggleDarkMode(),
+        margin: EdgeInsets.only(left: 16.h, right: 24.h),
+      );
+    });
   }
 
   /// Section Widget

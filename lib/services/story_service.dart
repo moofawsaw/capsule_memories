@@ -111,6 +111,83 @@ class StoryService {
     }
   }
 
+  /// Fetch stories ONLY authored by a specific user (for user profile pages)
+  /// Filters stories where user is the actual contributor, not just a memory participant
+  Future<List<Map<String, dynamic>>> fetchStoriesByAuthor(String userId) async {
+    return await _retryOperation(
+      () => _fetchStoriesByAuthorInternal(userId),
+      'fetch stories by author',
+    );
+  }
+
+  /// Internal implementation of fetchStoriesByAuthor with retry support
+  Future<List<Map<String, dynamic>>> _fetchStoriesByAuthorInternal(
+      String userId) async {
+    try {
+      print('🔍 STORY SERVICE: Fetching stories authored by userId: $userId');
+
+      // CRITICAL: Filter stories by contributor_id to show only stories created by this user
+      final response = await _supabase
+          ?.from('stories')
+          .select('''
+            id,
+            memory_id,
+            contributor_id,
+            image_url,
+            video_url,
+            thumbnail_url,
+            media_type,
+            created_at,
+            capture_timestamp,
+            duration_seconds,
+            location_name,
+            user_profiles!stories_contributor_id_fkey (
+              id,
+              display_name,
+              avatar_url,
+              username
+            ),
+            memories!inner (
+              id,
+              title,
+              visibility,
+              state,
+              creator_id,
+              category_id,
+              memory_categories (
+                name,
+                icon_name,
+                icon_url
+              )
+            )
+          ''')
+          .eq('contributor_id', userId)
+          .order('created_at', ascending: false);
+
+      final stories = List<Map<String, dynamic>>.from(response as List? ?? []);
+
+      print(
+          '✅ STORY SERVICE: Fetched ${stories.length} stories authored by user $userId');
+
+      // Enhanced logging for debugging
+      for (var story in stories) {
+        final memory = story['memories'] as Map<String, dynamic>?;
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
+        print('📸 Story ${story['id']}: '
+            'memory_id=${story['memory_id']}, '
+            'memory_title=${memory?['title']}, '
+            'category_name=${category?['name']}, '
+            'media_type=${story['media_type']}, '
+            'contributor=${story['user_profiles']?['display_name']}');
+      }
+
+      return stories;
+    } catch (e) {
+      print('❌ Error fetching stories by author: $e');
+      rethrow;
+    }
+  }
+
   /// Fetch timeline cards (memories) where user is associated with automatic retry
   Future<List<Map<String, dynamic>>> fetchUserTimelines(String userId) async {
     return await _retryOperation(

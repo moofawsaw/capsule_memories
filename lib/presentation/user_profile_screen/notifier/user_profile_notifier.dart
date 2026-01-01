@@ -54,8 +54,9 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
             '✅ USER PROFILE: Friendship status checked - isFriend: $isFriend');
       }
 
-      // Fetch real stories from database using StoryService
-      final storiesData = await _storyService.fetchUserStories(targetUserId);
+      // CRITICAL FIX: Use fetchStoriesByAuthor to show only stories authored by this user
+      final storiesData =
+          await _storyService.fetchStoriesByAuthor(targetUserId);
 
       // Map database stories to StoryItemModel
       final storyItems = storiesData.map((story) {
