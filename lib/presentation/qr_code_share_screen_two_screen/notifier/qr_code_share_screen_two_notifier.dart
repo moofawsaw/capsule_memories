@@ -33,15 +33,16 @@ class QRCodeShareScreenTwoNotifier
 
       final response = await SupabaseService.instance.client!
           .from('user_profiles')
-          .select('friend_code, display_name, username')
+          .select('qr_code_url, friend_code, display_name, username')
           .eq('id', userId)
           .single();
 
+      final qrCodeUrl = response['qr_code_url'] as String?;
       final friendCode = response['friend_code'] as String;
       final displayName = response['display_name'] as String?;
       final username = response['username'] as String?;
 
-      final shareUrl = 'https://capapp.co/add-friend/$friendCode';
+      final shareUrl = 'https://capapp.co/join/friend/$friendCode';
 
       state = state.copyWith(
         qrCodeShareScreenTwoModel: QRCodeShareScreenTwoModel(
@@ -49,6 +50,7 @@ class QRCodeShareScreenTwoNotifier
           displayName: displayName ?? username ?? 'User',
           qrCodeData: shareUrl,
           shareUrl: shareUrl,
+          qrCodeUrl: qrCodeUrl, // Add qr_code_url from database
         ),
         isLoading: false,
       );

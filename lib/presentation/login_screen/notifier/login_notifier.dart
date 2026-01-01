@@ -2,8 +2,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
 import '../../../core/services/deep_link_service.dart';
-import '../../../core/utils/navigator_service.dart';
-import '../../../routes/app_routes.dart';
 import '../../../services/supabase_service.dart';
 import '../models/login_model.dart';
 

@@ -1,10 +1,7 @@
 import 'package:app_links/app_links.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../app_export.dart';
-import '../utils/navigator_service.dart';
 
 class DeepLinkService {
   static final DeepLinkService _instance = DeepLinkService._internal();
@@ -14,6 +11,12 @@ class DeepLinkService {
   final _appLinks = AppLinks();
   String? _pendingSessionToken;
   bool _isInitialized = false;
+
+  // Callback for success messages
+  Function(String message, String type)? onSuccess;
+
+  // Callback for error messages
+  Function(String message)? onError;
 
   bool get hasPendingAction => _pendingSessionToken != null;
 
@@ -78,12 +81,20 @@ class DeepLinkService {
         debugPrint('Deep link requires auth. Session token stored.');
       } else if (data['success'] == true) {
         // Action completed!
-        debugPrint('Deep link action completed: ${data['message']}');
+        final message =
+            data['message'] as String? ?? 'Action completed successfully';
+        debugPrint('Deep link action completed: $message');
+
+        // Call success callback if set
+        onSuccess?.call(message, type);
+
         _navigateToConfirmation(type);
       }
     } catch (e) {
       debugPrint('Deep link error: $e');
-      _showError('Failed to process invitation');
+
+      // Call error callback if set
+      onError?.call('Failed to process invitation');
     }
   }
 
@@ -132,12 +143,15 @@ class DeepLinkService {
 
   void _showError(String message) {
     // Show error via global messenger key
-    NavigatorService.navigatorKey.currentState?.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+    final context = NavigatorService.navigatorKey.currentContext;
+    if (context != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
     debugPrint('Deep link error: $message');
   }
 }

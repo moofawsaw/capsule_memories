@@ -135,7 +135,48 @@ class QRCodeShareScreenTwoScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(qrCodeShareScreenTwoNotifier);
+        final qrCodeUrl = state.qrCodeShareScreenTwoModel?.qrCodeUrl;
 
+        // If qr_code_url exists, display it directly using Image.network
+        if (qrCodeUrl != null && qrCodeUrl.isNotEmpty) {
+          return Container(
+            margin: EdgeInsets.symmetric(horizontal: 68.h),
+            child: Image.network(
+              qrCodeUrl,
+              width: 254.h,
+              height: 254.h,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return SizedBox(
+                  width: 254.h,
+                  height: 254.h,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: appTheme.colorFF52D1,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                // Fallback to generated QR code if image fails to load
+                return QrImageView(
+                  data: state.qrCodeShareScreenTwoModel?.qrCodeData ?? '',
+                  version: QrVersions.auto,
+                  size: 254.h,
+                  backgroundColor: appTheme.whiteCustom,
+                  foregroundColor: appTheme.blackCustom,
+                );
+              },
+            ),
+          );
+        }
+
+        // Fallback to generated QR code if URL is not available
         return Container(
           margin: EdgeInsets.symmetric(horizontal: 68.h),
           child: QrImageView(

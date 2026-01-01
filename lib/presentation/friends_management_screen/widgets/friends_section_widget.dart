@@ -100,7 +100,7 @@ class FriendsSectionWidget extends ConsumerWidget {
     if (userId != null && userId.isNotEmpty) {
       NavigatorService.pushNamed(
         AppRoutes.appProfileUser,
-        arguments: userId,
+        arguments: {'userId': userId},
       );
     }
   }
