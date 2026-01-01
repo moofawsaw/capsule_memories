@@ -67,6 +67,128 @@ class GroupsService {
     }
   }
 
+  /// Subscribes to real-time changes for groups table
+  /// Returns a RealtimeChannel that can be used to unsubscribe
+  static RealtimeChannel subscribeToGroupChanges({
+    required Function(Map<String, dynamic>) onInsert,
+    required Function(Map<String, dynamic>) onUpdate,
+    required Function(Map<String, dynamic>) onDelete,
+  }) {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final channel = _client
+        .channel('groups_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'groups',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'creator_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            onInsert(payload.newRecord);
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'groups',
+          callback: (payload) {
+            final record = payload.newRecord;
+            // Only trigger if user is creator or member
+            if (record['creator_id'] == userId) {
+              onUpdate(record);
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'groups',
+          callback: (payload) {
+            onDelete(payload.oldRecord);
+          },
+        )
+        .subscribe();
+
+    return channel;
+  }
+
+  /// Subscribes to real-time changes for group_members table
+  /// Returns a RealtimeChannel that can be used to unsubscribe
+  static RealtimeChannel subscribeToGroupMembersChanges({
+    required String groupId,
+    required Function(Map<String, dynamic>) onMemberAdded,
+    required Function(Map<String, dynamic>) onMemberRemoved,
+  }) {
+    final channel = _client
+        .channel('group_members_$groupId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'group_members',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'group_id',
+            value: groupId,
+          ),
+          callback: (payload) {
+            onMemberAdded(payload.newRecord);
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'group_members',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'group_id',
+            value: groupId,
+          ),
+          callback: (payload) {
+            onMemberRemoved(payload.oldRecord);
+          },
+        )
+        .subscribe();
+
+    return channel;
+  }
+
+  /// Subscribes to member count changes for user's groups
+  /// This listens to group_members changes and refetches group data
+  static RealtimeChannel subscribeToUserGroupMembershipChanges({
+    required Function() onMembershipChanged,
+  }) {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('User not authenticated');
+    }
+
+    final channel = _client
+        .channel('user_group_membership')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'group_members',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            onMembershipChanged();
+          },
+        )
+        .subscribe();
+
+    return channel;
+  }
+
   /// Fetches group members with their profile information
   static Future<List<Map<String, dynamic>>> fetchGroupMembers(
       String groupId) async {

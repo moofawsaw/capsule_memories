@@ -1,121 +1,119 @@
+import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/app_export.dart';
-import '../../../services/friends_service.dart';
+import '../../../services/friends_data_provider.dart';
 import '../models/friends_management_model.dart';
 import './friends_management_state.dart';
 
-final friendsManagementNotifier = StateNotifierProvider.autoDispose<
+final friendsManagementNotifier = NotifierProvider.autoDispose<
     FriendsManagementNotifier, FriendsManagementState>(
-  (ref) => FriendsManagementNotifier(
-    FriendsManagementState(
-      friendsManagementModel: FriendsManagementModel(),
-    ),
-  ),
+  () => FriendsManagementNotifier(),
 );
 
-class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
-  final FriendsService _friendsService = FriendsService();
-  CameraController? _cameraController;
-  String _searchQuery = '';
-  final TextEditingController searchController = TextEditingController();
+class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementState> {
+  final FriendsDataProvider _friendsProvider = FriendsDataProvider();
+  final FriendsDataProvider _friendsService = FriendsDataProvider();
+  StreamSubscription<List<FriendItem>>? _friendsSubscription;
+  StreamSubscription<List<FriendRequestItem>>? _incomingRequestsSubscription;
+  StreamSubscription<List<FriendRequestItem>>? _sentRequestsSubscription;
 
-  FriendsManagementNotifier(FriendsManagementState state) : super(state) {
+  final TextEditingController searchController = TextEditingController();
+  String _searchQuery = '';
+  CameraController? _cameraController;
+
+  @override
+  FriendsManagementState build() {
     initialize();
     searchController.addListener(_onSearchTextChanged);
+    return FriendsManagementState(
+      friendsManagementModel: FriendsManagementModel(),
+    );
   }
 
   Future<void> initialize() async {
-    state = state.copyWith(
-      friendsManagementModel: FriendsManagementModel(),
-      isLoading: true,
-    );
+    state = state.copyWith(isLoading: true);
 
-    await _fetchAllFriendsData();
-
-    state = state.copyWith(
-      isLoading: false,
-    );
-  }
-
-  void _onSearchTextChanged() {
-    final query = searchController.text;
-    onSearchChanged(query);
-  }
-
-  Future<void> _fetchAllFriendsData() async {
     try {
-      // Fetch friends, sent requests, and incoming requests concurrently
-      final results = await Future.wait([
-        _friendsService.getUserFriends(),
-        _friendsService.getSentFriendRequests(),
-        _friendsService.getIncomingFriendRequests(),
-      ]);
+      // Initialize friends data provider with real-time subscriptions
+      _friendsProvider.initialize();
 
-      final friendsData = results[0];
-      final sentRequestsData = results[1];
-      final incomingRequestsData = results[2];
+      // Subscribe to friends stream
+      _friendsSubscription = _friendsProvider.friendsStream.listen((friends) {
+        final friendsList = friends
+            .map((f) => FriendModel(
+                  id: f.id,
+                  userName: f.userName,
+                  displayName: f.displayName,
+                  profileImagePath: f.profileImagePath,
+                  friendshipId: f.friendshipId,
+                ))
+            .toList();
 
-      state = state.copyWith(
-        friendsManagementModel: FriendsManagementModel(
-          friendsList: _transformFriendsData(friendsData),
-          sentRequestsList: _transformSentRequestsData(sentRequestsData),
-          incomingRequestsList:
-              _transformIncomingRequestsData(incomingRequestsData),
-        ),
-      );
+        state = state.copyWith(
+          friendsManagementModel: state.friendsManagementModel?.copyWith(
+            friendsList: friendsList.cast<FriendModel>(),
+          ),
+        );
+      });
 
-      _filterFriends(_searchQuery);
+      // Subscribe to incoming requests stream
+      _incomingRequestsSubscription =
+          _friendsProvider.incomingRequestsStream.listen((requests) {
+        final incomingRequests = requests
+            .map((r) => IncomingRequestModel(
+                  id: r.id,
+                  userId: r.userId,
+                  userName: r.userName,
+                  displayName: r.displayName,
+                  profileImagePath: r.profileImagePath,
+                  bio: r.bio,
+                ))
+            .toList();
+
+        state = state.copyWith(
+          friendsManagementModel: state.friendsManagementModel?.copyWith(
+            incomingRequestsList: incomingRequests.cast<IncomingRequestModel>(),
+          ),
+        );
+      });
+
+      // Subscribe to sent requests stream
+      _sentRequestsSubscription =
+          _friendsProvider.sentRequestsStream.listen((requests) {
+        final sentRequests = requests
+            .map((r) => SentRequestModel(
+                  id: r.id,
+                  userId: r.userId,
+                  userName: r.userName,
+                  displayName: r.displayName,
+                  profileImagePath: r.profileImagePath,
+                  status: r.status,
+                ))
+            .toList();
+
+        state = state.copyWith(
+          friendsManagementModel: state.friendsManagementModel?.copyWith(
+            sentRequestsList: sentRequests.cast<SentRequestModel>(),
+          ),
+        );
+      });
+
+      state = state.copyWith(isLoading: false);
     } catch (e) {
-      debugPrint('Error fetching friends data: $e');
+      debugPrint('Error initializing friends data: $e');
       state = state.copyWith(
-        errorMessage: 'Failed to load friends data',
+        errorMessage: 'Failed to initialize friends data',
         isLoading: false,
       );
     }
   }
 
-  List<FriendModel> _transformFriendsData(List<Map<String, dynamic>> data) {
-    return data.map((friend) {
-      return FriendModel(
-        id: friend['id'] ?? '',
-        friendshipId: friend['friendship_id'] ?? '',
-        userName: friend['username'] ?? '',
-        displayName: friend['display_name'] ?? friend['username'] ?? '',
-        profileImagePath: friend['avatar_url'] ?? '',
-      );
-    }).toList();
-  }
-
-  List<SentRequestModel> _transformSentRequestsData(
-      List<Map<String, dynamic>> data) {
-    return data.map((request) {
-      return SentRequestModel(
-        id: request['id'] ?? '',
-        userId: request['user_id'] ?? '',
-        userName: request['username'] ?? '',
-        displayName: request['display_name'] ?? request['username'] ?? '',
-        profileImagePath: request['avatar_url'] ?? '',
-        status: request['status'] ?? 'pending',
-      );
-    }).toList();
-  }
-
-  List<IncomingRequestModel> _transformIncomingRequestsData(
-      List<Map<String, dynamic>> data) {
-    return data.map((request) {
-      return IncomingRequestModel(
-        id: request['id'] ?? '',
-        userId: request['user_id'] ?? '',
-        userName: request['username'] ?? '',
-        displayName: request['display_name'] ?? request['username'] ?? '',
-        profileImagePath: request['avatar_url'] ?? '',
-        bio: request['bio'] ?? '',
-        buttonText: 'Accept',
-      );
-    }).toList();
+  void _onSearchTextChanged() {
+    final query = searchController.text;
+    onSearchChanged(query);
   }
 
   void onSearchChanged(String query) {
@@ -141,12 +139,12 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
         isSearching: true,
       );
 
-      final usersData = await _friendsService.searchAllUsers(query);
+      final usersData = await _friendsService.searchUsers(query);
 
       // Get friendship status for each user
       final searchResults = await Future.wait(
         usersData.map((user) async {
-          final status = await _friendsService.getFriendshipStatus(user['id']);
+          final status = await _friendsService.checkFriendshipStatus(user['id']);
           return SearchUserModel(
             id: user['id'] ?? '',
             userName: user['username'] ?? '',
@@ -159,7 +157,7 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
       );
 
       state = state.copyWith(
-        searchResults: searchResults,
+        searchResults: searchResults.cast<SearchUserModel>(),
         isSearching: false,
       );
     } catch (e) {
@@ -260,7 +258,7 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
       if (success) {
         // Refresh all friends data to get updated lists
-        await _fetchAllFriendsData();
+        await initialize();
       }
     } catch (e) {
       debugPrint('Error accepting request: $e');
@@ -453,7 +451,7 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
 
       // Check if user is already a friend or has pending request
       final friendshipStatus =
-          await _friendsService.getFriendshipStatus(userId);
+          await _friendsService.checkFriendshipStatus(userId);
 
       if (friendshipStatus == 'friends') {
         state = state.copyWith(
@@ -478,7 +476,7 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
       }
 
       // Send friend request - pass empty string as second parameter
-      final success = await _friendsService.sendFriendRequest(userId, '');
+      final success = await _friendsService.addFriendRequest(userId, '');
 
       if (success) {
         state = state.copyWith(
@@ -486,7 +484,7 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
         );
 
         // Refresh data to show the new sent request
-        await _fetchAllFriendsData();
+        await initialize();
       } else {
         state = state.copyWith(
           errorMessage: 'Failed to send friend request. Please try again.',
@@ -517,13 +515,5 @@ class FriendsManagementNotifier extends StateNotifier<FriendsManagementState> {
       isCameraActive: false,
       cameraController: null,
     );
-  }
-
-  @override
-  void dispose() {
-    searchController.removeListener(_onSearchTextChanged);
-    searchController.dispose();
-    _cameraController?.dispose();
-    super.dispose();
   }
 }

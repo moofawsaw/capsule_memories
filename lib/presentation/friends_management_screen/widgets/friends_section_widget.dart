@@ -39,31 +39,56 @@ class FriendsSectionWidget extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Friends (${friends.length})',
-          style: TextStyleHelper.instance.title16MediumPlusJakartaSans.copyWith(
-            color: appTheme.gray_50,
+        AnimatedSwitcher(
+          duration: Duration(milliseconds: 300),
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: animation,
+                child: child,
+              ),
+            );
+          },
+          child: Text(
+            'Friends (${friends.length})',
+            key: ValueKey<int>(friends.length),
+            style:
+                TextStyleHelper.instance.title16MediumPlusJakartaSans.copyWith(
+              color: appTheme.gray_50,
+            ),
           ),
         ),
         SizedBox(height: 12.h),
-        ListView.separated(
+        AnimatedList(
+          key: GlobalKey<AnimatedListState>(),
           shrinkWrap: true,
           physics: NeverScrollableScrollPhysics(),
-          itemCount: friends.length,
-          separatorBuilder: (context, index) => SizedBox(height: 12.h),
-          itemBuilder: (context, index) {
+          initialItemCount: friends.length,
+          itemBuilder: (context, index, animation) {
+            if (index >= friends.length) return SizedBox.shrink();
+
             final friend = friends[index];
-            return CustomFriendItem(
-              profileImagePath: friend.profileImagePath ?? '',
-              userName: friend.displayName ?? friend.userName ?? '',
-              onTap: () => _navigateToUserProfile(context, friend.id),
-              onActionTap: () {
-                _showRemoveFriendConfirmation(
-                    context,
-                    ref,
-                    friend.friendshipId ?? '',
-                    friend.displayName ?? friend.userName ?? '');
-              },
+            return SizeTransition(
+              sizeFactor: animation,
+              child: FadeTransition(
+                opacity: animation,
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 12.h),
+                  child: CustomFriendItem(
+                    profileImagePath: friend.profileImagePath ?? '',
+                    userName: friend.displayName ?? friend.userName ?? '',
+                    onTap: () => _navigateToUserProfile(context, friend.id),
+                    onActionTap: () {
+                      _showRemoveFriendConfirmation(
+                          context,
+                          ref,
+                          friend.friendshipId ?? '',
+                          friend.displayName ?? friend.userName ?? '');
+                    },
+                  ),
+                ),
+              ),
             );
           },
         ),
