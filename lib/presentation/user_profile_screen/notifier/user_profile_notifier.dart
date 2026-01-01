@@ -1,5 +1,6 @@
 import '../../../core/app_export.dart';
 import '../../../services/follows_service.dart';
+import '../../../services/friends_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/story_item_model.dart';
@@ -19,6 +20,7 @@ final userProfileNotifier =
 class UserProfileNotifier extends StateNotifier<UserProfileState> {
   final FollowsService _followsService = FollowsService();
   final StoryService _storyService = StoryService();
+  final FriendsService _friendsService = FriendsService();
 
   UserProfileNotifier(UserProfileState state) : super(state) {
     initialize();
@@ -29,9 +31,11 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
     state = state.copyWith(isLoading: true);
 
     try {
+      final currentUserId =
+          SupabaseService.instance.client?.auth.currentUser?.id;
+
       // Use current user's ID if not provided
-      final targetUserId =
-          userId ?? SupabaseService.instance.client?.auth.currentUser?.id;
+      final targetUserId = userId ?? currentUserId;
 
       if (targetUserId == null) {
         print('❌ USER PROFILE: No user ID available');
@@ -40,6 +44,15 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
       }
 
       print('🔍 USER PROFILE: Fetching stories for user: $targetUserId');
+
+      // Check friendship status if viewing another user's profile
+      bool isFriend = false;
+      if (currentUserId != null && targetUserId != currentUserId) {
+        isFriend =
+            await _friendsService.areFriends(currentUserId, targetUserId);
+        print(
+            '✅ USER PROFILE: Friendship status checked - isFriend: $isFriend');
+      }
 
       // Fetch real stories from database using StoryService
       final storiesData = await _storyService.fetchUserStories(targetUserId);
@@ -73,6 +86,7 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
           followingCount: '6',
           storyItems: storyItems,
         ),
+        isFriend: isFriend,
         isLoading: false,
       );
     } catch (e) {
@@ -114,10 +128,34 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
     }
   }
 
-  void onAddFriendButtonPressed() {
-    state = state.copyWith(
-      isFriend: !(state.isFriend ?? false),
-    );
+  Future<void> onAddFriendButtonPressed(String targetUserId) async {
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    if (currentUser == null) return;
+
+    // Send friend request
+    final success =
+        await _friendsService.sendFriendRequest(currentUser.id, targetUserId);
+
+    if (success) {
+      print('✅ USER PROFILE: Friend request sent successfully');
+    }
+  }
+
+  Future<bool> onRemoveFriendButtonPressed(String targetUserId) async {
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    if (currentUser == null) return false;
+
+    // Remove friend
+    final success =
+        await _friendsService.unfriendUser(currentUser.id, targetUserId);
+
+    if (success) {
+      state = state.copyWith(isFriend: false);
+      print('✅ USER PROFILE: Friend removed successfully');
+      return true;
+    }
+
+    return false;
   }
 
   void onBlockButtonPressed() {

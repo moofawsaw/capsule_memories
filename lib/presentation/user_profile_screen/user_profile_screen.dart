@@ -116,16 +116,20 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         final state = ref.watch(userProfileNotifier);
         final notifier = ref.read(userProfileNotifier.notifier);
         final isFollowing = state.isFollowing ?? false;
+        final isFriend = state.isFriend ?? false;
+
+        // Get target user ID from route arguments
+        final args = ModalRoute.of(context)?.settings.arguments;
+        final targetUserId = args is Map ? args['userId'] as String? : null;
 
         return Row(
           children: [
             Expanded(
               child: GestureDetector(
                 onTap: () {
-                  // Get target user ID from route arguments or state
-                  final targetUserId =
-                      'target-user-id'; // Replace with actual user ID
-                  notifier.onFollowButtonPressed(targetUserId);
+                  if (targetUserId != null) {
+                    notifier.onFollowButtonPressed(targetUserId);
+                  }
                 },
                 child: Container(
                   decoration: BoxDecoration(
@@ -164,27 +168,43 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             ),
             SizedBox(width: 8.h),
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: appTheme.deep_purple_A100,
-                  borderRadius: BorderRadius.circular(6.h),
-                ),
-                padding: EdgeInsets.symmetric(horizontal: 6.h, vertical: 12.h),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  spacing: 8.h,
-                  children: [
-                    Text(
-                      'add friend',
-                      style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                          .copyWith(color: appTheme.white_A700),
-                    ),
-                    CustomImageView(
-                      imagePath: ImageConstant.imgIconWhiteA70018x18,
-                      height: 18.h,
-                      width: 18.h,
-                    ),
-                  ],
+              child: GestureDetector(
+                onTap: () {
+                  if (targetUserId == null) return;
+
+                  if (isFriend) {
+                    // Show confirmation dialog for friend removal
+                    _showRemoveFriendConfirmation(context, targetUserId);
+                  } else {
+                    // Send friend request
+                    notifier.onAddFriendButtonPressed(targetUserId);
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color:
+                        isFriend ? appTheme.red_500 : appTheme.deep_purple_A100,
+                    borderRadius: BorderRadius.circular(6.h),
+                  ),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 6.h, vertical: 12.h),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    spacing: 8.h,
+                    children: [
+                      Text(
+                        isFriend ? 'remove friend' : 'add friend',
+                        style: TextStyleHelper
+                            .instance.body14BoldPlusJakartaSans
+                            .copyWith(color: appTheme.white_A700),
+                      ),
+                      CustomImageView(
+                        imagePath: ImageConstant.imgIconWhiteA70018x18,
+                        height: 18.h,
+                        width: 18.h,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -217,6 +237,64 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           ],
         );
       },
+    );
+  }
+
+  /// Show confirmation dialog for friend removal
+  void _showRemoveFriendConfirmation(
+      BuildContext context, String targetUserId) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: appTheme.gray_900_02,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.h),
+        ),
+        title: Text(
+          'Remove Friend',
+          style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+              .copyWith(color: appTheme.white_A700),
+        ),
+        content: Text(
+          'Are you sure you want to remove this person from your friends?',
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+
+              // Remove friend
+              final notifier = ref.read(userProfileNotifier.notifier);
+              final success =
+                  await notifier.onRemoveFriendButtonPressed(targetUserId);
+
+              if (success && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Friend removed successfully'),
+                    backgroundColor: appTheme.deep_purple_A100,
+                  ),
+                );
+              }
+            },
+            child: Text(
+              'Remove',
+              style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                  .copyWith(color: appTheme.red_500),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
