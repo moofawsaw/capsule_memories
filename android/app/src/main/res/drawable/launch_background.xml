@@ -3,11 +3,8 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Background color - Deep Purple matching app theme -->
     <item android:drawable="@color/splash_background" />
-
-    <!-- Splash screen image - centered -->
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/ic_launcher" />
-    </item>
+    
+    <!-- Note: Flutter assets cannot be referenced here. -->
+    <!-- The splash logo image will be displayed by Flutter's splash screen widget -->
+    <!-- See lib/presentation/splash_screen/splash_screen.dart for the logo implementation -->
 </layer-list>
