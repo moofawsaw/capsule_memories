@@ -1,11 +1,11 @@
 import '../../core/app_export.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
-import '../../shared/widgets/qr_scanner_overlay.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart';
 import '../create_memory_screen/create_memory_screen.dart';
+import '../friends_management_screen/widgets/qr_scanner_overlay.dart';
 import './models/memory_item_model.dart';
 import './widgets/memory_card_widget.dart';
 import 'notifier/memories_dashboard_notifier.dart';
