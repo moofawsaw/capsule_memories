@@ -5,6 +5,7 @@ class MemoryShareOptionsModel {
   final String memoryId;
   final String memoryName;
   final String? inviteCode;
+  final String? qrCodeUrl;
   final bool isLoading;
   final bool isSendingInvites;
   final List<Map<String, dynamic>> friends;
@@ -17,6 +18,7 @@ class MemoryShareOptionsModel {
     this.memoryId = '',
     this.memoryName = '',
     this.inviteCode,
+    this.qrCodeUrl,
     this.isLoading = true,
     this.isSendingInvites = false,
     this.friends = const [],
@@ -41,6 +43,7 @@ class MemoryShareOptionsModel {
     String? memoryId,
     String? memoryName,
     String? inviteCode,
+    String? qrCodeUrl,
     bool? isLoading,
     bool? isSendingInvites,
     List<Map<String, dynamic>>? friends,
@@ -53,6 +56,7 @@ class MemoryShareOptionsModel {
       memoryId: memoryId ?? this.memoryId,
       memoryName: memoryName ?? this.memoryName,
       inviteCode: inviteCode ?? this.inviteCode,
+      qrCodeUrl: qrCodeUrl ?? this.qrCodeUrl,
       isLoading: isLoading ?? this.isLoading,
       isSendingInvites: isSendingInvites ?? this.isSendingInvites,
       friends: friends ?? this.friends,

@@ -26,7 +26,8 @@ class GroupQRInviteNotifier extends StateNotifier<GroupQRInviteState> {
       if (groupData != null && mounted) {
         final inviteCode = groupData['invite_code'] as String;
         final groupName = groupData['name'] as String;
-        final inviteUrl = 'https://capapp.co/group/join/$inviteCode';
+        final qrCodeUrl = groupData['qr_code_url'] as String?;
+        final inviteUrl = 'https://capapp.co/join/group/$inviteCode';
 
         state = state.copyWith(
           isLoading: false,
@@ -35,6 +36,7 @@ class GroupQRInviteNotifier extends StateNotifier<GroupQRInviteState> {
             groupName: groupName,
             invitationUrl: inviteUrl,
             qrCodeData: inviteUrl,
+            qrCodeUrl: qrCodeUrl,
             groupDescription: 'Scan to join the group',
             iconPath: ImageConstant.imgButtons,
           ),

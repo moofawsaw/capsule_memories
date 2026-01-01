@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/app_export.dart';
@@ -18,6 +19,7 @@ class MemoryInvitationScreenState
   Map<String, dynamic>? _memoryData;
   bool _isLoading = true;
   String? _errorMessage;
+  final GlobalKey _qrKey = GlobalKey();
 
   @override
   void initState() {
@@ -213,7 +215,10 @@ class MemoryInvitationScreenState
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(height: 20.h),
-        _buildQRCode(qrCodeUrl),
+        _buildQRCodeSection({
+          'qr_code_url': qrCodeUrl,
+          'qr_data': inviteCode,
+        }),
         SizedBox(height: 24.h),
         _buildMemoryTitle(memoryTitle),
         SizedBox(height: 12.h),
@@ -238,19 +243,54 @@ class MemoryInvitationScreenState
     );
   }
 
-  /// QR Code display
-  Widget _buildQRCode(String url) {
+  /// Section Widget - QR Code Display
+  Widget _buildQRCodeSection(Map<String, dynamic> model) {
+    // Check if pre-generated QR code URL exists from backend
+    final qrCodeUrl = model['qr_code_url'] as String?;
+    final qrData = model['qr_data'] as String? ?? '';
+
     return Container(
-      padding: EdgeInsets.all(16.h),
-      decoration: BoxDecoration(
-        color: appTheme.white_A700,
-        borderRadius: BorderRadius.circular(16.h),
-      ),
-      child: QrImageView(
-        data: url,
-        version: QrVersions.auto,
-        size: 200.h,
-        backgroundColor: appTheme.white_A700,
+      margin: EdgeInsets.symmetric(horizontal: 68.h),
+      child: RepaintBoundary(
+        key: _qrKey,
+        child: Container(
+          padding: EdgeInsets.all(16.h),
+          decoration: BoxDecoration(
+            color: appTheme.whiteCustom,
+            borderRadius: BorderRadius.circular(12.h),
+          ),
+          child: (qrCodeUrl != null && qrCodeUrl.isNotEmpty)
+              ? CachedNetworkImage(
+                  imageUrl: qrCodeUrl,
+                  width: 200.h,
+                  height: 200.h,
+                  fit: BoxFit.contain,
+                  placeholder: (context, url) => Container(
+                    width: 200.h,
+                    height: 200.h,
+                    alignment: Alignment.center,
+                    child: CircularProgressIndicator(
+                      color: appTheme.deep_purple_A100,
+                    ),
+                  ),
+                  errorWidget: (context, url, error) {
+                    return QrImageView(
+                      data: qrData,
+                      version: QrVersions.auto,
+                      size: 200.h,
+                      backgroundColor: appTheme.whiteCustom,
+                      foregroundColor: appTheme.blackCustom,
+                    );
+                  },
+                )
+              : QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 200.h,
+                  backgroundColor: appTheme.whiteCustom,
+                  foregroundColor: appTheme.blackCustom,
+                ),
+        ),
       ),
     );
   }

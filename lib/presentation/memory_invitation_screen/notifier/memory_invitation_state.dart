@@ -1,32 +1,17 @@
 part of 'memory_invitation_notifier.dart';
 
-class MemoryInvitationState {
-  final bool? isLoading;
-  final bool? isJoined;
-  final Map<String, dynamic>? memoryInvitationModel;
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-  MemoryInvitationState({
-    this.isLoading = false,
-    this.isJoined = false,
-    this.memoryInvitationModel,
-  });
-
-  List<Object?> get props => [
-        isLoading,
-        isJoined,
-        memoryInvitationModel,
-      ];
-
-  MemoryInvitationState copyWith({
-    bool? isLoading,
-    bool? isJoined,
+@freezed
+class MemoryInvitationState with _$MemoryInvitationState {
+  const factory MemoryInvitationState({
     Map<String, dynamic>? memoryInvitationModel,
-  }) {
-    return MemoryInvitationState(
-      isLoading: isLoading ?? this.isLoading,
-      isJoined: isJoined ?? this.isJoined,
-      memoryInvitationModel:
-          memoryInvitationModel ?? this.memoryInvitationModel,
-    );
-  }
+    @Default(false) bool isLoading,
+    @Default(false) bool isDownloading,
+    @Default(false) bool isSharing,
+    @Default(false) bool downloadSuccess,
+    @Default(false) bool shareSuccess,
+    @Default(false) bool copySuccess,
+    String? errorMessage,
+  }) = _MemoryInvitationState;
 }

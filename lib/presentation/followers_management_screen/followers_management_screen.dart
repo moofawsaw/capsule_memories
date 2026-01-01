@@ -231,7 +231,12 @@ class FollowersManagementScreenState
 
   /// Navigates to follower profile
   void onTapFollower(BuildContext context, FollowerItemModel follower) {
-    NavigatorService.pushNamed(AppRoutes.appProfile);
+    if (follower.id == null || follower.id!.isEmpty) return;
+
+    NavigatorService.pushNamed(
+      AppRoutes.appProfile,
+      arguments: {'userId': follower.id},
+    );
   }
 
   /// Blocks the selected follower

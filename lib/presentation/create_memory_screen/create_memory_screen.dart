@@ -176,9 +176,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                       },
                       value: selectedCategory,
                       placeholder: 'Select a category...',
-                      leftIcon: selectedCategory != null
-                          ? ImageConstant.imgEmojiMemorycategory
-                          : null,
                       rightIcon: ImageConstant.imgIconBlueGray30022x18,
                       margin: EdgeInsets.zero,
                     ),

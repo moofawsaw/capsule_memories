@@ -65,8 +65,8 @@ class _MemoryShareOptionsScreenState
                       SizedBox(height: 2.h.fSize),
                       Text(
                         'Failed to load sharing options',
-                        style:
-                            TextStyle(color: Colors.white54, fontSize: 14.fSize),
+                        style: TextStyle(
+                            color: Colors.white54, fontSize: 14.fSize),
                       ),
                     ],
                   ),
@@ -220,7 +220,8 @@ class _MemoryShareOptionsScreenState
                                         ? 'No friends to invite'
                                         : 'No friends found',
                                     style: TextStyle(
-                                        color: Colors.white54, fontSize: 12.fSize),
+                                        color: Colors.white54,
+                                        fontSize: 12.fSize),
                                   ),
                                 )
                               : ListView.separated(
@@ -235,7 +236,8 @@ class _MemoryShareOptionsScreenState
 
                                     return ListTile(
                                       contentPadding: EdgeInsets.symmetric(
-                                          horizontal: 2.w.fSize, vertical: 0.5.h.fSize),
+                                          horizontal: 2.w.fSize,
+                                          vertical: 0.5.h.fSize),
                                       leading: CircleAvatar(
                                         radius: 20.fSize,
                                         backgroundColor: Color(0xFF9C27B0),
@@ -335,7 +337,8 @@ class _MemoryShareOptionsScreenState
                                   child: Text(
                                     'No groups to invite',
                                     style: TextStyle(
-                                        color: Colors.white54, fontSize: 12.fSize),
+                                        color: Colors.white54,
+                                        fontSize: 12.fSize),
                                   ),
                                 )
                               : ListView.separated(
@@ -350,12 +353,14 @@ class _MemoryShareOptionsScreenState
 
                                     return ListTile(
                                       contentPadding: EdgeInsets.symmetric(
-                                          horizontal: 2.w.fSize, vertical: 0.5.h.fSize),
+                                          horizontal: 2.w.fSize,
+                                          vertical: 0.5.h.fSize),
                                       leading: CircleAvatar(
                                         radius: 20.fSize,
                                         backgroundColor: Color(0xFF673AB7),
                                         child: Icon(Icons.group,
-                                            color: Colors.white, size: 20.fSize),
+                                            color: Colors.white,
+                                            size: 20.fSize),
                                       ),
                                       title: Text(
                                         group['name'] ?? 'Unknown Group',
@@ -429,8 +434,8 @@ class _MemoryShareOptionsScreenState
                                       : () => notifier.sendInvites(context),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Color(0xFF9C27B0),
-                                    padding:
-                                        EdgeInsets.symmetric(vertical: 1.8.h.fSize),
+                                    padding: EdgeInsets.symmetric(
+                                        vertical: 1.8.h.fSize),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -461,8 +466,8 @@ class _MemoryShareOptionsScreenState
                               child: OutlinedButton(
                                 onPressed: () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
-                                  padding:
-                                      EdgeInsets.symmetric(vertical: 1.8.h.fSize),
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 1.8.h.fSize),
                                   side: BorderSide(color: Color(0xFF9C27B0)),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
@@ -539,7 +544,8 @@ class _MemoryShareOptionsScreenState
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16.fSize),
+            Icon(Icons.arrow_forward_ios,
+                color: Colors.white54, size: 16.fSize),
           ],
         ),
       ),
@@ -575,21 +581,75 @@ class _MemoryShareOptionsScreenState
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 3.h.fSize),
-              Container(
-                padding: EdgeInsets.all(4.w.fSize),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: PrettyQrView.data(
-                  data: 'https://capsule.app/join/${model.inviteCode}',
-                  decoration: PrettyQrDecoration(
-                    shape: PrettyQrSmoothSymbol(
-                      color: Color(0xFF1A1A1A),
+
+              // Display pre-generated QR code from database or fallback to local generation
+              if (model.qrCodeUrl != null && model.qrCodeUrl!.isNotEmpty)
+                Container(
+                  padding: EdgeInsets.all(4.w.fSize),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Image.network(
+                    model.qrCodeUrl!,
+                    width: 60.w.fSize,
+                    height: 60.w.fSize,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return SizedBox(
+                        width: 60.w.fSize,
+                        height: 60.w.fSize,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF9C27B0),
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      // Fallback to locally generated QR if image fails to load
+                      return Container(
+                        padding: EdgeInsets.all(4.w.fSize),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: PrettyQrView.data(
+                          data:
+                              'https://capapp.co/join/memory/${model.inviteCode}',
+                          decoration: PrettyQrDecoration(
+                            shape: PrettyQrSmoothSymbol(
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                )
+              else
+                // Fallback: Generate QR code locally if URL not available
+                Container(
+                  padding: EdgeInsets.all(4.w.fSize),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: PrettyQrView.data(
+                    data: 'https://capapp.co/join/memory/${model.inviteCode}',
+                    decoration: PrettyQrDecoration(
+                      shape: PrettyQrSmoothSymbol(
+                        color: Color(0xFF1A1A1A),
+                      ),
                     ),
                   ),
                 ),
-              ),
+
               SizedBox(height: 3.h.fSize),
               Text(
                 'Invite Code: ${model.inviteCode}',
@@ -606,7 +666,7 @@ class _MemoryShareOptionsScreenState
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Share.share(
-                          'Join my Capsule memory: ${model.memoryName}\n\nhttps://capsule.app/join/${model.inviteCode}',
+                          'Join my Capsule memory: ${model.memoryName}\n\nhttps://capapp.co/join/memory/${model.inviteCode}',
                           subject: 'Join ${model.memoryName} on Capsule',
                         );
                       },

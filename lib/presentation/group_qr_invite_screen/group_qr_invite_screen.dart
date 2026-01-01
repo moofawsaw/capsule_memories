@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -144,6 +145,9 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
 
   /// Section Widget
   Widget _buildQRCodeSection(GroupQRInviteModel model) {
+    // Check if pre-generated QR code URL exists from backend
+    final qrCodeUrl = model.qrCodeUrl;
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 68.h),
       child: RepaintBoundary(
@@ -154,13 +158,37 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
             color: appTheme.whiteCustom,
             borderRadius: BorderRadius.circular(12.h),
           ),
-          child: QrImageView(
-            data: model.qrCodeData ?? '',
-            version: QrVersions.auto,
-            size: 200.h,
-            backgroundColor: appTheme.whiteCustom,
-            foregroundColor: appTheme.blackCustom,
-          ),
+          child: (qrCodeUrl != null && qrCodeUrl.isNotEmpty)
+              ? CachedNetworkImage(
+                  imageUrl: qrCodeUrl,
+                  width: 200.h,
+                  height: 200.h,
+                  fit: BoxFit.contain,
+                  placeholder: (context, url) => Container(
+                    width: 200.h,
+                    height: 200.h,
+                    alignment: Alignment.center,
+                    child: CircularProgressIndicator(
+                      color: appTheme.deep_purple_A100,
+                    ),
+                  ),
+                  errorWidget: (context, url, error) {
+                    return QrImageView(
+                      data: model.qrCodeData ?? '',
+                      version: QrVersions.auto,
+                      size: 200.h,
+                      backgroundColor: appTheme.whiteCustom,
+                      foregroundColor: appTheme.blackCustom,
+                    );
+                  },
+                )
+              : QrImageView(
+                  data: model.qrCodeData ?? '',
+                  version: QrVersions.auto,
+                  size: 200.h,
+                  backgroundColor: appTheme.whiteCustom,
+                  foregroundColor: appTheme.blackCustom,
+                ),
         ),
       ),
     );

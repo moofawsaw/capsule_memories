@@ -1,5 +1,4 @@
 import '../core/app_export.dart';
-import '../widgets/custom_button.dart';
 import '../widgets/custom_image_view.dart';
 
 /// Timeline variant enum to determine which features to display
@@ -113,45 +112,12 @@ class TimelineWidget extends StatelessWidget {
 
   /// Build action buttons (sealed variant only)
   Widget _buildActionButtons(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 22.h),
-      child: Row(
-        spacing: 18.h,
-        children: [
-          Expanded(
-            child: CustomButton(
-              text: 'Replay All',
-              leftIcon: ImageConstant.imgIcon12,
-              onPressed: onReplayAll,
-              buttonStyle: CustomButtonStyle.fillPrimary,
-              buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-            ),
-          ),
-          Expanded(
-            child: CustomButton(
-              text: 'Add Media',
-              leftIcon: ImageConstant.imgIcon13,
-              onPressed: onAddMedia,
-              buttonStyle: CustomButtonStyle.fillPrimary,
-              buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-            ),
-          ),
-        ],
-      ),
-    );
+    return SizedBox();
   }
 
   /// Build footer message (sealed variant only)
   Widget _buildFooterMessage(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 33.h, vertical: 14.h),
-      child: Text(
-        'You can still add photos and videos you captured during the memory window',
-        textAlign: TextAlign.center,
-        style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-            .copyWith(color: appTheme.blue_gray_300, height: 1.21),
-      ),
-    );
+    return SizedBox();
   }
 
   double _centerX({

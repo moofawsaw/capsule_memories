@@ -3,7 +3,6 @@ import '../../core/utils/memory_nav_args.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_story_list.dart';
-import '../../widgets/custom_story_progress.dart';
 import '../../widgets/timeline_widget.dart';
 import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
@@ -131,23 +130,21 @@ class MemoryDetailsViewScreenState
         return Container(
           color: appTheme.gray_900_02,
           child: SingleChildScrollView(
-            child: Column(
-              children: [
-                SizedBox(height: 18.h),
-                _buildEventCard(context),
-                SizedBox(height: 18.h),
-                _buildTimelineSection(context),
-                SizedBox(height: 20.h),
-                _buildStoriesSection(context),
-                SizedBox(height: 19.h),
-                _buildStoriesList(context),
-                SizedBox(height: 23.h),
-                _buildActionButtons(context),
-                _buildFooterMessage(context),
-                SizedBox(height: 24.h),
-              ],
-            ),
-          ),
+              child: Column(
+            children: [
+              SizedBox(height: 18.h),
+              _buildEventCard(context),
+              _buildTimelineSection(context),
+              SizedBox(height: 20.h),
+              _buildStoriesSection(context),
+              SizedBox(height: 19.h),
+              _buildStoriesList(context),
+              SizedBox(height: 23.h),
+              _buildActionButtons(context),
+              _buildFooterMessage(context),
+              SizedBox(height: 24.h),
+            ],
+          )),
         );
       },
     );
@@ -200,7 +197,6 @@ class MemoryDetailsViewScreenState
         }
 
         return Container(
-          margin: EdgeInsets.only(top: 6.h),
           child: Stack(
             children: [
               Container(
@@ -270,20 +266,7 @@ class MemoryDetailsViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsViewNotifier);
 
-        return Container(
-          margin: EdgeInsets.symmetric(horizontal: 32.h),
-          child: CustomStoryProgress(
-            mainImagePath: ImageConstant.imgImage9,
-            progressValue: 0.6,
-            profileImagePath: ImageConstant.imgEllipse826x26,
-            actionIconPath: ImageConstant.imgFrame19,
-            showOverlayControls: true,
-            overlayIconPath: ImageConstant.imgImagesmode,
-            onActionTap: () {
-              // Handle action tap
-            },
-          ),
-        );
+        return SizedBox();
       },
     );
   }

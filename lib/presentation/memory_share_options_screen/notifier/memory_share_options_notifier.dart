@@ -25,14 +25,15 @@ class MemoryShareOptionsNotifier
     );
 
     try {
-      // Fetch memory details to get invite code
+      // Fetch memory details to get invite code and QR code URL
       final memoryResponse = await _supabase
           ?.from('memories')
-          .select('invite_code')
+          .select('invite_code, qr_code_url')
           .eq('id', memoryId)
           .single();
 
       final inviteCode = memoryResponse?['invite_code'] as String?;
+      final qrCodeUrl = memoryResponse?['qr_code_url'] as String?;
 
       // Fetch friends and groups concurrently
       final results = await Future.wait([
@@ -42,6 +43,7 @@ class MemoryShareOptionsNotifier
 
       state = state.copyWith(
         inviteCode: inviteCode,
+        qrCodeUrl: qrCodeUrl,
         friends: results[0],
         groups: results[1],
         isLoading: false,
@@ -79,7 +81,7 @@ class MemoryShareOptionsNotifier
   Future<void> copyLinkToClipboard(BuildContext context) async {
     if (state.inviteCode == null) return;
 
-    final link = 'https://capsule.app/join/${state.inviteCode}';
+    final link = 'https://capapp.co/join/memory/${state.inviteCode}';
     await Clipboard.setData(ClipboardData(text: link));
 
     if (context.mounted) {

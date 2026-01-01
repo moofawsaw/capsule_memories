@@ -46,12 +46,13 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
       print(
           '🔍 QR TIMELINE SHARE: Fetching memory details for: ${widget.memoryId}');
 
-      // Fetch memory with all necessary details
+      // Fetch memory with all necessary details INCLUDING qr_code_url
       final response =
           await SupabaseService.instance.client?.from('memories').select('''
             id,
             title,
             invite_code,
+            qr_code_url,
             contributor_count,
             state,
             created_at,
@@ -79,11 +80,20 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
           .eq('memory_id', widget.memoryId);
 
       final storiesCount = storiesResponse?.length ?? 0;
-
       print('✅ QR TIMELINE SHARE: Successfully loaded memory');
       print('   - Title: ${response['title']}');
       print('   - Invite Code: ${response['invite_code']}');
+      print('   - QR Code URL: ${response['qr_code_url']}');
       print('   - Stories: $storiesCount');
+      
+      // 🔍 ENHANCED DEBUG - Check qr_code_url status
+      final rawQrUrl = response['qr_code_url'];
+      print('🔍 DEBUG qr_code_url analysis:');
+      print('   - Raw value: $rawQrUrl');
+      print('   - Type: ${rawQrUrl.runtimeType}');
+      print('   - Is null: ${rawQrUrl == null}');
+      print('   - Is empty string: ${rawQrUrl == ""}');
+      print('   - Full response keys: ${response.keys.toList()}');
 
       setState(() {
         _memoryData = {
@@ -190,13 +200,20 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
     // Extract data
     final memoryTitle = _memoryData!['title'] as String? ?? 'Untitled Memory';
     final inviteCode = _memoryData!['invite_code'] as String? ?? '';
+    final qrCodeUrl = _memoryData!['qr_code_url'] as String?;
     final membersCount = _memoryData!['contributor_count'] as int? ?? 0;
     final storiesCount = _memoryData!['stories_count'] as int? ?? 0;
     final status = _memoryData!['state'] as String? ?? 'open';
     final locationName = _memoryData!['location_name'] as String?;
 
-    // Generate QR code URL
-    final qrCodeUrl = 'https://capapp.co/memories/$inviteCode';
+    // Generate correct deep link URL
+    final deepLinkUrl = 'https://capapp.co/join/memory/$inviteCode';
+
+// DEBUG: Log what we extracted
+print('📋 _buildContent data extraction:');
+print('   - inviteCode: "$inviteCode"');
+print('   - qrCodeUrl: "$qrCodeUrl"');
+print('   - deepLinkUrl: "$deepLinkUrl"');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -229,8 +246,8 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
           textAlign: TextAlign.center,
         ),
         SizedBox(height: 32.h),
-        // QR Code
-        _buildQRCode(qrCodeUrl),
+        // QR Code - Display from database or fallback to local generation
+        _buildQRCode(deepLinkUrl, qrCodeUrl),
         SizedBox(height: 24.h),
         // Memory title
         Text(
@@ -262,11 +279,11 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         // Stats
         _buildStatsRow(membersCount, storiesCount, status),
         SizedBox(height: 32.h),
-        // Share URL section
-        _buildUrlSection(qrCodeUrl),
+        // Share URL section with correct deep link
+        _buildUrlSection(deepLinkUrl),
         SizedBox(height: 24.h),
-        // Action buttons
-        _buildActionButtons(qrCodeUrl),
+        // Action buttons with correct deep link
+        _buildActionButtons(deepLinkUrl),
         SizedBox(height: 16.h),
         // Helper text
         Text(
@@ -280,20 +297,58 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
     );
   }
 
-  /// QR Code widget
-  Widget _buildQRCode(String url) {
+  /// QR Code widget - Display database image with fallback
+  Widget _buildQRCode(String deepLinkUrl, String? qrCodeUrl) {
+      // DEBUG: Log what we're displaying
+  print('🖼️ _buildQRCode called:');
+  print('   - deepLinkUrl: $deepLinkUrl');
+  print('   - qrCodeUrl: $qrCodeUrl');
+  print('   - Using database image: ${qrCodeUrl != null && qrCodeUrl.isNotEmpty}');
     return Container(
       padding: EdgeInsets.all(16.h),
       decoration: BoxDecoration(
         color: appTheme.white_A700,
         borderRadius: BorderRadius.circular(16.h),
       ),
-      child: QrImageView(
-        data: url,
-        version: QrVersions.auto,
-        size: 200.h,
-        backgroundColor: appTheme.white_A700,
-      ),
+      child: qrCodeUrl != null && qrCodeUrl.isNotEmpty
+          ? Image.network(
+              qrCodeUrl,
+              width: 200.h,
+              height: 200.h,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return SizedBox(
+                  width: 200.h,
+                  height: 200.h,
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: appTheme.deep_purple_A100,
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                // Fallback to locally generated QR if database image fails
+                print('⚠️ Failed to load QR from database, using fallback');
+                return QrImageView(
+                  data: deepLinkUrl,
+                  version: QrVersions.auto,
+                  size: 200.h,
+                  backgroundColor: appTheme.white_A700,
+                );
+              },
+            )
+          : QrImageView(
+              data: deepLinkUrl,
+              version: QrVersions.auto,
+              size: 200.h,
+              backgroundColor: appTheme.white_A700,
+            ),
     );
   }
 
@@ -408,10 +463,10 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
     );
   }
 
-  /// Copy URL to clipboard
+  /// Copy URL to clipboard with correct deep link
   void _copyUrlToClipboard() async {
     final inviteCode = _memoryData!['invite_code'] as String;
-    final url = 'https://capapp.co/memories/$inviteCode';
+    final url = 'https://capapp.co/join/memory/$inviteCode';
 
     await Clipboard.setData(ClipboardData(text: url));
 

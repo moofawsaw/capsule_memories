@@ -179,7 +179,12 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
 
   /// Navigates to user profile screen
   void onTapFollowingUser(BuildContext context, FollowingUserModel? user) {
-    NavigatorService.pushNamed(AppRoutes.appProfile);
+    if (user?.id == null || user!.id!.isEmpty) return;
+
+    NavigatorService.pushNamed(
+      AppRoutes.appProfile,
+      arguments: {'userId': user.id},
+    );
   }
 
   /// Handles user action (more options)

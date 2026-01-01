@@ -1,4 +1,3 @@
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -427,28 +426,79 @@ class PushNotificationService {
         return;
       }
 
-      switch (uri.host) {
+      final pathSegments = uri.pathSegments;
+
+      if (pathSegments.isEmpty) {
+        debugPrint('⚠️ Empty path segments in deep link: $deepLink');
+        return;
+      }
+
+      debugPrint('📱 Processing deep link path: ${pathSegments.join("/")}');
+
+      switch (pathSegments[0]) {
         case 'memory':
-          final memoryId =
-              uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
-          if (memoryId != null) {
-            navigatorKey.currentState
-                ?.pushNamed('/memory_details/$memoryId', arguments: memoryId);
+          // Handle: /memory/{memoryId}
+          if (pathSegments.length > 1) {
+            final memoryId = pathSegments[1];
+            debugPrint('📱 Navigating to memory: $memoryId');
+            navigatorKey.currentState?.pushNamed(
+              '/app/bs/details',
+              arguments: memoryId,
+            );
           }
           break;
+
         case 'profile':
-          final userId =
-              uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
-          if (userId != null) {
-            navigatorKey.currentState
-                ?.pushNamed('/user_profile/$userId', arguments: userId);
+          // Handle: /profile/{userId}
+          if (pathSegments.length > 1) {
+            final userId = pathSegments[1];
+            debugPrint('📱 Navigating to profile: $userId');
+            navigatorKey.currentState?.pushNamed(
+              '/app/profile-user',
+              arguments: userId,
+            );
           }
           break;
+
         case 'friends':
-          navigatorKey.currentState?.pushNamed('/friends_management');
+          // Handle: /friends
+          debugPrint('📱 Navigating to friends screen');
+          navigatorKey.currentState?.pushNamed('/app/friends');
           break;
+
+        case 'group':
+          // Handle: /group/{groupId}
+          if (pathSegments.length > 1) {
+            final groupId = pathSegments[1];
+            debugPrint('📱 Navigating to group: $groupId');
+            navigatorKey.currentState?.pushNamed(
+              '/app/groups',
+              arguments: groupId,
+            );
+          }
+          break;
+
+        case 'notifications':
+          // Handle: /notifications
+          debugPrint('📱 Navigating to notifications screen');
+          navigatorKey.currentState?.pushNamed('/app/notifications');
+          break;
+
+        case 'join':
+          // Handle: /join/{type}/{code} - e.g., /join/memory/ABC123, /join/group/XYZ789, /join/friend/CODE
+          if (pathSegments.length >= 3) {
+            final type = pathSegments[1]; // memory, group, or friend
+            final code = pathSegments[2];
+            debugPrint('📱 Navigating to join screen: type=$type, code=$code');
+            navigatorKey.currentState?.pushNamed(
+              '/app/join',
+              arguments: {'type': type, 'code': code},
+            );
+          }
+          break;
+
         default:
-          debugPrint('⚠️ Unknown deep link host: ${uri.host}');
+          debugPrint('⚠️ Unknown deep link path: ${pathSegments[0]}');
       }
     } catch (e) {
       debugPrint('❌ Error handling deep link: $e');
