@@ -1,6 +1,8 @@
 import '../../core/app_export.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
+import '../../shared/widgets/qr_scanner_overlay.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart';
 import '../create_memory_screen/create_memory_screen.dart';
@@ -79,14 +81,29 @@ class _MemoriesDashboardScreenState
           ),
           Consumer(
             builder: (context, ref, _) {
-              return CustomButton(
-                text: 'New',
-                leftIcon: ImageConstant.imgIcon20x20,
-                onPressed: () => _onCreateMemoryTap(context),
-                buttonStyle: CustomButtonStyle.fillPrimary,
-                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                height: 42.h,
-                padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+              return Row(
+                children: [
+                  CustomIconButton(
+                    height: 44.h,
+                    width: 44.h,
+                    iconPath: ImageConstant.imgButtonsGray50,
+                    backgroundColor: appTheme.gray_900_01.withAlpha(179),
+                    borderRadius: 22.h,
+                    iconSize: 24.h,
+                    onTap: () => _onCameraButtonTap(context),
+                  ),
+                  SizedBox(width: 8.h),
+                  CustomButton(
+                    text: 'New',
+                    leftIcon: ImageConstant.imgIcon20x20,
+                    onPressed: () => _onCreateMemoryTap(context),
+                    buttonStyle: CustomButtonStyle.fillPrimary,
+                    buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                    height: 42.h,
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+                  ),
+                ],
               );
             },
           ),
@@ -451,6 +468,22 @@ class _MemoriesDashboardScreenState
   void _onTabTap(BuildContext context, int index) {
     final notifier = ref.read(memoriesDashboardNotifier.notifier);
     notifier.updateSelectedTabIndex(index);
+  }
+
+  /// Handle camera action for memory QR scanning
+  void _onCameraButtonTap(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => QRScannerOverlay(
+          scanType: 'memory',
+          onSuccess: () {
+            ref.read(memoriesDashboardNotifier.notifier).refreshMemories();
+          },
+        ),
+      ),
+    );
   }
 
   /// CRITICAL FIX: Use validated navigation wrapper for navigation

@@ -1,11 +1,11 @@
 import '../../core/app_export.dart';
+import '../../shared/widgets/qr_scanner_overlay.dart' as shared;
 import '../../widgets/custom_icon_button_row.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
 import '../qr_code_share_screen_two_screen/qr_code_share_screen_two_screen.dart';
 import './widgets/friends_section_widget.dart';
 import './widgets/incoming_requests_section_widget.dart';
-import './widgets/qr_scanner_overlay.dart';
 import './widgets/sent_requests_section_widget.dart';
 import 'notifier/friends_management_notifier.dart';
 
@@ -155,7 +155,7 @@ class FriendsManagementScreenState
       context,
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => QRScannerOverlay(
+        builder: (_) => shared.QRScannerOverlay(
           scanType: 'friend',
           onSuccess: () {
             ref.read(friendsManagementNotifier.notifier).initialize();

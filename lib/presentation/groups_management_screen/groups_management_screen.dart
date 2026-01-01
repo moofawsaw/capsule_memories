@@ -1,13 +1,15 @@
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../shared/widgets/qr_scanner_overlay.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_group_card.dart';
 import '../../widgets/custom_group_invitation_card.dart';
+import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../create_group_screen/create_group_screen.dart';
-import '../group_edit_bottom_sheet/group_edit_bottom_sheet.dart';
 import '../group_qr_invite_screen/group_qr_invite_screen.dart';
+import '../group_edit_bottom_sheet/group_edit_bottom_sheet.dart';
 import './models/groups_management_model.dart';
 import 'notifier/groups_management_notifier.dart';
 
@@ -83,6 +85,16 @@ class GroupsManagementScreenState
                 ),
               ),
               Spacer(),
+              CustomIconButton(
+                height: 44.h,
+                width: 44.h,
+                iconPath: ImageConstant.imgButtonsGray50,
+                backgroundColor: appTheme.gray_900_01.withAlpha(179),
+                borderRadius: 22.h,
+                iconSize: 24.h,
+                onTap: () => onTapCameraButton(context),
+              ),
+              SizedBox(width: 8.h),
               CustomButton(
                 text: 'New Group',
                 width: null,
@@ -301,5 +313,21 @@ class GroupsManagementScreenState
     if (confirmed == true) {
       ref.read(groupsManagementNotifier.notifier).declineInvitation();
     }
+  }
+
+  /// Handle camera action for group QR scanning
+  void onTapCameraButton(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => QRScannerOverlay(
+          scanType: 'group',
+          onSuccess: () {
+            ref.read(groupsManagementNotifier.notifier).refresh();
+          },
+        ),
+      ),
+    );
   }
 }

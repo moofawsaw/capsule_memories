@@ -13,7 +13,8 @@ final friendsManagementNotifier = NotifierProvider.autoDispose<
   () => FriendsManagementNotifier(),
 );
 
-class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementState> {
+class FriendsManagementNotifier
+    extends AutoDisposeNotifier<FriendsManagementState> {
   final FriendsDataProvider _friendsProvider = FriendsDataProvider();
   final FriendsDataProvider _friendsService = FriendsDataProvider();
   StreamSubscription<List<FriendItem>>? _friendsSubscription;
@@ -144,7 +145,8 @@ class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementSta
       // Get friendship status for each user
       final searchResults = await Future.wait(
         usersData.map((user) async {
-          final status = await _friendsService.checkFriendshipStatus(user['id']);
+          final status =
+              await _friendsService.checkFriendshipStatus(user['id']);
           return SearchUserModel(
             id: user['id'] ?? '',
             userName: user['username'] ?? '',
@@ -483,7 +485,10 @@ class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementSta
           successMessage: 'Friend request sent successfully!',
         );
 
-        // Refresh data to show the new sent request
+        // Explicitly refresh all friends data to show the new sent request
+        await _friendsProvider.refreshAllData();
+
+        // Also reinitialize to ensure real-time subscriptions are active
         await initialize();
       } else {
         state = state.copyWith(
