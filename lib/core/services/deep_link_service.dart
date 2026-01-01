@@ -74,7 +74,7 @@ class DeepLinkService {
         // User not logged in - store token for later
         _pendingSessionToken = data['session_token'];
         // Navigate to login screen
-        NavigatorService.pushNamed(AppRoutes.loginScreen);
+        NavigatorService.pushNamed(AppRoutes.authLogin);
         debugPrint('Deep link requires auth. Session token stored.');
       } else if (data['success'] == true) {
         // Action completed!
@@ -117,22 +117,22 @@ class DeepLinkService {
   void _navigateToConfirmation(String type) {
     switch (type) {
       case 'friend':
-        NavigatorService.pushNamed(AppRoutes.friendsManagementScreen);
+        NavigatorService.pushNamed(AppRoutes.appFriends);
         break;
       case 'group':
-        NavigatorService.pushNamed(AppRoutes.groupsManagementScreen);
+        NavigatorService.pushNamed(AppRoutes.appGroups);
         break;
       case 'memory':
-        NavigatorService.pushNamed(AppRoutes.memoriesDashboardScreen);
+        NavigatorService.pushNamed(AppRoutes.appMemories);
         break;
       default:
-        NavigatorService.pushNamed(AppRoutes.memoryFeedDashboardScreen);
+        NavigatorService.pushNamed(AppRoutes.appFeed);
     }
   }
 
   void _showError(String message) {
     // Show error via global messenger key
-    globalMessengerKey.currentState?.showSnackBar(
+    NavigatorService.navigatorKey.currentState?.showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,

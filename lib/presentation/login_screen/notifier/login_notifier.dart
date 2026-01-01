@@ -200,10 +200,24 @@ class LoginNotifier extends StateNotifier<LoginState> {
     );
 
     try {
-      await _supabaseService.signInWithEmail(
-        state.emailController!.text,
-        state.passwordController!.text,
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
+
+      final email = state.emailController?.text ?? '';
+      final password = state.passwordController?.text ?? '';
+
+      // Sign in with Supabase
+      final response = await supabaseClient.auth.signInWithPassword(
+        email: email,
+        password: password,
       );
+
+      if (response.user == null) {
+        throw Exception('Login failed: Unable to authenticate user.');
+      }
 
       state = state.copyWith(isLoading: false);
 
@@ -216,7 +230,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
       }
 
       NavigatorService.pushNamedAndRemoveUntil(
-        AppRoutes.memoryFeedDashboardScreen,
+        AppRoutes.appFeed,
       );
     } catch (error) {
       String errorMessage = 'Login failed. Please try again.';

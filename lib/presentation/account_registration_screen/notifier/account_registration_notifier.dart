@@ -86,9 +86,15 @@ class AccountRegistrationNotifier
     );
 
     try {
-      await _supabaseService.signUpWithEmail(
-        state.emailController!.text,
-        state.passwordController!.text,
+      final supabaseClient = SupabaseService.instance.client;
+      if (supabaseClient == null) {
+        throw Exception(
+            'Supabase is not initialized. Please check your configuration.');
+      }
+
+      await supabaseClient.auth.signUp(
+        email: state.emailController!.text,
+        password: state.passwordController!.text,
       );
 
       state = state.copyWith(isLoading: false);
@@ -102,7 +108,7 @@ class AccountRegistrationNotifier
       }
 
       NavigatorService.pushNamedAndRemoveUntil(
-        AppRoutes.memoryFeedDashboardScreen,
+        AppRoutes.appFeed,
       );
     } catch (error) {
       String errorMessage = 'Registration failed. Please try again.';
