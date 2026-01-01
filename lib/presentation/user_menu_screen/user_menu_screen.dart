@@ -7,6 +7,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_menu_item.dart';
 import '../../widgets/custom_navigation_drawer.dart';
+import '../app_download_screen/app_download_screen.dart';
 import 'notifier/user_menu_notifier.dart';
 
 class UserMenuScreen extends ConsumerStatefulWidget {
@@ -398,7 +399,7 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
 
   /// Handles share app functionality
   void onTapShareApp(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.appBsDownload);
+    AppDownloadScreen.show(context);
   }
 
   /// Navigates to feature request screen
