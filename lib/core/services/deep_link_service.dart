@@ -1,134 +1,143 @@
-import 'package:flutter/services.dart';
+import 'package:app_links/app_links.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../app_export.dart';
+import '../utils/navigator_service.dart';
 
 class DeepLinkService {
   static final DeepLinkService _instance = DeepLinkService._internal();
   factory DeepLinkService() => _instance;
   DeepLinkService._internal();
 
-  static const platform = MethodChannel('capapp.co/deep_links');
+  final _appLinks = AppLinks();
+  String? _pendingSessionToken;
   bool _isInitialized = false;
+
+  bool get hasPendingAction => _pendingSessionToken != null;
 
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      // Set up method channel to receive deep links from native code
-      platform.setMethodCallHandler(_handleDeepLink);
-
-      // Check for initial link (when app is opened from deep link)
-      final initialLink = await _getInitialLink();
-      if (initialLink != null) {
-        await _processDeepLink(initialLink);
+      // Handle link that opened the app
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        await _handleDeepLink(initialUri);
       }
 
+      // Handle links while app is running
+      _appLinks.uriLinkStream.listen(_handleDeepLink);
+
       _isInitialized = true;
-      debugPrint('✅ Deep link service initialized');
+      debugPrint('✅ Deep link service initialized with app_links');
     } catch (e) {
       debugPrint('❌ Failed to initialize deep link service: $e');
     }
   }
 
-  Future<String?> _getInitialLink() async {
-    try {
-      final String? link = await platform.invokeMethod('getInitialLink');
-      return link;
-    } catch (e) {
-      debugPrint('Error getting initial link: $e');
-      return null;
-    }
+  Future<void> _handleDeepLink(Uri uri) async {
+    // Only handle capapp.co/join links
+    if (uri.host != 'capapp.co' || !uri.path.startsWith('/join')) return;
+
+    final segments = uri.pathSegments;
+    if (segments.length < 3) return; // Need: join/{type}/{code}
+
+    final type = segments[1]; // friend, group, or memory
+    final code = segments[2];
+
+    await _processLink(type, code);
   }
 
-  Future<void> _handleDeepLink(MethodCall call) async {
-    if (call.method == 'onDeepLink') {
-      final String? link = call.arguments as String?;
-      if (link != null) {
-        await _processDeepLink(link);
-      }
+  Future<void> _processLink(String type, String code) async {
+    final client = SupabaseService.instance.client;
+    if (client == null) {
+      debugPrint('Supabase not initialized');
+      return;
     }
-  }
 
-  Future<void> _processDeepLink(String link) async {
+    final session = client.auth.currentSession;
+
     try {
-      final uri = Uri.parse(link);
-
-      // Handle capapp.co/join/{type}/{code} URLs
-      if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'join') {
-        if (uri.pathSegments.length >= 3) {
-          final type = uri.pathSegments[1];
-          final code = uri.pathSegments[2];
-
-          await _handleJoinLink(type, code);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error processing deep link: $e');
-    }
-  }
-
-  Future<void> _handleJoinLink(String type, String code) async {
-    try {
-      final client = SupabaseService.instance.client;
-      if (client == null) {
-        debugPrint('Supabase not initialized');
-        return;
-      }
-
-      // Check if user is authenticated
-      final user = client.auth.currentUser;
-      if (user == null) {
-        // Store pending action and redirect to login
-        await _storePendingAction(type, code);
-        NavigatorService.pushNamed(AppRoutes.authLogin);
-        return;
-      }
-
-      // Process the join action
       final response = await client.functions.invoke(
         'handle-qr-scan',
-        body: {
-          'type': type,
-          'code': code,
-        },
+        body: {'type': type, 'code': code},
+        headers: session != null
+            ? {'Authorization': 'Bearer ${session.accessToken}'}
+            : null,
       );
 
-      if (response.status == 200) {
-        // Navigate to appropriate confirmation screen
+      final data = response.data as Map<String, dynamic>;
+
+      if (data['requires_auth'] == true) {
+        // User not logged in - store token for later
+        _pendingSessionToken = data['session_token'];
+        // Navigate to login screen
+        NavigatorService.pushNamed(AppRoutes.loginScreen);
+        debugPrint('Deep link requires auth. Session token stored.');
+      } else if (data['success'] == true) {
+        // Action completed!
+        debugPrint('Deep link action completed: ${data['message']}');
         _navigateToConfirmation(type);
-      } else {
-        _showError(response.data['error'] ?? 'Failed to process invitation');
       }
     } catch (e) {
-      _showError('Error processing invitation: $e');
+      debugPrint('Deep link error: $e');
+      _showError('Failed to process invitation');
     }
   }
 
-  Future<void> _storePendingAction(String type, String code) async {
-    // Store pending action in shared preferences or secure storage
-    // This will be processed after user logs in
-    debugPrint('Storing pending action: $type - $code');
+  /// Call this after user logs in/signs up
+  Future<Map<String, dynamic>?> completePendingAction() async {
+    if (_pendingSessionToken == null) return null;
+
+    final client = SupabaseService.instance.client;
+    if (client == null) return null;
+
+    final session = client.auth.currentSession;
+    if (session == null) return null;
+
+    try {
+      final response = await client.functions.invoke(
+        'complete-pending-action',
+        body: {'session_token': _pendingSessionToken},
+        headers: {'Authorization': 'Bearer ${session.accessToken}'},
+      );
+
+      _pendingSessionToken = null; // Clear after use
+
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Complete pending action error: $e');
+      _pendingSessionToken = null;
+      return null;
+    }
   }
 
   void _navigateToConfirmation(String type) {
     switch (type) {
       case 'friend':
-        NavigatorService.pushNamed(AppRoutes.appFriends);
+        NavigatorService.pushNamed(AppRoutes.friendsManagementScreen);
         break;
       case 'group':
-        NavigatorService.pushNamed(AppRoutes.appGroups);
+        NavigatorService.pushNamed(AppRoutes.groupsManagementScreen);
         break;
       case 'memory':
-        NavigatorService.pushNamed(AppRoutes.appMemories);
+        NavigatorService.pushNamed(AppRoutes.memoriesDashboardScreen);
         break;
       default:
-        NavigatorService.pushNamed(AppRoutes.appFeed);
+        NavigatorService.pushNamed(AppRoutes.memoryFeedDashboardScreen);
     }
   }
 
   void _showError(String message) {
-    // Show error toast or snackbar
+    // Show error via global messenger key
+    globalMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
     debugPrint('Deep link error: $message');
   }
 }

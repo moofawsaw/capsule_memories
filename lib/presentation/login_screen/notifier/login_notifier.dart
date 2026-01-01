@@ -1,7 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/login_model.dart';
+
 import '../../../core/app_export.dart';
+import '../../../core/services/deep_link_service.dart';
+import '../../../core/utils/navigator_service.dart';
+import '../../../routes/app_routes.dart';
 import '../../../services/supabase_service.dart';
+import '../models/login_model.dart';
 
 part 'login_state.dart';
 
@@ -180,6 +184,50 @@ class LoginNotifier extends StateNotifier<LoginState> {
           'Facebook login failed. Please ensure Facebook OAuth is configured in Supabase dashboard.';
       if (e.toString().isNotEmpty && !e.toString().contains('Exception: ')) {
         errorMessage = e.toString();
+      }
+
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: errorMessage,
+      );
+    }
+  }
+
+  Future<void> signInWithEmail(BuildContext context) async {
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+    );
+
+    try {
+      await _supabaseService.signInWithEmail(
+        state.emailController!.text,
+        state.passwordController!.text,
+      );
+
+      state = state.copyWith(isLoading: false);
+
+      // Check for pending deep link action after login
+      final result = await DeepLinkService().completePendingAction();
+      if (result != null && result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Action completed!')),
+        );
+      }
+
+      NavigatorService.pushNamedAndRemoveUntil(
+        AppRoutes.memoryFeedDashboardScreen,
+      );
+    } catch (error) {
+      String errorMessage = 'Login failed. Please try again.';
+      if (error.toString().contains('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please try again.';
+      } else if (error.toString().contains('Email not confirmed')) {
+        errorMessage = 'Please verify your email address before signing in.';
+      } else if (error.toString().contains('Invalid email')) {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.toString().isNotEmpty) {
+        errorMessage = error.toString().replaceAll('Exception: ', '');
       }
 
       state = state.copyWith(

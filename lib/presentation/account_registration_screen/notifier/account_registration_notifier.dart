@@ -1,8 +1,12 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/account_registration_model.dart';
+
 import '../../../core/app_export.dart';
+import '../../../core/services/deep_link_service.dart';
+import '../../../core/utils/navigator_service.dart';
+import '../../../routes/app_routes.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/user_profile_service.dart';
+import '../models/account_registration_model.dart';
 
 part 'account_registration_state.dart';
 
@@ -72,6 +76,53 @@ class AccountRegistrationNotifier
       return 'Passwords do not match';
     }
     return null;
+  }
+
+  Future<void> signUpWithEmail(BuildContext context) async {
+    state = state.copyWith(
+      isLoading: true,
+      hasError: false,
+      errorMessage: '',
+    );
+
+    try {
+      await _supabaseService.signUpWithEmail(
+        state.emailController!.text,
+        state.passwordController!.text,
+      );
+
+      state = state.copyWith(isLoading: false);
+
+      // Check for pending deep link action after signup
+      final result = await DeepLinkService().completePendingAction();
+      if (result != null && result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Action completed!')),
+        );
+      }
+
+      NavigatorService.pushNamedAndRemoveUntil(
+        AppRoutes.memoryFeedDashboardScreen,
+      );
+    } catch (error) {
+      String errorMessage = 'Registration failed. Please try again.';
+      if (error.toString().contains('User already registered')) {
+        errorMessage =
+            'This email is already registered. Please sign in instead.';
+      } else if (error.toString().contains('Invalid email')) {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.toString().contains('Password')) {
+        errorMessage = 'Password does not meet requirements.';
+      } else if (error.toString().isNotEmpty) {
+        errorMessage = error.toString().replaceAll('Exception: ', '');
+      }
+
+      state = state.copyWith(
+        isLoading: false,
+        hasError: true,
+        errorMessage: errorMessage,
+      );
+    }
   }
 
   void signUp() async {
