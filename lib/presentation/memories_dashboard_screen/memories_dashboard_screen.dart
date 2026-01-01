@@ -44,7 +44,6 @@ class _MemoriesDashboardScreenState
             children: [
               _buildMemoriesHeader(context),
               _buildLatestStoriesSection(context),
-              _buildViewAllButton(context),
               _buildTabSection(context),
               Expanded(
                 child: _buildMemoriesContent(context),
@@ -171,22 +170,6 @@ class _MemoriesDashboardScreenState
             textAlign: TextAlign.center,
           ),
         ],
-      ),
-    );
-  }
-
-  /// Section Widget - View All Button
-  Widget _buildViewAllButton(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.fromLTRB(20.h, 18.h, 20.h, 0),
-      child: CustomButton(
-        text: 'View All',
-        onPressed: () => _onViewAllTap(context),
-        width: double.infinity,
-        buttonStyle: CustomButtonStyle.outlineDark,
-        buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-        height: 44.h,
-        padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 8.h),
       ),
     );
   }

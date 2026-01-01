@@ -307,6 +307,30 @@ class NotificationService {
     }
   }
 
+  /// Restore a deleted notification
+  Future<void> restoreNotification(Map<String, dynamic> notification) async {
+    try {
+      final userId = _client?.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Re-insert the notification with all its original data
+      await _client?.from('notifications').insert({
+        'id': notification['id'],
+        'user_id': notification['user_id'],
+        'type': notification['type'],
+        'title': notification['title'],
+        'message': notification['message'],
+        'data': notification['data'],
+        'is_read': notification['is_read'],
+        'created_at': notification['created_at'],
+      });
+    } catch (error) {
+      throw Exception('Failed to restore notification: $error');
+    }
+  }
+
   /// Get notification by ID
   Future<Map<String, dynamic>?> getNotificationById(
       String notificationId) async {

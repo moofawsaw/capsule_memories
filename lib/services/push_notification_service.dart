@@ -1,3 +1,4 @@
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -6,10 +7,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/utils/navigator_service.dart';
 import './notification_preferences_service.dart';
+import './platform_stub.dart';
 import './supabase_service.dart';
 
 // Conditional import for Platform - use stub on web
-import 'dart:io' if (dart.library.html) 'platform_stub.dart' show Platform;
 
 /// Top-level function for handling background messages
 @pragma('vm:entry-point')

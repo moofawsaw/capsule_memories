@@ -16,6 +16,9 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   final NotificationService _notificationService = NotificationService.instance;
 
+  // Stack to maintain deleted notifications (most recent at end)
+  final List<Map<String, dynamic>> _deletedNotificationsStack = [];
+
   @override
   void initState() {
     super.initState();
@@ -396,39 +399,107 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           return Dismissible(
             key: Key(notificationId),
             direction: DismissDirection.endToStart,
-            confirmDismiss: (direction) async {
-              // Show delete confirmation
-              return await CustomConfirmationDialog.show(
-                context: context,
-                title: 'Delete Notification?',
-                message: 'Are you sure you want to delete this notification?',
-                confirmText: 'Delete',
-                cancelText: 'Cancel',
-                icon: Icons.delete_outline,
-              );
-            },
             onDismissed: (direction) async {
+              // Store notification data in stack (most recent at end)
+              final deletedNotification =
+                  Map<String, dynamic>.from(notification);
+              _deletedNotificationsStack.add(deletedNotification);
+
               // Delete notification from database
               try {
                 await _notificationService.deleteNotification(notificationId);
 
+                // Reload notifications to update UI
+                await _loadNotifications();
+
                 if (mounted) {
+                  // Dismiss any existing snackbar to show new one
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+                  // Show undo toast at bottom
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Notification deleted'),
-                      duration: Duration(seconds: 2),
+                    SnackBar(
+                      content: Text(
+                        'Notification deleted (${_deletedNotificationsStack.length} in stack)',
+                      ),
+                      duration: const Duration(seconds: 4),
+                      behavior: SnackBarBehavior.floating,
+                      margin: EdgeInsets.only(
+                        bottom: 80.h,
+                        left: 16.w,
+                        right: 16.w,
+                      ),
+                      action: SnackBarAction(
+                        label: 'UNDO',
+                        textColor: appTheme.deep_purple_A100,
+                        onPressed: () async {
+                          // Restore the most recently deleted notification (LIFO)
+                          if (_deletedNotificationsStack.isNotEmpty) {
+                            final notificationToRestore =
+                                _deletedNotificationsStack.removeLast();
+
+                            try {
+                              await _notificationService
+                                  .restoreNotification(notificationToRestore);
+                              await _loadNotifications();
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Notification restored (${_deletedNotificationsStack.length} remaining in stack)',
+                                    ),
+                                    duration: const Duration(seconds: 2),
+                                    behavior: SnackBarBehavior.floating,
+                                    margin: EdgeInsets.only(
+                                      bottom: 80.h,
+                                      left: 16.w,
+                                      right: 16.w,
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (error) {
+                              // If restore fails, add it back to stack
+                              _deletedNotificationsStack
+                                  .add(notificationToRestore);
+
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to restore: $error'),
+                                    duration: const Duration(seconds: 2),
+                                    behavior: SnackBarBehavior.floating,
+                                    margin: EdgeInsets.only(
+                                      bottom: 80.h,
+                                      left: 16.w,
+                                      right: 16.w,
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          }
+                        },
+                      ),
                     ),
                   );
                 }
-
-                // Reload notifications to update UI
-                await _loadNotifications();
               } catch (error) {
+                // If delete fails, remove from stack
+                _deletedNotificationsStack.removeLast();
+
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Failed to delete notification: $error'),
                       duration: const Duration(seconds: 2),
+                      behavior: SnackBarBehavior.floating,
+                      margin: EdgeInsets.only(
+                        bottom: 80.h,
+                        left: 16.w,
+                        right: 16.w,
+                      ),
                     ),
                   );
                 }
