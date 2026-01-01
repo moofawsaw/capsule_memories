@@ -2,6 +2,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
 import '../../../core/services/deep_link_service.dart';
+import '../../../core/utils/navigator_service.dart';
+import '../../../routes/app_routes.dart';
 import '../../../services/supabase_service.dart';
 import '../models/login_model.dart';
 
@@ -103,7 +105,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
     }
   }
 
-  /// Handle Google login
+  /// Handle Google login with enhanced error handling and navigation
   void loginWithGoogle() async {
     state = state.copyWith(
       isLoading: true,
@@ -120,14 +122,22 @@ class LoginNotifier extends StateNotifier<LoginState> {
       // Sign in with Google OAuth
       // Supabase Flutter SDK v2.12.0+ handles deep link callbacks automatically
       // The auth state change listener in main.dart will handle success
-      await supabaseClient.auth.signInWithOAuth(
+      final authResponse = await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
         authScreenLaunchMode: LaunchMode.externalApplication,
       );
 
+      // Verify OAuth URL was generated successfully
+      if (!authResponse) {
+        throw AuthException(
+          'Failed to generate Google OAuth URL. Please check your Supabase OAuth configuration.',
+        );
+      }
+
       // Note: Don't set loading to false here as OAuth flow redirects
       // The auth state listener will update UI when user returns
+      // Keep loading state true while waiting for OAuth callback
     } on AuthException catch (e) {
       String errorMessage = 'Google login failed. Please try again.';
 
@@ -137,6 +147,9 @@ class LoginNotifier extends StateNotifier<LoginState> {
         errorMessage = 'Sign-in popup was closed. Please try again.';
       } else if (e.message.contains('network')) {
         errorMessage = 'Network error. Please check your internet connection.';
+      } else if (e.message.contains('OAuth configuration')) {
+        errorMessage =
+            'Google Sign-In is not properly configured in Supabase. Please check the setup guide.';
       } else {
         errorMessage = 'Google login failed: ${e.message}';
       }
@@ -148,7 +161,8 @@ class LoginNotifier extends StateNotifier<LoginState> {
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'An unexpected error occurred during Google login.',
+        errorMessage:
+            'An unexpected error occurred during Google login. Please try again later.',
       );
     }
   }

@@ -39,6 +39,7 @@ dev_dependencies:
   freezed: ^2.5.7
   freezed_annotation: ^2.4.4
   json_serializable: ^6.8.0
+  flutter_native_splash: ^2.3.8
   flutter_test:    # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
     sdk: flutter    # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
 flutter: 
@@ -77,5 +78,12 @@ flutter:
   # 🚨 CRITICAL FONTS RULE:
   # - DO NOT ADD NEW LOCAL FONTS TO assets/fonts/ 
   # - ONLY USE EXISTING LOCAL FONTS FROM assets/fonts/
+
+flutter_native_splash:
+  color: "#6B4EFF"
+  image: assets/images/splash_icon.png
+  android_12:
+    image: assets/images/splash_icon.png
+    color: "#6B4EFF"
 
 # Note: app_links package is NOT compatible with current Dart SDK 3.6.0 - deep linking implemented using native method channels instead

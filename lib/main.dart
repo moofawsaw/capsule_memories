@@ -5,12 +5,16 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './core/services/deep_link_service.dart';
+import './core/utils/navigator_service.dart';
+import './core/utils/size_utils.dart';
 import './core/utils/theme_provider.dart';
 import './firebase_options.dart';
 import './presentation/notifications_screen/notifier/notifications_notifier.dart';
+import './routes/app_routes.dart';
 import './services/notification_service.dart';
 import './services/push_notification_service.dart';
 import './services/supabase_service.dart';
+import './theme/theme_helper.dart';
 import 'core/app_export.dart';
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -104,6 +108,9 @@ void _setupGlobalNotificationListener() {
 
     client.auth.onAuthStateChange.listen((data) async {
       if (data.event == AuthChangeEvent.signedIn) {
+        debugPrint(
+            '✅ User signed in successfully: ${data.session?.user.email}');
+
         // 🔥 STEP 1: Load initial notification count on login
         await _loadInitialNotificationCount();
 
@@ -115,13 +122,32 @@ void _setupGlobalNotificationListener() {
             await _loadInitialNotificationCount();
           },
         );
+
+        // 🎯 ENHANCED: Navigate to feed after successful sign-in
+        // This ensures OAuth redirects properly route to app content
+        try {
+          // Short delay to ensure UI is ready for navigation
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          // Navigate to feed screen, removing all previous routes
+          NavigatorService.pushNamedAndRemoveUntil(
+            AppRoutes.appFeed,
+          );
+
+          debugPrint('✅ Navigated to feed after OAuth sign-in');
+        } catch (navError) {
+          debugPrint('⚠️ Navigation error after sign-in: $navError');
+          // Non-critical error - user is still authenticated
+        }
       } else if (data.event == AuthChangeEvent.signedOut) {
+        debugPrint('👋 User signed out');
         notificationService.unsubscribeFromNotifications();
       }
     });
 
     // 🔥 STEP 4: Load notification count if user is already logged in
     if (client.auth.currentUser != null) {
+      debugPrint('✅ User already logged in on app start');
       _loadInitialNotificationCount();
     }
   } catch (e, st) {
