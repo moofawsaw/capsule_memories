@@ -14,29 +14,38 @@ class AppDownloadScreen extends ConsumerStatefulWidget {
 class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: Container(
-          width: double.maxFinite,
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_02,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(26.h),
-              topRight: Radius.circular(26.h),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(height: 12.h),
-              _buildAppInfoSection(context),
-              _buildQRCodeSection(context),
-              _buildShareButton(context),
-              SizedBox(height: 30.h),
-            ],
-          ),
+    return Container(
+      width: double.maxFinite,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(26.h),
+          topRight: Radius.circular(26.h),
         ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 8.h),
+          _buildDragHandle(),
+          SizedBox(height: 4.h),
+          _buildAppInfoSection(context),
+          _buildQRCodeSection(context),
+          _buildShareButton(context),
+          SizedBox(height: 30.h),
+        ],
+      ),
+    );
+  }
+
+  /// Drag handle for bottom sheet
+  Widget _buildDragHandle() {
+    return Container(
+      width: 40.w,
+      height: 4.h,
+      decoration: BoxDecoration(
+        color: appTheme.gray_50.withAlpha(77),
+        borderRadius: BorderRadius.circular(2.h),
       ),
     );
   }
