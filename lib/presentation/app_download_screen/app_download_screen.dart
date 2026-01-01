@@ -9,6 +9,16 @@ class AppDownloadScreen extends ConsumerStatefulWidget {
 
   @override
   AppDownloadScreenState createState() => AppDownloadScreenState();
+
+  /// Helper method to show this screen as a bottom sheet
+  static void show(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AppDownloadScreen(),
+    );
+  }
 }
 
 class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
@@ -74,7 +84,7 @@ class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
         right: 62.h,
       ),
       child: CustomImageView(
-        imagePath: 'assets/images/image-1767240579108.png',
+        imagePath: ImageConstant.imgCapsuleDownloadQR,
         height: 200.h,
         width: 200.h,
         fit: BoxFit.contain,
