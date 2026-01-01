@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -9,6 +7,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/utils/navigator_service.dart';
 import './notification_preferences_service.dart';
 import './supabase_service.dart';
+
+// Conditional import for Platform - use stub on web
+import 'dart:io' if (dart.library.html) 'platform_stub.dart' show Platform;
 
 /// Top-level function for handling background messages
 @pragma('vm:entry-point')
@@ -122,38 +123,47 @@ class PushNotificationService {
 
   /// Request notification permissions
   Future<void> _requestPermissions() async {
-    if (Platform.isIOS || Platform.isAndroid) {
-      // Request FCM permissions
-      NotificationSettings settings =
-          await _firebaseMessaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
+    // Skip on web - notifications work differently on web
+    if (kIsWeb) {
+      debugPrint('⚠️ Notification permissions not supported on web');
+      return;
+    }
 
-      debugPrint('✅ FCM permission status: ${settings.authorizationStatus}');
+    // Only check Platform if not on web (already checked above)
+    if (!kIsWeb) {
+      if (Platform.isIOS || Platform.isAndroid) {
+        // Request FCM permissions
+        NotificationSettings settings =
+            await _firebaseMessaging.requestPermission(
+          alert: true,
+          announcement: false,
+          badge: true,
+          carPlay: false,
+          criticalAlert: false,
+          provisional: false,
+          sound: true,
+        );
 
-      // Request local notification permissions
-      if (Platform.isIOS) {
-        await _flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                IOSFlutterLocalNotificationsPlugin>()
-            ?.requestPermissions(
-              alert: true,
-              badge: true,
-              sound: true,
-            );
-      } else if (Platform.isAndroid) {
-        final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-            _flutterLocalNotificationsPlugin
-                .resolvePlatformSpecificImplementation<
-                    AndroidFlutterLocalNotificationsPlugin>();
+        debugPrint('✅ FCM permission status: ${settings.authorizationStatus}');
 
-        await androidImplementation?.requestNotificationsPermission();
+        // Request local notification permissions
+        if (Platform.isIOS) {
+          await _flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<
+                  IOSFlutterLocalNotificationsPlugin>()
+              ?.requestPermissions(
+                alert: true,
+                badge: true,
+                sound: true,
+              );
+        } else if (Platform.isAndroid) {
+          final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+              _flutterLocalNotificationsPlugin
+                  .resolvePlatformSpecificImplementation<
+                      AndroidFlutterLocalNotificationsPlugin>();
+
+          await androidImplementation?.requestNotificationsPermission();
+        }
       }
     }
   }
@@ -161,7 +171,16 @@ class PushNotificationService {
   /// Generate a unique device ID
   Future<String> _generateDeviceId() async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final platform = Platform.isAndroid ? 'android' : 'ios';
+    String platform;
+    if (kIsWeb) {
+      platform = 'web';
+    } else if (Platform.isAndroid) {
+      platform = 'android';
+    } else if (Platform.isIOS) {
+      platform = 'ios';
+    } else {
+      platform = 'unknown';
+    }
     return '$platform-$timestamp';
   }
 
@@ -176,7 +195,16 @@ class PushNotificationService {
 
       _fcmToken = token;
 
-      final deviceType = Platform.isAndroid ? 'android' : 'ios';
+      String deviceType;
+      if (kIsWeb) {
+        deviceType = 'web';
+      } else if (Platform.isAndroid) {
+        deviceType = 'android';
+      } else if (Platform.isIOS) {
+        deviceType = 'ios';
+      } else {
+        deviceType = 'unknown';
+      }
 
       await _client?.from('fcm_tokens').upsert({
         'user_id': userId,
@@ -219,6 +247,12 @@ class PushNotificationService {
 
   /// Initialize notification channels for Android
   Future<void> initNotificationChannels() async {
+    // Skip on web - notification channels are Android-specific
+    if (kIsWeb) {
+      debugPrint('⚠️ Notification channels not supported on web');
+      return;
+    }
+
     if (Platform.isAndroid) {
       final androidImplementation = _flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
@@ -267,7 +301,6 @@ class PushNotificationService {
     // Extract image type and URL from data payload
     final String? imageType = data['image_type'];
     final String? imageUrl = data['image_url'];
-    final String? notificationIcon = data['notification_icon'];
 
     // Get channel from data
     final channelId = data['channel_id'] ?? 'system';
@@ -478,6 +511,12 @@ class PushNotificationService {
 
   /// Create notification channel (Android only)
   Future<void> createNotificationChannel() async {
+    // Skip on web - notification channels are Android-specific
+    if (kIsWeb) {
+      debugPrint('⚠️ Notification channels not supported on web');
+      return;
+    }
+
     if (Platform.isAndroid) {
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
         'capsule_notifications',
