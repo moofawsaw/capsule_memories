@@ -70,7 +70,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           children: [
             // Centered splash logo image
             Image.asset(
-              'assets/images/tmpw3ktllrh-1767232038145.jpg',
+              'assets/images/256_white_-1767199904722.png',
               width: 200.0,
               height: 200.0,
               fit: BoxFit.contain,

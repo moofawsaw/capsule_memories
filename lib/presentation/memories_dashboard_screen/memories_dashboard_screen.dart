@@ -330,7 +330,7 @@ class _MemoriesDashboardScreenState
         }
 
         return Container(
-          margin: EdgeInsets.fromLTRB(16.h, 20.h, 16.h, 0),
+          margin: EdgeInsets.fromLTRB(16.h, 20.h, 16.h, 24.h),
           child: _buildMemoryList(context, filteredMemories, selectedIndex),
         );
       },
@@ -345,7 +345,7 @@ class _MemoriesDashboardScreenState
     }
 
     return ListView.separated(
-      padding: EdgeInsets.zero,
+      padding: EdgeInsets.only(bottom: 20.h),
       scrollDirection: Axis.horizontal,
       physics: BouncingScrollPhysics(),
       separatorBuilder: (context, index) => SizedBox(width: 12.h),
