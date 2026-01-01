@@ -45,6 +45,8 @@ class ImageConstant {
   static String imgLaughing = '${_basePath}img_laughing.svg';
   static String imgLilyPhillips = '${_basePath}img_lily_phillips.png';
   static String imgNetworkDownload = 'https://memry.app/download';
+  static String imgCapsuleDownloadQR =
+      '${_basePath}capsule-download-qr-1767240198336.png';
   static String imgNetworkR812309r72309r572093t722323t23t23t08 =
       'https://129r812309r72309r572093t72-2323t23t23t08';
   static String imgPlayCircleGray50 = '${_basePath}img_play_circle_gray_50.svg';

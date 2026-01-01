@@ -22,9 +22,9 @@ class AppDownloadNotifier extends StateNotifier<AppDownloadState> {
   void initialize() {
     state = state.copyWith(
       appDownloadModel: AppDownloadModel(
-        qrData: ImageConstant.imgNetworkDownload,
+        qrData: ImageConstant.imgCapsuleDownloadQR,
         shareText:
-            'Download the memry App and start creating memories together! https://memry.app/download',
+            'Download the Capsule App and start creating memories together! https://capapp.co/download',
         isLoading: false,
       ),
     );
@@ -39,11 +39,11 @@ class AppDownloadNotifier extends StateNotifier<AppDownloadState> {
       );
 
       final shareText = state.appDownloadModel?.shareText ??
-          'Download the memry App and start creating memories together! https://memry.app/download';
+          'Download the Capsule App and start creating memories together! https://capapp.co/download';
 
       await Share.share(
         shareText,
-        subject: 'Download memry App',
+        subject: 'Download Capsule App',
       );
 
       state = state.copyWith(
