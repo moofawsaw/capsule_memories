@@ -114,11 +114,30 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         print('⚠️ Location capture failed: $e - continuing without location');
       }
 
-      // Step 1: Insert story record first to get story ID
+      // Get video duration BEFORE inserting (if video)
+      int durationSeconds = 5; // Default for images
+      if (isVideo) {
+        print('⏱️ Getting video duration...');
+        try {
+          final mediaFile = File(mediaPath);
+          final videoController = VideoPlayerController.file(mediaFile);
+          await videoController.initialize();
+          durationSeconds = videoController.value.duration.inSeconds;
+          videoController.dispose();
+          print('✅ Video duration: $durationSeconds seconds');
+        } catch (e) {
+          print('⚠️ Failed to get video duration: $e - using default 10s');
+          durationSeconds = 10;
+        }
+      }
+
+      // Step 1: Insert story record with duration_seconds included
       final storyInsertData = {
         'memory_id': memoryId,
         'contributor_id': userId,
         'media_type': isVideo ? 'video' : 'image',
+        'duration_seconds':
+            durationSeconds, // ✅ Include duration in initial insert
         'capture_timestamp': DateTime.now().toIso8601String(),
         'created_at': DateTime.now().toIso8601String(),
       };
@@ -130,7 +149,7 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         storyInsertData['location_name'] = locationData['location_name'];
       }
 
-      print('📝 Inserting initial story record...');
+      print('📝 Inserting story record with duration...');
 
       final storyResponse = await _supabase
           .from('stories')
@@ -141,15 +160,13 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       final storyId = storyResponse['id'] as String;
       print('✅ Story ID created: $storyId');
 
-      // Step 2: Prepare file uploads
+      // Step 2: Upload media files
       final mediaFile = File(mediaPath);
       final mediaBytes = await mediaFile.readAsBytes();
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       String? videoRelativePath;
       String? imageRelativePath;
       String? thumbnailRelativePath;
-      int? durationSeconds;
 
       if (isVideo) {
         // Upload video file
@@ -161,12 +178,6 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
             .from('story-media')
             .uploadBinary(videoRelativePath, mediaBytes);
         print('✅ Video uploaded successfully');
-
-        // Get video duration
-        final videoController = VideoPlayerController.file(mediaFile);
-        await videoController.initialize();
-        durationSeconds = videoController.value.duration.inSeconds;
-        videoController.dispose();
 
         // Generate and upload thumbnail
         print('🖼️ Generating video thumbnail...');
@@ -195,9 +206,7 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       }
 
       // Step 3: Update story record with media paths
-      final updateData = <String, dynamic>{
-        'duration_seconds': isVideo ? (durationSeconds ?? 10) : 5,
-      };
+      final updateData = <String, dynamic>{};
 
       if (videoRelativePath != null) {
         updateData['video_url'] = videoRelativePath;
