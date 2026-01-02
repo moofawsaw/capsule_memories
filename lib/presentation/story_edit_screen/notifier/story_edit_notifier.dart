@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import 'package:video_player/video_player.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../services/supabase_service.dart';
 import '../../../services/location_service.dart';
@@ -15,6 +16,7 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
   StoryEditNotifier() : super(const StoryEditState());
 
   final _supabase = SupabaseService.instance.client!;
+  final _uuid = const Uuid();
 
   /// Initialize screen with media path
   void initializeScreen(String mediaPath) {
@@ -49,34 +51,98 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
     state = state.copyWith(backgroundMusic: musicUrl);
   }
 
-  /// Generate thumbnail from video using screenshot approach
-  Future<File?> _generateVideoThumbnail(String videoPath) async {
+  /// Get video duration in seconds
+  Future<int> _getVideoDuration(String videoPath) async {
     try {
-      print('🎬 Starting thumbnail generation for: $videoPath');
-
-      final videoController = VideoPlayerController.file(File(videoPath));
+      print('⏱️ Getting video duration...');
+      final mediaFile = File(videoPath);
+      final videoController = VideoPlayerController.file(mediaFile);
       await videoController.initialize();
-
-      // Seek to 1 second position for thumbnail
-      final duration = videoController.value.duration;
-      final seekPosition = duration.inMilliseconds > 1000
-          ? const Duration(seconds: 1)
-          : Duration(milliseconds: duration.inMilliseconds ~/ 2);
-
-      await videoController.seekTo(seekPosition);
-
-      // Wait for frame to load
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Note: Creating a simple placeholder thumbnail approach
-      // For full implementation, consider backend processing or native platform channels
-      // This is a simplified version that stores relative path reference
-
+      final durationSeconds = videoController.value.duration.inSeconds;
       videoController.dispose();
-      return null; // Thumbnail generation deferred to backend/native processing
+      print('✅ Video duration: $durationSeconds seconds');
+      return durationSeconds > 0 ? durationSeconds : 10;
     } catch (e) {
-      print('⚠️ Failed to generate thumbnail: $e');
-      return null;
+      print('⚠️ Failed to get video duration: $e - using default 10s');
+      return 10;
+    }
+  }
+
+  /// Upload media file to Supabase Storage
+  Future<String> _uploadMedia({
+    required String storyId,
+    required String mediaPath,
+    required bool isVideo,
+  }) async {
+    final mediaFile = File(mediaPath);
+    final mediaBytes = await mediaFile.readAsBytes();
+
+    if (isVideo) {
+      final videoFileName = '$storyId.mp4';
+      final videoRelativePath = 'videos/$videoFileName';
+
+      print('🎥 Uploading video to: $videoRelativePath');
+      await _supabase.storage
+          .from('story-media')
+          .uploadBinary(videoRelativePath, mediaBytes);
+      print('✅ Video uploaded successfully');
+
+      return videoRelativePath;
+    } else {
+      final imageFileName = '$storyId.jpg';
+      final imageRelativePath = 'images/$imageFileName';
+
+      print('🖼️ Uploading image to: $imageRelativePath');
+      await _supabase.storage
+          .from('story-media')
+          .uploadBinary(imageRelativePath, mediaBytes);
+      print('✅ Image uploaded successfully');
+
+      return imageRelativePath;
+    }
+  }
+
+  /// Upload thumbnail (for videos, create placeholder; for images, reuse image path)
+  Future<String> _uploadThumbnail({
+    required String storyId,
+    required String mediaPath,
+    required bool isVideo,
+  }) async {
+    if (isVideo) {
+      // For videos, we create a thumbnail path
+      // In production, you'd extract a frame and upload it
+      // For now, return the expected path - backend/edge function can handle generation
+      final thumbnailRelativePath = 'thumbnails/$storyId.jpg';
+      print('🖼️ Thumbnail path reserved: $thumbnailRelativePath');
+      return thumbnailRelativePath;
+    } else {
+      // For images, thumbnail is the same as the image
+      final imageRelativePath = 'images/$storyId.jpg';
+      return imageRelativePath;
+    }
+  }
+
+  /// Cleanup uploaded files on failure
+  Future<void> _cleanupUploadedFiles({
+    String? videoPath,
+    String? imagePath,
+    String? thumbnailPath,
+  }) async {
+    try {
+      final pathsToDelete = <String>[];
+      if (videoPath != null) pathsToDelete.add(videoPath);
+      if (imagePath != null) pathsToDelete.add(imagePath);
+      if (thumbnailPath != null && thumbnailPath != imagePath) {
+        pathsToDelete.add(thumbnailPath);
+      }
+
+      if (pathsToDelete.isNotEmpty) {
+        print('🧹 Cleaning up ${pathsToDelete.length} uploaded files...');
+        await _supabase.storage.from('story-media').remove(pathsToDelete);
+        print('✅ Cleanup completed');
+      }
+    } catch (e) {
+      print('⚠️ Cleanup failed: $e');
     }
   }
 
@@ -86,8 +152,12 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
     required bool isVideo,
     required String caption,
   }) async {
+    String? uploadedVideoPath;
+    String? uploadedImagePath;
+    String? uploadedThumbnailPath;
+
     try {
-      state = state.copyWith(isUploading: true);
+      state = state.copyWith(isUploading: true, errorMessage: null);
 
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) {
@@ -99,7 +169,17 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       print('Media Path: $mediaPath');
       print('Is Video: $isVideo');
 
-      // Capture location data (non-blocking)
+      // Step 1: Generate story ID upfront
+      final storyId = _uuid.v4();
+      print('🆔 Generated Story ID: $storyId');
+
+      // Step 2: Get video duration (if video)
+      int durationSeconds = 5; // Default for images
+      if (isVideo) {
+        durationSeconds = await _getVideoDuration(mediaPath);
+      }
+
+      // Step 3: Capture location data (non-blocking)
       print('📍 Attempting to capture location...');
       Map<String, dynamic>? locationData;
       try {
@@ -107,136 +187,102 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         if (locationData != null) {
           print('✅ Location captured: ${locationData['location_name']}');
         } else {
-          print(
-              '⚠️ Location capture skipped (permission denied or unavailable)');
+          print('⚠️ Location capture skipped (permission denied or unavailable)');
         }
       } catch (e) {
         print('⚠️ Location capture failed: $e - continuing without location');
       }
 
-      // Get video duration BEFORE inserting (if video)
-      int durationSeconds = 5; // Default for images
+      // Step 4: Upload media files FIRST (before database insert)
+      print('📤 Uploading media files...');
+
+      String? videoUrl;
+      String? imageUrl;
+      String thumbnailUrl;
+
       if (isVideo) {
-        print('⏱️ Getting video duration...');
-        try {
-          final mediaFile = File(mediaPath);
-          final videoController = VideoPlayerController.file(mediaFile);
-          await videoController.initialize();
-          durationSeconds = videoController.value.duration.inSeconds;
-          videoController.dispose();
-          print('✅ Video duration: $durationSeconds seconds');
-        } catch (e) {
-          print('⚠️ Failed to get video duration: $e - using default 10s');
-          durationSeconds = 10;
-        }
+        uploadedVideoPath = await _uploadMedia(
+          storyId: storyId,
+          mediaPath: mediaPath,
+          isVideo: true,
+        );
+        videoUrl = uploadedVideoPath;
+
+        uploadedThumbnailPath = await _uploadThumbnail(
+          storyId: storyId,
+          mediaPath: mediaPath,
+          isVideo: true,
+        );
+        thumbnailUrl = uploadedThumbnailPath;
+      } else {
+        uploadedImagePath = await _uploadMedia(
+          storyId: storyId,
+          mediaPath: mediaPath,
+          isVideo: false,
+        );
+        imageUrl = uploadedImagePath;
+
+        // For images, thumbnail is the same path
+        thumbnailUrl = uploadedImagePath;
+        uploadedThumbnailPath = thumbnailUrl;
       }
 
-      // Step 1: Insert story record with duration_seconds included
-      final storyInsertData = {
+      print('✅ All media files uploaded successfully');
+
+      // Step 5: Build story data with ALL required fields
+      final storyData = <String, dynamic>{
+        'id': storyId,
         'memory_id': memoryId,
         'contributor_id': userId,
         'media_type': isVideo ? 'video' : 'image',
-        'duration_seconds':
-            durationSeconds, // ✅ Include duration in initial insert
+        'duration_seconds': durationSeconds,
         'capture_timestamp': DateTime.now().toIso8601String(),
         'created_at': DateTime.now().toIso8601String(),
+        'thumbnail_url': thumbnailUrl,
       };
+
+      // Add media URL based on type
+      if (isVideo) {
+        storyData['video_url'] = videoUrl;
+      } else {
+        storyData['image_url'] = imageUrl;
+      }
 
       // Add location data if available
       if (locationData != null) {
-        storyInsertData['location_lat'] = locationData['latitude'];
-        storyInsertData['location_lng'] = locationData['longitude'];
-        storyInsertData['location_name'] = locationData['location_name'];
+        storyData['location_lat'] = locationData['latitude'];
+        storyData['location_lng'] = locationData['longitude'];
+        storyData['location_name'] = locationData['location_name'];
       }
-
-      print('📝 Inserting story record with duration...');
-
-      final storyResponse = await _supabase
-          .from('stories')
-          .insert(storyInsertData)
-          .select('id')
-          .single();
-
-      final storyId = storyResponse['id'] as String;
-      print('✅ Story ID created: $storyId');
-
-      // Step 2: Upload media files
-      final mediaFile = File(mediaPath);
-      final mediaBytes = await mediaFile.readAsBytes();
-
-      String? videoRelativePath;
-      String? imageRelativePath;
-      String? thumbnailRelativePath;
-
-      if (isVideo) {
-        // Upload video file
-        final videoFileName = '${storyId}.mp4';
-        videoRelativePath = 'videos/$videoFileName';
-
-        print('🎥 Uploading video to: $videoRelativePath');
-        await _supabase.storage
-            .from('story-media')
-            .uploadBinary(videoRelativePath, mediaBytes);
-        print('✅ Video uploaded successfully');
-
-        // Generate and upload thumbnail
-        print('🖼️ Generating video thumbnail...');
-        thumbnailRelativePath = 'thumbnails/${storyId}.jpg';
-
-        // For now, use a placeholder approach - in production this would:
-        // 1. Extract frame from video using native processing
-        // 2. Resize to 400px width with 75% quality
-        // 3. Save as JPEG
-
-        // Simplified: Create a small placeholder reference
-        // Backend/Edge function would handle actual thumbnail generation
-      } else {
-        // Upload image file
-        final imageFileName = '${storyId}.jpg';
-        imageRelativePath = 'images/$imageFileName';
-
-        print('🖼️ Uploading image to: $imageRelativePath');
-        await _supabase.storage
-            .from('story-media')
-            .uploadBinary(imageRelativePath, mediaBytes);
-        print('✅ Image uploaded successfully');
-
-        // For images, use same path for thumbnail
-        thumbnailRelativePath = imageRelativePath;
-      }
-
-      // Step 3: Update story record with media paths
-      final updateData = <String, dynamic>{};
-
-      if (videoRelativePath != null) {
-        updateData['video_url'] = videoRelativePath;
-      }
-
-      if (imageRelativePath != null) {
-        updateData['image_url'] = imageRelativePath;
-      }
-
-      updateData['thumbnail_url'] = thumbnailRelativePath;
 
       // Add caption as text overlay if provided
       if (caption.isNotEmpty) {
-        updateData['text_overlays'] = [
+        storyData['text_overlays'] = [
           {'text': caption, 'position': 'bottom'}
         ];
       }
 
-      print('📝 Updating story with media paths...');
-      print('Update data: $updateData');
+      // Step 6: Insert story record (single operation with all data)
+      print('📝 Inserting story record with all data...');
+      print('Story data: $storyData');
 
-      await _supabase.from('stories').update(updateData).eq('id', storyId);
+      await _supabase.from('stories').insert(storyData);
 
-      print('✅ Story updated successfully with media paths');
+      print('✅ Story created and shared successfully!');
 
       state = state.copyWith(isUploading: false);
       return true;
     } catch (e, stackTrace) {
       print('❌ Error uploading story: $e');
       print('Stack trace: $stackTrace');
+
+      // Cleanup any uploaded files on failure
+      await _cleanupUploadedFiles(
+        videoPath: uploadedVideoPath,
+        imagePath: uploadedImagePath,
+        thumbnailPath: uploadedThumbnailPath,
+      );
+
       state = state.copyWith(
         isUploading: false,
         errorMessage: 'Failed to upload story: ${e.toString()}',

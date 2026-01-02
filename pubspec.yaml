@@ -9,6 +9,7 @@ dependencies:
   flutter_localizations: 
     sdk: flutter
   flutter_svg: ^2.0.12
+  uuid: ^4.2.1
   cached_network_image: ^3.4.1
   shared_preferences: ^2.3.3
   connectivity_plus: ^6.1.0
