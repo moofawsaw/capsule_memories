@@ -1,7 +1,11 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
-import 'package:video_player/video_player.dart';
+import 'dart:typed_data';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:video_player/video_player.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../../../services/supabase_service.dart';
 import '../../../services/location_service.dart';
@@ -51,98 +55,104 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
     state = state.copyWith(backgroundMusic: musicUrl);
   }
 
+  /// Generate thumbnail from video using video_thumbnail package
+  Future<File?> _generateVideoThumbnail(String videoPath) async {
+    try {
+      print('🎬 Generating thumbnail for video: $videoPath');
+
+      // Get temporary directory for storing thumbnail
+      final tempDir = await getTemporaryDirectory();
+      final thumbnailPath = '${tempDir.path}/thumb_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      // Generate thumbnail at 1 second mark (or first frame if video is shorter)
+      final thumbnail = await VideoThumbnail.thumbnailFile(
+        video: videoPath,
+        thumbnailPath: thumbnailPath,
+        imageFormat: ImageFormat.JPEG,
+        maxWidth: 400,  // Reasonable size for thumbnails
+        quality: 75,    // Good balance of quality vs size
+        timeMs: 1000,   // 1 second into video
+      );
+
+      if (thumbnail != null) {
+        print('✅ Thumbnail generated successfully: $thumbnail');
+        return File(thumbnail);
+      } else {
+        print('⚠️ Thumbnail generation returned null');
+        return null;
+      }
+    } catch (e) {
+      print('⚠️ Failed to generate thumbnail: $e');
+      return null;
+    }
+  }
+
   /// Get video duration in seconds
   Future<int> _getVideoDuration(String videoPath) async {
     try {
-      print('⏱️ Getting video duration...');
-      final mediaFile = File(videoPath);
-      final videoController = VideoPlayerController.file(mediaFile);
+      final videoController = VideoPlayerController.file(File(videoPath));
       await videoController.initialize();
-      final durationSeconds = videoController.value.duration.inSeconds;
+      final duration = videoController.value.duration.inSeconds;
       videoController.dispose();
-      print('✅ Video duration: $durationSeconds seconds');
-      return durationSeconds > 0 ? durationSeconds : 10;
+      return duration > 0 ? duration : 10;
     } catch (e) {
-      print('⚠️ Failed to get video duration: $e - using default 10s');
-      return 10;
+      print('⚠️ Failed to get video duration: $e');
+      return 10; // Default duration
     }
   }
 
   /// Upload media file to Supabase Storage
   Future<String> _uploadMedia({
     required String storyId,
-    required String mediaPath,
+    required Uint8List mediaBytes,
     required bool isVideo,
   }) async {
-    final mediaFile = File(mediaPath);
-    final mediaBytes = await mediaFile.readAsBytes();
+    final extension = isVideo ? 'mp4' : 'jpg';
+    final folder = isVideo ? 'videos' : 'images';
+    final relativePath = '$folder/$storyId.$extension';
 
-    if (isVideo) {
-      final videoFileName = '$storyId.mp4';
-      final videoRelativePath = 'videos/$videoFileName';
+    print('📤 Uploading ${isVideo ? 'video' : 'image'} to: $relativePath');
 
-      print('🎥 Uploading video to: $videoRelativePath');
-      await _supabase.storage
-          .from('story-media')
-          .uploadBinary(videoRelativePath, mediaBytes);
-      print('✅ Video uploaded successfully');
+    await _supabase.storage
+        .from('story-media')
+        .uploadBinary(relativePath, mediaBytes);
 
-      return videoRelativePath;
-    } else {
-      final imageFileName = '$storyId.jpg';
-      final imageRelativePath = 'images/$imageFileName';
-
-      print('🖼️ Uploading image to: $imageRelativePath');
-      await _supabase.storage
-          .from('story-media')
-          .uploadBinary(imageRelativePath, mediaBytes);
-      print('✅ Image uploaded successfully');
-
-      return imageRelativePath;
-    }
+    print('✅ ${isVideo ? 'Video' : 'Image'} uploaded successfully');
+    return relativePath;
   }
 
-  /// Upload thumbnail (for videos, create placeholder; for images, reuse image path)
-  Future<String> _uploadThumbnail({
+  /// Upload thumbnail to Supabase Storage
+  Future<String?> _uploadThumbnail({
     required String storyId,
-    required String mediaPath,
-    required bool isVideo,
+    required File thumbnailFile,
   }) async {
-    if (isVideo) {
-      // For videos, we create a thumbnail path
-      // In production, you'd extract a frame and upload it
-      // For now, return the expected path - backend/edge function can handle generation
-      final thumbnailRelativePath = 'thumbnails/$storyId.jpg';
-      print('🖼️ Thumbnail path reserved: $thumbnailRelativePath');
-      return thumbnailRelativePath;
-    } else {
-      // For images, thumbnail is the same as the image
-      final imageRelativePath = 'images/$storyId.jpg';
-      return imageRelativePath;
+    try {
+      final thumbnailBytes = await thumbnailFile.readAsBytes();
+      final relativePath = 'thumbnails/$storyId.jpg';
+
+      print('📤 Uploading thumbnail to: $relativePath');
+
+      await _supabase.storage
+          .from('story-media')
+          .uploadBinary(relativePath, thumbnailBytes);
+
+      print('✅ Thumbnail uploaded successfully');
+      return relativePath;
+    } catch (e) {
+      print('⚠️ Failed to upload thumbnail: $e');
+      return null;
     }
   }
 
   /// Cleanup uploaded files on failure
-  Future<void> _cleanupUploadedFiles({
-    String? videoPath,
-    String? imagePath,
-    String? thumbnailPath,
-  }) async {
-    try {
-      final pathsToDelete = <String>[];
-      if (videoPath != null) pathsToDelete.add(videoPath);
-      if (imagePath != null) pathsToDelete.add(imagePath);
-      if (thumbnailPath != null && thumbnailPath != imagePath) {
-        pathsToDelete.add(thumbnailPath);
+  Future<void> _cleanupUploadedFiles(List<String> paths) async {
+    for (final path in paths) {
+      try {
+        await _supabase.storage.from('story-media').remove([path]);
+        print('🧹 Cleaned up: $path');
+      } catch (e) {
+        print('⚠️ Failed to cleanup $path: $e');
       }
-
-      if (pathsToDelete.isNotEmpty) {
-        print('🧹 Cleaning up ${pathsToDelete.length} uploaded files...');
-        await _supabase.storage.from('story-media').remove(pathsToDelete);
-        print('✅ Cleanup completed');
-      }
-    } catch (e) {
-      print('⚠️ Cleanup failed: $e');
     }
   }
 
@@ -152,12 +162,10 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
     required bool isVideo,
     required String caption,
   }) async {
-    String? uploadedVideoPath;
-    String? uploadedImagePath;
-    String? uploadedThumbnailPath;
+    final uploadedPaths = <String>[];
 
     try {
-      state = state.copyWith(isUploading: true, errorMessage: null);
+      state = state.copyWith(isUploading: true);
 
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) {
@@ -169,17 +177,11 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       print('Media Path: $mediaPath');
       print('Is Video: $isVideo');
 
-      // Step 1: Generate story ID upfront
+      // Generate story ID upfront
       final storyId = _uuid.v4();
       print('🆔 Generated Story ID: $storyId');
 
-      // Step 2: Get video duration (if video)
-      int durationSeconds = 5; // Default for images
-      if (isVideo) {
-        durationSeconds = await _getVideoDuration(mediaPath);
-      }
-
-      // Step 3: Capture location data (non-blocking)
+      // Capture location data (non-blocking)
       print('📍 Attempting to capture location...');
       Map<String, dynamic>? locationData;
       try {
@@ -193,44 +195,66 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         print('⚠️ Location capture failed: $e - continuing without location');
       }
 
-      // Step 4: Upload media files FIRST (before database insert)
-      print('📤 Uploading media files...');
+      // Read media file
+      final mediaFile = File(mediaPath);
+      final mediaBytes = await mediaFile.readAsBytes();
 
-      String? videoUrl;
-      String? imageUrl;
-      String thumbnailUrl;
+      // Variables for media paths
+      String? videoRelativePath;
+      String? imageRelativePath;
+      String? thumbnailRelativePath;
+      int durationSeconds = 5; // Default for images
 
       if (isVideo) {
-        uploadedVideoPath = await _uploadMedia(
-          storyId: storyId,
-          mediaPath: mediaPath,
-          isVideo: true,
-        );
-        videoUrl = uploadedVideoPath;
+        // Step 1: Get video duration
+        print('⏱️ Getting video duration...');
+        durationSeconds = await _getVideoDuration(mediaPath);
+        print('✅ Video duration: $durationSeconds seconds');
 
-        uploadedThumbnailPath = await _uploadThumbnail(
+        // Step 2: Generate thumbnail BEFORE uploading
+        print('🖼️ Generating video thumbnail...');
+        final thumbnailFile = await _generateVideoThumbnail(mediaPath);
+
+        // Step 3: Upload video
+        videoRelativePath = await _uploadMedia(
           storyId: storyId,
-          mediaPath: mediaPath,
+          mediaBytes: mediaBytes,
           isVideo: true,
         );
-        thumbnailUrl = uploadedThumbnailPath;
+        uploadedPaths.add(videoRelativePath);
+
+        // Step 4: Upload thumbnail if generated successfully
+        if (thumbnailFile != null && await thumbnailFile.exists()) {
+          thumbnailRelativePath = await _uploadThumbnail(
+            storyId: storyId,
+            thumbnailFile: thumbnailFile,
+          );
+          if (thumbnailRelativePath != null) {
+            uploadedPaths.add(thumbnailRelativePath);
+          }
+
+          // Clean up local thumbnail file
+          try {
+            await thumbnailFile.delete();
+          } catch (_) {}
+        } else {
+          print('⚠️ No thumbnail generated - story will have no preview image');
+        }
       } else {
-        uploadedImagePath = await _uploadMedia(
+        // For images: upload image file
+        imageRelativePath = await _uploadMedia(
           storyId: storyId,
-          mediaPath: mediaPath,
+          mediaBytes: mediaBytes,
           isVideo: false,
         );
-        imageUrl = uploadedImagePath;
+        uploadedPaths.add(imageRelativePath);
 
-        // For images, thumbnail is the same path
-        thumbnailUrl = uploadedImagePath;
-        uploadedThumbnailPath = thumbnailUrl;
+        // For images, use same path for thumbnail
+        thumbnailRelativePath = imageRelativePath;
       }
 
-      print('✅ All media files uploaded successfully');
-
-      // Step 5: Build story data with ALL required fields
-      final storyData = <String, dynamic>{
+      // Step 5: Build the complete story insert data
+      final storyInsertData = <String, dynamic>{
         'id': storyId,
         'memory_id': memoryId,
         'contributor_id': userId,
@@ -238,35 +262,38 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         'duration_seconds': durationSeconds,
         'capture_timestamp': DateTime.now().toIso8601String(),
         'created_at': DateTime.now().toIso8601String(),
-        'thumbnail_url': thumbnailUrl,
       };
 
-      // Add media URL based on type
-      if (isVideo) {
-        storyData['video_url'] = videoUrl;
-      } else {
-        storyData['image_url'] = imageUrl;
+      // Add media URLs
+      if (videoRelativePath != null) {
+        storyInsertData['video_url'] = videoRelativePath;
+      }
+      if (imageRelativePath != null) {
+        storyInsertData['image_url'] = imageRelativePath;
+      }
+      if (thumbnailRelativePath != null) {
+        storyInsertData['thumbnail_url'] = thumbnailRelativePath;
       }
 
       // Add location data if available
       if (locationData != null) {
-        storyData['location_lat'] = locationData['latitude'];
-        storyData['location_lng'] = locationData['longitude'];
-        storyData['location_name'] = locationData['location_name'];
+        storyInsertData['location_lat'] = locationData['latitude'];
+        storyInsertData['location_lng'] = locationData['longitude'];
+        storyInsertData['location_name'] = locationData['location_name'];
       }
 
       // Add caption as text overlay if provided
       if (caption.isNotEmpty) {
-        storyData['text_overlays'] = [
+        storyInsertData['text_overlays'] = [
           {'text': caption, 'position': 'bottom'}
         ];
       }
 
-      // Step 6: Insert story record (single operation with all data)
-      print('📝 Inserting story record with all data...');
-      print('Story data: $storyData');
+      // Step 6: Insert story record with ALL data in single operation
+      print('📝 Inserting complete story record...');
+      print('Insert data: $storyInsertData');
 
-      await _supabase.from('stories').insert(storyData);
+      await _supabase.from('stories').insert(storyInsertData);
 
       print('✅ Story created and shared successfully!');
 
@@ -277,11 +304,10 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       print('Stack trace: $stackTrace');
 
       // Cleanup any uploaded files on failure
-      await _cleanupUploadedFiles(
-        videoPath: uploadedVideoPath,
-        imagePath: uploadedImagePath,
-        thumbnailPath: uploadedThumbnailPath,
-      );
+      if (uploadedPaths.isNotEmpty) {
+        print('🧹 Cleaning up uploaded files...');
+        await _cleanupUploadedFiles(uploadedPaths);
+      }
 
       state = state.copyWith(
         isUploading: false,
