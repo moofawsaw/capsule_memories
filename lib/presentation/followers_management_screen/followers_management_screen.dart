@@ -234,7 +234,7 @@ class FollowersManagementScreenState
     if (follower.id == null || follower.id!.isEmpty) return;
 
     NavigatorService.pushNamed(
-      AppRoutes.appProfile,
+      AppRoutes.appProfileUser,
       arguments: {'userId': follower.id},
     );
   }

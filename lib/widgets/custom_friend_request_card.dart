@@ -117,13 +117,16 @@ class CustomFriendRequestCard extends StatelessWidget {
 
   /// Builds the user name text section
   Widget _buildUserNameSection() {
-    return Container(
-      margin: EdgeInsets.only(left: 16.h),
-      child: Text(
-        userName ?? 'User Name',
-        style: userNameTextStyle ??
-            TextStyleHelper.instance.title16BoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_50, height: 1.31),
+    return GestureDetector(
+      onTap: onProfileTap,
+      child: Container(
+        margin: EdgeInsets.only(left: 16.h),
+        child: Text(
+          userName ?? 'User Name',
+          style: userNameTextStyle ??
+              TextStyleHelper.instance.title16BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50, height: 1.31),
+        ),
       ),
     );
   }

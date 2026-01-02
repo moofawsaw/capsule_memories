@@ -1,5 +1,8 @@
 part of 'memory_invitation_notifier.dart';
 
+// Add this import for freezed package
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 @freezed
 class MemoryInvitationState with _$MemoryInvitationState {
   const factory MemoryInvitationState({

@@ -47,6 +47,15 @@ class IncomingRequestsSectionWidget extends ConsumerWidget {
                 _showDeclineRequestConfirmation(context, ref, request.id ?? '',
                     request.displayName ?? request.userName ?? '');
               },
+              onProfileTap: request.id != null && request.id!.isNotEmpty
+                  ? () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.appProfileUser,
+                        arguments: request.id,
+                      );
+                    }
+                  : null,
             );
           },
         ),

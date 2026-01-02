@@ -170,19 +170,16 @@ class EventTimelineViewScreenState
         final state = ref.watch(eventTimelineViewNotifier);
 
         return CustomEventCard(
-          eventTitle: state.eventTimelineViewModel?.eventTitle,
-          eventDate: state.eventTimelineViewModel?.eventDate,
-          isPrivate: state.eventTimelineViewModel?.isPrivate,
-          iconButtonImagePath: state.eventTimelineViewModel?.categoryIcon ??
-              ImageConstant.imgFrame13,
-          participantImages: state.eventTimelineViewModel?.participantImages,
-          onBackTap: () {
-            onTapBackButton(context);
-          },
-          onIconButtonTap: () {
+          eventData: CustomEventData(
+            title: state.eventTimelineViewModel?.eventTitle,
+            storyCountText: '${state.eventTimelineViewModel?.customStoryItems?.length ?? 0} stories',
+            profileImage: state.eventTimelineViewModel?.categoryIcon ?? ImageConstant.imgFrame13,
+            participantImages: state.eventTimelineViewModel?.participantImages,
+          ),
+          onActionTap: () {
             onTapEventOptions(context);
           },
-          onAvatarTap: () {
+          onMemoryTap: () {
             onTapAvatars(context);
           },
         );

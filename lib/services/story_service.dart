@@ -113,6 +113,7 @@ class StoryService {
 
   /// Fetch stories ONLY authored by a specific user (for user profile pages)
   /// Filters stories where user is the actual contributor, not just a memory participant
+  /// CRITICAL FIX: Now filters for PUBLIC memories only to show on user profiles
   Future<List<Map<String, dynamic>>> fetchStoriesByAuthor(String userId) async {
     return await _retryOperation(
       () => _fetchStoriesByAuthorInternal(userId),
@@ -124,9 +125,11 @@ class StoryService {
   Future<List<Map<String, dynamic>>> _fetchStoriesByAuthorInternal(
       String userId) async {
     try {
-      print('🔍 STORY SERVICE: Fetching stories authored by userId: $userId');
+      print(
+          '🔍 STORY SERVICE: Fetching PUBLIC stories authored by userId: $userId');
 
-      // CRITICAL: Filter stories by contributor_id to show only stories created by this user
+      // CRITICAL: Filter stories by contributor_id AND public memory visibility
+      // This ensures only stories from public memories are shown on user profiles
       final response = await _supabase
           ?.from('stories')
           .select('''
@@ -162,12 +165,14 @@ class StoryService {
             )
           ''')
           .eq('contributor_id', userId)
+          .eq('memories.visibility',
+              'public') // CRITICAL: Filter for public memories only
           .order('created_at', ascending: false);
 
       final stories = List<Map<String, dynamic>>.from(response as List? ?? []);
 
       print(
-          '✅ STORY SERVICE: Fetched ${stories.length} stories authored by user $userId');
+          '✅ STORY SERVICE: Fetched ${stories.length} PUBLIC stories authored by user $userId');
 
       // Enhanced logging for debugging
       for (var story in stories) {
@@ -176,6 +181,7 @@ class StoryService {
         print('📸 Story ${story['id']}: '
             'memory_id=${story['memory_id']}, '
             'memory_title=${memory?['title']}, '
+            'memory_visibility=${memory?['visibility']}, '
             'category_name=${category?['name']}, '
             'media_type=${story['media_type']}, '
             'contributor=${story['user_profiles']?['display_name']}');

@@ -157,19 +157,17 @@ class MemoryDetailsViewScreenState
         final state = ref.watch(memoryDetailsViewNotifier);
 
         return CustomEventCard(
-          eventTitle: state.memoryDetailsViewModel?.eventTitle,
-          eventDate: state.memoryDetailsViewModel?.eventDate,
-          isPrivate: state.memoryDetailsViewModel?.isPrivate,
-          iconButtonImagePath: state.memoryDetailsViewModel?.categoryIcon ??
-              ImageConstant.imgFrame13,
-          participantImages: state.memoryDetailsViewModel?.participantImages,
-          onBackTap: () {
-            NavigatorService.goBack();
-          },
-          onIconButtonTap: () {
+          eventData: CustomEventData(
+            title: state.memoryDetailsViewModel?.eventTitle,
+            storyCountText: state.memoryDetailsViewModel?.eventDate,
+            profileImage: state.memoryDetailsViewModel?.categoryIcon ??
+                ImageConstant.imgFrame13,
+            participantImages: state.memoryDetailsViewModel?.participantImages,
+          ),
+          onActionTap: () {
             ref.read(memoryDetailsViewNotifier.notifier).onEventOptionsTap();
           },
-          onAvatarTap: () {
+          onMemoryTap: () {
             onTapAvatars(context);
           },
         );

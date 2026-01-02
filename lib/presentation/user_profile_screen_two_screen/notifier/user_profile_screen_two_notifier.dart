@@ -63,8 +63,9 @@ class UserProfileScreenTwoNotifier
         // Set stories loading state before fetching
         state = state.copyWith(isLoadingStories: true);
 
-        // Fetch stories
-        final stories = await _storyService.fetchUserStories(
+        // CRITICAL FIX: Use fetchStoriesByAuthor to get only stories created by this user from public memories
+        // This replaces fetchUserStories which returned stories from ALL memories where user is a contributor
+        final stories = await _storyService.fetchStoriesByAuthor(
           userId ?? SupabaseService.instance.client?.auth.currentUser?.id ?? '',
         );
 

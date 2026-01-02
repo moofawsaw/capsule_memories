@@ -121,14 +121,27 @@ class CustomGroupCard extends StatelessWidget {
 
   Widget _buildProfileImages(BuildContext context) {
     final images = groupData.memberImages ?? [];
+    final memberIds = groupData.memberIds ?? [];
+
     if (images.isEmpty) return SizedBox.shrink();
 
     if (images.length == 1) {
-      return CustomImageView(
-        imagePath: images[0],
-        height: 32.h,
-        width: 32.h,
-        fit: BoxFit.cover,
+      return GestureDetector(
+        onTap: memberIds.isNotEmpty && memberIds[0] != null
+            ? () {
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.appProfileUser,
+                  arguments: memberIds[0],
+                );
+              }
+            : null,
+        child: CustomImageView(
+          imagePath: images[0],
+          height: 32.h,
+          width: 32.h,
+          fit: BoxFit.cover,
+        ),
       );
     }
 
@@ -143,14 +156,26 @@ class CustomGroupCard extends StatelessWidget {
           final index = entry.key;
           final imagePath = entry.value;
           final leftPosition = (index * 23).h;
+          final memberId = index < memberIds.length ? memberIds[index] : null;
 
           return Positioned(
             left: leftPosition,
-            child: CustomImageView(
-              imagePath: imagePath,
-              height: 32.h,
-              width: 32.h,
-              fit: BoxFit.cover,
+            child: GestureDetector(
+              onTap: memberId != null
+                  ? () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.appProfileUser,
+                        arguments: memberId,
+                      );
+                    }
+                  : null,
+              child: CustomImageView(
+                imagePath: imagePath,
+                height: 32.h,
+                width: 32.h,
+                fit: BoxFit.cover,
+              ),
             ),
           );
         }).toList(),
@@ -201,6 +226,7 @@ class CustomGroupData {
     this.title,
     this.memberCountText,
     this.memberImages,
+    this.memberIds,
     this.isCreator = false,
   });
 
@@ -212,6 +238,9 @@ class CustomGroupData {
 
   /// List of profile image paths for group members
   final List<String>? memberImages;
+
+  /// List of user IDs corresponding to member images for navigation
+  final List<String?>? memberIds;
 
   /// Whether the current user is the creator of this group
   final bool? isCreator;
