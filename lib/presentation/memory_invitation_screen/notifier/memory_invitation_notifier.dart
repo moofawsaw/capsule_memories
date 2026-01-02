@@ -1,9 +1,27 @@
 import '../../../core/app_export.dart';
-import '../../../core/utils/image_constant.dart';
 import '../../../services/supabase_service.dart';
-import '../models/memory_invitation_model.dart';
 
-part 'memory_invitation_state.dart';
+class MemoryInvitationState {
+  final Map<String, dynamic>? memoryInvitationModel;
+  final bool isLoading;
+  final bool isDownloading;
+  final bool isSharing;
+  final bool downloadSuccess;
+  final bool shareSuccess;
+  final bool copySuccess;
+  final String? errorMessage;
+
+  MemoryInvitationState({
+    this.memoryInvitationModel,
+    this.isLoading = false,
+    this.isDownloading = false,
+    this.isSharing = false,
+    this.downloadSuccess = false,
+    this.shareSuccess = false,
+    this.copySuccess = false,
+    this.errorMessage,
+  });
+}
 
 final memoryInvitationNotifier = StateNotifierProvider.autoDispose<
     MemoryInvitationNotifier, MemoryInvitationState>(

@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/utils/navigator_service.dart';
@@ -71,8 +72,8 @@ class PushNotificationService {
       // Setup Firebase Messaging handlers
       await _setupFirebaseMessaging();
 
-      // Generate device ID
-      _deviceId = await _generateDeviceId();
+      // Generate or retrieve persisted device ID
+      _deviceId = await _generateOrGetDeviceId();
 
       // Get and register FCM token
       _fcmToken = await _firebaseMessaging.getToken();
@@ -168,7 +169,35 @@ class PushNotificationService {
     }
   }
 
-  /// Generate a unique device ID
+  /// Generate or retrieve persisted device ID
+  Future<String> _generateOrGetDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? deviceId = prefs.getString('fcm_device_id');
+
+    if (deviceId == null) {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      String platform;
+      if (kIsWeb) {
+        platform = 'web';
+      } else if (Platform.isAndroid) {
+        platform = 'android';
+      } else if (Platform.isIOS) {
+        platform = 'ios';
+      } else {
+        platform = 'unknown';
+      }
+      deviceId = '$platform-$timestamp';
+      await prefs.setString('fcm_device_id', deviceId);
+      debugPrint('✅ Generated and persisted new device ID: $deviceId');
+    } else {
+      debugPrint('✅ Retrieved existing device ID: $deviceId');
+    }
+
+    return deviceId;
+  }
+
+  /// Generate a unique device ID (DEPRECATED - kept for reference)
+  @Deprecated('Use _generateOrGetDeviceId() instead for persistent device IDs')
   Future<String> _generateDeviceId() async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     String platform;
@@ -206,6 +235,8 @@ class PushNotificationService {
         deviceType = 'unknown';
       }
 
+      // Always set is_active to true when registering
+      // is_active should only be false when token is invalid or user logs out
       await _client?.from('fcm_tokens').upsert({
         'user_id': userId,
         'token': token,
@@ -215,7 +246,7 @@ class PushNotificationService {
         'last_used_at': DateTime.now().toIso8601String(),
       }, onConflict: 'device_id,user_id');
 
-      debugPrint('✅ FCM token registered successfully');
+      debugPrint('✅ FCM token registered successfully (is_active=true)');
     } catch (error) {
       debugPrint('❌ Error registering FCM token: $error');
     }

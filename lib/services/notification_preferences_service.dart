@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import './supabase_service.dart';
+import './push_notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for managing user notification preferences
@@ -87,8 +88,7 @@ class NotificationPreferencesService {
       final userId = _client?.auth.currentUser?.id;
       if (userId == null) return false;
 
-      // When master toggle is disabled, disable all individual preferences
-      // When enabled, enable all individual preferences
+      // Update email preferences
       await _client?.from('email_preferences').update({
         'push_notifications_enabled': enabled,
         'push_memory_invites': enabled,
@@ -100,6 +100,36 @@ class NotificationPreferencesService {
         'push_group_invites': enabled,
         'updated_at': DateTime.now().toIso8601String(),
       }).eq('user_id', userId);
+
+      // If enabling notifications, re-register FCM token if it doesn't exist
+      if (enabled) {
+        final pushService = PushNotificationService.instance;
+
+        // Check if FCM token exists and is active
+        final existingToken = await _client
+            ?.from('fcm_tokens')
+            .select('token, is_active')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (existingToken == null) {
+          // No token exists, register new one
+          debugPrint('📱 No FCM token found, re-registering...');
+          final fcmToken = pushService.fcmToken;
+          if (fcmToken != null) {
+            await pushService.registerToken(fcmToken);
+          } else {
+            debugPrint('⚠️ Cannot re-register: No FCM token available');
+          }
+        } else if (existingToken['is_active'] == false) {
+          // Token exists but is inactive, re-register it
+          debugPrint('📱 FCM token inactive, re-registering...');
+          final fcmToken = pushService.fcmToken ?? existingToken['token'];
+          if (fcmToken != null) {
+            await pushService.registerToken(fcmToken);
+          }
+        }
+      }
 
       debugPrint('✅ Push notifications ${enabled ? "enabled" : "disabled"}');
       return true;

@@ -1,6 +1,9 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-part 'memory_invitation_notifier.dart';
+// Remove this line - the .freezed.dart file will be generated after running build_runner
+// part 'memory_invitation_state.freezed.dart';
+
+// Note: Run 'flutter pub run build_runner build' to generate the freezed file
 
 @freezed
 class MemoryInvitationState with _$MemoryInvitationState {
