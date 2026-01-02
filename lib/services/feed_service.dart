@@ -98,7 +98,7 @@ class FeedService {
   }
 
   /// Fetch recent stories for "Happening Now" section with pagination
-  /// Returns stories from the last 24 hours sorted by creation time
+  /// Returns stories from the last 7 days sorted by creation time
   Future<List<Map<String, dynamic>>> fetchHappeningNowStories({
     int offset = 0,
     int limit = _pageSize,
@@ -134,7 +134,7 @@ class FeedService {
           ''')
           .eq('memories.visibility', 'public')
           .gte('created_at',
-              DateTime.now().subtract(Duration(hours: 24)).toIso8601String())
+              DateTime.now().subtract(Duration(days: 7)).toIso8601String())
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 

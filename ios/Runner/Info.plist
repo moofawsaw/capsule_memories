@@ -69,5 +69,10 @@
     <array>
         <string>applinks:capsule.app</string>
     </array>
+    
+    <key>NSLocationWhenInUseUsageDescription</key>
+	<string>Capsule needs access to your location to tag stories with where they were captured</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Capsule needs access to your location to tag stories with where they were captured</string>
 </dict>
 </plist>

@@ -493,29 +493,35 @@ class PushNotificationService {
       }
 
       debugPrint('📱 Processing deep link path: ${pathSegments.join("/")}');
+      debugPrint(
+          '📱 Path segments: $pathSegments (count: ${pathSegments.length})');
 
       switch (pathSegments[0]) {
         case 'memory':
           // Handle: /memory/{memoryId}
-          if (pathSegments.length > 1) {
+          if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
             final memoryId = pathSegments[1];
             debugPrint('📱 Navigating to memory: $memoryId');
             navigatorKey.currentState?.pushNamed(
               '/app/bs/details',
               arguments: memoryId,
             );
+          } else {
+            debugPrint('❌ Memory deep link missing ID: $deepLink');
           }
           break;
 
         case 'profile':
           // Handle: /profile/{userId}
-          if (pathSegments.length > 1) {
+          if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
             final userId = pathSegments[1];
             debugPrint('📱 Navigating to profile: $userId');
             navigatorKey.currentState?.pushNamed(
               '/app/profile-user',
               arguments: userId,
             );
+          } else {
+            debugPrint('❌ Profile deep link missing ID: $deepLink');
           }
           break;
 
@@ -527,13 +533,15 @@ class PushNotificationService {
 
         case 'group':
           // Handle: /group/{groupId}
-          if (pathSegments.length > 1) {
+          if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
             final groupId = pathSegments[1];
             debugPrint('📱 Navigating to group: $groupId');
             navigatorKey.currentState?.pushNamed(
               '/app/groups',
               arguments: groupId,
             );
+          } else {
+            debugPrint('❌ Group deep link missing ID: $deepLink');
           }
           break;
 
@@ -553,6 +561,8 @@ class PushNotificationService {
               '/app/join',
               arguments: {'type': type, 'code': code},
             );
+          } else {
+            debugPrint('❌ Join deep link missing parameters: $deepLink');
           }
           break;
 

@@ -5,8 +5,9 @@
 
 part of 'friends_management_state.dart';
 
-import 'package:flutter/foundation.dart';
+// Add this import ... //
 import 'package:json_annotation/json_annotation.dart';
+import 'package:collection/collection.dart';
 
 // **************************************************************************
 // FreezedGenerator
@@ -424,7 +425,7 @@ class _$FriendsManagementStateImpl implements _FriendsManagementState {
           _$FriendsManagementStateImpl>(this, _$identity);
 }
 
-abstract class _FriendsManagementState {
+abstract class _FriendsManagementState implements FriendsManagementState {
   const factory _FriendsManagementState(
       {final bool isLoading,
       final bool isQRScannerActive,

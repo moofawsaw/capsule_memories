@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -25,7 +26,8 @@ class NativeCameraRecordingScreen extends StatefulWidget {
 }
 
 class _NativeCameraRecordingScreenState
-    extends State<NativeCameraRecordingScreen> {
+    extends State<NativeCameraRecordingScreen>
+    with SingleTickerProviderStateMixin {
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
   bool _isRecording = false;
@@ -34,15 +36,30 @@ class _NativeCameraRecordingScreenState
   Timer? _longPressTimer;
   bool _isLongPress = false;
 
+  // Progress animation
+  AnimationController? _progressController;
+  static const int _maxRecordingDurationSeconds = 60; // 60 seconds max
+  Timer? _recordingTimer;
+  int _elapsedSeconds = 0;
+
   @override
   void initState() {
     super.initState();
     _initializeCamera();
+
+    // Initialize progress animation controller
+    _progressController = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: _maxRecordingDurationSeconds),
+    );
   }
 
   @override
   void dispose() {
     _cameraController?.dispose();
+    _progressController?.dispose();
+    _recordingTimer?.cancel();
+    _longPressTimer?.cancel();
     super.dispose();
   }
 
@@ -165,6 +182,24 @@ class _NativeCameraRecordingScreenState
 
     try {
       await _cameraController!.startVideoRecording();
+
+      // Start progress animation
+      _progressController?.reset();
+      _progressController?.forward();
+      _elapsedSeconds = 0;
+
+      // Start timer to track elapsed time and auto-stop at max duration
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          _elapsedSeconds++;
+        });
+
+        // Auto-stop at max duration
+        if (_elapsedSeconds >= _maxRecordingDurationSeconds) {
+          _stopRecording();
+        }
+      });
+
       setState(() {
         _isRecording = true;
       });
@@ -185,7 +220,12 @@ class _NativeCameraRecordingScreenState
     }
 
     try {
+      // Stop timers and animation
+      _recordingTimer?.cancel();
+      _progressController?.stop();
+
       final videoFile = await _cameraController!.stopVideoRecording();
+
       setState(() {
         _isRecording = false;
       });
@@ -348,7 +388,7 @@ class _NativeCameraRecordingScreenState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Recording indicator
+          // Recording indicator with timer
           if (_isRecording)
             Container(
               padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
@@ -369,7 +409,7 @@ class _NativeCameraRecordingScreenState
                   ),
                   SizedBox(width: 8.h),
                   Text(
-                    'Recording...',
+                    'Recording ${_formatTime(_elapsedSeconds)}/${_formatTime(_maxRecordingDurationSeconds)}',
                     style: TextStyleHelper.instance.body14Bold
                         .copyWith(color: appTheme.gray_50),
                   ),
@@ -395,38 +435,122 @@ class _NativeCameraRecordingScreenState
 
           SizedBox(height: 16.h),
 
-          // Record button with gesture detection
+          // Record button with circular progress indicator
           GestureDetector(
             onTapDown: _handleTapDown,
             onTapUp: _handleTapUp,
             onTapCancel: _handleTapCancel,
-            child: Container(
-              width: 72.h,
-              height: 72.h,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: appTheme.gray_50,
-                  width: 4,
-                ),
-              ),
-              child: Center(
-                child: AnimatedContainer(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Animated circular progress ring
+                if (_isRecording)
+                  AnimatedBuilder(
+                    animation: _progressController!,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        size: Size(80.h, 80.h),
+                        painter: _CircularProgressPainter(
+                          progress: _progressController!.value,
+                          strokeWidth: 4.0,
+                          progressColor: appTheme.red_500,
+                        ),
+                      );
+                    },
+                  ),
+
+                // Static white border when not recording
+                if (!_isRecording)
+                  Container(
+                    width: 80.h,
+                    height: 80.h,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: appTheme.gray_50,
+                        width: 4,
+                      ),
+                    ),
+                  ),
+
+                // Inner button with pulsing animation when recording
+                AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: _isRecording ? 24.h : 56.h,
-                  height: _isRecording ? 24.h : 56.h,
+                  width: _isRecording ? 28.h : 64.h,
+                  height: _isRecording ? 28.h : 64.h,
                   decoration: BoxDecoration(
                     color: appTheme.red_500,
                     shape: _isRecording ? BoxShape.rectangle : BoxShape.circle,
                     borderRadius:
-                        _isRecording ? BorderRadius.circular(4.h) : null,
+                        _isRecording ? BorderRadius.circular(6.h) : null,
+                    boxShadow: _isRecording
+                        ? [
+                            BoxShadow(
+                              color: appTheme.red_500.withAlpha(128),
+                              blurRadius: 12.h,
+                              spreadRadius: 2.h,
+                            ),
+                          ]
+                        : null,
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Format seconds to MM:SS
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+}
+
+/// Custom painter for circular progress indicator
+class _CircularProgressPainter extends CustomPainter {
+  final double progress;
+  final double strokeWidth;
+  final Color progressColor;
+
+  _CircularProgressPainter({
+    required this.progress,
+    required this.strokeWidth,
+    required this.progressColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth) / 2;
+
+    // Draw progress arc (starts at top, goes clockwise)
+    final progressPaint = Paint()
+      ..color = progressColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    // Calculate sweep angle (0 to 2π)
+    final sweepAngle = 2 * math.pi * progress;
+
+    // Draw arc starting from top (-π/2 radians = 12 o'clock)
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2, // Start at 12 o'clock
+      sweepAngle,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CircularProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.progressColor != progressColor;
   }
 }

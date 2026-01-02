@@ -2,6 +2,7 @@ import '../../../core/app_export.dart';
 import '../../../services/feed_service.dart';
 import '../../../services/supabase_service.dart';
 import '../model/memory_feed_dashboard_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 part 'memory_feed_dashboard_state.dart';
 
@@ -17,16 +18,328 @@ class MemoryFeedDashboardNotifier
     extends StateNotifier<MemoryFeedDashboardState> {
   MemoryFeedDashboardNotifier(MemoryFeedDashboardState state) : super(state) {
     loadFeedData();
+    _setupRealtimeSubscriptions();
   }
 
   final _feedService = FeedService();
   bool _isDisposed = false;
   static const int _pageSize = 10;
 
+  // Real-time subscription channels
+  RealtimeChannel? _storiesChannel;
+  RealtimeChannel? _memoriesChannel;
+
   @override
   void dispose() {
     _isDisposed = true;
+    _cleanupSubscriptions();
     super.dispose();
+  }
+
+  /// Setup real-time subscriptions for stories and memories
+  void _setupRealtimeSubscriptions() {
+    final client = SupabaseService.instance.client;
+    if (client == null) {
+      print('⚠️ REALTIME: Supabase client not available');
+      return;
+    }
+
+    try {
+      // Subscribe to new stories
+      _storiesChannel = client
+          .channel('public:stories')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'stories',
+            callback: _handleNewStory,
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'stories',
+            callback: _handleStoryUpdate,
+          )
+          .subscribe();
+
+      // Subscribe to memory updates
+      _memoriesChannel = client
+          .channel('public:memories')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'memories',
+            callback: _handleNewMemory,
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'memories',
+            callback: _handleMemoryUpdate,
+          )
+          .subscribe();
+
+      print('✅ REALTIME: Subscriptions setup complete');
+    } catch (e) {
+      print('❌ REALTIME: Error setting up subscriptions: $e');
+    }
+  }
+
+  /// Cleanup real-time subscriptions
+  void _cleanupSubscriptions() {
+    try {
+      _storiesChannel?.unsubscribe();
+      _memoriesChannel?.unsubscribe();
+      print('✅ REALTIME: Subscriptions cleaned up');
+    } catch (e) {
+      print('⚠️ REALTIME: Error cleaning up subscriptions: $e');
+    }
+  }
+
+  /// Handle new story inserted
+  void _handleNewStory(PostgresChangePayload payload) async {
+    if (_isDisposed) return;
+
+    print('🔔 REALTIME: New story detected: ${payload.newRecord['id']}');
+
+    try {
+      // Fetch full story details with joins
+      final storyId = payload.newRecord['id'] as String;
+      final client = SupabaseService.instance.client;
+
+      if (client == null) return;
+
+      final response = await client.from('stories').select('''
+            id,
+            thumbnail_url,
+            video_url,
+            created_at,
+            contributor_id,
+            memory_id,
+            user_profiles!contributor_id(
+              avatar_url,
+              display_name
+            ),
+            memories!memory_id(
+              title,
+              memory_categories(
+                name,
+                icon_url
+              )
+            )
+          ''').eq('id', storyId).single();
+
+      if (_isDisposed) return;
+
+      final newStoryData = HappeningNowStoryData(
+        id: response['id'] as String,
+        backgroundImage: response['thumbnail_url'] as String,
+        profileImage: response['user_profiles']['avatar_url'] as String,
+        userName: response['user_profiles']['display_name'] as String,
+        categoryName:
+            response['memories']['memory_categories']['name'] as String,
+        categoryIcon:
+            response['memories']['memory_categories']['icon_url'] as String? ??
+                '',
+        timestamp: 'Just now',
+        isViewed: false,
+      );
+
+      // Add to happening now at the beginning
+      final currentStories =
+          state.memoryFeedDashboardModel?.happeningNowStories ?? [];
+      final updatedStories = [newStoryData, ...currentStories];
+
+      final updatedModel = state.memoryFeedDashboardModel?.copyWith(
+        happeningNowStories: updatedStories.cast<HappeningNowStoryData>(),
+      );
+
+      _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
+
+      print('✅ REALTIME: New story added to feed');
+    } catch (e) {
+      print('❌ REALTIME: Error handling new story: $e');
+    }
+  }
+
+  /// Handle story update
+  void _handleStoryUpdate(PostgresChangePayload payload) {
+    if (_isDisposed) return;
+
+    print('🔔 REALTIME: Story updated: ${payload.newRecord['id']}');
+
+    try {
+      final storyId = payload.newRecord['id'] as String;
+      final currentModel = state.memoryFeedDashboardModel;
+
+      if (currentModel == null) return;
+
+      // Update story in all lists that might contain it
+      final updatedHappeningNow = _updateStoryInList(
+        currentModel.happeningNowStories,
+        storyId,
+        payload.newRecord,
+      );
+
+      final updatedLatest = _updateStoryInList(
+        currentModel.latestStories,
+        storyId,
+        payload.newRecord,
+      );
+
+      final updatedTrending = _updateStoryInList(
+        currentModel.trendingStories,
+        storyId,
+        payload.newRecord,
+      );
+
+      final updatedModel = currentModel.copyWith(
+        happeningNowStories: updatedHappeningNow?.cast<HappeningNowStoryData>(),
+        latestStories: updatedLatest?.cast<HappeningNowStoryData>(),
+        trendingStories: updatedTrending?.cast<HappeningNowStoryData>(),
+      );
+
+      _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
+
+      print('✅ REALTIME: Story updated in feed');
+    } catch (e) {
+      print('❌ REALTIME: Error handling story update: $e');
+    }
+  }
+
+  /// Handle new memory inserted
+  void _handleNewMemory(PostgresChangePayload payload) async {
+    if (_isDisposed) return;
+
+    print('🔔 REALTIME: New memory detected: ${payload.newRecord['id']}');
+
+    try {
+      // Fetch full memory details
+      final memoryId = payload.newRecord['id'] as String;
+      final client = SupabaseService.instance.client;
+
+      if (client == null) return;
+
+      final response = await client.from('memories').select('''
+            id,
+            title,
+            start_time,
+            end_time,
+            location_name,
+            memory_categories(
+              icon_url
+            ),
+            memory_contributors(
+              user_profiles(
+                avatar_url
+              )
+            ),
+            stories(
+              thumbnail_url,
+              video_url
+            )
+          ''').eq('id', memoryId).eq('visibility', 'public').single();
+
+      if (_isDisposed) return;
+
+      final contributors = response['memory_contributors'] as List;
+      final stories = response['stories'] as List;
+
+      final newMemoryData = CustomMemoryItem(
+        id: response['id'],
+        title: response['title'],
+        date: DateTime.parse(response['start_time']).toString(),
+        iconPath: response['memory_categories']['icon_url'] ?? '',
+        profileImages: contributors
+            .map((c) => c['user_profiles']['avatar_url'] as String)
+            .toList(),
+        mediaItems: stories
+            .map((s) => CustomMediaItem(
+                  imagePath: s['thumbnail_url'] ?? '',
+                  hasPlayButton: s['video_url'] != null,
+                ))
+            .toList(),
+        startDate: response['start_time'],
+        startTime: response['start_time'],
+        endDate: response['end_time'],
+        endTime: response['end_time'],
+        location: response['location_name'] ?? '',
+        distance: '',
+        isLiked: false,
+      );
+
+      // Add to public memories at the beginning
+      final currentMemories =
+          state.memoryFeedDashboardModel?.publicMemories ?? [];
+      final updatedMemories = [newMemoryData, ...currentMemories];
+
+      final updatedModel = state.memoryFeedDashboardModel?.copyWith(
+        publicMemories: updatedMemories,
+      );
+
+      _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
+
+      print('✅ REALTIME: New memory added to feed');
+    } catch (e) {
+      print('❌ REALTIME: Error handling new memory: $e');
+    }
+  }
+
+  /// Handle memory update
+  void _handleMemoryUpdate(PostgresChangePayload payload) {
+    if (_isDisposed) return;
+
+    print('🔔 REALTIME: Memory updated: ${payload.newRecord['id']}');
+
+    try {
+      final memoryId = payload.newRecord['id'] as String;
+      final currentModel = state.memoryFeedDashboardModel;
+
+      if (currentModel == null || currentModel.publicMemories == null) return;
+
+      // Update memory in public memories list
+      final updatedMemories = currentModel.publicMemories!.map((memory) {
+        if (memory.id == memoryId) {
+          return memory.copyWith(
+            title: payload.newRecord['title'] as String? ?? memory.title,
+          );
+        }
+        return memory;
+      }).toList();
+
+      final updatedModel = currentModel.copyWith(
+        publicMemories: updatedMemories,
+      );
+
+      _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
+
+      print('✅ REALTIME: Memory updated in feed');
+    } catch (e) {
+      print('❌ REALTIME: Error handling memory update: $e');
+    }
+  }
+
+  /// Helper to update story in a list
+  List<HappeningNowStoryData>? _updateStoryInList(
+    List<HappeningNowStoryData>? stories,
+    String storyId,
+    Map<String, dynamic> newRecord,
+  ) {
+    if (stories == null) return null;
+
+    bool found = false;
+    final updated = stories.map((story) {
+      if (story.id == storyId) {
+        found = true;
+        return story.copyWith(
+          backgroundImage:
+              newRecord['thumbnail_url'] as String? ?? story.backgroundImage,
+        );
+      }
+      return story;
+    }).toList();
+
+    return found ? updated : null;
   }
 
   /// Safely set state only if notifier is not disposed
