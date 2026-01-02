@@ -1,16 +1,21 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './core/services/deep_link_service.dart';
+import './core/utils/navigator_service.dart';
+import './core/utils/size_utils.dart';
 import './core/utils/theme_provider.dart';
 import './firebase_options.dart';
 import './presentation/notifications_screen/notifier/notifications_notifier.dart';
+import './routes/app_routes.dart';
 import './services/notification_service.dart';
 import './services/push_notification_service.dart';
 import './services/supabase_service.dart';
+import './theme/theme_helper.dart';
 import 'core/app_export.dart';
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -55,6 +60,10 @@ Future<void> main() async {
   // 🎯 Initialize push notifications with FCM token registration
   await PushNotificationService.instance.initialize();
 
+  // 🎯 CRITICAL: Setup notification handlers BEFORE initializing deep link service
+  // This ensures notification taps are handled properly
+  await _setupNotificationHandlers();
+
   // 🎯 Initialize deep link service for QR code handling
   await DeepLinkService().initialize();
 
@@ -88,6 +97,49 @@ Future<bool> _initSupabaseSafely() async {
     debugPrint('❌ Failed to initialize Supabase: $e');
     debugPrint('Stack trace: $st');
     return false;
+  }
+}
+
+/// 🎯 Setup notification handlers for deep link navigation
+/// Handles notification taps when app is in foreground, background, or terminated
+Future<void> _setupNotificationHandlers() async {
+  try {
+    // Handle notification tap when app is in background (not terminated)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint(
+          '📱 Notification tapped from background: ${message.messageId}');
+      final deepLink = message.data['deep_link'];
+      if (deepLink != null && deepLink.isNotEmpty) {
+        debugPrint('📱 Navigating to deep link from background: $deepLink');
+        // Navigation will be handled by PushNotificationService._handleDeepLink
+      }
+    });
+
+    // Check if app was opened from a notification (terminated state)
+    RemoteMessage? initialMessage =
+        await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      debugPrint(
+          '📱 App opened from notification (terminated): ${initialMessage.messageId}');
+      final deepLink = initialMessage.data['deep_link'];
+      if (deepLink != null && deepLink.isNotEmpty) {
+        debugPrint('📱 Will navigate to deep link after app loads: $deepLink');
+        // Delay navigation until app is fully loaded
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          // Call the handleDeepLink method using the notification tap handler
+          PushNotificationService.instance._onNotificationTapped(
+            NotificationResponse(
+              notificationResponseType: NotificationResponseType.selectedNotification,
+              payload: deepLink,
+            ),
+          );
+        });
+      }
+    }
+
+    debugPrint('✅ Notification handlers setup complete');
+  } catch (e) {
+    debugPrint('❌ Error setting up notification handlers: $e');
   }
 }
 

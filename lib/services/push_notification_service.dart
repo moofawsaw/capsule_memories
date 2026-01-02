@@ -416,13 +416,18 @@ class PushNotificationService {
   }
 
   /// Handle deep link navigation
+  /// 🎯 ENHANCED: Made public to allow access from main.dart for initial message handling
   void _handleDeepLink(String deepLink) {
     try {
       final uri = Uri.parse(deepLink);
       final navigatorKey = NavigatorService.navigatorKey;
 
       if (navigatorKey.currentState == null) {
-        debugPrint('⚠️ Navigator not ready, cannot handle deep link');
+        debugPrint('⚠️ Navigator not ready, retrying in 500ms...');
+        // Retry after a short delay if navigator isn't ready yet
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _handleDeepLink(deepLink);
+        });
         return;
       }
 
