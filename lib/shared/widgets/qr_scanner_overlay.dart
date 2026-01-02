@@ -194,7 +194,8 @@ class _QRScannerOverlayState extends State<QRScannerOverlay> {
               height: 250,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: _isProcessing ? Colors.green : appTheme.deep_purple_A100,
+                  color:
+                      _isProcessing ? Colors.green : appTheme.deep_purple_A100,
                   width: 3,
                 ),
                 borderRadius: BorderRadius.circular(20),
@@ -267,7 +268,7 @@ class _QRScannerOverlayState extends State<QRScannerOverlay> {
                   ? appTheme.deep_purple_A100
                   : Colors.white.withAlpha(51),
               child: Icon(
-                _flashEnabled ? Icons.flash_on : Icons.flash_off,
+                _flashEnabled ? Icons.bolt : Icons.bolt_outlined,
                 color: Colors.white,
               ),
             ),

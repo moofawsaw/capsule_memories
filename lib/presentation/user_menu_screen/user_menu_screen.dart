@@ -4,7 +4,6 @@ import '../../core/app_export.dart';
 import '../../services/avatar_state_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_menu_item.dart';
 import '../../widgets/custom_navigation_drawer.dart';
 import '../app_download_screen/app_download_screen.dart';
@@ -201,10 +200,8 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
                 )),
             GestureDetector(
                 onTap: () => onTapCloseButton(context),
-                child: CustomImageView(
-                    imagePath: ImageConstant.imgFrame19,
-                    height: 26.h,
-                    width: 26.h)),
+                child: Icon(Icons.close,
+                    size: 26, color: Theme.of(context).colorScheme.onSurface)),
           ]));
     });
   }
@@ -294,27 +291,27 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   Widget _buildNavigationMenu(BuildContext context) {
     final navigationItems = <CustomNavigationDrawerItem>[
       CustomNavigationDrawerItem(
-          iconPath: ImageConstant.imgIconGray5024x24,
+          icon: Icons.person_outline,
           label: 'Profile',
           onTap: () => onTapProfile(context)),
       CustomNavigationDrawerItem(
-          iconPath: ImageConstant.imgIconGray50,
+          icon: Icons.photo_outlined,
           label: 'Memories',
           onTap: () => onTapMemories(context)),
       CustomNavigationDrawerItem(
-          iconPath: ImageConstant.imgIcon24x24,
+          icon: Icons.group_outlined,
           label: 'Groups',
           onTap: () => onTapGroups(context)),
       CustomNavigationDrawerItem(
-          iconPath: ImageConstant.imgIcon2,
+          icon: Icons.people_outline,
           label: 'Friends',
           onTap: () => onTapFriends(context)),
       CustomNavigationDrawerItem(
-          iconPath: ImageConstant.imgIcon3,
+          icon: Icons.favorite_border,
           label: 'Following',
           onTap: () => onTapFollowing(context)),
       CustomNavigationDrawerItem(
-          iconPath: ImageConstant.imgIcon4,
+          icon: Icons.settings_outlined,
           label: 'Settings',
           onTap: () => onTapSettings(context)),
     ];
@@ -356,8 +353,9 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   /// Sign out section
   Widget _buildSignOutSection(BuildContext context) {
     return CustomMenuItem(
-        iconPath: ImageConstant.imgIconRed500,
+        icon: Icons.logout_outlined,
         title: 'Sign Out',
+        iconColor: Color(0xFFEF4444),
         onTap: () => onTapSignOut(context),
         margin: EdgeInsets.only(right: 8.h, left: 8.h));
   }

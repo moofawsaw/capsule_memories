@@ -690,6 +690,7 @@ class _MemoryFeedDashboardScreenState
                               iconUrl: category['icon_url'] ?? '',
                               title: category['name'] ?? '',
                               description: category['tagline'] ?? '',
+                              backgroundColor: appTheme.gray_900_01,
                               onTap: () {
                                 // Pass selected category ID to CreateMemoryScreen
                                 showModalBottomSheet(

@@ -6,6 +6,7 @@ class CustomCategoryBadge extends StatelessWidget {
   final String title;
   final String description;
   final VoidCallback? onTap;
+  final Color? backgroundColor;
 
   const CustomCategoryBadge({
     Key? key,
@@ -13,6 +14,7 @@ class CustomCategoryBadge extends StatelessWidget {
     required this.title,
     required this.description,
     this.onTap,
+    this.backgroundColor,
   }) : super(key: key);
 
   @override
@@ -24,7 +26,7 @@ class CustomCategoryBadge extends StatelessWidget {
         margin: EdgeInsets.only(right: 12.h),
         padding: EdgeInsets.all(16.h),
         decoration: BoxDecoration(
-          color: appTheme.blue_gray_900_01,
+          color: backgroundColor ?? appTheme.blue_gray_900_01,
           borderRadius: BorderRadius.circular(16.h),
         ),
         child: Row(

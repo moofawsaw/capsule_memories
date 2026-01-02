@@ -1,9 +1,10 @@
-import '../models/create_memory_model.dart';
 import '../../../core/app_export.dart';
 import '../../../services/groups_service.dart';
-import '../../../services/story_service.dart';
 import '../../../services/memory_cache_service.dart';
+import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
+import '../../friends_management_screen/widgets/qr_scanner_overlay.dart';
+import '../models/create_memory_model.dart';
 
 part 'create_memory_state.dart';
 
@@ -266,9 +267,37 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     // Navigate to QR code screen or show QR scanner
   }
 
-  void handleCameraTap() {
-    // Handle camera functionality
-    // Open camera or image picker
+  Future<void> handleCameraTap() async {
+    // Open QR scanner to add users via friend QR code scanning
+    final context = NavigatorService.navigatorKey.currentContext;
+    if (context == null) return;
+
+    try {
+      // Use existing QRScannerOverlay instead of custom scanner
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => QRScannerOverlay(
+            scanType: 'friend',
+            onSuccess: () async {
+              // QR scanner returns after successful scan
+              // We'll get the scanned user from the service
+              // Refresh invites or show success
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('User added to memory invites!'),
+                  backgroundColor: appTheme.deep_purple_A100,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error opening QR scanner: $e');
+    }
   }
 
   Future<void> createMemory() async {
@@ -317,8 +346,8 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         for (final member in groupMembers) {
           final userId = member['id'] as String?;
           // Only add valid UUIDs and exclude current user
-          if (userId != null && 
-              userId != currentUser.id && 
+          if (userId != null &&
+              userId != currentUser.id &&
               isValidUUID(userId)) {
             invitedUserIds.add(userId);
           }

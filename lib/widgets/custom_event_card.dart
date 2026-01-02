@@ -1,29 +1,21 @@
 import '../core/app_export.dart';
+import '../core/utils/memory_categories.dart';
 import './custom_icon_button.dart';
 import './custom_image_view.dart';
 
-/** CustomEventCard - A reusable component for displaying event information with a profile image, story count, participant list, and configurable action buttons. Supports flexible styling and interactive elements for event management interfaces. */
+/** 
+ * CustomEventCard - A reusable event card component that displays event information
+ * including title, date, privacy status, and participant avatars with navigation controls.
+ * 
+ * Features:
+ * - Event title and date display
+ * - Privacy status indicator (Private/Public)
+ * - Participant avatar stack with overlapping layout
+ * - Interactive back navigation and icon button
+ * - Responsive design with consistent styling
+ * - Flexible content configuration
+ */
 class CustomEventCard extends StatelessWidget {
-  const CustomEventCard({
-    Key? key,
-    this.eventData,
-    this.eventTitle,
-    this.eventDate,
-    this.isPrivate,
-    this.iconButtonImagePath,
-    this.participantImages,
-    this.onBackTap,
-    this.onIconButtonTap,
-    this.onAvatarTap,
-    this.onActionTap,
-    this.onMemoryTap,
-    this.backgroundColor,
-    this.borderRadius,
-    this.padding,
-    this.margin,
-  }) : super(key: key);
-
-  // Legacy API parameters
   final String? eventTitle;
   final String? eventDate;
   final bool? isPrivate;
@@ -33,31 +25,52 @@ class CustomEventCard extends StatelessWidget {
   final VoidCallback? onIconButtonTap;
   final VoidCallback? onAvatarTap;
 
-  // New API parameters
-  final CustomEventData? eventData;
-  final VoidCallback? onActionTap;
-  final VoidCallback? onMemoryTap;
-  final Color? backgroundColor;
-  final double? borderRadius;
-  final EdgeInsetsGeometry? padding;
-  final EdgeInsetsGeometry? margin;
-
-  bool get _isLegacyMode => eventTitle != null || eventDate != null;
+  const CustomEventCard({
+    Key? key,
+    this.eventTitle,
+    this.eventDate,
+    this.isPrivate,
+    this.iconButtonImagePath,
+    this.participantImages,
+    this.onBackTap,
+    this.onIconButtonTap,
+    this.onAvatarTap,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    if (_isLegacyMode) {
-      return _buildLegacyLayout(context);
-    }
-    return _buildNewLayout(context);
-  }
+    // CRITICAL DEBUG: Log what CustomEventCard receives for rendering
+    print('🚨 CUSTOM EVENT CARD DEBUG: build() called');
+    print('   - eventTitle: "$eventTitle"');
+    print('   - eventDate: "$eventDate"');
+    print('   - participantImages count: ${participantImages?.length ?? 0}');
+    print('   - iconButtonImagePath: "$iconButtonImagePath"');
+    print('   - Using fallback title: ${eventTitle == "Event Title"}');
+    print('   - Using fallback date: ${eventDate == "Event Date"}');
 
-  Widget _buildLegacyLayout(BuildContext context) {
+    // Extract category name from icon path URL to look up the proper category
+    String? categoryName;
+    if (iconButtonImagePath != null &&
+        iconButtonImagePath!.contains('icon_url=')) {
+      // Parse category name from Supabase URL format
+      final uri = Uri.parse(iconButtonImagePath!);
+      categoryName = uri.queryParameters['icon_url'];
+      print(
+          '🔍 DEBUG CustomEventCard: Extracted category name = "$categoryName"');
+    }
+
+    // Get category using the same successful pattern as story cards
+    final category = categoryName != null
+        ? MemoryCategories.getByName(categoryName)
+        : MemoryCategories.custom; // fallback to custom category
+
+    print(
+        '🔍 DEBUG CustomEventCard: Using category = "${category.name}" with emoji = "${category.emoji}"');
+
     return Container(
-      width: double.maxFinite,
-      padding: EdgeInsets.fromLTRB(12.h, 14.h, 16.h, 14.h),
+      width: double.infinity,
       decoration: BoxDecoration(
-        color: backgroundColor ?? appTheme.gray_900_02,
+        color: appTheme.gray_900_01,
         border: Border(
           bottom: BorderSide(
             color: appTheme.blue_gray_900,
@@ -65,298 +78,169 @@ class CustomEventCard extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(12.h, 12.h, 12.h, 12.h),
+      child: Column(
         children: [
-          // Back button on the left
-          CustomIconButton(
-            iconPath: ImageConstant.imgArrowLeft,
-            height: 48.h,
-            width: 48.h,
-            padding: EdgeInsets.all(12.h),
-            backgroundColor: appTheme.gray_900_03,
-            borderRadius: 24.h,
-            onTap: onBackTap,
-          ),
-          SizedBox(width: 12.h),
-          // Memory title and date in center
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  eventTitle ?? '',
-                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 4.h),
-                Row(
-                  children: [
-                    Text(
-                      eventDate ?? '',
-                      style: TextStyleHelper
-                          .instance.bodyTextRegularPlusJakartaSans
-                          .copyWith(color: appTheme.blue_gray_300),
-                    ),
-                    SizedBox(width: 8.h),
-                    // Private/Public button
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8.h,
-                        vertical: 4.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isPrivate == true
-                            ? appTheme.red_500.withAlpha(51)
-                            : appTheme.green_500.withAlpha(51),
-                        borderRadius: BorderRadius.circular(4.h),
-                      ),
-                      child: Text(
-                        isPrivate == true ? 'Private' : 'Public',
-                        style: TextStyleHelper
-                            .instance.bodyTextRegularPlusJakartaSans
-                            .copyWith(
-                          color: isPrivate == true
-                              ? appTheme.red_500
-                              : appTheme.green_500,
-                          fontSize: 12.h,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: 12.h),
-          // Members on the right
-          GestureDetector(
-            onTap: onAvatarTap,
-            child: _buildLegacyMemberAvatars(context),
+          // Header row with back button, title, and options
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildBackButton(),
+              SizedBox(width: 16.h),
+              _buildIconButton(),
+              SizedBox(width: 16.h),
+              _buildEventDetails(context),
+              SizedBox(width: 16.h),
+              _buildAvatarStack(),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLegacyMemberAvatars(BuildContext context) {
-    final images = participantImages ?? [];
-
-    if (images.isEmpty) {
-      return CustomImageView(
-        imagePath: iconButtonImagePath ?? ImageConstant.imgFrame13,
-        height: 48.h,
-        width: 48.h,
-        fit: BoxFit.cover,
-      );
-    }
-
-    if (images.length == 1) {
-      return CustomImageView(
-        imagePath: images[0],
-        height: 48.h,
-        width: 48.h,
-        fit: BoxFit.cover,
-      );
-    }
-
-    // Calculate stack width for multiple avatars
-    final stackWidth = (48 + (images.length - 1) * 32).h;
-
-    return SizedBox(
-      width: stackWidth,
-      height: 48.h,
-      child: Stack(
-        children: images.take(3).toList().asMap().entries.map((entry) {
-          final index = entry.key;
-          final imagePath = entry.value;
-          final leftPosition = (index * 32).h;
-
-          return Positioned(
-            left: leftPosition,
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: appTheme.gray_900_02,
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(24.h),
-              ),
-              child: CustomImageView(
-                imagePath: imagePath,
-                height: 48.h,
-                width: 48.h,
-                fit: BoxFit.cover,
-              ),
-            ),
-          );
-        }).toList(),
+  Widget _buildBackButton() {
+    return Padding(
+      padding: EdgeInsets.only(top: 14.h),
+      child: GestureDetector(
+        onTap: onBackTap,
+        child: CustomImageView(
+          imagePath: ImageConstant.imgArrowLeft,
+          width: 24.h,
+          height: 24.h,
+        ),
       ),
     );
   }
 
-  Widget _buildNewLayout(BuildContext context) {
-    return GestureDetector(
-      onTap: onMemoryTap,
-      child: Container(
-        margin: margin,
-        padding: padding ?? EdgeInsets.all(16.h),
-        decoration: BoxDecoration(
-          color: backgroundColor ?? const Color(0xFF151319),
-          borderRadius: BorderRadius.circular(borderRadius ?? 12.h),
-        ),
-        child: Row(
+  Widget _buildIconButton() {
+    return Padding(
+      padding: EdgeInsets.only(top: 14.h),
+      child: CustomIconButton(
+        iconPath: iconButtonImagePath ?? ImageConstant.imgFrame13,
+        height: 36.h,
+        width: 36.h,
+        backgroundColor: appTheme.color41C124,
+        borderRadius: 18.h,
+        padding: EdgeInsets.all(6.h),
+        onTap: onIconButtonTap,
+      ),
+    );
+  }
+
+  Widget _buildEventDetails(BuildContext context) {
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.only(top: 14.h),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CustomImageView(
-              imagePath: eventData?.profileImage ?? '',
-              height: 48.h,
-              width: 48.h,
-              fit: BoxFit.cover,
+            Text(
+              eventTitle ?? 'Event Title',
+              style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50, height: 1.22),
             ),
-            SizedBox(width: 12.h),
-            Expanded(
-              child: _buildEventInfo(context),
-            ),
-            SizedBox(width: 18.h),
-            if (onActionTap != null)
-              GestureDetector(
-                onTap: onActionTap,
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgButtons,
-                  height: 26.h,
-                  width: 26.h,
+            SizedBox(height: 4.h),
+            Row(
+              children: [
+                Text(
+                  eventDate ?? 'Event Date',
+                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                      .copyWith(height: 1.33),
                 ),
-              )
-            else
-              const SizedBox.shrink(),
+                SizedBox(width: 6.h),
+                _buildPrivacyButton(),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEventInfo(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          eventData?.title ?? '',
-          style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-              .copyWith(color: appTheme.gray_50),
-          overflow: TextOverflow.ellipsis,
-        ),
-        SizedBox(height: 4.h),
-        _buildParticipantsInfo(context),
-      ],
-    );
-  }
-
-  Widget _buildParticipantsInfo(BuildContext context) {
-    return Row(
-      children: [
-        if (eventData?.participantImages?.isNotEmpty == true) ...[
-          _buildParticipantImages(context),
-          SizedBox(width: 6.h),
+  Widget _buildPrivacyButton() {
+    final bool isEventPrivate = isPrivate ?? true;
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 8.h,
+        vertical: 2.h,
+      ),
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_03,
+        borderRadius: BorderRadius.circular(6.h),
+      ),
+      child: Row(
+        spacing: 4.h,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CustomImageView(
+            imagePath: isEventPrivate
+                ? ImageConstant.imgIconDeepPurpleA10014x14
+                : ImageConstant.imgIcon14x14,
+            height: 14.h,
+            width: 14.h,
+          ),
+          Text(
+            isEventPrivate ? 'PRIVATE' : 'PUBLIC',
+            style: TextStyleHelper.instance.body12BoldPlusJakartaSans
+                .copyWith(color: appTheme.deep_purple_A100),
+          ),
         ],
-        Text(
-          eventData?.storyCountText ?? '',
-          style: TextStyleHelper.instance.bodyTextRegularPlusJakartaSans
-              .copyWith(color: appTheme.blue_gray_300),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildParticipantImages(BuildContext context) {
-    final images = eventData?.participantImages ?? [];
-    final participantIds = eventData?.participantIds ?? [];
-
-    if (images.isEmpty) return const SizedBox.shrink();
-
-    if (images.length == 1) {
-      return GestureDetector(
-        onTap: participantIds.isNotEmpty && participantIds[0] != null
-            ? () {
-                Navigator.pushNamed(
-                  context,
-                  AppRoutes.appProfileUser,
-                  arguments: participantIds[0],
-                );
-              }
-            : null,
-        child: CustomImageView(
-          imagePath: images[0],
-          height: 32.h,
-          width: 32.h,
-          fit: BoxFit.cover,
-        ),
-      );
-    }
-
-    // Calculate stack width based on number of images
-    final stackWidth = (32 + (images.length - 1) * 23).h;
-
-    return SizedBox(
-      width: stackWidth,
-      height: 32.h,
-      child: Stack(
-        children: images.asMap().entries.map((entry) {
-          final index = entry.key;
-          final imagePath = entry.value;
-          final leftPosition = (index * 23).h;
-          final participantId =
-              index < participantIds.length ? participantIds[index] : null;
-
-          return Positioned(
-            left: leftPosition,
-            child: GestureDetector(
-              onTap: participantId != null
-                  ? () {
-                      Navigator.pushNamed(
-                        context,
-                        AppRoutes.appProfileUser,
-                        arguments: participantId,
-                      );
-                    }
-                  : null,
-              child: CustomImageView(
-                imagePath: imagePath,
-                height: 32.h,
-                width: 32.h,
-                fit: BoxFit.cover,
-              ),
-            ),
-          );
-        }).toList(),
       ),
     );
   }
-}
 
-/// Data model for event card information
-class CustomEventData {
-  CustomEventData({
-    this.title,
-    this.storyCountText,
-    this.profileImage,
-    this.participantImages,
-    this.participantIds,
-  });
+  Widget _buildAvatarStack() {
+    final List<String> avatars = participantImages ??
+        [
+          ImageConstant.imgFrame2,
+          ImageConstant.imgFrame1,
+          ImageConstant.imgEllipse81,
+        ];
 
-  /// The event title/name
-  final String? title;
-
-  /// Text describing story count (e.g., "2 stories", "1 story")
-  final String? storyCountText;
-
-  /// Primary profile image for the event
-  final String? profileImage;
-
-  /// List of profile images for event participants
-  final List<String>? participantImages;
-
-  /// List of user IDs corresponding to participant images for navigation
-  final List<String?>? participantIds;
+    return Padding(
+      padding: EdgeInsets.only(top: 14.h),
+      child: GestureDetector(
+        onTap: onAvatarTap,
+        child: SizedBox(
+          width: 84.h,
+          height: 36.h,
+          child: Stack(
+            children: [
+              if (avatars.isNotEmpty)
+                Positioned(
+                  left: 0,
+                  child: CustomImageView(
+                    imagePath: avatars[0],
+                    width: 36.h,
+                    height: 36.h,
+                    radius: BorderRadius.circular(18.h),
+                  ),
+                ),
+              if (avatars.length > 1)
+                Positioned(
+                  left: 24.h,
+                  child: CustomImageView(
+                    imagePath: avatars[1],
+                    width: 36.h,
+                    height: 36.h,
+                    radius: BorderRadius.circular(18.h),
+                  ),
+                ),
+              if (avatars.length > 2)
+                Positioned(
+                  left: 48.h,
+                  child: CustomImageView(
+                    imagePath: avatars[2],
+                    width: 36.h,
+                    height: 36.h,
+                    radius: BorderRadius.circular(18.h),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

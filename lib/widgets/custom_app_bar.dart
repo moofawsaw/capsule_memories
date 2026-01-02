@@ -195,10 +195,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
                 child: IconButton(
                   onPressed: () => _handlePlusButtonTap(context),
                   padding: EdgeInsets.all(6.h),
-                  icon: CustomImageView(
-                    imagePath: widget.iconButtonImagePath!,
-                    width: 34.h,
-                    height: 34.h,
+                  icon: Icon(
+                    Icons.add,
+                    size: 34,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -225,6 +225,16 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
                   activeColor = appTheme.deep_purple_A100;
                 }
 
+                // Determine Material icon based on icon path
+                IconData materialIcon;
+                if (isNotificationIcon) {
+                  materialIcon = Icons.notifications_outlined;
+                } else if (isPicturesIcon) {
+                  materialIcon = Icons.photo_outlined;
+                } else {
+                  materialIcon = Icons.help_outline;
+                }
+
                 return Padding(
                   padding: EdgeInsets.only(left: index > 0 ? 6.h : 0),
                   child: GestureDetector(
@@ -243,11 +253,12 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
                                   shape: BoxShape.circle,
                                 )
                               : null,
-                          child: CustomImageView(
-                            imagePath: iconPath,
-                            width: isActive ? 20.h : 32.h,
-                            height: isActive ? 20.h : 32.h,
-                            color: isActive ? appTheme.gray_50 : null,
+                          child: Icon(
+                            materialIcon,
+                            size: isActive ? 20 : 32,
+                            color: isActive
+                                ? appTheme.gray_50
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         if (isNotificationIcon && unreadCount > 0)
@@ -418,10 +429,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
           if (widget.leadingIcon != null)
             GestureDetector(
               onTap: widget.onLeadingTap,
-              child: CustomImageView(
-                imagePath: widget.leadingIcon!,
-                width: 42.h,
-                height: 42.h,
+              child: Icon(
+                Icons.arrow_back,
+                size: 42,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           if (widget.title != null) ...[
@@ -447,10 +458,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
           if (widget.leadingIcon != null)
             GestureDetector(
               onTap: widget.onLeadingTap,
-              child: CustomImageView(
-                imagePath: widget.leadingIcon!,
-                width: 26.h,
-                height: 26.h,
+              child: Icon(
+                Icons.close,
+                size: 26,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           if (widget.title != null)

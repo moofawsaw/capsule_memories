@@ -1,5 +1,4 @@
 import '../core/app_export.dart';
-import './custom_image_view.dart';
 
 /**
  * CustomMenuItem - A reusable menu item component with icon and text
@@ -14,10 +13,10 @@ import './custom_image_view.dart';
  * - Responsive spacing using SizeUtils extensions
  * - Flexible margin and padding configuration
  * 
- * @param iconPath - Path to the menu item icon (required)
+ * @param icon - Material Design icon data (required)
  * @param title - Text label for the menu item (required)
  * @param onTap - Callback function when item is tapped
- * @param iconColor - Color for the icon
+ * @param iconColor - Color for the icon (defaults to theme)
  * @param textColor - Color for the text label
  * @param textStyle - Custom text styling
  * @param margin - External spacing around the component
@@ -26,7 +25,7 @@ import './custom_image_view.dart';
  * @param spacing - Space between icon and text
  */
 class CustomMenuItem extends StatelessWidget {
-  final String iconPath;
+  final IconData icon;
   final String title;
   final VoidCallback? onTap;
   final Color? iconColor;
@@ -39,7 +38,7 @@ class CustomMenuItem extends StatelessWidget {
 
   const CustomMenuItem({
     Key? key,
-    required this.iconPath,
+    required this.icon,
     required this.title,
     this.onTap,
     this.iconColor,
@@ -62,11 +61,10 @@ class CustomMenuItem extends StatelessWidget {
           padding: padding ?? EdgeInsets.all(8.h),
           child: Row(
             children: [
-              CustomImageView(
-                imagePath: iconPath,
-                height: iconSize ?? 24.h,
-                width: iconSize ?? 24.h,
-                color: iconColor,
+              Icon(
+                icon,
+                size: iconSize ?? 24.h,
+                color: iconColor ?? Theme.of(context).colorScheme.onSurface,
               ),
               SizedBox(width: spacing ?? 8.h),
               Expanded(

@@ -42,9 +42,7 @@ class _MemoriesDashboardScreenState
         backgroundColor: appTheme.gray_900_02,
         body: RefreshIndicator(
           onRefresh: () async {
-            ref
-                .read(memoriesDashboardNotifier.notifier)
-                .refreshMemories();
+            ref.read(memoriesDashboardNotifier.notifier).refreshMemories();
           },
           color: appTheme.deep_purple_A100,
           backgroundColor: appTheme.gray_900_01,
@@ -95,10 +93,11 @@ class _MemoriesDashboardScreenState
                   CustomIconButton(
                     height: 44.h,
                     width: 44.h,
-                    iconPath: ImageConstant.imgButtonsGray50,
+                    icon: Icons.camera_alt,
                     backgroundColor: appTheme.gray_900_01.withAlpha(179),
                     borderRadius: 22.h,
                     iconSize: 24.h,
+                    iconColor: Theme.of(context).colorScheme.onSurface,
                     onTap: () => _onCameraButtonTap(context),
                   ),
                   SizedBox(width: 8.h),

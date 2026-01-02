@@ -82,10 +82,11 @@ class GroupsManagementScreenState
               CustomIconButton(
                 height: 44.h,
                 width: 44.h,
-                iconPath: ImageConstant.imgButtonsGray50,
+                icon: Icons.camera_alt,
                 backgroundColor: appTheme.gray_900_01.withAlpha(179),
                 borderRadius: 22.h,
                 iconSize: 24.h,
+                iconColor: Theme.of(context).colorScheme.onSurface,
                 onTap: () => onTapCameraButton(context),
               ),
               SizedBox(width: 8.h),

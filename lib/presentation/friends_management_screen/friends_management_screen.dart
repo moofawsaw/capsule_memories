@@ -122,7 +122,8 @@ class FriendsManagementScreenState
           Spacer(),
           CustomIconButtonRow(
               firstIconPath: ImageConstant.imgButtons,
-              secondIconPath: ImageConstant.imgButtonsGray50,
+              secondIcon: Icons.camera_alt,
+              secondIconSize: 24.h,
               onFirstIconTap: () => _openQRShareBottomSheet(context),
               onSecondIconTap: () => onTapCameraButton(context)),
         ],

@@ -1,5 +1,4 @@
 import '../core/app_export.dart';
-import './custom_image_view.dart';
 
 /** 
  * CustomNavigationDrawer - A flexible navigation drawer component that displays a vertical list of menu items
@@ -65,10 +64,9 @@ class CustomNavigationDrawer extends StatelessWidget {
       onTap: item.onTap,
       child: Row(
         children: [
-          CustomImageView(
-            imagePath: item.iconPath,
-            width: iconSize ?? 24.h,
-            height: iconSize ?? 24.h,
+          Icon(
+            item.icon,
+            size: iconSize ?? 24.h,
           ),
           SizedBox(width: iconTextSpacing ?? 8.h),
           Expanded(
@@ -88,13 +86,13 @@ class CustomNavigationDrawer extends StatelessWidget {
 /// Data model for navigation drawer menu items
 class CustomNavigationDrawerItem {
   CustomNavigationDrawerItem({
-    required this.iconPath,
+    required this.icon,
     required this.label,
     this.onTap,
   });
 
-  /// Path to the icon image (SVG, PNG, etc.)
-  final String iconPath;
+  /// Material Design icon for the menu item
+  final IconData icon;
 
   /// Text label for the menu item
   final String label;

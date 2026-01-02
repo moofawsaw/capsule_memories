@@ -23,6 +23,7 @@ class QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
   bool isProcessing = false;
   String? resultMessage;
   bool isSuccess = false;
+  bool _flashEnabled = false;
 
   @override
   void initState() {
@@ -153,14 +154,24 @@ class QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
                       iconSize: 24.h,
                       onTap: () => Navigator.pop(context),
                     ),
-                    CustomIconButton(
-                      height: 44.h,
-                      width: 44.h,
-                      iconPath: ImageConstant.imgButtonsVolume,
-                      backgroundColor: appTheme.gray_900_01.withAlpha(179),
-                      borderRadius: 22.h,
-                      iconSize: 24.h,
-                      onTap: () => _controller?.toggleTorch(),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => _flashEnabled = !_flashEnabled);
+                        _controller?.toggleTorch();
+                      },
+                      child: Container(
+                        height: 44.h,
+                        width: 44.h,
+                        decoration: BoxDecoration(
+                          color: appTheme.gray_900_01.withAlpha(179),
+                          borderRadius: BorderRadius.circular(22.h),
+                        ),
+                        child: Icon(
+                          _flashEnabled ? Icons.flash_on : Icons.flash_off,
+                          color: appTheme.white_A700,
+                          size: 24.h,
+                        ),
+                      ),
                     ),
                   ],
                 ),

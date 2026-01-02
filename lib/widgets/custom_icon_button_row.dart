@@ -7,79 +7,61 @@ import './custom_icon_button.dart';
  * This component provides a horizontal layout with two icon buttons, commonly used for action bars,
  * toolbars, or control panels. Features include:
  * - Consistent spacing and alignment
- * - Configurable icon paths for both buttons
+ * - Configurable icons (SVG paths or Material Design icons)
  * - Optional expanded width behavior
  * - Responsive design using SizeUtils extensions
  * - Built-in tap callbacks for both buttons
+ * - Theme-aware icon colors
  */
 class CustomIconButtonRow extends StatelessWidget {
-  const CustomIconButtonRow({
-    Key? key,
-    required this.firstIconPath,
-    required this.secondIconPath,
-    this.onFirstIconTap,
-    this.onSecondIconTap,
-    this.isExpanded = false,
-    this.margin,
-  }) : super(key: key);
-
-  /// Path to the first (left) icon image
-  final String firstIconPath;
-
-  /// Path to the second (right) icon image
-  final String secondIconPath;
-
-  /// Callback function triggered when first icon button is tapped
+  final String? firstIconPath;
+  final IconData? firstIcon;
+  final String? secondIconPath;
+  final IconData? secondIcon;
+  final double? firstIconSize;
+  final double? secondIconSize;
   final VoidCallback? onFirstIconTap;
-
-  /// Callback function triggered when second icon button is tapped
   final VoidCallback? onSecondIconTap;
 
-  /// Whether the row should expand to fill available width
-  final bool isExpanded;
-
-  /// External margin around the entire row
-  final EdgeInsetsGeometry? margin;
+  const CustomIconButtonRow({
+    Key? key,
+    this.firstIconPath,
+    this.firstIcon,
+    this.secondIconPath,
+    this.secondIcon,
+    this.firstIconSize,
+    this.secondIconSize,
+    this.onFirstIconTap,
+    this.onSecondIconTap,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    Widget rowWidget = Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      mainAxisSize: isExpanded ? MainAxisSize.max : MainAxisSize.min,
+    return Row(
       children: [
         CustomIconButton(
+          height: 44.h,
+          width: 44.h,
           iconPath: firstIconPath,
+          icon: firstIcon,
+          backgroundColor: appTheme.gray_900_01.withAlpha(179),
+          borderRadius: 22.h,
+          iconSize: firstIconSize ?? 24.h,
           onTap: onFirstIconTap,
-          backgroundColor: appTheme.gray_900_03,
-          borderRadius: 24.h,
-          height: 48.h,
-          width: 48.h,
-          padding: EdgeInsets.all(12.h),
         ),
+        SizedBox(width: 8.h),
         CustomIconButton(
+          height: 44.h,
+          width: 44.h,
           iconPath: secondIconPath,
+          icon: secondIcon,
+          backgroundColor: appTheme.gray_900_01.withAlpha(179),
+          borderRadius: 22.h,
+          iconSize: secondIconSize ?? 24.h,
+          iconColor: Theme.of(context).colorScheme.onSurface,
           onTap: onSecondIconTap,
-          backgroundColor: appTheme.gray_900_03,
-          borderRadius: 24.h,
-          height: 48.h,
-          width: 48.h,
-          padding: EdgeInsets.all(12.h),
-          margin: EdgeInsets.only(left: 16.h),
         ),
       ],
     );
-
-    if (isExpanded) {
-      rowWidget = Expanded(child: rowWidget);
-    }
-
-    if (margin != null) {
-      return Container(
-        margin: margin,
-        child: rowWidget,
-      );
-    }
-
-    return rowWidget;
   }
 }
