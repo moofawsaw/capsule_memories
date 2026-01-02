@@ -69,6 +69,30 @@ class ThemeHelper {
 
   /// Returns the current theme data.
   ThemeData themeData() => _getThemeData();
+
+  /// Returns light theme configuration
+  ThemeData lightTheme() {
+    final colors = _supportedCustomColor['light']!;
+    final colorScheme = supportedColorScheme['light']!;
+
+    return ThemeData(
+      visualDensity: VisualDensity.standard,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: colors.gray_900_02,
+    );
+  }
+
+  /// Returns dark theme configuration
+  ThemeData darkTheme() {
+    final colors = _supportedCustomColor['dark']!;
+    final colorScheme = supportedColorScheme['dark']!;
+
+    return ThemeData(
+      visualDensity: VisualDensity.standard,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: colors.gray_900_02,
+    );
+  }
 }
 
 class ColorSchemes {
@@ -264,10 +288,10 @@ class LightModeColors implements ThemeColors {
   // App Colors - Light mode equivalents
   Color get deep_purple_A100 =>
       Color(0xFF7C3AED); // Darker purple for light mode
-  Color get gray_50 => Color(0xFF1E293B); // Dark text on light background
-  Color get blue_gray_300 => Color(0xFF475569); // Darker blue-gray
+  Color get gray_50 => Color(0xFF1E293B); // Dark icons/text on light background
+  Color get blue_gray_300 => Color(0xFF475569); // Darker blue-gray for icons
   Color get gray_900 => Color(0xFFF8FAFC); // Light backgrounds
-  Color get white_A700 => Color(0xFF1E293B); // Dark text
+  Color get white_A700 => Color(0xFFFFFFFF); // WHITE text on primary buttons
   Color get gray_900_01 => Color(0xFFF1F5F9); // Light surface
   Color get blue_gray_900 => Color(0xFFE2E8F0); // Light surface variant
   Color get gray_900_02 => Color(0xFFFFFFFF); // White background
@@ -278,7 +302,8 @@ class LightModeColors implements ThemeColors {
   Color get orange_100 => Color(0xFFFFF7ED); // Lighter orange
   Color get gray_300 => Color(0xFFCBD5E1); // Medium gray
   Color get deep_purple_400_07 => Color(0x077C3AED); // Transparent purple
-  Color get black_900 => Color(0xFFFFFFFF); // White (inverse)
+  Color get black_900 =>
+      Color(0xFF000000); // Black for list items/dropdown text
   Color get red_500 => Color(0xFFEF4444); // Keep red vibrant
   Color get deep_purple_A200 => Color(0xFF8B5CF6); // Rich purple
   Color get deep_purple_A200_16 => Color(0x168B5CF6); // Transparent purple
@@ -316,8 +341,8 @@ class LightModeColors implements ThemeColors {
   Color get orange_200 => Color(0xFFFED7AA); // Light orange
 
   // Additional Colors - Light mode
-  Color get whiteCustom => Color(0xFF1E293B); // Dark text
-  Color get blackCustom => Color(0xFFFFFFFF); // White
+  Color get whiteCustom => Color(0xFFFFFFFF); // WHITE for button text
+  Color get blackCustom => Color(0xFF000000); // Black for list items
   Color get transparentCustom => Colors.transparent;
   Color get redCustom => Color(0xFFEF4444);
   Color get greyCustom => Color(0xFF64748B);

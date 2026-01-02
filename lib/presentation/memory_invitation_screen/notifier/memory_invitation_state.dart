@@ -1,7 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-// Remove this line - the .freezed.dart file will be generated after running build_runner
-// part 'memory_invitation_state.freezed.dart';
+// Add this line - required for freezed code generation
+part 'memory_invitation_state.freezed.dart';
 
 // Note: Run 'flutter pub run build_runner build' to generate the freezed file
 

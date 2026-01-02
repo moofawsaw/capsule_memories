@@ -192,8 +192,8 @@ class MyApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
-      theme: ThemeHelper().themeData(),
-      darkTheme: ThemeHelper().themeData(),
+      theme: ThemeHelper().lightTheme(),
+      darkTheme: ThemeHelper().darkTheme(),
       themeMode: themeMode,
       title: 'capsule_memories',
       builder: (context, child) {

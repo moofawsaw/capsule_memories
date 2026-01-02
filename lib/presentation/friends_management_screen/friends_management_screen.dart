@@ -43,18 +43,29 @@ class FriendsManagementScreenState
             width: double.maxFinite,
             child: Column(
               children: [
-                _buildFriendsHeaderSection(context),
-                _buildSearchSection(context),
+                SizedBox(height: 24.h),
                 Expanded(
-                  child: SingleChildScrollView(
+                  child: Container(
+                    margin: EdgeInsets.symmetric(horizontal: 16.h),
                     child: Column(
                       children: [
-                        SizedBox(height: 20.h),
-                        FriendsSectionWidget(),
-                        SizedBox(height: 20.h),
-                        SentRequestsSectionWidget(),
-                        SizedBox(height: 20.h),
-                        IncomingRequestsSectionWidget(),
+                        _buildFriendsHeaderSection(context),
+                        SizedBox(height: 16.h),
+                        _buildSearchSection(context),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                SizedBox(height: 20.h),
+                                FriendsSectionWidget(),
+                                SizedBox(height: 20.h),
+                                SentRequestsSectionWidget(),
+                                SizedBox(height: 20.h),
+                                IncomingRequestsSectionWidget(),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -92,31 +103,30 @@ class FriendsManagementScreenState
       final friendsCount =
           state.friendsManagementModel?.friendsList?.length ?? 0;
 
-      return Container(
-          margin: EdgeInsets.only(right: 6.h),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-                width: 26.h,
-                height: 26.h,
-                margin: EdgeInsets.only(top: 2.h),
-                child: CustomImageView(
-                    imagePath: ImageConstant.imgIconDeepPurpleA100,
-                    fit: BoxFit.contain)),
-            SizedBox(width: 6.h),
-            Container(
-                margin: EdgeInsets.only(top: 2.h),
-                child: Text('Friends ($friendsCount)',
-                    style: TextStyleHelper
-                        .instance.title20ExtraBoldPlusJakartaSans)),
-            Expanded(
-                child: Container(
-                    alignment: Alignment.centerRight,
-                    child: CustomIconButtonRow(
-                        firstIconPath: ImageConstant.imgButtons,
-                        secondIconPath: ImageConstant.imgButtonsGray50,
-                        onFirstIconTap: () => _openQRShareBottomSheet(context),
-                        onSecondIconTap: () => onTapCameraButton(context)))),
-          ]));
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+              width: 26.h,
+              height: 26.h,
+              margin: EdgeInsets.only(top: 2.h),
+              child: CustomImageView(
+                  imagePath: ImageConstant.imgIconDeepPurpleA100,
+                  fit: BoxFit.contain)),
+          SizedBox(width: 6.h),
+          Container(
+              margin: EdgeInsets.only(top: 2.h),
+              child: Text('Friends ($friendsCount)',
+                  style: TextStyleHelper
+                      .instance.title20ExtraBoldPlusJakartaSans)),
+          Spacer(),
+          CustomIconButtonRow(
+              firstIconPath: ImageConstant.imgButtons,
+              secondIconPath: ImageConstant.imgButtonsGray50,
+              onFirstIconTap: () => _openQRShareBottomSheet(context),
+              onSecondIconTap: () => onTapCameraButton(context)),
+        ],
+      );
     });
   }
 
@@ -136,16 +146,12 @@ class FriendsManagementScreenState
       final state = ref.watch(friendsManagementNotifier);
       final notifier = ref.read(friendsManagementNotifier.notifier);
 
-      return Container(
-          margin: EdgeInsets.only(left: 4.h),
-          child: CustomSearchView(
-              controller: notifier.searchController,
-              placeholder: 'Search for friends...',
-              onChanged: (value) {
-                ref
-                    .read(friendsManagementNotifier.notifier)
-                    .onSearchChanged(value);
-              }));
+      return CustomSearchView(
+          controller: notifier.searchController,
+          placeholder: 'Search for friends...',
+          onChanged: (value) {
+            ref.read(friendsManagementNotifier.notifier).onSearchChanged(value);
+          });
     });
   }
 

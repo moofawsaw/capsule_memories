@@ -81,7 +81,7 @@ class CustomFriendRequestCard extends StatelessWidget {
       padding: EdgeInsets.symmetric(vertical: 6.h),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12.h),
-        color: backgroundColor ?? Color(0xFF151319),
+        color: backgroundColor ?? appTheme.gray_900_01,
       ),
       child: Row(
         children: [

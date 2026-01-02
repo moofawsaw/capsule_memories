@@ -54,7 +54,7 @@ class CustomFriendItem extends StatelessWidget {
         margin: margin,
         padding: EdgeInsets.symmetric(vertical: 6.h),
         decoration: BoxDecoration(
-          color: backgroundColor ?? Color(0xFF151319),
+          color: backgroundColor ?? appTheme.gray_900_01,
           borderRadius: BorderRadius.circular(12.h),
         ),
         child: Row(
