@@ -96,9 +96,11 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       final mediaFile = File(mediaPath);
       final mediaBytes = await mediaFile.readAsBytes();
 
-      // Upload media to Supabase Storage
+      // Upload media to Supabase Storage (stories/{memory_id}/{filename})
       final mediaFileName = 'story_${userId}_${timestamp}$fileExtension';
       final mediaUploadPath = 'stories/$memoryId/$mediaFileName';
+
+      print('🚀 Uploading to path: $mediaUploadPath');
 
       await _supabase.storage
           .from('story-media')
@@ -107,6 +109,8 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       // Get public URL for media
       final mediaUrl =
           _supabase.storage.from('story-media').getPublicUrl(mediaUploadPath);
+
+      print('✅ Media uploaded successfully: $mediaUrl');
 
       // Generate and upload thumbnail for videos
       String? thumbnailUrl;
@@ -153,8 +157,12 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         storyData['thumbnail_url'] = thumbnailUrl;
       }
 
+      print('📝 Inserting story data: $storyData');
+
       // Insert story into database
       await _supabase.from('stories').insert(storyData);
+
+      print('✅ Story inserted successfully');
 
       state = state.copyWith(isUploading: false);
       return true;

@@ -5,6 +5,9 @@
 
 part of 'friends_management_state.dart';
 
+import 'package:flutter/foundation.dart';
+import 'package:json_annotation/json_annotation.dart';
+
 // **************************************************************************
 // FreezedGenerator
 // **************************************************************************
@@ -44,9 +47,9 @@ mixin _$FriendsManagementState {
 
 /// @nodoc
 abstract class $FriendsManagementStateCopyWith<$Res> {
-  factory $FriendsManagementStateCopyWith(dynamic value,
-          $Res Function(dynamic) then) =
-      _$FriendsManagementStateCopyWithImpl<$Res, dynamic>;
+  factory $FriendsManagementStateCopyWith(FriendsManagementState value,
+          $Res Function(FriendsManagementState) then) =
+      _$FriendsManagementStateCopyWithImpl<$Res, FriendsManagementState>;
   $Res call(
       {bool isLoading,
       bool isQRScannerActive,
@@ -66,7 +69,7 @@ abstract class $FriendsManagementStateCopyWith<$Res> {
 
 /// @nodoc
 class _$FriendsManagementStateCopyWithImpl<$Res,
-        $Val extends dynamic>
+        $Val extends FriendsManagementState>
     implements $FriendsManagementStateCopyWith<$Res> {
   _$FriendsManagementStateCopyWithImpl(this._value, this._then);
 
