@@ -40,6 +40,7 @@ import '../presentation/qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import '../presentation/report_story_screen/report_story_screen.dart';
 import '../presentation/share_story_screen/share_story_screen.dart';
 import '../presentation/splash_screen/splash_screen.dart';
+import '../presentation/story_edit_screen/story_edit_screen.dart';
 import '../presentation/user_menu_screen/user_menu_screen.dart';
 import '../presentation/user_profile_screen/user_profile_screen.dart';
 import '../presentation/user_profile_screen_two_screen/user_profile_screen_two_screen.dart';
@@ -47,6 +48,7 @@ import '../presentation/vibe_selection_screen/vibe_selection_screen.dart';
 import '../presentation/video_call_interface_screen/video_call_interface_screen.dart';
 import '../presentation/qr_scanner_screen/qr_scanner_screen.dart';
 import '../presentation/friend_request_confirmation_dialog/friend_request_confirmation_dialog.dart';
+import '../presentation/memory_selection_bottom_sheet/memory_selection_bottom_sheet.dart';
 
 class AppRoutes {
   // App shell route - renders AppShell with persistent header
@@ -59,6 +61,7 @@ class AppRoutes {
   static const String appBsInvite = '/app/bs/invite';
   static const String appBsMembers = '/app/bs/members';
   static const String appBsMemoryCreate = '/app/bs/memory-create';
+  static const String appBsMemorySelection = '/app/bs/memory-selection';
   static const String appBsQrFriend = '/app/bs/qr-friend';
   static const String appBsQrGroup = '/app/bs/qr-group';
   static const String appBsQrMemory = '/app/bs/qr-memory';
@@ -91,6 +94,7 @@ class AppRoutes {
   static const String appReport = '/app/report';
   static const String appSettings = '/app/settings';
   static const String appStickers = '/app/stickers';
+  static const String appNativeCamera = '/app/native-camera';
   static const String appStoryEdit = '/app/story/edit';
   static const String appStoryRecord = '/app/story/record';
   static const String appStoryView = '/app/story/view';
@@ -208,6 +212,8 @@ class AppRoutes {
         return MemoryInvitationScreen();
       case appBsDownload:
         return AppDownloadScreen();
+      case appBsMemorySelection:
+        return const MemorySelectionBottomSheet();
 
       // Overlay routes
       case appOverlayText:
@@ -364,4 +370,36 @@ class AppRoutes {
         friendRequestConfirmationDialog: (context) =>
             const FriendRequestConfirmationDialog(),
       };
+}
+
+class AppRouter {
+  static Map<String, WidgetBuilder> routes = {
+    AppRoutes.authLogin: (context) => LoginScreen(),
+    AppRoutes.authRegister: (context) => AccountRegistrationScreen(),
+    AppRoutes.authReset: (context) => PasswordResetScreen(),
+    AppRoutes.splash: (context) => SplashScreen(),
+    AppRoutes.qrCodeShareScreenTwo: (context) =>
+        const QRCodeShareScreenTwoScreen(),
+    AppRoutes.qrTimelineShare: (context) {
+      final memoryId = ModalRoute.of(context)?.settings.arguments as String?;
+      return QRTimelineShareScreen(
+        memoryId: memoryId ?? '',
+      );
+    },
+    AppRoutes.memoryShareOptionsScreen: (context) =>
+        const MemoryShareOptionsScreen(),
+    AppRoutes.qrScannerScreen: (context) => const QRScannerScreen(),
+    AppRoutes.friendRequestConfirmationDialog: (context) =>
+        const FriendRequestConfirmationDialog(),
+    AppRoutes.appStoryEdit: (context) {
+      final args =
+          ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+      return StoryEditScreen(
+        videoPath: args['video_path'] as String,
+        memoryId: args['memory_id'] as String,
+        memoryTitle: args['memory_title'] as String,
+        categoryIcon: args['category_icon'] as String?,
+      );
+    },
+  };
 }

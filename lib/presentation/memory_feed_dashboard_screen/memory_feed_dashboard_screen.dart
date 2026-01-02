@@ -10,6 +10,8 @@ import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../create_memory_screen/create_memory_screen.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import './widgets/happening_now_story_card.dart';
+import './widgets/memory_selection_bottom_sheet.dart';
+import './widgets/native_camera_recording_screen.dart';
 import 'notifier/memory_feed_dashboard_notifier.dart';
 
 class MemoryFeedDashboardScreen extends ConsumerStatefulWidget {
@@ -210,24 +212,26 @@ class _MemoryFeedDashboardScreenState
   void _onCreateStoryTap(
       BuildContext context, List<Map<String, dynamic>> activeMemories) {
     if (activeMemories.length == 1) {
-      // Navigate directly to story upload screen with single memory
+      // Navigate directly to native camera with single memory
       final memory = activeMemories[0];
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => AddMemoryUploadScreen(),
-          settings: RouteSettings(
-            arguments: {
-              'memory_id': memory['id'],
-              'memory_title': memory['title'],
-              'category_icon': memory['category_icon'],
-            },
+          builder: (context) => NativeCameraRecordingScreen(
+            memoryId: memory['id'],
+            memoryTitle: memory['title'],
+            categoryIcon: memory['category_icon'],
           ),
         ),
       );
     } else {
-      // Show bottom sheet to select memory
-      _showMemorySelectionBottomSheet(context, activeMemories);
+      // Show memory selection bottom sheet for multiple memories
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => const MemorySelectionBottomSheet(),
+      );
     }
   }
 
