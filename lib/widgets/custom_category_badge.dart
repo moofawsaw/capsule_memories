@@ -24,7 +24,7 @@ class CustomCategoryBadge extends StatelessWidget {
         margin: EdgeInsets.only(right: 12.h),
         padding: EdgeInsets.all(16.h),
         decoration: BoxDecoration(
-          color: Color(0xFF151319),
+          color: appTheme.blue_gray_900_01,
           borderRadius: BorderRadius.circular(16.h),
         ),
         child: Row(

@@ -1,11 +1,20 @@
 import '../core/app_export.dart';
+import './custom_icon_button.dart';
 import './custom_image_view.dart';
 
 /** CustomEventCard - A reusable component for displaying event information with a profile image, story count, participant list, and configurable action buttons. Supports flexible styling and interactive elements for event management interfaces. */
 class CustomEventCard extends StatelessWidget {
   const CustomEventCard({
     Key? key,
-    required this.eventData,
+    this.eventData,
+    this.eventTitle,
+    this.eventDate,
+    this.isPrivate,
+    this.iconButtonImagePath,
+    this.participantImages,
+    this.onBackTap,
+    this.onIconButtonTap,
+    this.onAvatarTap,
     this.onActionTap,
     this.onMemoryTap,
     this.backgroundColor,
@@ -14,29 +23,180 @@ class CustomEventCard extends StatelessWidget {
     this.margin,
   }) : super(key: key);
 
-  /// Event data containing title, story count, and profile images
-  final CustomEventData eventData;
+  // Legacy API parameters
+  final String? eventTitle;
+  final String? eventDate;
+  final bool? isPrivate;
+  final String? iconButtonImagePath;
+  final List<String>? participantImages;
+  final VoidCallback? onBackTap;
+  final VoidCallback? onIconButtonTap;
+  final VoidCallback? onAvatarTap;
 
-  /// Callback for the action button
+  // New API parameters
+  final CustomEventData? eventData;
   final VoidCallback? onActionTap;
-
-  /// Callback when tapping on the memory/event itself
   final VoidCallback? onMemoryTap;
-
-  /// Background color of the card
   final Color? backgroundColor;
-
-  /// Border radius of the card
   final double? borderRadius;
-
-  /// Internal padding of the card
   final EdgeInsetsGeometry? padding;
-
-  /// External margin of the card
   final EdgeInsetsGeometry? margin;
+
+  bool get _isLegacyMode => eventTitle != null || eventDate != null;
 
   @override
   Widget build(BuildContext context) {
+    if (_isLegacyMode) {
+      return _buildLegacyLayout(context);
+    }
+    return _buildNewLayout(context);
+  }
+
+  Widget _buildLegacyLayout(BuildContext context) {
+    return Container(
+      width: double.maxFinite,
+      padding: EdgeInsets.fromLTRB(12.h, 14.h, 16.h, 14.h),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? appTheme.gray_900_02,
+        border: Border(
+          bottom: BorderSide(
+            color: appTheme.blue_gray_900,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Back button on the left
+          CustomIconButton(
+            iconPath: ImageConstant.imgArrowLeft,
+            height: 48.h,
+            width: 48.h,
+            padding: EdgeInsets.all(12.h),
+            backgroundColor: appTheme.gray_900_03,
+            borderRadius: 24.h,
+            onTap: onBackTap,
+          ),
+          SizedBox(width: 12.h),
+          // Memory title and date in center
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  eventTitle ?? '',
+                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 4.h),
+                Row(
+                  children: [
+                    Text(
+                      eventDate ?? '',
+                      style: TextStyleHelper
+                          .instance.bodyTextRegularPlusJakartaSans
+                          .copyWith(color: appTheme.blue_gray_300),
+                    ),
+                    SizedBox(width: 8.h),
+                    // Private/Public button
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8.h,
+                        vertical: 4.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isPrivate == true
+                            ? appTheme.red_500.withAlpha(51)
+                            : appTheme.green_500.withAlpha(51),
+                        borderRadius: BorderRadius.circular(4.h),
+                      ),
+                      child: Text(
+                        isPrivate == true ? 'Private' : 'Public',
+                        style: TextStyleHelper
+                            .instance.bodyTextRegularPlusJakartaSans
+                            .copyWith(
+                          color: isPrivate == true
+                              ? appTheme.red_500
+                              : appTheme.green_500,
+                          fontSize: 12.h,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 12.h),
+          // Members on the right
+          GestureDetector(
+            onTap: onAvatarTap,
+            child: _buildLegacyMemberAvatars(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegacyMemberAvatars(BuildContext context) {
+    final images = participantImages ?? [];
+
+    if (images.isEmpty) {
+      return CustomImageView(
+        imagePath: iconButtonImagePath ?? ImageConstant.imgFrame13,
+        height: 48.h,
+        width: 48.h,
+        fit: BoxFit.cover,
+      );
+    }
+
+    if (images.length == 1) {
+      return CustomImageView(
+        imagePath: images[0],
+        height: 48.h,
+        width: 48.h,
+        fit: BoxFit.cover,
+      );
+    }
+
+    // Calculate stack width for multiple avatars
+    final stackWidth = (48 + (images.length - 1) * 32).h;
+
+    return SizedBox(
+      width: stackWidth,
+      height: 48.h,
+      child: Stack(
+        children: images.take(3).toList().asMap().entries.map((entry) {
+          final index = entry.key;
+          final imagePath = entry.value;
+          final leftPosition = (index * 32).h;
+
+          return Positioned(
+            left: leftPosition,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: appTheme.gray_900_02,
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(24.h),
+              ),
+              child: CustomImageView(
+                imagePath: imagePath,
+                height: 48.h,
+                width: 48.h,
+                fit: BoxFit.cover,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildNewLayout(BuildContext context) {
     return GestureDetector(
       onTap: onMemoryTap,
       child: Container(
@@ -49,7 +209,7 @@ class CustomEventCard extends StatelessWidget {
         child: Row(
           children: [
             CustomImageView(
-              imagePath: eventData.profileImage ?? '',
+              imagePath: eventData?.profileImage ?? '',
               height: 48.h,
               width: 48.h,
               fit: BoxFit.cover,
@@ -82,7 +242,7 @@ class CustomEventCard extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          eventData.title ?? '',
+          eventData?.title ?? '',
           style: TextStyleHelper.instance.title16BoldPlusJakartaSans
               .copyWith(color: appTheme.gray_50),
           overflow: TextOverflow.ellipsis,
@@ -96,12 +256,12 @@ class CustomEventCard extends StatelessWidget {
   Widget _buildParticipantsInfo(BuildContext context) {
     return Row(
       children: [
-        if (eventData.participantImages?.isNotEmpty == true) ...[
+        if (eventData?.participantImages?.isNotEmpty == true) ...[
           _buildParticipantImages(context),
           SizedBox(width: 6.h),
         ],
         Text(
-          eventData.storyCountText ?? '',
+          eventData?.storyCountText ?? '',
           style: TextStyleHelper.instance.bodyTextRegularPlusJakartaSans
               .copyWith(color: appTheme.blue_gray_300),
         ),
@@ -110,8 +270,8 @@ class CustomEventCard extends StatelessWidget {
   }
 
   Widget _buildParticipantImages(BuildContext context) {
-    final images = eventData.participantImages ?? [];
-    final participantIds = eventData.participantIds ?? [];
+    final images = eventData?.participantImages ?? [];
+    final participantIds = eventData?.participantIds ?? [];
 
     if (images.isEmpty) return const SizedBox.shrink();
 

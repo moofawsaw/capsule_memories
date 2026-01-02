@@ -7,8 +7,8 @@ import '../../widgets/custom_story_list.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import '../qr_timeline_share_screen/qr_timeline_share_screen.dart';
+import './notifier/event_timeline_view_notifier.dart';
 import './widgets/timeline_detail_widget.dart';
-import 'notifier/event_timeline_view_notifier.dart';
 
 class EventTimelineViewScreen extends ConsumerStatefulWidget {
   EventTimelineViewScreen({Key? key}) : super(key: key);
@@ -139,47 +139,51 @@ class EventTimelineViewScreenState
             final state = ref.read(eventTimelineViewNotifier);
             final memoryId = state.eventTimelineViewModel?.memoryId;
             if (memoryId != null) {
-              await ref.read(eventTimelineViewNotifier.notifier).validateMemoryData(memoryId);
+              await ref
+                  .read(eventTimelineViewNotifier.notifier)
+                  .validateMemoryData(memoryId);
             }
           },
           color: appTheme.deep_purple_A100,
           backgroundColor: appTheme.gray_900_01,
-          child: CustomScrollView(
+          child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: Column(
-                  children: [
-                    _buildEventHeader(context),
-                    _buildEventDetails(context),
-                  ],
-                ),
-              ),
-              _buildTimelineStories(context),
-            ],
+            child: Column(
+              children: [
+                _buildEventHeader(context),
+                _buildTimelineSection(context),
+                _buildStoriesSection(context),
+                SizedBox(height: 18.h),
+                _buildActionButtons(context),
+                SizedBox(height: 20.h),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Section Widget
+  /// Section Widget - Restored original timeline header
   Widget _buildEventHeader(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
 
         return CustomEventCard(
-          eventData: CustomEventData(
-            title: state.eventTimelineViewModel?.eventTitle,
-            storyCountText: '${state.eventTimelineViewModel?.customStoryItems?.length ?? 0} stories',
-            profileImage: state.eventTimelineViewModel?.categoryIcon ?? ImageConstant.imgFrame13,
-            participantImages: state.eventTimelineViewModel?.participantImages,
-          ),
-          onActionTap: () {
+          eventTitle: state.eventTimelineViewModel?.eventTitle,
+          eventDate: state.eventTimelineViewModel?.eventDate,
+          isPrivate: state.eventTimelineViewModel?.isPrivate,
+          iconButtonImagePath: state.eventTimelineViewModel?.categoryIcon ??
+              ImageConstant.imgFrame13,
+          participantImages: state.eventTimelineViewModel?.participantImages,
+          onBackTap: () {
+            onTapBackButton(context);
+          },
+          onIconButtonTap: () {
             onTapEventOptions(context);
           },
-          onMemoryTap: () {
+          onAvatarTap: () {
             onTapAvatars(context);
           },
         );
@@ -187,7 +191,7 @@ class EventTimelineViewScreenState
     );
   }
 
-  /// Section Widget - UPDATED to conditionally show QR button
+  /// Section Widget - Timeline section with QR button
   Widget _buildTimelineSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -214,7 +218,6 @@ class EventTimelineViewScreenState
                 ),
                 child: Column(
                   children: [
-                    _buildStoryProgress(context),
                     SizedBox(height: 44.h),
                     _buildTimelineDetails(context),
                     SizedBox(height: 20.h),
@@ -245,11 +248,6 @@ class EventTimelineViewScreenState
         );
       },
     );
-  }
-
-  /// Section Widget
-  Widget _buildStoryProgress(BuildContext context) {
-    return SizedBox();
   }
 
   /// Section Widget
@@ -330,50 +328,6 @@ class EventTimelineViewScreenState
           margin: EdgeInsets.only(left: 20.h),
         );
       },
-    );
-  }
-
-  /// Section Widget
-  Widget _buildEventDetails(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 24.h),
-      child: Column(
-        children: [
-          CustomButton(
-            text: 'View All',
-            width: double.infinity,
-            buttonStyle: CustomButtonStyle.outlineDark,
-            buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-            onPressed: () {
-              onTapViewAll(context);
-            },
-          ),
-          SizedBox(height: 12.h),
-          CustomButton(
-            text: 'Create Story',
-            width: double.infinity,
-            buttonStyle: CustomButtonStyle.fillPrimary,
-            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-            onPressed: () {
-              onTapCreateStory(context);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Section Widget
-  Widget _buildTimelineStories(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Column(
-        children: [
-          _buildStoriesSection(context),
-          SizedBox(height: 18.h),
-          _buildActionButtons(context),
-          SizedBox(height: 20.h),
-        ],
-      ),
     );
   }
 
