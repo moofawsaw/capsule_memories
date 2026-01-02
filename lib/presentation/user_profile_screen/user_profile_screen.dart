@@ -14,24 +14,54 @@ class UserProfileScreen extends ConsumerStatefulWidget {
 }
 
 class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
+  String? _targetUserId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Extract userId from route arguments
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final userId = args is Map ? args['userId'] as String? : null;
+
+    // Initialize profile with target user ID if not already loaded
+    if (userId != _targetUserId) {
+      _targetUserId = userId;
+
+      // Initialize the notifier with the target user's ID
+      Future.microtask(() {
+        ref.read(userProfileNotifier.notifier).initialize(userId: userId);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(userProfileNotifier);
+
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        body: Container(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 24.h),
-              child: Column(
-                spacing: 40.h,
-                children: [
-                  _buildProfileSection(context),
-                  _buildStoriesSection(context),
-                ],
+        body: RefreshIndicator(
+          onRefresh: () async {
+            await ref.read(userProfileNotifier.notifier).initialize();
+          },
+          color: appTheme.deep_purple_A100,
+          backgroundColor: appTheme.gray_900_01,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  children: [
+                    _buildProfileHeader(context),
+                    _buildStatsRow(context),
+                    _buildActionButtons(context),
+                  ],
+                ),
               ),
-            ),
+              _buildStoriesSection(context),
+            ],
           ),
         ),
       ),

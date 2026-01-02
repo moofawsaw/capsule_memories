@@ -24,33 +24,27 @@ class GroupsManagementScreenState
     extends ConsumerState<GroupsManagementScreen> {
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(groupsManagementNotifier);
+
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        body: Container(
-          width: double.maxFinite,
-          height: double.maxFinite,
-          child: Column(
-            children: [
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () async {
-                    await ref.read(groupsManagementNotifier.notifier).refresh();
-                  },
-                  child: SingleChildScrollView(
-                    physics: AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        _buildGroupsSection(context),
-                        _buildGroupsList(context),
-                        _buildInvitesSection(context),
-                        _buildGroupInvitation(context),
-                      ],
-                    ),
-                  ),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            await ref.read(groupsManagementNotifier.notifier).loadGroups();
+          },
+          color: appTheme.deep_purple_A100,
+          backgroundColor: appTheme.gray_900_01,
+          child: Container(
+            width: double.maxFinite,
+            child: Column(
+              children: [
+                _buildGroupsHeader(context),
+                Expanded(
+                  child: _buildGroupsContent(context),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -58,7 +52,7 @@ class GroupsManagementScreenState
   }
 
   /// Section Widget - Groups section header
-  Widget _buildGroupsSection(BuildContext context) {
+  Widget _buildGroupsHeader(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(groupsManagementNotifier);
@@ -113,7 +107,7 @@ class GroupsManagementScreenState
   }
 
   /// Section Widget - Groups list
-  Widget _buildGroupsList(BuildContext context) {
+  Widget _buildGroupsContent(BuildContext context) {
     return Container(
       margin: EdgeInsets.fromLTRB(12.h, 20.h, 12.h, 0),
       child: Consumer(

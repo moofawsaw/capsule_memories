@@ -112,7 +112,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     }
   }
 
-  void refreshMemories() async {
+  Future<void> refreshMemories() async {
     state = state.copyWith(isLoading: true);
 
     try {

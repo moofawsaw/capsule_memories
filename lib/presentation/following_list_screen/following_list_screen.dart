@@ -182,7 +182,7 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     if (user?.id == null || user!.id!.isEmpty) return;
 
     NavigatorService.pushNamed(
-      AppRoutes.appProfile,
+      AppRoutes.appProfileUser,
       arguments: {'userId': user.id},
     );
   }

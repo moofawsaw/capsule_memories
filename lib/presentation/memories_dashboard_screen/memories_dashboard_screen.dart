@@ -40,17 +40,26 @@ class _MemoriesDashboardScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        body: Container(
-          width: double.maxFinite,
-          child: Column(
-            children: [
-              _buildMemoriesHeader(context),
-              _buildLatestStoriesSection(context),
-              _buildTabSection(context),
-              Expanded(
-                child: _buildMemoriesContent(context),
-              ),
-            ],
+        body: RefreshIndicator(
+          onRefresh: () async {
+            ref
+                .read(memoriesDashboardNotifier.notifier)
+                .refreshMemories();
+          },
+          color: appTheme.deep_purple_A100,
+          backgroundColor: appTheme.gray_900_01,
+          child: Container(
+            width: double.maxFinite,
+            child: Column(
+              children: [
+                _buildMemoriesHeader(context),
+                _buildLatestStoriesSection(context),
+                _buildTabSection(context),
+                Expanded(
+                  child: _buildMemoriesContent(context),
+                ),
+              ],
+            ),
           ),
         ),
       ),

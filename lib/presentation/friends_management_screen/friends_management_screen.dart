@@ -28,18 +28,43 @@ class FriendsManagementScreenState
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(friendsManagementNotifier);
+
     return SafeArea(
-        child: Scaffold(
-            backgroundColor: appTheme.gray_900_02,
-            body: Container(
-                width: double.infinity,
-                child: Column(children: [
-                  Expanded(
-                      child: SingleChildScrollView(
-                          child: Column(spacing: 24.h, children: [
-                    _buildMainContentSection(context),
-                  ]))),
-                ]))));
+      child: Scaffold(
+        backgroundColor: appTheme.gray_900_02,
+        body: RefreshIndicator(
+          onRefresh: () async {
+            await ref.read(friendsManagementNotifier.notifier).initialize();
+          },
+          color: appTheme.deep_purple_A100,
+          backgroundColor: appTheme.gray_900_01,
+          child: Container(
+            width: double.maxFinite,
+            child: Column(
+              children: [
+                _buildFriendsHeaderSection(context),
+                _buildSearchSection(context),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        SizedBox(height: 20.h),
+                        FriendsSectionWidget(),
+                        SizedBox(height: 20.h),
+                        SentRequestsSectionWidget(),
+                        SizedBox(height: 20.h),
+                        IncomingRequestsSectionWidget(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /// Main content section with friends management

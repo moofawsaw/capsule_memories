@@ -129,96 +129,42 @@ class EventTimelineViewScreenState
 
   @override
   Widget build(BuildContext context) {
-    // This screen is rendered inside `AppShell`, which already provides
-    // a `Scaffold` with a persistent `CustomAppBar`. To avoid showing
-    // two app bars and to prevent bottom overflow on smaller screens,
-    // we render only the content here and make it scrollable.
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(eventTimelineViewNotifier);
+    final state = ref.watch(eventTimelineViewNotifier);
 
-        // CRITICAL FIX: Show clear error UI when args are invalid
-        if (state.errorMessage != null) {
-          return Container(
-            color: appTheme.gray_900_02,
-            child: Center(
-              child: Padding(
-                padding: EdgeInsets.all(24.h),
+    return SafeArea(
+      child: Scaffold(
+        backgroundColor: appTheme.gray_900_02,
+        body: RefreshIndicator(
+          onRefresh: () async {
+            final state = ref.read(eventTimelineViewNotifier);
+            final memoryId = state.eventTimelineViewModel?.memoryId;
+            if (memoryId != null) {
+              await ref.read(eventTimelineViewNotifier.notifier).validateMemoryData(memoryId);
+            }
+          },
+          color: appTheme.deep_purple_A100,
+          backgroundColor: appTheme.gray_900_01,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64.h,
-                      color: appTheme.red_500,
-                    ),
-                    SizedBox(height: 16.h),
-                    Text(
-                      'Failed to Load Memory',
-                      style: TextStyleHelper.instance.body16BoldPlusJakartaSans
-                          .copyWith(color: appTheme.gray_50),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 8.h),
-                    Text(
-                      state.errorMessage!,
-                      style: TextStyleHelper
-                          .instance.body14MediumPlusJakartaSans
-                          .copyWith(color: appTheme.gray_300),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 24.h),
-                    CustomButton(
-                      text: 'Go Back',
-                      width: double.infinity,
-                      buttonStyle: CustomButtonStyle.fillPrimary,
-                      buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                      onPressed: () {
-                        NavigatorService.goBack();
-                      },
-                    ),
+                    _buildEventHeader(context),
+                    _buildEventDetails(context),
                   ],
                 ),
               ),
-            ),
-          );
-        }
-
-        // Display loading state
-        if (state.isLoading ?? false) {
-          return Container(
-            color: appTheme.gray_900_02,
-            child: Center(
-              child: CircularProgressIndicator(
-                color: appTheme.deep_purple_A100,
-              ),
-            ),
-          );
-        }
-
-        // Display content when data loaded successfully
-        return Container(
-          color: appTheme.gray_900_02,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildEventCard(context),
-                _buildTimelineSection(context),
-                SizedBox(height: 18.h),
-                _buildStoriesSection(context),
-                SizedBox(height: 18.h),
-                _buildActionButtons(context),
-                SizedBox(height: 20.h),
-              ],
-            ),
+              _buildTimelineStories(context),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
   /// Section Widget
-  Widget _buildEventCard(BuildContext context) {
+  Widget _buildEventHeader(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
@@ -387,6 +333,50 @@ class EventTimelineViewScreenState
           margin: EdgeInsets.only(left: 20.h),
         );
       },
+    );
+  }
+
+  /// Section Widget
+  Widget _buildEventDetails(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 24.h),
+      child: Column(
+        children: [
+          CustomButton(
+            text: 'View All',
+            width: double.infinity,
+            buttonStyle: CustomButtonStyle.outlineDark,
+            buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
+            onPressed: () {
+              onTapViewAll(context);
+            },
+          ),
+          SizedBox(height: 12.h),
+          CustomButton(
+            text: 'Create Story',
+            width: double.infinity,
+            buttonStyle: CustomButtonStyle.fillPrimary,
+            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+            onPressed: () {
+              onTapCreateStory(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Section Widget
+  Widget _buildTimelineStories(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          _buildStoriesSection(context),
+          SizedBox(height: 18.h),
+          _buildActionButtons(context),
+          SizedBox(height: 20.h),
+        ],
+      ),
     );
   }
 
