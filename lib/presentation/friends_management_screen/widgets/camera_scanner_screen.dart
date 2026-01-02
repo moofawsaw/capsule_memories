@@ -98,13 +98,20 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
 
     if (!mounted) return;
 
-    // Process the QR code
-    await ref
+    // Process the QR code and get the result
+    final result = await ref
         .read(friendsManagementNotifier.notifier)
         .processScannedQRCode(code);
 
-    if (mounted) {
+    if (mounted && result['success'] == true) {
+      // Close camera scanner
       Navigator.pop(context);
+
+      // Navigate to Friends screen after successful friend QR scan
+      if (result['type'] == 'friend') {
+        // The realtime subscription will automatically refresh the friends list
+        Navigator.pushNamed(context, AppRoutes.appFriends);
+      }
     }
   }
 

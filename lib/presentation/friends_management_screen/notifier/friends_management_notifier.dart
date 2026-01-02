@@ -424,7 +424,7 @@ class FriendsManagementNotifier
     }
   }
 
-  Future<void> processScannedQRCode(String qrCode) async {
+  Future<Map<String, dynamic>> processScannedQRCode(String qrCode) async {
     try {
       debugPrint('Processing QR code: $qrCode');
 
@@ -438,7 +438,12 @@ class FriendsManagementNotifier
           errorMessage:
               'Invalid QR code format. Please scan a valid friend request QR code.',
         );
-        return;
+        return {
+          'success': false,
+          'message':
+              'Invalid QR code format. Please scan a valid friend request QR code.',
+          'type': 'error'
+        };
       }
 
       final userId =
@@ -448,7 +453,11 @@ class FriendsManagementNotifier
         state = state.copyWith(
           errorMessage: 'Invalid user ID in QR code.',
         );
-        return;
+        return {
+          'success': false,
+          'message': 'Invalid user ID in QR code.',
+          'type': 'error'
+        };
       }
 
       // Check if user is already a friend or has pending request
@@ -459,14 +468,22 @@ class FriendsManagementNotifier
         state = state.copyWith(
           errorMessage: 'You are already friends with this user.',
         );
-        return;
+        return {
+          'success': false,
+          'message': 'You are already friends with this user.',
+          'type': 'error'
+        };
       }
 
       if (friendshipStatus == 'pending_sent') {
         state = state.copyWith(
           errorMessage: 'Friend request already sent to this user.',
         );
-        return;
+        return {
+          'success': false,
+          'message': 'Friend request already sent to this user.',
+          'type': 'error'
+        };
       }
 
       if (friendshipStatus == 'pending_received') {
@@ -474,15 +491,32 @@ class FriendsManagementNotifier
           errorMessage:
               'This user has already sent you a friend request. Check your incoming requests.',
         );
-        return;
+        return {
+          'success': false,
+          'message':
+              'This user has already sent you a friend request. Check your incoming requests.',
+          'type': 'error'
+        };
       }
+
+      // Get the user's display name for the success message
+      final userData = await _friendsService.searchUsers('');
+      final targetUser = userData.firstWhere(
+        (user) => user['id'] == userId,
+        orElse: () => {'display_name': 'user'},
+      );
+      final displayName =
+          targetUser['display_name'] ?? targetUser['username'] ?? 'user';
 
       // Send friend request - pass empty string as second parameter
       final success = await _friendsService.addFriendRequest(userId, '');
 
       if (success) {
+        final successMessage =
+            'Success! You have added $displayName as a friend';
+
         state = state.copyWith(
-          successMessage: 'Friend request sent successfully!',
+          successMessage: successMessage,
         );
 
         // Explicitly refresh all friends data to show the new sent request
@@ -490,16 +524,28 @@ class FriendsManagementNotifier
 
         // Also reinitialize to ensure real-time subscriptions are active
         await initialize();
+
+        return {'success': true, 'message': successMessage, 'type': 'friend'};
       } else {
         state = state.copyWith(
           errorMessage: 'Failed to send friend request. Please try again.',
         );
+        return {
+          'success': false,
+          'message': 'Failed to send friend request. Please try again.',
+          'type': 'error'
+        };
       }
     } catch (e) {
       debugPrint('Error processing QR code: $e');
       state = state.copyWith(
         errorMessage: 'An error occurred while processing the QR code.',
       );
+      return {
+        'success': false,
+        'message': 'An error occurred while processing the QR code.',
+        'type': 'error'
+      };
     }
   }
 
