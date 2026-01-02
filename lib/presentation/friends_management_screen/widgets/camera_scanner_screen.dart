@@ -29,9 +29,25 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
     });
   }
 
-  void _initializeCamera() {
-    final state = ref.read(friendsManagementNotifier);
-    _cameraController = state.cameraController;
+  Future<void> _initializeCamera() async {
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) return;
+      
+      final camera = cameras.first;
+      _cameraController = CameraController(
+        camera,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+      
+      await _cameraController!.initialize();
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      debugPrint('Error initializing camera: $e');
+    }
   }
 
   void _startImageStream() {

@@ -395,7 +395,8 @@ class AppRouter {
       final args =
           ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
       return StoryEditScreen(
-        videoPath: args['video_path'] as String,
+        mediaPath: args['video_path'] as String,
+        isVideo: args['is_video'] as bool? ?? true,
         memoryId: args['memory_id'] as String,
         memoryTitle: args['memory_title'] as String,
         categoryIcon: args['category_icon'] as String?,

@@ -19,21 +19,21 @@ mixin _$FriendsManagementState {
   bool get isLoading => throw _privateConstructorUsedError;
   bool get isQRScannerActive => throw _privateConstructorUsedError;
   bool get isCameraActive => throw _privateConstructorUsedError;
-  CameraController? get cameraController => throw _privateConstructorUsedError;
-  CameraPermissionStatus get cameraPermissionStatus =>
+  dynamic get cameraController => throw _privateConstructorUsedError;
+  dynamic get cameraPermissionStatus =>
       throw _privateConstructorUsedError;
   String? get errorMessage => throw _privateConstructorUsedError;
   String? get successMessage => throw _privateConstructorUsedError;
   String get searchQuery => throw _privateConstructorUsedError;
-  FriendsManagementModel? get friendsManagementModel =>
+  dynamic get friendsManagementModel =>
       throw _privateConstructorUsedError;
-  List<FriendModel>? get filteredFriendsList =>
+  List<dynamic>? get filteredFriendsList =>
       throw _privateConstructorUsedError;
-  List<SentRequestModel>? get filteredSentRequestsList =>
+  List<dynamic>? get filteredSentRequestsList =>
       throw _privateConstructorUsedError;
-  List<IncomingRequestModel>? get filteredIncomingRequestsList =>
+  List<dynamic>? get filteredIncomingRequestsList =>
       throw _privateConstructorUsedError;
-  List<SearchUserModel>? get searchResults =>
+  List<dynamic>? get searchResults =>
       throw _privateConstructorUsedError;
   bool get isSearching => throw _privateConstructorUsedError;
 
@@ -44,30 +44,29 @@ mixin _$FriendsManagementState {
 
 /// @nodoc
 abstract class $FriendsManagementStateCopyWith<$Res> {
-  factory $FriendsManagementStateCopyWith(FriendsManagementState value,
-          $Res Function(FriendsManagementState) then) =
-      _$FriendsManagementStateCopyWithImpl<$Res, FriendsManagementState>;
-  @useResult
+  factory $FriendsManagementStateCopyWith(dynamic value,
+          $Res Function(dynamic) then) =
+      _$FriendsManagementStateCopyWithImpl<$Res, dynamic>;
   $Res call(
       {bool isLoading,
       bool isQRScannerActive,
       bool isCameraActive,
-      CameraController? cameraController,
-      CameraPermissionStatus cameraPermissionStatus,
+      dynamic cameraController,
+      dynamic cameraPermissionStatus,
       String? errorMessage,
       String? successMessage,
       String searchQuery,
-      FriendsManagementModel? friendsManagementModel,
-      List<FriendModel>? filteredFriendsList,
-      List<SentRequestModel>? filteredSentRequestsList,
-      List<IncomingRequestModel>? filteredIncomingRequestsList,
-      List<SearchUserModel>? searchResults,
+      dynamic friendsManagementModel,
+      List<dynamic>? filteredFriendsList,
+      List<dynamic>? filteredSentRequestsList,
+      List<dynamic>? filteredIncomingRequestsList,
+      List<dynamic>? searchResults,
       bool isSearching});
 }
 
 /// @nodoc
 class _$FriendsManagementStateCopyWithImpl<$Res,
-        $Val extends FriendsManagementState>
+        $Val extends dynamic>
     implements $FriendsManagementStateCopyWith<$Res> {
   _$FriendsManagementStateCopyWithImpl(this._value, this._then);
 
@@ -82,16 +81,16 @@ class _$FriendsManagementStateCopyWithImpl<$Res,
     Object? isLoading = null,
     Object? isQRScannerActive = null,
     Object? isCameraActive = null,
-    Object? cameraController = freezed,
+    Object? cameraController = null,
     Object? cameraPermissionStatus = null,
-    Object? errorMessage = freezed,
-    Object? successMessage = freezed,
+    Object? errorMessage = null,
+    Object? successMessage = null,
     Object? searchQuery = null,
-    Object? friendsManagementModel = freezed,
-    Object? filteredFriendsList = freezed,
-    Object? filteredSentRequestsList = freezed,
-    Object? filteredIncomingRequestsList = freezed,
-    Object? searchResults = freezed,
+    Object? friendsManagementModel = null,
+    Object? filteredFriendsList = null,
+    Object? filteredSentRequestsList = null,
+    Object? filteredIncomingRequestsList = null,
+    Object? searchResults = null,
     Object? isSearching = null,
   }) {
     return _then(_value.copyWith(
@@ -107,19 +106,19 @@ class _$FriendsManagementStateCopyWithImpl<$Res,
           ? _value.isCameraActive
           : isCameraActive // ignore: cast_nullable_to_non_nullable
               as bool,
-      cameraController: freezed == cameraController
+      cameraController: null == cameraController
           ? _value.cameraController
           : cameraController // ignore: cast_nullable_to_non_nullable
-              as CameraController?,
+              as dynamic,
       cameraPermissionStatus: null == cameraPermissionStatus
           ? _value.cameraPermissionStatus
           : cameraPermissionStatus // ignore: cast_nullable_to_non_nullable
-              as CameraPermissionStatus,
-      errorMessage: freezed == errorMessage
+              as dynamic,
+      errorMessage: null == errorMessage
           ? _value.errorMessage
           : errorMessage // ignore: cast_nullable_to_non_nullable
               as String?,
-      successMessage: freezed == successMessage
+      successMessage: null == successMessage
           ? _value.successMessage
           : successMessage // ignore: cast_nullable_to_non_nullable
               as String?,
@@ -127,26 +126,26 @@ class _$FriendsManagementStateCopyWithImpl<$Res,
           ? _value.searchQuery
           : searchQuery // ignore: cast_nullable_to_non_nullable
               as String,
-      friendsManagementModel: freezed == friendsManagementModel
+      friendsManagementModel: null == friendsManagementModel
           ? _value.friendsManagementModel
           : friendsManagementModel // ignore: cast_nullable_to_non_nullable
-              as FriendsManagementModel?,
-      filteredFriendsList: freezed == filteredFriendsList
+              as dynamic,
+      filteredFriendsList: null == filteredFriendsList
           ? _value.filteredFriendsList
           : filteredFriendsList // ignore: cast_nullable_to_non_nullable
-              as List<FriendModel>?,
-      filteredSentRequestsList: freezed == filteredSentRequestsList
+              as List<dynamic>?,
+      filteredSentRequestsList: null == filteredSentRequestsList
           ? _value.filteredSentRequestsList
           : filteredSentRequestsList // ignore: cast_nullable_to_non_nullable
-              as List<SentRequestModel>?,
-      filteredIncomingRequestsList: freezed == filteredIncomingRequestsList
+              as List<dynamic>?,
+      filteredIncomingRequestsList: null == filteredIncomingRequestsList
           ? _value.filteredIncomingRequestsList
           : filteredIncomingRequestsList // ignore: cast_nullable_to_non_nullable
-              as List<IncomingRequestModel>?,
-      searchResults: freezed == searchResults
+              as List<dynamic>?,
+      searchResults: null == searchResults
           ? _value.searchResults
           : searchResults // ignore: cast_nullable_to_non_nullable
-              as List<SearchUserModel>?,
+              as List<dynamic>?,
       isSearching: null == isSearching
           ? _value.isSearching
           : isSearching // ignore: cast_nullable_to_non_nullable
@@ -156,37 +155,36 @@ class _$FriendsManagementStateCopyWithImpl<$Res,
 }
 
 /// @nodoc
-abstract class _$$FriendsManagementStateImplCopyWith<$Res>
+abstract class _$FriendsManagementStateImplCopyWith<$Res>
     implements $FriendsManagementStateCopyWith<$Res> {
-  factory _$$FriendsManagementStateImplCopyWith(
+  factory _$FriendsManagementStateImplCopyWith(
           _$FriendsManagementStateImpl value,
           $Res Function(_$FriendsManagementStateImpl) then) =
-      __$$FriendsManagementStateImplCopyWithImpl<$Res>;
+      __$FriendsManagementStateImplCopyWithImpl<$Res>;
   @override
-  @useResult
   $Res call(
       {bool isLoading,
       bool isQRScannerActive,
       bool isCameraActive,
-      CameraController? cameraController,
-      CameraPermissionStatus cameraPermissionStatus,
+      dynamic cameraController,
+      dynamic cameraPermissionStatus,
       String? errorMessage,
       String? successMessage,
       String searchQuery,
-      FriendsManagementModel? friendsManagementModel,
-      List<FriendModel>? filteredFriendsList,
-      List<SentRequestModel>? filteredSentRequestsList,
-      List<IncomingRequestModel>? filteredIncomingRequestsList,
-      List<SearchUserModel>? searchResults,
+      dynamic friendsManagementModel,
+      List<dynamic>? filteredFriendsList,
+      List<dynamic>? filteredSentRequestsList,
+      List<dynamic>? filteredIncomingRequestsList,
+      List<dynamic>? searchResults,
       bool isSearching});
 }
 
 /// @nodoc
-class __$$FriendsManagementStateImplCopyWithImpl<$Res>
+class __$FriendsManagementStateImplCopyWithImpl<$Res>
     extends _$FriendsManagementStateCopyWithImpl<$Res,
         _$FriendsManagementStateImpl>
-    implements _$$FriendsManagementStateImplCopyWith<$Res> {
-  __$$FriendsManagementStateImplCopyWithImpl(
+    implements _$FriendsManagementStateImplCopyWith<$Res> {
+  __$FriendsManagementStateImplCopyWithImpl(
       _$FriendsManagementStateImpl _value,
       $Res Function(_$FriendsManagementStateImpl) _then)
       : super(_value, _then);
@@ -197,16 +195,16 @@ class __$$FriendsManagementStateImplCopyWithImpl<$Res>
     Object? isLoading = null,
     Object? isQRScannerActive = null,
     Object? isCameraActive = null,
-    Object? cameraController = freezed,
+    Object? cameraController = null,
     Object? cameraPermissionStatus = null,
-    Object? errorMessage = freezed,
-    Object? successMessage = freezed,
+    Object? errorMessage = null,
+    Object? successMessage = null,
     Object? searchQuery = null,
-    Object? friendsManagementModel = freezed,
-    Object? filteredFriendsList = freezed,
-    Object? filteredSentRequestsList = freezed,
-    Object? filteredIncomingRequestsList = freezed,
-    Object? searchResults = freezed,
+    Object? friendsManagementModel = null,
+    Object? filteredFriendsList = null,
+    Object? filteredSentRequestsList = null,
+    Object? filteredIncomingRequestsList = null,
+    Object? searchResults = null,
     Object? isSearching = null,
   }) {
     return _then(_$FriendsManagementStateImpl(
@@ -222,19 +220,19 @@ class __$$FriendsManagementStateImplCopyWithImpl<$Res>
           ? _value.isCameraActive
           : isCameraActive // ignore: cast_nullable_to_non_nullable
               as bool,
-      cameraController: freezed == cameraController
+      cameraController: null == cameraController
           ? _value.cameraController
           : cameraController // ignore: cast_nullable_to_non_nullable
-              as CameraController?,
+              as dynamic,
       cameraPermissionStatus: null == cameraPermissionStatus
           ? _value.cameraPermissionStatus
           : cameraPermissionStatus // ignore: cast_nullable_to_non_nullable
-              as CameraPermissionStatus,
-      errorMessage: freezed == errorMessage
+              as dynamic,
+      errorMessage: null == errorMessage
           ? _value.errorMessage
           : errorMessage // ignore: cast_nullable_to_non_nullable
               as String?,
-      successMessage: freezed == successMessage
+      successMessage: null == successMessage
           ? _value.successMessage
           : successMessage // ignore: cast_nullable_to_non_nullable
               as String?,
@@ -242,26 +240,26 @@ class __$$FriendsManagementStateImplCopyWithImpl<$Res>
           ? _value.searchQuery
           : searchQuery // ignore: cast_nullable_to_non_nullable
               as String,
-      friendsManagementModel: freezed == friendsManagementModel
+      friendsManagementModel: null == friendsManagementModel
           ? _value.friendsManagementModel
           : friendsManagementModel // ignore: cast_nullable_to_non_nullable
-              as FriendsManagementModel?,
-      filteredFriendsList: freezed == filteredFriendsList
+              as dynamic,
+      filteredFriendsList: null == filteredFriendsList
           ? _value._filteredFriendsList
           : filteredFriendsList // ignore: cast_nullable_to_non_nullable
-              as List<FriendModel>?,
-      filteredSentRequestsList: freezed == filteredSentRequestsList
+              as List<dynamic>?,
+      filteredSentRequestsList: null == filteredSentRequestsList
           ? _value._filteredSentRequestsList
           : filteredSentRequestsList // ignore: cast_nullable_to_non_nullable
-              as List<SentRequestModel>?,
-      filteredIncomingRequestsList: freezed == filteredIncomingRequestsList
+              as List<dynamic>?,
+      filteredIncomingRequestsList: null == filteredIncomingRequestsList
           ? _value._filteredIncomingRequestsList
           : filteredIncomingRequestsList // ignore: cast_nullable_to_non_nullable
-              as List<IncomingRequestModel>?,
-      searchResults: freezed == searchResults
+              as List<dynamic>?,
+      searchResults: null == searchResults
           ? _value._searchResults
           : searchResults // ignore: cast_nullable_to_non_nullable
-              as List<SearchUserModel>?,
+              as List<dynamic>?,
       isSearching: null == isSearching
           ? _value.isSearching
           : isSearching // ignore: cast_nullable_to_non_nullable
@@ -278,15 +276,15 @@ class _$FriendsManagementStateImpl implements _FriendsManagementState {
       this.isQRScannerActive = false,
       this.isCameraActive = false,
       this.cameraController,
-      this.cameraPermissionStatus = CameraPermissionStatus.notDetermined,
+      this.cameraPermissionStatus,
       this.errorMessage,
       this.successMessage,
       this.searchQuery = '',
       this.friendsManagementModel,
-      final List<FriendModel>? filteredFriendsList,
-      final List<SentRequestModel>? filteredSentRequestsList,
-      final List<IncomingRequestModel>? filteredIncomingRequestsList,
-      final List<SearchUserModel>? searchResults,
+      final List<dynamic>? filteredFriendsList,
+      final List<dynamic>? filteredSentRequestsList,
+      final List<dynamic>? filteredIncomingRequestsList,
+      final List<dynamic>? searchResults,
       this.isSearching = false})
       : _filteredFriendsList = filteredFriendsList,
         _filteredSentRequestsList = filteredSentRequestsList,
@@ -294,78 +292,72 @@ class _$FriendsManagementStateImpl implements _FriendsManagementState {
         _searchResults = searchResults;
 
   @override
-  @JsonKey()
   final bool isLoading;
   @override
-  @JsonKey()
   final bool isQRScannerActive;
   @override
-  @JsonKey()
   final bool isCameraActive;
   @override
-  final CameraController? cameraController;
+  final dynamic cameraController;
   @override
-  @JsonKey()
-  final CameraPermissionStatus cameraPermissionStatus;
+  final dynamic cameraPermissionStatus;
   @override
   final String? errorMessage;
   @override
   final String? successMessage;
   @override
-  @JsonKey()
   final String searchQuery;
   @override
-  final FriendsManagementModel? friendsManagementModel;
-  final List<FriendModel>? _filteredFriendsList;
+  final dynamic friendsManagementModel;
+  final List<dynamic>? _filteredFriendsList;
   @override
-  List<FriendModel>? get filteredFriendsList {
+  List<dynamic>? get filteredFriendsList {
     final value = _filteredFriendsList;
     if (value == null) return null;
-    if (_filteredFriendsList is EqualUnmodifiableListView)
+    if (_filteredFriendsList is List)
       return _filteredFriendsList;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
+    return List.unmodifiable(value);
   }
 
-  final List<SentRequestModel>? _filteredSentRequestsList;
+  final List<dynamic>? _filteredSentRequestsList;
   @override
-  List<SentRequestModel>? get filteredSentRequestsList {
+  List<dynamic>? get filteredSentRequestsList {
     final value = _filteredSentRequestsList;
     if (value == null) return null;
-    if (_filteredSentRequestsList is EqualUnmodifiableListView)
+    if (_filteredSentRequestsList is List)
       return _filteredSentRequestsList;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
+    return List.unmodifiable(value);
   }
 
-  final List<IncomingRequestModel>? _filteredIncomingRequestsList;
+  final List<dynamic>? _filteredIncomingRequestsList;
   @override
-  List<IncomingRequestModel>? get filteredIncomingRequestsList {
+  List<dynamic>? get filteredIncomingRequestsList {
     final value = _filteredIncomingRequestsList;
     if (value == null) return null;
-    if (_filteredIncomingRequestsList is EqualUnmodifiableListView)
+    if (_filteredIncomingRequestsList is List)
       return _filteredIncomingRequestsList;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
+    return List.unmodifiable(value);
   }
 
-  final List<SearchUserModel>? _searchResults;
+  final List<dynamic>? _searchResults;
   @override
-  List<SearchUserModel>? get searchResults {
+  List<dynamic>? get searchResults {
     final value = _searchResults;
     if (value == null) return null;
-    if (_searchResults is EqualUnmodifiableListView) return _searchResults;
+    if (_searchResults is List) return _searchResults;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
+    return List.unmodifiable(value);
   }
 
   @override
-  @JsonKey()
   final bool isSearching;
 
   @override
   String toString() {
-    return 'FriendsManagementState(isLoading: $isLoading, isQRScannerActive: $isQRScannerActive, isCameraActive: $isCameraActive, cameraController: $cameraController, cameraPermissionStatus: $cameraPermissionStatus, errorMessage: $errorMessage, successMessage: $successMessage, searchQuery: $searchQuery, friendsManagementModel: $friendsManagementModel, filteredFriendsList: $filteredFriendsList, filteredSentRequestsList: $filteredSentRequestsList, filteredIncomingRequestsList: $filteredIncomingRequestsList, searchResults: $searchResults, isSearching: $isSearching)';
+    return 'FriendsManagementState(isLoading: \$isLoading, isQRScannerActive: \$isQRScannerActive, isCameraActive: \$isCameraActive, cameraController: \$cameraController, cameraPermissionStatus: \$cameraPermissionStatus, errorMessage: \$errorMessage, successMessage: \$successMessage, searchQuery: \$searchQuery, friendsManagementModel: \$friendsManagementModel, filteredFriendsList: \$filteredFriendsList, filteredSentRequestsList: \$filteredSentRequestsList, filteredIncomingRequestsList: \$filteredIncomingRequestsList, searchResults: \$searchResults, isSearching: \$isSearching)';
   }
 
   @override
@@ -422,61 +414,45 @@ class _$FriendsManagementStateImpl implements _FriendsManagementState {
       const DeepCollectionEquality().hash(_searchResults),
       isSearching);
 
-  @JsonKey(ignore: true)
   @override
   @pragma('vm:prefer-inline')
-  _$$FriendsManagementStateImplCopyWith<_$FriendsManagementStateImpl>
-      get copyWith => __$$FriendsManagementStateImplCopyWithImpl<
+  _$FriendsManagementStateImplCopyWith<_$FriendsManagementStateImpl>
+      get copyWith => __$FriendsManagementStateImplCopyWithImpl<
           _$FriendsManagementStateImpl>(this, _$identity);
 }
 
-abstract class _FriendsManagementState implements FriendsManagementState {
+abstract class _FriendsManagementState {
   const factory _FriendsManagementState(
       {final bool isLoading,
       final bool isQRScannerActive,
       final bool isCameraActive,
-      final CameraController? cameraController,
-      final CameraPermissionStatus cameraPermissionStatus,
+      final dynamic cameraController,
+      final dynamic cameraPermissionStatus,
       final String? errorMessage,
       final String? successMessage,
       final String searchQuery,
-      final FriendsManagementModel? friendsManagementModel,
-      final List<FriendModel>? filteredFriendsList,
-      final List<SentRequestModel>? filteredSentRequestsList,
-      final List<IncomingRequestModel>? filteredIncomingRequestsList,
-      final List<SearchUserModel>? searchResults,
+      final dynamic friendsManagementModel,
+      final List<dynamic>? filteredFriendsList,
+      final List<dynamic>? filteredSentRequestsList,
+      final List<dynamic>? filteredIncomingRequestsList,
+      final List<dynamic>? searchResults,
       final bool isSearching}) = _$FriendsManagementStateImpl;
 
-  @override
   bool get isLoading;
-  @override
   bool get isQRScannerActive;
-  @override
   bool get isCameraActive;
-  @override
-  CameraController? get cameraController;
-  @override
-  CameraPermissionStatus get cameraPermissionStatus;
-  @override
+  dynamic get cameraController;
+  dynamic get cameraPermissionStatus;
   String? get errorMessage;
-  @override
   String? get successMessage;
-  @override
   String get searchQuery;
-  @override
-  FriendsManagementModel? get friendsManagementModel;
-  @override
-  List<FriendModel>? get filteredFriendsList;
-  @override
-  List<SentRequestModel>? get filteredSentRequestsList;
-  @override
-  List<IncomingRequestModel>? get filteredIncomingRequestsList;
-  @override
-  List<SearchUserModel>? get searchResults;
-  @override
+  dynamic get friendsManagementModel;
+  List<dynamic>? get filteredFriendsList;
+  List<dynamic>? get filteredSentRequestsList;
+  List<dynamic>? get filteredIncomingRequestsList;
+  List<dynamic>? get searchResults;
   bool get isSearching;
-  @override
-  @JsonKey(ignore: true)
-  _$$FriendsManagementStateImplCopyWith<_$FriendsManagementStateImpl>
+  @pragma('vm:prefer-inline')
+  _$FriendsManagementStateImplCopyWith<_$FriendsManagementStateImpl>
       get copyWith => throw _privateConstructorUsedError;
 }

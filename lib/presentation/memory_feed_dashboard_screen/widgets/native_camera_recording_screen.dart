@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -29,6 +31,8 @@ class _NativeCameraRecordingScreenState
   bool _isRecording = false;
   bool _isInitialized = false;
   String? _errorMessage;
+  Timer? _longPressTimer;
+  bool _isLongPress = false;
 
   @override
   void initState() {
@@ -89,6 +93,71 @@ class _NativeCameraRecordingScreenState
     }
   }
 
+  /// Handle tap down - start timer to detect long press
+  void _handleTapDown(TapDownDetails details) {
+    _isLongPress = false;
+    _longPressTimer = Timer(const Duration(milliseconds: 500), () {
+      // Long press detected - start video recording
+      _isLongPress = true;
+      _startRecording();
+    });
+  }
+
+  /// Handle tap up - either take photo or stop recording
+  Future<void> _handleTapUp(TapUpDetails details) async {
+    _longPressTimer?.cancel();
+
+    if (_isRecording) {
+      // Stop video recording
+      await _stopRecording();
+    } else if (!_isLongPress) {
+      // Quick tap - take photo
+      await _takePhoto();
+    }
+  }
+
+  /// Handle tap cancel - stop recording if active
+  void _handleTapCancel() {
+    _longPressTimer?.cancel();
+    if (_isRecording) {
+      _stopRecording();
+    }
+  }
+
+  /// Take a photo (single tap)
+  Future<void> _takePhoto() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
+
+    try {
+      final photoFile = await _cameraController!.takePicture();
+
+      // Navigate to story edit screen with photo
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StoryEditScreen(
+              mediaPath: photoFile.path,
+              isVideo: false,
+              memoryId: widget.memoryId,
+              memoryTitle: widget.memoryTitle,
+              categoryIcon: widget.categoryIcon,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error taking photo: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to take photo')),
+        );
+      }
+    }
+  }
+
   Future<void> _startRecording() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return;
@@ -101,9 +170,11 @@ class _NativeCameraRecordingScreenState
       });
     } catch (e) {
       print('❌ Error starting recording: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to start recording')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start recording')),
+        );
+      }
     }
   }
 
@@ -119,13 +190,14 @@ class _NativeCameraRecordingScreenState
         _isRecording = false;
       });
 
-      // Navigate to story edit screen
+      // Navigate to story edit screen with video
       if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => StoryEditScreen(
-              videoPath: videoFile.path,
+              mediaPath: videoFile.path,
+              isVideo: true,
               memoryId: widget.memoryId,
               memoryTitle: widget.memoryTitle,
               categoryIcon: widget.categoryIcon,
@@ -135,9 +207,11 @@ class _NativeCameraRecordingScreenState
       }
     } catch (e) {
       print('❌ Error stopping recording: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save recording')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save recording')),
+        );
+      }
     }
   }
 
@@ -302,11 +376,30 @@ class _NativeCameraRecordingScreenState
                 ],
               ),
             ),
-          SizedBox(height: 24.h),
 
-          // Record/Stop button
+          // Instruction text
+          if (!_isRecording)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+              margin: EdgeInsets.only(bottom: 8.h),
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(128),
+                borderRadius: BorderRadius.circular(20.h),
+              ),
+              child: Text(
+                'Tap for photo • Hold for video',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.gray_50),
+              ),
+            ),
+
+          SizedBox(height: 16.h),
+
+          // Record button with gesture detection
           GestureDetector(
-            onTap: _isRecording ? _stopRecording : _startRecording,
+            onTapDown: _handleTapDown,
+            onTapUp: _handleTapUp,
+            onTapCancel: _handleTapCancel,
             child: Container(
               width: 72.h,
               height: 72.h,
@@ -318,11 +411,12 @@ class _NativeCameraRecordingScreenState
                 ),
               ),
               child: Center(
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   width: _isRecording ? 24.h : 56.h,
                   height: _isRecording ? 24.h : 56.h,
                   decoration: BoxDecoration(
-                    color: _isRecording ? appTheme.red_500 : appTheme.red_500,
+                    color: appTheme.red_500,
                     shape: _isRecording ? BoxShape.rectangle : BoxShape.circle,
                     borderRadius:
                         _isRecording ? BorderRadius.circular(4.h) : null,

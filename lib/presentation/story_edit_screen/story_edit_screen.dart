@@ -1,19 +1,23 @@
 import 'dart:io';
 
+import 'package:video_player/video_player.dart';
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import './notifier/story_edit_notifier.dart';
 
 class StoryEditScreen extends ConsumerStatefulWidget {
-  final String videoPath;
+  final String mediaPath;
+  final bool isVideo;
   final String memoryId;
   final String memoryTitle;
   final String? categoryIcon;
 
   const StoryEditScreen({
     Key? key,
-    required this.videoPath,
+    required this.mediaPath,
+    required this.isVideo,
     required this.memoryId,
     required this.memoryTitle,
     this.categoryIcon,
@@ -25,18 +29,31 @@ class StoryEditScreen extends ConsumerStatefulWidget {
 
 class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   final TextEditingController _captionController = TextEditingController();
+  VideoPlayerController? _videoController;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(storyEditProvider.notifier).initializeScreen(widget.videoPath);
+      ref.read(storyEditProvider.notifier).initializeScreen(widget.mediaPath);
+      if (widget.isVideo) {
+        _initializeVideoPlayer();
+      }
     });
+  }
+
+  Future<void> _initializeVideoPlayer() async {
+    _videoController = VideoPlayerController.file(File(widget.mediaPath));
+    await _videoController!.initialize();
+    await _videoController!.setLooping(true);
+    await _videoController!.play();
+    setState(() {});
   }
 
   @override
   void dispose() {
     _captionController.dispose();
+    _videoController?.dispose();
     super.dispose();
   }
 
@@ -78,12 +95,21 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
       child: Container(
         color: Colors.black,
         child: Center(
-          child: Image.file(
-            File(widget.videoPath),
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-          ),
+          child: widget.isVideo && _videoController != null
+              ? _videoController!.value.isInitialized
+                  ? AspectRatio(
+                      aspectRatio: _videoController!.value.aspectRatio,
+                      child: VideoPlayer(_videoController!),
+                    )
+                  : CircularProgressIndicator(
+                      color: appTheme.deep_purple_A100,
+                    )
+              : Image.file(
+                  File(widget.mediaPath),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
         ),
       ),
     );
@@ -353,7 +379,8 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
     try {
       final success = await notifier.uploadAndShareStory(
         memoryId: widget.memoryId,
-        videoPath: widget.videoPath,
+        mediaPath: widget.mediaPath,
+        isVideo: widget.isVideo,
         caption: _captionController.text,
       );
 
