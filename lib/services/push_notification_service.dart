@@ -28,6 +28,9 @@ class PushNotificationService {
   factory PushNotificationService() => instance;
   PushNotificationService._internal();
 
+  // 🎯 NEW: Static pending deep link for deferred navigation
+  static String? pendingDeepLink;
+
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
@@ -446,21 +449,41 @@ class PushNotificationService {
     }
   }
 
-  /// Handle deep link navigation
-  /// 🎯 ENHANCED: Made public to allow access from main.dart for initial message handling
-  void _handleDeepLink(String deepLink) {
+  /// Handle deep link navigation with retry mechanism
+  Future<void> _handleDeepLink(String deepLink) async {
+    debugPrint('📱 Processing deep link: $deepLink');
+
+    // 🎯 NEW: Retry up to 3 times (1.5s total) instead of just once
+    for (int attempt = 0; attempt < 3; attempt++) {
+      if (NavigatorService.navigatorKey.currentState != null) {
+        _navigateToPath(deepLink);
+        return;
+      }
+      debugPrint('📱 Navigator not ready, attempt ${attempt + 1}/3');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // 🎯 NEW: Navigator still not ready - defer for later processing
+    debugPrint('📱 Deferring deep link for post-auth: $deepLink');
+    pendingDeepLink = deepLink;
+  }
+
+  /// 🎯 NEW: Process pending deep link after authentication
+  static void processPendingDeepLink() {
+    if (pendingDeepLink != null) {
+      final link = pendingDeepLink!;
+      pendingDeepLink = null;
+      debugPrint('📱 Processing deferred deep link: $link');
+      // Navigate using the existing method
+      instance._navigateToPath(link);
+    }
+  }
+
+  /// Navigate to path based on deep link
+  void _navigateToPath(String deepLink) {
     try {
       final uri = Uri.parse(deepLink);
       final navigatorKey = NavigatorService.navigatorKey;
-
-      if (navigatorKey.currentState == null) {
-        debugPrint('⚠️ Navigator not ready, retrying in 500ms...');
-        // Retry after a short delay if navigator isn't ready yet
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _handleDeepLink(deepLink);
-        });
-        return;
-      }
 
       final pathSegments = uri.pathSegments;
 

@@ -1,3 +1,4 @@
+import '../../services/push_notification_service.dart';
 import '../../services/supabase_service.dart';
 import '../app_export.dart';
 
@@ -50,6 +51,9 @@ class AuthGuard {
       });
       return false;
     }
+
+    // 🎯 NEW: Process any pending deep link from push notification
+    PushNotificationService.processPendingDeepLink();
 
     return true;
   }

@@ -1,19 +1,21 @@
-import 'package:equatable/equatable.dart';
+import '../../../core/app_export.dart';
 
-/// Model for Memory Feed Dashboard screen data
+/// This class defines the model for the MemoryFeedDashboard screen.
 class MemoryFeedDashboardModel extends Equatable {
   final List<HappeningNowStoryData>? happeningNowStories;
   final List<CustomMemoryItem>? publicMemories;
   final List<HappeningNowStoryData>? trendingStories;
   final List<HappeningNowStoryData>? longestStreakStories;
   final List<HappeningNowStoryData>? popularUserStories;
+  final List<HappeningNowStoryData>? latestStories;
 
   MemoryFeedDashboardModel({
-    this.happeningNowStories,
-    this.publicMemories,
-    this.trendingStories,
-    this.longestStreakStories,
-    this.popularUserStories,
+    this.happeningNowStories = const [],
+    this.publicMemories = const [],
+    this.trendingStories = const [],
+    this.longestStreakStories = const [],
+    this.popularUserStories = const [],
+    this.latestStories = const [],
   });
 
   MemoryFeedDashboardModel copyWith({
@@ -22,6 +24,7 @@ class MemoryFeedDashboardModel extends Equatable {
     List<HappeningNowStoryData>? trendingStories,
     List<HappeningNowStoryData>? longestStreakStories,
     List<HappeningNowStoryData>? popularUserStories,
+    List<HappeningNowStoryData>? latestStories,
   }) {
     return MemoryFeedDashboardModel(
       happeningNowStories: happeningNowStories ?? this.happeningNowStories,
@@ -29,6 +32,7 @@ class MemoryFeedDashboardModel extends Equatable {
       trendingStories: trendingStories ?? this.trendingStories,
       longestStreakStories: longestStreakStories ?? this.longestStreakStories,
       popularUserStories: popularUserStories ?? this.popularUserStories,
+      latestStories: latestStories ?? this.latestStories,
     );
   }
 
@@ -38,7 +42,8 @@ class MemoryFeedDashboardModel extends Equatable {
         publicMemories,
         trendingStories,
         longestStreakStories,
-        popularUserStories
+        popularUserStories,
+        latestStories,
       ];
 }
 

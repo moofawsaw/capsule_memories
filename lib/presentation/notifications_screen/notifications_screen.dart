@@ -198,72 +198,76 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
 
-    switch (type) {
-      case 'memory_invite':
-        final memoryId = data?['memory_id'];
-        if (memoryId != null) {
-          debugPrint('🔔 Navigating to memory: $memoryId');
-          Navigator.pushNamed(
-            context,
-            AppRoutes.appTimelineSealed,
-            arguments: {'memoryId': memoryId},
-          );
-        } else {
-          debugPrint('⚠️ Missing memory_id');
-        }
-        break;
-
-      case 'friend_request':
-        debugPrint('🔔 Navigating to friends screen');
-        Navigator.pushNamed(context, AppRoutes.appFriends);
-        break;
-
-      case 'new_story':
-        final memoryId = data?['memory_id'];
-        if (memoryId != null) {
-          debugPrint('🔔 Navigating to story: $memoryId');
-          Navigator.pushNamed(
-            context,
-            AppRoutes.appBsStories,
-            arguments: {'memoryId': memoryId},
-          );
-        } else {
-          debugPrint('⚠️ Missing memory_id');
-        }
-        break;
-
-      case 'followed':
-        final followerId = data?['follower_id'];
-        if (followerId != null) {
-          debugPrint('🔔 Navigating to profile: $followerId');
-          Navigator.pushNamed(
-            context,
-            AppRoutes.appProfileUser,
-            arguments: {'userId': followerId},
-          );
-        } else {
-          debugPrint('⚠️ Missing follower_id');
-        }
-        break;
-
-      case 'memory_expiring':
-      case 'memory_sealed':
-        final memoryId = data?['memory_id'];
-        if (memoryId != null) {
-          debugPrint('🔔 Navigating to sealed memory: $memoryId');
-          Navigator.pushNamed(
-            context,
-            AppRoutes.appTimelineSealed,
-            arguments: {'memoryId': memoryId},
-          );
-        } else {
-          debugPrint('⚠️ Missing memory_id');
-        }
-        break;
-
-      default:
-        debugPrint('⚠️ Unknown notification type: $type');
+    // Friend-related notifications → navigate to /friends
+    if (type == 'friend_request' || type == 'friend_accepted') {
+      debugPrint('🔔 Navigating to friends screen');
+      Navigator.pushNamed(context, AppRoutes.appFriends);
+      return;
     }
+
+    // Memory-related notifications → navigate to /timeline with memory ID
+    if (type == 'memory_invite' ||
+        type == 'memory_expiring' ||
+        type == 'memory_sealed' ||
+        type == 'memory_update' ||
+        type.startsWith('memory_')) {
+      final memoryId = data?['memory_id'];
+      if (memoryId != null) {
+        debugPrint('🔔 Navigating to memory timeline: $memoryId');
+        Navigator.pushNamed(
+          context,
+          AppRoutes.appTimelineSealed,
+          arguments: {'memoryId': memoryId},
+        );
+      } else {
+        debugPrint('⚠️ Missing memory_id for memory notification');
+      }
+      return;
+    }
+
+    // Story-related notifications → navigate to specific story
+    if (type == 'new_story' ||
+        type == 'story_mention' ||
+        type == 'story_reaction' ||
+        type.startsWith('story_')) {
+      final memoryId = data?['memory_id'];
+      final storyId = data?['story_id'];
+
+      if (memoryId != null) {
+        debugPrint(
+            '🔔 Navigating to story view: memory=$memoryId, story=$storyId');
+        Navigator.pushNamed(
+          context,
+          AppRoutes.appBsStories,
+          arguments: {
+            'memoryId': memoryId,
+            if (storyId != null) 'storyId': storyId,
+          },
+        );
+      } else {
+        debugPrint('⚠️ Missing memory_id for story notification');
+      }
+      return;
+    }
+
+    // Follower/following notifications
+    if (type == 'followed' || type == 'new_follower') {
+      final followerId = data?['follower_id'] ?? data?['user_id'];
+      if (followerId != null) {
+        debugPrint('🔔 Navigating to user profile: $followerId');
+        Navigator.pushNamed(
+          context,
+          AppRoutes.appProfileUser,
+          arguments: {'userId': followerId},
+        );
+      } else {
+        debugPrint('⚠️ Missing follower_id for follow notification');
+      }
+      return;
+    }
+
+    // Default case for unknown notification types
+    debugPrint('⚠️ Unknown notification type: $type - no navigation handler');
   }
 
   @override

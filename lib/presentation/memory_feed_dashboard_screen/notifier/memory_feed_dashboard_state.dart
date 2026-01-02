@@ -11,6 +11,7 @@ class MemoryFeedDashboardState extends Equatable {
   final bool hasMoreLongestStreak;
   final bool hasMorePopularUsers;
   final bool hasMorePopularMemories;
+  final bool hasMoreLatestStories;
   final List<Map<String, dynamic>> activeMemories;
   final List<Map<String, dynamic>>? categories;
   final bool isLoadingCategories;
@@ -25,6 +26,7 @@ class MemoryFeedDashboardState extends Equatable {
     this.hasMoreLongestStreak = true,
     this.hasMorePopularUsers = true,
     this.hasMorePopularMemories = true,
+    this.hasMoreLatestStories = true,
     this.activeMemories = const [],
     this.categories,
     this.isLoadingCategories = false,
@@ -40,6 +42,7 @@ class MemoryFeedDashboardState extends Equatable {
     bool? hasMoreLongestStreak,
     bool? hasMorePopularUsers,
     bool? hasMorePopularMemories,
+    bool? hasMoreLatestStories,
     List<Map<String, dynamic>>? activeMemories,
     List<Map<String, dynamic>>? categories,
     bool? isLoadingCategories,
@@ -57,6 +60,7 @@ class MemoryFeedDashboardState extends Equatable {
       hasMorePopularUsers: hasMorePopularUsers ?? this.hasMorePopularUsers,
       hasMorePopularMemories:
           hasMorePopularMemories ?? this.hasMorePopularMemories,
+      hasMoreLatestStories: hasMoreLatestStories ?? this.hasMoreLatestStories,
       activeMemories: activeMemories ?? this.activeMemories,
       categories: categories ?? this.categories,
       isLoadingCategories: isLoadingCategories ?? this.isLoadingCategories,
@@ -74,6 +78,7 @@ class MemoryFeedDashboardState extends Equatable {
         hasMoreLongestStreak,
         hasMorePopularUsers,
         hasMorePopularMemories,
+        hasMoreLatestStories,
         activeMemories,
         categories,
         isLoadingCategories,

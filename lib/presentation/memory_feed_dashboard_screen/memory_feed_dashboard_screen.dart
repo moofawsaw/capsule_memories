@@ -114,7 +114,7 @@ class _MemoryFeedDashboardScreenState
                     if (_isAuthenticated) _buildActionButton(context),
                     if (_isAuthenticated) SizedBox(height: 22.h),
                     if (!_isAuthenticated) SizedBox(height: 2.h),
-                    _buildHappeningNowSection(context),
+                    _buildHappeningNowOrLatestSection(context),
                     _buildPublicMemoriesSection(context),
                     _buildTrendingStoriesSection(context),
                     _buildCategoriesSection(context),
@@ -340,6 +340,122 @@ class _MemoryFeedDashboardScreenState
               SizedBox(height: 12.h),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  /// NEW METHOD: Build Happening Now or Latest Stories section based on data availability
+  Widget _buildHappeningNowOrLatestSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryFeedDashboardProvider);
+        final happeningNowStories =
+            state.memoryFeedDashboardModel?.happeningNowStories ?? [];
+        final latestStories =
+            state.memoryFeedDashboardModel?.latestStories ?? [];
+        final isLoading = state.isLoading ?? false;
+
+        // If happening now has stories, show it
+        if (happeningNowStories.isNotEmpty) {
+          return _buildHappeningNowSection(context);
+        }
+
+        // Otherwise show Latest Stories
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.h),
+              child: Row(
+                children: [
+                  CustomImageView(
+                    imagePath: ImageConstant.imgIconDeepPurpleA10022x22,
+                    height: 22.h,
+                    width: 22.h,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    'Latest Stories',
+                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+            SizedBox(
+              height: 240.h,
+              child: isLoading
+                  ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24.h),
+                        child: CircularProgressIndicator(
+                          color: appTheme.deep_purple_A100,
+                        ),
+                      ),
+                    )
+                  : latestStories.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24.h),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CustomImageView(
+                                  imagePath:
+                                      ImageConstant.imgIconDeepPurpleA10022x22,
+                                  height: 48.h,
+                                  width: 48.h,
+                                  color: appTheme.blue_gray_300,
+                                ),
+                                SizedBox(height: 12.h),
+                                Text(
+                                  'No stories yet',
+                                  style: TextStyleHelper
+                                      .instance.title16MediumPlusJakartaSans
+                                      .copyWith(color: appTheme.blue_gray_300),
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  'Create your first story',
+                                  style: TextStyleHelper
+                                      .instance.body12MediumPlusJakartaSans
+                                      .copyWith(color: appTheme.blue_gray_300),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.only(left: 24.h),
+                          itemCount: latestStories.length,
+                          itemBuilder: (context, index) {
+                            final story = latestStories[index];
+                            return HappeningNowStoryCard(
+                              story: story,
+                              onTap: () {
+                                // Create feed context with all story IDs from latest stories feed
+                                final feedContext = FeedStoryContext(
+                                  feedType: 'latest_stories',
+                                  storyIds: latestStories
+                                      .map((s) => s.id ?? '')
+                                      .where((id) => id.isNotEmpty)
+                                      .toList(),
+                                  initialStoryId: story.id ?? '',
+                                );
+
+                                NavigatorService.pushNamed(
+                                  AppRoutes.appStoryView,
+                                  arguments: feedContext,
+                                );
+                              },
+                            );
+                          },
+                        ),
+            ),
+          ],
         );
       },
     );

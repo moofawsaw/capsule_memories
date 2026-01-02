@@ -642,6 +642,102 @@ class FeedService {
     }
   }
 
+  /// NEW METHOD: Fetch latest stories (all stories ordered by date)
+  /// Returns stories from all memories the user is a contributor to, ordered by creation date
+  Future<List<Map<String, dynamic>>> fetchLatestStories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
+    if (_client == null) return [];
+
+    try {
+      final currentUserId = _client!.auth.currentUser?.id;
+      if (currentUserId == null) {
+        print('❌ ERROR: No authenticated user for latest stories');
+        return [];
+      }
+
+      // Get memory IDs where user is a contributor
+      final contributorResponse = await _client!
+          .from('memory_contributors')
+          .select('memory_id')
+          .eq('user_id', currentUserId);
+
+      if (contributorResponse.isEmpty) {
+        print('⚠️ WARNING: User is not a contributor to any memories');
+        return [];
+      }
+
+      final memoryIds = (contributorResponse as List)
+          .map((c) => c['memory_id'] as String)
+          .toList();
+
+      // Fetch stories from these memories ordered by date
+      final response = await _client!
+          .from('stories')
+          .select('''
+            id,
+            video_url,
+            thumbnail_url,
+            created_at,
+            contributor_id,
+            memory_id,
+            memories!inner(
+              title,
+              state,
+              category_id,
+              memory_categories:category_id(
+                id,
+                name,
+                icon_url
+              )
+            ),
+            user_profiles!stories_contributor_id_fkey(
+              id,
+              display_name,
+              avatar_url
+            )
+          ''')
+          .inFilter('memory_id', memoryIds)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      // 🛡️ VALIDATION: Filter out stories with incomplete data
+      final validatedStories = <Map<String, dynamic>>[];
+
+      for (final item in response) {
+        if (_validateStoryData(item, 'LatestStories')) {
+          final memory = item['memories'] as Map<String, dynamic>?;
+          final contributor =
+              item['user_profiles'] as Map<String, dynamic>? ?? {};
+          final category =
+              memory?['memory_categories'] as Map<String, dynamic>?;
+
+          validatedStories.add({
+            'id': item['id'] ?? '',
+            'thumbnail_url': item['thumbnail_url'] ?? '',
+            'created_at': item['created_at'] ?? '',
+            'memory_id': item['memory_id'] ?? '',
+            'contributor_name': contributor['display_name'] ?? 'Unknown User',
+            'contributor_avatar': AvatarHelperService.getAvatarUrl(
+              contributor['avatar_url'],
+            ),
+            'memory_title': memory?['title'] ?? 'Untitled Memory',
+            'category_name': category?['name'] ?? 'Custom',
+            'category_icon': category?['icon_url'] ?? '',
+          });
+        }
+      }
+
+      print(
+          '✅ VALIDATION: ${validatedStories.length} latest stories passed validation');
+      return validatedStories;
+    } catch (e) {
+      print('❌ ERROR fetching latest stories: $e');
+      return [];
+    }
+  }
+
   /// NEW METHOD: Fetch all latest story IDs in chronological order (not grouped by memory)
   /// Filters stories to only include those from memories where current user is a contributor
   Future<List<String>> fetchLatestStoryIds() async {

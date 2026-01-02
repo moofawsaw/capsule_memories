@@ -219,13 +219,37 @@ class FriendsDataProvider {
     final userId = client.auth.currentUser?.id;
     if (userId == null) return;
 
-    // Listen to friends table changes
+    // Listen to friends table changes for user_id
     client
-        .channel('friends_changes')
+        .channel('friends_changes_user')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'friends',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            debugPrint('Friends table changed: ${payload.eventType}');
+            _refreshFriends();
+          },
+        )
+        .subscribe();
+
+    // Listen to friends table changes for friend_id
+    client
+        .channel('friends_changes_friend')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'friends',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'friend_id',
+            value: userId,
+          ),
           callback: (payload) {
             debugPrint('Friends table changed: ${payload.eventType}');
             _refreshFriends();

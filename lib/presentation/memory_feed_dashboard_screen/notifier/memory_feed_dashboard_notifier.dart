@@ -57,6 +57,7 @@ class MemoryFeedDashboardNotifier
 
       // Fetch initial page (offset 0) for all feeds
       final happeningNowData = await _feedService.fetchHappeningNowStories();
+      final latestStoriesData = await _feedService.fetchLatestStories();
       final publicMemoriesData = await _feedService.fetchPublicMemories();
       final trendingData = await _feedService.fetchTrendingStories();
       final longestStreakData = await _feedService.fetchLongestStreakStories();
@@ -65,10 +66,8 @@ class MemoryFeedDashboardNotifier
       // Debug: Log what we received from service
       print(
           '🔍 DEBUG: Notifier received ${happeningNowData.length} happening now stories');
-      for (final item in happeningNowData) {
-        print(
-            '🔍 DEBUG: Notifier mapping story - category_icon: "${item['category_icon']}"');
-      }
+      print(
+          '🔍 DEBUG: Notifier received ${latestStoriesData.length} latest stories');
 
       // Transform to model objects - NOW INCLUDING categoryIcon
       final happeningNowStories = happeningNowData.map((item) {
@@ -94,6 +93,21 @@ class MemoryFeedDashboardNotifier
       for (final story in happeningNowStories) {
         print('🔍 DEBUG: Story model categoryIcon: "${story.categoryIcon}"');
       }
+
+      // Transform latest stories
+      final latestStories = latestStoriesData
+          .map((item) => HappeningNowStoryData(
+                id: item['id'] as String,
+                backgroundImage: item['thumbnail_url'] as String,
+                profileImage: item['contributor_avatar'] as String,
+                userName: item['contributor_name'] as String,
+                categoryName: item['category_name'] as String,
+                categoryIcon: item['category_icon'] as String? ?? '',
+                timestamp: _getRelativeTime(
+                    DateTime.parse(item['created_at'] as String)),
+                isViewed: false,
+              ))
+          .toList();
 
       final publicMemories = publicMemoriesData
           .map((item) => CustomMemoryItem(
@@ -171,7 +185,10 @@ class MemoryFeedDashboardNotifier
       final model = MemoryFeedDashboardModel(
         happeningNowStories: happeningNowStories.isNotEmpty
             ? happeningNowStories.cast<HappeningNowStoryData>()
-            : null, // Will use defaults if empty
+            : null,
+        latestStories: latestStories.isNotEmpty
+            ? latestStories.cast<HappeningNowStoryData>()
+            : null,
         publicMemories: publicMemories.isNotEmpty ? publicMemories : null,
         trendingStories: trendingStories.isNotEmpty
             ? trendingStories.cast<HappeningNowStoryData>()
@@ -189,6 +206,7 @@ class MemoryFeedDashboardNotifier
         isLoading: false,
         activeMemories: activeMemoriesData,
         hasMoreHappeningNow: happeningNowData.length == _pageSize,
+        hasMoreLatestStories: latestStoriesData.length == _pageSize,
         hasMorePublicMemories: publicMemoriesData.length == _pageSize,
         hasMoreTrending: trendingData.length == _pageSize,
         hasMoreLongestStreak: longestStreakData.length == _pageSize,
@@ -250,6 +268,59 @@ class MemoryFeedDashboardNotifier
       ));
     } catch (e) {
       print('Error loading more happening now: $e');
+      _safeSetState(state.copyWith(isLoadingMore: false));
+    }
+  }
+
+  /// Load more latest stories
+  Future<void> loadMoreLatestStories() async {
+    if (_isDisposed || state.isLoadingMore || !state.hasMoreLatestStories)
+      return;
+
+    _safeSetState(state.copyWith(isLoadingMore: true));
+
+    try {
+      final currentStories =
+          state.memoryFeedDashboardModel?.latestStories ?? [];
+      final offset = currentStories.length;
+
+      final newData = await _feedService.fetchLatestStories(offset: offset);
+
+      if (_isDisposed || newData.isEmpty) {
+        _safeSetState(state.copyWith(
+          isLoadingMore: false,
+          hasMoreLatestStories: false,
+        ));
+        return;
+      }
+
+      final newStories = newData.map((item) {
+        return HappeningNowStoryData(
+          id: item['id'] as String,
+          backgroundImage: item['thumbnail_url'] as String,
+          profileImage: item['contributor_avatar'] as String,
+          userName: item['contributor_name'] as String,
+          categoryName: item['category_name'] as String,
+          categoryIcon: item['category_icon'] as String? ?? '',
+          timestamp:
+              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          isViewed: false,
+        );
+      }).toList();
+
+      final updatedStories = [...currentStories, ...newStories];
+
+      final updatedModel = state.memoryFeedDashboardModel?.copyWith(
+        latestStories: updatedStories.cast<HappeningNowStoryData>(),
+      );
+
+      _safeSetState(state.copyWith(
+        memoryFeedDashboardModel: updatedModel,
+        hasMoreLatestStories: newData.length == _pageSize,
+        isLoadingMore: false,
+      ));
+    } catch (e) {
+      print('Error loading more latest stories: $e');
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
