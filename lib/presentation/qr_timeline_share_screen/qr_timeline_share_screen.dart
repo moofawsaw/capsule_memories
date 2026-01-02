@@ -85,7 +85,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
       print('   - Invite Code: ${response['invite_code']}');
       print('   - QR Code URL: ${response['qr_code_url']}');
       print('   - Stories: $storiesCount');
-      
+
       // 🔍 ENHANCED DEBUG - Check qr_code_url status
       final rawQrUrl = response['qr_code_url'];
       print('🔍 DEBUG qr_code_url analysis:');
@@ -210,10 +210,10 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
     final deepLinkUrl = 'https://capapp.co/join/memory/$inviteCode';
 
 // DEBUG: Log what we extracted
-print('📋 _buildContent data extraction:');
-print('   - inviteCode: "$inviteCode"');
-print('   - qrCodeUrl: "$qrCodeUrl"');
-print('   - deepLinkUrl: "$deepLinkUrl"');
+    print('📋 _buildContent data extraction:');
+    print('   - inviteCode: "$inviteCode"');
+    print('   - qrCodeUrl: "$qrCodeUrl"');
+    print('   - deepLinkUrl: "$deepLinkUrl"');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -299,11 +299,12 @@ print('   - deepLinkUrl: "$deepLinkUrl"');
 
   /// QR Code widget - Display database image with fallback
   Widget _buildQRCode(String deepLinkUrl, String? qrCodeUrl) {
-      // DEBUG: Log what we're displaying
-  print('🖼️ _buildQRCode called:');
-  print('   - deepLinkUrl: $deepLinkUrl');
-  print('   - qrCodeUrl: $qrCodeUrl');
-  print('   - Using database image: ${qrCodeUrl != null && qrCodeUrl.isNotEmpty}');
+    // DEBUG: Log what we're displaying
+    print('🖼️ _buildQRCode called:');
+    print('   - deepLinkUrl: $deepLinkUrl');
+    print('   - qrCodeUrl: $qrCodeUrl');
+    print(
+        '   - Using database image: ${qrCodeUrl != null && qrCodeUrl.isNotEmpty}');
     return Container(
       padding: EdgeInsets.all(16.h),
       decoration: BoxDecoration(

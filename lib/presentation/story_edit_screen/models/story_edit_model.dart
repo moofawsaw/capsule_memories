@@ -52,8 +52,7 @@ class StoryEditModel {
       'memory_title': memoryTitle,
       if (categoryIcon != null) 'category_icon': categoryIcon,
       'caption': caption,
-      'text_overlays':
-          textOverlays.map((overlay) => overlay.toJson()).toList(),
+      'text_overlays': textOverlays.map((overlay) => overlay.toJson()).toList(),
       'stickers': stickers,
       'drawings': drawings.map((drawing) => drawing.toJson()).toList(),
       if (backgroundMusic != null) 'background_music': backgroundMusic,

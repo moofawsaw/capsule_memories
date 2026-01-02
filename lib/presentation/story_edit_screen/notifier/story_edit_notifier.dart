@@ -2,8 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../services/supabase_service.dart';
 import '../models/story_edit_model.dart';
-import './story_edit_state.dart';
-import './story_edit_state.freezed.dart';
 
 final storyEditProvider =
     StateNotifierProvider.autoDispose<StoryEditNotifier, StoryEditState>(
@@ -106,5 +104,49 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       );
       return false;
     }
+  }
+}
+
+class StoryEditState {
+  const StoryEditState({
+    this.isLoading = false,
+    this.isUploading = false,
+    this.caption = '',
+    this.textOverlays = const [],
+    this.stickers = const [],
+    this.drawings = const [],
+    this.backgroundMusic,
+    this.errorMessage,
+  });
+
+  final bool isLoading;
+  final bool isUploading;
+  final String caption;
+  final List<TextOverlay> textOverlays;
+  final List<String> stickers;
+  final List<Drawing> drawings;
+  final String? backgroundMusic;
+  final String? errorMessage;
+
+  StoryEditState copyWith({
+    bool? isLoading,
+    bool? isUploading,
+    String? caption,
+    List<TextOverlay>? textOverlays,
+    List<String>? stickers,
+    List<Drawing>? drawings,
+    String? backgroundMusic,
+    String? errorMessage,
+  }) {
+    return StoryEditState(
+      isLoading: isLoading ?? this.isLoading,
+      isUploading: isUploading ?? this.isUploading,
+      caption: caption ?? this.caption,
+      textOverlays: textOverlays ?? this.textOverlays,
+      stickers: stickers ?? this.stickers,
+      drawings: drawings ?? this.drawings,
+      backgroundMusic: backgroundMusic ?? this.backgroundMusic,
+      errorMessage: errorMessage ?? this.errorMessage,
+    );
   }
 }

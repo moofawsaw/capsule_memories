@@ -1,7 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 // Add this line - uncomment the part directive
-part 'memory_invitation_state.freezed.dart';
+part 'memory_invitation_state.freezed.dart'; // ... Add this line ... //
 
 // Note: Run 'flutter pub run build_runner build' to generate the freezed file
 

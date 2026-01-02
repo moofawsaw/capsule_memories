@@ -1,4 +1,3 @@
-
 class QRCodeShareScreenTwoModel {
   String? friendCode;
   String? displayName;

@@ -175,8 +175,7 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
                           )
                         : Text(
                             'Next',
-                            style: TextStyleHelper
-                                .instance.body14Bold
+                            style: TextStyleHelper.instance.body14Bold
                                 .copyWith(color: appTheme.gray_50),
                           ),
                   ),

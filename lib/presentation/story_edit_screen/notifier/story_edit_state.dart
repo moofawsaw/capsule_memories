@@ -1,18 +1,23 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
 import '../models/story_edit_model.dart';
 
-part 'story_edit_state.freezed.dart';
+class StoryEditState {
+  const StoryEditState({
+    this.isLoading = false,
+    this.isUploading = false,
+    this.caption = '',
+    this.textOverlays = const [],
+    this.stickers = const [],
+    this.drawings = const [],
+    this.backgroundMusic,
+    this.errorMessage,
+  });
 
-@freezed
-class StoryEditState with _$StoryEditState {
-  const factory StoryEditState({
-    @Default(false) bool isLoading,
-    @Default(false) bool isUploading,
-    @Default('') String caption,
-    @Default([]) List<TextOverlay> textOverlays,
-    @Default([]) List<String> stickers,
-    @Default([]) List<Drawing> drawings,
-    String? backgroundMusic,
-    String? errorMessage,
-  }) = _StoryEditState;
+  final bool isLoading;
+  final bool isUploading;
+  final String caption;
+  final List<TextOverlay> textOverlays;
+  final List<String> stickers;
+  final List<Drawing> drawings;
+  final String? backgroundMusic;
+  final String? errorMessage;
 }

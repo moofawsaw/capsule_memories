@@ -103,10 +103,9 @@ class MemoryInvitationNotifier extends StateNotifier<MemoryInvitationState> {
   }
 
   void updateUrl(String newUrl) {
-    final updatedModel =
-        Map<String, dynamic>.from(null ?? {})
-          ..['url'] = newUrl
-          ..['qr_data'] = newUrl;
+    final updatedModel = Map<String, dynamic>.from(null ?? {})
+      ..['url'] = newUrl
+      ..['qr_data'] = newUrl;
 
     state = MemoryInvitationState(
       memoryInvitationModel: updatedModel,

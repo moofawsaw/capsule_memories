@@ -65,7 +65,7 @@ class _FriendRequestConfirmationDialogState
     try {
       final currentUserId = Supabase.instance.client.auth.currentUser?.id;
       if (currentUserId == null) throw Exception('Not authenticated');
-      
+
       await FriendsService().sendFriendRequest(currentUserId, _userData!['id']);
 
       if (mounted) {

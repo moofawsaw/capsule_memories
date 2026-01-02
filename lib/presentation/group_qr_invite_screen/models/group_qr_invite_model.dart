@@ -1,4 +1,3 @@
-
 /// This class is used in the [GroupQRInviteScreen] screen.
 
 // ignore_for_file: must_be_immutable

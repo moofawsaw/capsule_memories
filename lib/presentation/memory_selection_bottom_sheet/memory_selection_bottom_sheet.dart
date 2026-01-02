@@ -96,7 +96,7 @@ class _MemorySelectionBottomSheetState
   Widget _buildSearchBar(BuildContext context) {
     final state = ref.watch(memorySelectionProvider);
 
-    if ((state.filteredMemories?.length ?? 0) < 5) {
+    if ((state.activeMemories?.length ?? 0) < 5) {
       return SizedBox.shrink(); // Hide search for small lists
     }
 
@@ -140,7 +140,7 @@ class _MemorySelectionBottomSheetState
           );
         }
 
-        if (state.filteredMemories?.isEmpty ?? true) {
+        if (state.activeMemories?.isEmpty ?? true) {
           return _buildEmptyState(context);
         }
 
@@ -149,10 +149,10 @@ class _MemorySelectionBottomSheetState
           child: ListView.separated(
             shrinkWrap: true,
             padding: EdgeInsets.symmetric(horizontal: 24.h),
-            itemCount: state.filteredMemories!.length,
+            itemCount: state.activeMemories!.length,
             separatorBuilder: (context, index) => SizedBox(height: 12.h),
             itemBuilder: (context, index) {
-              final memory = state.filteredMemories![index];
+              final memory = state.activeMemories![index];
               final isSelected = selectedMemoryId == memory.id;
 
               return GestureDetector(
@@ -290,7 +290,7 @@ class _MemorySelectionBottomSheetState
             onPressed: selectedMemoryId != null
                 ? () {
                     final state = ref.read(memorySelectionProvider);
-                    final selectedMemory = state.filteredMemories?.firstWhere(
+                    final selectedMemory = state.activeMemories?.firstWhere(
                       (m) => m.id == selectedMemoryId,
                       orElse: () => MemoryItem(),
                     );

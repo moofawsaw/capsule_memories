@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../services/supabase_service.dart';
 import '../models/memory_selection_model.dart';
 import './memory_selection_state.dart';
+
+part 'memory_selection_notifier.freezed.dart';
 
 final memorySelectionProvider =
     StateNotifierProvider<MemorySelectionNotifier, MemorySelectionState>(
@@ -14,13 +17,9 @@ class MemorySelectionNotifier extends StateNotifier<MemorySelectionState> {
 
   /// Load active memories for current user
   Future<void> loadActiveMemories() async {
-    state = MemorySelectionState(
+    state = state.copyWith(
       isLoading: true,
       errorMessage: null,
-      memorySelectionModel: state.memorySelectionModel,
-      activeMemories: state.memorySelectionModel?.activeMemories,
-      filteredMemories: state.memorySelectionModel?.filteredMemories,
-      searchQuery: state.searchQuery,
     );
 
     try {
@@ -77,10 +76,6 @@ class MemorySelectionNotifier extends StateNotifier<MemorySelectionState> {
         isLoading: false,
         activeMemories: memories,
         filteredMemories: memories,
-        memorySelectionModel: MemorySelectionModel(
-          activeMemories: memories,
-          filteredMemories: memories,
-        ),
       );
     } catch (e) {
       state = MemorySelectionState(
@@ -95,18 +90,14 @@ class MemorySelectionNotifier extends StateNotifier<MemorySelectionState> {
   /// Filter memories based on search query
   void filterMemories(String query) {
     if (query.isEmpty) {
-      state = MemorySelectionState(
-        filteredMemories: state.memorySelectionModel?.activeMemories,
+      state = state.copyWith(
+        filteredMemories: state.activeMemories,
         searchQuery: null,
-        isLoading: state.isLoading,
-        memorySelectionModel: state.memorySelectionModel,
-        activeMemories: state.memorySelectionModel?.activeMemories,
-        errorMessage: state.errorMessage,
       );
       return;
     }
 
-    final filtered = state.memorySelectionModel?.activeMemories?.where((memory) {
+    final filtered = state.activeMemories?.where((memory) {
       final title = memory.title?.toLowerCase() ?? '';
       final category = memory.categoryName?.toLowerCase() ?? '';
       final searchLower = query.toLowerCase();
@@ -114,13 +105,9 @@ class MemorySelectionNotifier extends StateNotifier<MemorySelectionState> {
       return title.contains(searchLower) || category.contains(searchLower);
     }).toList();
 
-    state = MemorySelectionState(
+    state = state.copyWith(
       filteredMemories: filtered,
       searchQuery: query,
-      isLoading: state.isLoading,
-      memorySelectionModel: state.memorySelectionModel,
-      activeMemories: state.memorySelectionModel?.activeMemories,
-      errorMessage: state.errorMessage,
     );
   }
 
