@@ -1,17 +1,35 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
 import '../models/memory_selection_model.dart';
 
-part 'memory_selection_state.freezed.dart';
+class MemorySelectionState {
+  final bool isLoading;
+  final List<MemoryItem>? activeMemories;
+  final List<MemoryItem>? filteredMemories;
+  final String? errorMessage;
+  final String? searchQuery;
 
-@freezed
-class MemorySelectionState with _$MemorySelectionState {
-  const factory MemorySelectionState({
-    @Default(false) bool isLoading,
+  const MemorySelectionState({
+    this.isLoading = false,
+    this.activeMemories,
+    this.filteredMemories,
+    this.errorMessage,
+    this.searchQuery,
+  });
+
+  factory MemorySelectionState.initial() => const MemorySelectionState();
+
+  MemorySelectionState copyWith({
+    bool? isLoading,
     List<MemoryItem>? activeMemories,
     List<MemoryItem>? filteredMemories,
     String? errorMessage,
     String? searchQuery,
-  }) = _MemorySelectionState;
-
-  factory MemorySelectionState.initial() => const MemorySelectionState();
+  }) {
+    return MemorySelectionState(
+      isLoading: isLoading ?? this.isLoading,
+      activeMemories: activeMemories ?? this.activeMemories,
+      filteredMemories: filteredMemories ?? this.filteredMemories,
+      errorMessage: errorMessage ?? this.errorMessage,
+      searchQuery: searchQuery ?? this.searchQuery,
+    );
+  }
 }

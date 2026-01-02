@@ -1,5 +1,4 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import '../models/native_camera_recording_model.dart';
 
 part 'native_camera_recording_state.freezed.dart';
 

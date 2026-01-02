@@ -29,9 +29,7 @@ class FriendsManagementNotifier
   FriendsManagementState build() {
     initialize();
     searchController.addListener(_onSearchTextChanged);
-    return FriendsManagementState(
-      friendsManagementModel: FriendsManagementModel(),
-    );
+    return FriendsManagementState();
   }
 
   Future<void> initialize() async {
@@ -54,9 +52,7 @@ class FriendsManagementNotifier
             .toList();
 
         state = state.copyWith(
-          friendsManagementModel: state.friendsManagementModel?.copyWith(
-            friendsList: friendsList.cast<FriendModel>(),
-          ),
+          filteredFriendsList: friendsList.cast<FriendModel>(),
         );
       });
 
@@ -75,9 +71,7 @@ class FriendsManagementNotifier
             .toList();
 
         state = state.copyWith(
-          friendsManagementModel: state.friendsManagementModel?.copyWith(
-            incomingRequestsList: incomingRequests.cast<IncomingRequestModel>(),
-          ),
+          filteredIncomingRequestsList: incomingRequests.cast<IncomingRequestModel>(),
         );
       });
 
@@ -96,9 +90,7 @@ class FriendsManagementNotifier
             .toList();
 
         state = state.copyWith(
-          friendsManagementModel: state.friendsManagementModel?.copyWith(
-            sentRequestsList: sentRequests.cast<SentRequestModel>(),
-          ),
+          filteredSentRequestsList: sentRequests.cast<SentRequestModel>(),
         );
       });
 
@@ -174,14 +166,14 @@ class FriendsManagementNotifier
   void _filterFriends(String query) {
     if (query.isEmpty) {
       state = state.copyWith(
-        filteredFriendsList: state.friendsManagementModel?.friendsList,
+        filteredFriendsList: state.filteredFriendsList,
         filteredSentRequestsList:
-            state.friendsManagementModel?.sentRequestsList,
+            state.filteredSentRequestsList,
         filteredIncomingRequestsList:
-            state.friendsManagementModel?.incomingRequestsList,
+            state.filteredIncomingRequestsList,
       );
     } else {
-      final filteredFriends = state.friendsManagementModel?.friendsList
+      final filteredFriends = state.filteredFriendsList
           ?.where((friend) =>
               (friend.userName?.toLowerCase().contains(query.toLowerCase()) ??
                   false) ||
@@ -192,7 +184,7 @@ class FriendsManagementNotifier
           .toList();
 
       final filteredSentRequests = state
-          .friendsManagementModel?.sentRequestsList
+          .filteredSentRequestsList
           ?.where((request) =>
               (request.userName?.toLowerCase().contains(query.toLowerCase()) ??
                   false) ||
@@ -203,7 +195,7 @@ class FriendsManagementNotifier
           .toList();
 
       final filteredIncomingRequests = state
-          .friendsManagementModel?.incomingRequestsList
+          .filteredIncomingRequestsList
           ?.where((request) =>
               (request.userName?.toLowerCase().contains(query.toLowerCase()) ??
                   false) ||
@@ -234,14 +226,12 @@ class FriendsManagementNotifier
       final success = await _friendsService.cancelSentRequest(requestId);
 
       if (success) {
-        final updatedList = state.friendsManagementModel?.sentRequestsList
+        final updatedList = state.filteredSentRequestsList
             ?.where((request) => request.id != requestId)
             .toList();
 
         state = state.copyWith(
-          friendsManagementModel: state.friendsManagementModel?.copyWith(
-            sentRequestsList: updatedList,
-          ),
+          filteredSentRequestsList: updatedList,
         );
 
         _filterFriends(_searchQuery);
@@ -275,14 +265,12 @@ class FriendsManagementNotifier
       final success = await _friendsService.declineFriendRequest(requestId);
 
       if (success) {
-        final updatedList = state.friendsManagementModel?.incomingRequestsList
+        final updatedList = state.filteredIncomingRequestsList
             ?.where((request) => request.id != requestId)
             .toList();
 
         state = state.copyWith(
-          friendsManagementModel: state.friendsManagementModel?.copyWith(
-            incomingRequestsList: updatedList,
-          ),
+          filteredIncomingRequestsList: updatedList,
         );
 
         _filterFriends(_searchQuery);
@@ -300,14 +288,12 @@ class FriendsManagementNotifier
       final success = await _friendsService.removeFriend(friendshipId);
 
       if (success) {
-        final updatedList = state.friendsManagementModel?.friendsList
+        final updatedList = state.filteredFriendsList
             ?.where((friend) => friend.friendshipId != friendshipId)
             .toList();
 
         state = state.copyWith(
-          friendsManagementModel: state.friendsManagementModel?.copyWith(
-            friendsList: updatedList,
-          ),
+          filteredFriendsList: updatedList,
         );
 
         _filterFriends(_searchQuery);
@@ -398,20 +384,16 @@ class FriendsManagementNotifier
 
         state = state.copyWith(
           isCameraActive: true,
-          cameraController: _cameraController,
-          cameraPermissionStatus: CameraPermissionStatus.granted,
         );
       } else if (cameraStatus.isPermanentlyDenied) {
         // User permanently denied - show settings dialog
         state = state.copyWith(
-          cameraPermissionStatus: CameraPermissionStatus.permanentlyDenied,
           errorMessage:
               'Camera permission is required for scanning. Please enable it in app settings.',
         );
       } else {
         // User denied permission
         state = state.copyWith(
-          cameraPermissionStatus: CameraPermissionStatus.denied,
           errorMessage: 'Camera permission is required to scan QR codes',
         );
       }
@@ -564,7 +546,6 @@ class FriendsManagementNotifier
 
     state = state.copyWith(
       isCameraActive: false,
-      cameraController: null,
     );
   }
 }

@@ -1,11 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../services/supabase_service.dart';
 import '../models/memory_selection_model.dart';
 import './memory_selection_state.dart';
-
-part 'memory_selection_notifier.freezed.dart';
 
 final memorySelectionProvider =
     StateNotifierProvider<MemorySelectionNotifier, MemorySelectionState>(

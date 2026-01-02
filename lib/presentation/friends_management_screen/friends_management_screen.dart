@@ -101,7 +101,7 @@ class FriendsManagementScreenState
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(friendsManagementNotifier);
       final friendsCount =
-          state.friendsManagementModel?.friendsList?.length ?? 0;
+          state.filteredFriendsList?.length ?? 0;
 
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -17,19 +17,26 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   bool isFlashOn = false;
   bool isScanning = false;
   BarcodeScanner? _barcodeScanner;
+  CameraController? _cameraController;
 
   @override
   void initState() {
     super.initState();
     _barcodeScanner = BarcodeScanner();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeCamera();
       _startImageStream();
     });
   }
 
+  void _initializeCamera() {
+    final state = ref.read(friendsManagementNotifier);
+    _cameraController = state.cameraController;
+  }
+
   void _startImageStream() {
     final state = ref.read(friendsManagementNotifier);
-    final cameraController = state.cameraController;
+    final cameraController = _cameraController;
 
     if (cameraController == null || !cameraController.value.isInitialized) {
       return;
@@ -90,7 +97,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
 
   Future<void> _handleScannedCode(String code) async {
     final state = ref.read(friendsManagementNotifier);
-    final cameraController = state.cameraController;
+    final cameraController = _cameraController;
 
     if (cameraController != null && cameraController.value.isStreamingImages) {
       await cameraController.stopImageStream();
@@ -124,7 +131,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(friendsManagementNotifier);
-    final cameraController = state.cameraController;
+    final cameraController = _cameraController;
 
     if (cameraController == null || !cameraController.value.isInitialized) {
       return Scaffold(
@@ -298,7 +305,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
     if (kIsWeb) return;
 
     final state = ref.read(friendsManagementNotifier);
-    final cameraController = state.cameraController;
+    final cameraController = _cameraController;
     if (cameraController == null) return;
 
     try {

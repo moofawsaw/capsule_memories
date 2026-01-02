@@ -9,9 +9,7 @@ class FriendsSectionWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(friendsManagementNotifier);
-    final friends = state.filteredFriendsList ??
-        state.friendsManagementModel?.friendsList ??
-        [];
+    final friends = state.filteredFriendsList ?? [];
 
     if (state.isLoading) {
       return Center(

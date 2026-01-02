@@ -9,9 +9,7 @@ class SentRequestsSectionWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(friendsManagementNotifier);
-    final sentRequests = state.filteredSentRequestsList ??
-        state.friendsManagementModel?.sentRequestsList ??
-        [];
+    final sentRequests = state.filteredSentRequestsList ?? [];
 
     if (sentRequests.isEmpty) {
       return SizedBox.shrink();

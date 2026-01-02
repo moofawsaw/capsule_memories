@@ -9,9 +9,7 @@ class IncomingRequestsSectionWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(friendsManagementNotifier);
-    final incomingRequests = state.filteredIncomingRequestsList ??
-        state.friendsManagementModel?.incomingRequestsList ??
-        [];
+    final incomingRequests = state.filteredIncomingRequestsList ?? [];
 
     if (incomingRequests.isEmpty) {
       return SizedBox.shrink();
