@@ -35,12 +35,14 @@ class _NativeCameraRecordingScreenState
   String? _errorMessage;
   Timer? _longPressTimer;
   bool _isLongPress = false;
+  bool _isPreparing = false; // NEW: Track when preparing to record
 
   // Progress animation
   AnimationController? _progressController;
   static const int _maxRecordingDurationSeconds = 60; // 60 seconds max
   Timer? _recordingTimer;
   int _elapsedSeconds = 0;
+  DateTime? _recordingStartTime; // NEW: Track actual recording start time
 
   @override
   void initState() {
@@ -113,9 +115,13 @@ class _NativeCameraRecordingScreenState
   /// Handle tap down - start timer to detect long press
   void _handleTapDown(TapDownDetails details) {
     _isLongPress = false;
-    _longPressTimer = Timer(const Duration(milliseconds: 500), () {
+    // Reduced from 500ms to 250ms for lower sensitivity
+    _longPressTimer = Timer(const Duration(milliseconds: 250), () {
       // Long press detected - start video recording
       _isLongPress = true;
+      setState(() {
+        _isPreparing = true; // Show visual feedback immediately
+      });
       _startRecording();
     });
   }
@@ -124,7 +130,20 @@ class _NativeCameraRecordingScreenState
   Future<void> _handleTapUp(TapUpDetails details) async {
     _longPressTimer?.cancel();
 
+    setState(() {
+      _isPreparing = false; // Reset preparing state
+    });
+
     if (_isRecording) {
+      // Check minimum recording duration (500ms) to prevent errors
+      final recordingDuration =
+          DateTime.now().difference(_recordingStartTime ?? DateTime.now());
+      if (recordingDuration.inMilliseconds < 500) {
+        // Too short - show message and continue recording briefly
+        await Future.delayed(
+            Duration(milliseconds: 500 - recordingDuration.inMilliseconds));
+      }
+
       // Stop video recording
       await _stopRecording();
     } else if (!_isLongPress) {
@@ -136,6 +155,9 @@ class _NativeCameraRecordingScreenState
   /// Handle tap cancel - stop recording if active
   void _handleTapCancel() {
     _longPressTimer?.cancel();
+    setState(() {
+      _isPreparing = false; // Reset preparing state
+    });
     if (_isRecording) {
       _stopRecording();
     }
@@ -177,11 +199,16 @@ class _NativeCameraRecordingScreenState
 
   Future<void> _startRecording() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      setState(() {
+        _isPreparing = false;
+      });
       return;
     }
 
     try {
+      // Start recording immediately
       await _cameraController!.startVideoRecording();
+      _recordingStartTime = DateTime.now(); // Track start time
 
       // Start progress animation
       _progressController?.reset();
@@ -202,9 +229,13 @@ class _NativeCameraRecordingScreenState
 
       setState(() {
         _isRecording = true;
+        _isPreparing = false; // Recording started successfully
       });
     } catch (e) {
       print('❌ Error starting recording: $e');
+      setState(() {
+        _isPreparing = false;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to start recording')),
@@ -417,8 +448,38 @@ class _NativeCameraRecordingScreenState
               ),
             ),
 
+          // Preparing indicator
+          if (_isPreparing && !_isRecording)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+              margin: EdgeInsets.only(bottom: 8.h),
+              decoration: BoxDecoration(
+                color: appTheme.red_500.withAlpha(179),
+                borderRadius: BorderRadius.circular(20.h),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 12.h,
+                    height: 12.h,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: appTheme.gray_50,
+                    ),
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    'Preparing...',
+                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ],
+              ),
+            ),
+
           // Instruction text
-          if (!_isRecording)
+          if (!_isRecording && !_isPreparing)
             Container(
               padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
               margin: EdgeInsets.only(bottom: 8.h),
@@ -435,7 +496,7 @@ class _NativeCameraRecordingScreenState
 
           SizedBox(height: 16.h),
 
-          // Record button with circular progress indicator
+          // Record button with circular progress indicator - MADE BIGGER
           GestureDetector(
             onTapDown: _handleTapDown,
             onTapUp: _handleTapUp,
@@ -443,13 +504,13 @@ class _NativeCameraRecordingScreenState
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Animated circular progress ring
+                // Animated circular progress ring (increased size)
                 if (_isRecording)
                   AnimatedBuilder(
                     animation: _progressController!,
                     builder: (context, child) {
                       return CustomPaint(
-                        size: Size(80.h, 80.h),
+                        size: Size(100.h, 100.h), // Increased from 80.h
                         painter: _CircularProgressPainter(
                           progress: _progressController!.value,
                           strokeWidth: 4.0,
@@ -459,31 +520,37 @@ class _NativeCameraRecordingScreenState
                     },
                   ),
 
-                // Static white border when not recording
+                // Static white border when not recording (increased size)
                 if (!_isRecording)
                   Container(
-                    width: 80.h,
-                    height: 80.h,
+                    width: 100.h, // Increased from 80.h
+                    height: 100.h, // Increased from 80.h
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: appTheme.gray_50,
-                        width: 4,
+                        color: _isPreparing
+                            ? appTheme.red_500.withAlpha(179)
+                            : appTheme.gray_50,
+                        width: _isPreparing ? 5 : 4,
                       ),
                     ),
                   ),
 
-                // Inner button with pulsing animation when recording
+                // Inner button with pulsing animation when recording (increased size)
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: _isRecording ? 28.h : 64.h,
-                  height: _isRecording ? 28.h : 64.h,
+                  width: _isRecording
+                      ? 32.h
+                      : 80.h, // Increased from 28.h and 64.h
+                  height: _isRecording
+                      ? 32.h
+                      : 80.h, // Increased from 28.h and 64.h
                   decoration: BoxDecoration(
                     color: appTheme.red_500,
                     shape: _isRecording ? BoxShape.rectangle : BoxShape.circle,
                     borderRadius:
                         _isRecording ? BorderRadius.circular(6.h) : null,
-                    boxShadow: _isRecording
+                    boxShadow: (_isRecording || _isPreparing)
                         ? [
                             BoxShadow(
                               color: appTheme.red_500.withAlpha(128),

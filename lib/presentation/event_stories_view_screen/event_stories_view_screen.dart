@@ -13,6 +13,7 @@ import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../widgets/story_reactions.dart';
 import 'models/event_stories_view_model.dart';
 
 class EventStoriesViewScreen extends ConsumerStatefulWidget {
@@ -1022,60 +1023,95 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   Widget _buildBottomInfo() {
     final caption = _storyData?['caption'] as String?;
     final location = _storyData?['location'] as String?;
+    final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : null;
 
-    if (caption == null && location == null) {
-      return SizedBox.shrink();
-    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Volume control - positioned above reactions
+        if (storyId != null) _buildVolumeButtonAboveReactions(),
 
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16.h),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            appTheme.blackCustom.withAlpha(153),
-            appTheme.transparentCustom,
-          ],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (caption != null && caption.isNotEmpty)
-            Text(
-              caption,
-              style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                  .copyWith(color: appTheme.whiteCustom),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+        SizedBox(height: 12.h),
+
+        // Full-width reaction widget container
+        if (storyId != null)
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  appTheme.blackCustom.withAlpha(153),
+                  appTheme.transparentCustom,
+                ],
+              ),
             ),
-          if (location != null && location.isNotEmpty) ...[
-            SizedBox(height: 8.h),
-            Row(
+            child: StoryReactionsWidget(
+              storyId: storyId,
+              onReactionAdded: () {
+                print('✅ Reaction added for story $storyId');
+              },
+            ),
+          ),
+
+        // Caption and location section (separate from reactions)
+        if ((caption != null && caption.isNotEmpty) ||
+            (location != null && location.isNotEmpty))
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(16.h),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  appTheme.blackCustom.withAlpha(153),
+                  appTheme.transparentCustom,
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.location_on,
-                  size: 16.h,
-                  color: Colors.white70,
-                ),
-                SizedBox(width: 4.h),
-                Expanded(
-                  child: Text(
-                    location,
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: Colors.white70),
-                    maxLines: 1,
+                if (caption != null && caption.isNotEmpty)
+                  Text(
+                    caption,
+                    style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                        .copyWith(color: appTheme.whiteCustom),
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                if (location != null && location.isNotEmpty) ...[
+                  SizedBox(height: 8.h),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 16.h,
+                        color: Colors.white70,
+                      ),
+                      SizedBox(width: 4.h),
+                      Expanded(
+                        child: Text(
+                          location,
+                          style: TextStyleHelper
+                              .instance.body14RegularPlusJakartaSans
+                              .copyWith(color: Colors.white70),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -1104,6 +1140,13 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   }
 
   Widget _buildVolumeControl() {
+    // This method is now replaced by _buildVolumeButtonAboveReactions
+    // Return empty widget to avoid duplicate rendering
+    return SizedBox.shrink();
+  }
+
+  /// New method: Volume button positioned above reactions
+  Widget _buildVolumeButtonAboveReactions() {
     final mediaType = _storyData?['media_type'] as String? ?? 'image';
 
     // Only show volume control for videos
@@ -1113,22 +1156,24 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       return SizedBox.shrink();
     }
 
-    return Positioned(
-      right: 16.h,
-      bottom: 100.h,
-      child: GestureDetector(
-        onTap: _toggleMute,
-        child: Container(
-          width: 44.h,
-          height: 44.h,
-          decoration: BoxDecoration(
-            color: appTheme.blackCustom.withAlpha(128),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            _isMuted ? Icons.volume_off : Icons.volume_up,
-            color: Colors.white,
-            size: 24.h,
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: EdgeInsets.only(right: 16.h),
+        child: GestureDetector(
+          onTap: _toggleMute,
+          child: Container(
+            width: 44.h,
+            height: 44.h,
+            decoration: BoxDecoration(
+              color: appTheme.blackCustom.withAlpha(128),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              _isMuted ? Icons.volume_off : Icons.volume_up,
+              color: Colors.white,
+              size: 24.h,
+            ),
           ),
         ),
       ),
