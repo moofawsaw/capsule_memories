@@ -88,7 +88,7 @@ class UserProfileScreenTwoNotifier
             userAvatar: AvatarHelperService.getAvatarUrl(
               contributor?['avatar_url'],
             ),
-            backgroundImage: _storyService.getStoryMediaUrl(story),
+            backgroundImage: StoryService.getStoryMediaUrl(story['thumbnail_url'] as String?),
             categoryText:
                 categoryName, // Use actual category name from database
             categoryIcon: categoryIconUrl ??

@@ -248,12 +248,21 @@ class _CustomImageViewState extends State<CustomImageView>
               backgroundColor: appTheme.grey100,
             ),
           ),
-          errorWidget: (context, url, error) => Image.asset(
-            widget.placeHolder ?? ImageConstant.imgImageNotFound,
-            height: widget.height,
-            width: widget.width,
-            fit: widget.fit ?? BoxFit.cover,
-          ),
+          errorWidget: (context, url, error) {
+            // CRITICAL: Enhanced error logging for debugging story media URL issues
+            print('❌ IMAGE LOAD FAILED:');
+            print('   Raw URL: ${widget.imagePath}');
+            print('   Resolved URL: $url');
+            print('   Error: $error');
+            print('   Widget Size: ${widget.width}x${widget.height}');
+
+            return Image.asset(
+              widget.placeHolder ?? ImageConstant.imgImageNotFound,
+              height: widget.height,
+              width: widget.width,
+              fit: widget.fit ?? BoxFit.cover,
+            );
+          },
         );
       case ImageType.png:
       default:
@@ -263,12 +272,20 @@ class _CustomImageViewState extends State<CustomImageView>
           width: widget.width,
           fit: widget.fit ?? BoxFit.cover,
           color: widget.color,
-          errorBuilder: (context, error, stackTrace) => Image.asset(
-            widget.placeHolder ?? ImageConstant.imgImageNotFound,
-            height: widget.height,
-            width: widget.width,
-            fit: widget.fit ?? BoxFit.cover,
-          ),
+          errorBuilder: (context, error, stackTrace) {
+            // CRITICAL: Enhanced error logging for asset load failures
+            print('❌ ASSET LOAD FAILED:');
+            print('   Asset Path: ${widget.imagePath}');
+            print('   Error: $error');
+            print('   Stack Trace: $stackTrace');
+
+            return Image.asset(
+              widget.placeHolder ?? ImageConstant.imgImageNotFound,
+              height: widget.height,
+              width: widget.width,
+              fit: widget.fit ?? BoxFit.cover,
+            );
+          },
         );
     }
   }

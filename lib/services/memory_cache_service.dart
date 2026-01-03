@@ -371,6 +371,15 @@ class MemoryCacheService {
         try {
           print('🔍 CACHE: Fetching contributors for memory $memoryId');
 
+          final backgroundImage = StoryService.getStoryMediaUrl(
+            storyData['thumbnail_url'] as String?,
+          ) ?? StoryService.getStoryMediaUrl(
+            storyData['image_url'] as String?,
+          ) ?? '';
+          final profileImage = AvatarHelperService.getAvatarUrl(
+            contributor?['avatar_url'] as String?,
+          );
+
           // FIXED: Query memory_contributors table (correct table name from schema)
           // Matches working /feed implementation pattern
           final contributorsResponse = await SupabaseService.instance.client

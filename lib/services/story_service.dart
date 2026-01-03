@@ -8,6 +8,31 @@ class StoryService {
   static const int _maxRetries = 3;
   static const Duration _initialRetryDelay = Duration(milliseconds: 500);
 
+  /// Static helper method to resolve story media URLs from raw database paths
+  /// CRITICAL: This method normalizes paths and resolves them to full Supabase Storage URLs
+  ///
+  /// Returns null for null/empty paths, full URLs unchanged, and resolves relative paths
+  static String? resolveStoryMediaUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+
+    // Already a full URL - return as-is
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+
+    // Normalize: remove leading slash and accidental bucket prefix
+    String normalized = path;
+    if (normalized.startsWith('/')) normalized = normalized.substring(1);
+    if (normalized.startsWith('story-media/')) {
+      normalized = normalized.substring(12);
+    }
+
+    // Resolve to full Supabase Storage URL
+    return SupabaseService.instance.client?.storage
+        .from('story-media')
+        .getPublicUrl(normalized);
+  }
+
   /// Fetch stories ONLY from memories where user is a participant (creator or contributor)
   /// Uses explicit memory filtering to ensure user access with automatic retry
   Future<List<Map<String, dynamic>>> fetchUserStories(String userId) async {
