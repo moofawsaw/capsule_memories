@@ -1,4 +1,5 @@
 import '../../../core/app_export.dart';
+import '../../../core/utils/memory_navigation_wrapper.dart';
 import '../../../services/avatar_helper_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
@@ -376,10 +377,13 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
         memoryEndTime: _memoryEndTime ?? DateTime.now(),
         timelineHeight: 112,
         onStoryTap: (storyId) {
-          // Navigate with full memory context when timeline card is tapped
-          if (widget.onTap != null) {
-            widget.onTap!();
-          }
+          // CRITICAL FIX: Navigate directly to timeline instead of opening bottom sheet
+          print(
+              '🔍 TIMELINE CARD TAPPED: Navigating to /timeline for memory ${widget.memoryItem.id}');
+          MemoryNavigationWrapper.navigateFromMemoryItem(
+            context: context,
+            memoryItem: widget.memoryItem,
+          );
         },
       ),
     );

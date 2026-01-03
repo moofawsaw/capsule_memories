@@ -22,7 +22,7 @@ class StoryGridItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: width ?? 116.h,
-        height: height ?? 300.h,
+        height: height ?? 600.h,
         decoration: BoxDecoration(
           color: appTheme.gray_900_01,
           borderRadius: BorderRadius.circular(1.h),
@@ -41,7 +41,7 @@ class StoryGridItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: 12.h),
+                  SizedBox(height: 20.h),
                   Container(
                     margin: EdgeInsets.only(left: 4.h),
                     child: Container(

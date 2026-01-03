@@ -6,6 +6,7 @@ class EventTimelineViewState extends Equatable {
   final bool? isSuccess;
   final String? errorMessage;
   final bool isCurrentUserMember;
+  final bool isCurrentUserCreator;
 
   EventTimelineViewState({
     this.eventTimelineViewModel,
@@ -13,6 +14,7 @@ class EventTimelineViewState extends Equatable {
     this.isSuccess = false,
     this.errorMessage,
     this.isCurrentUserMember = false,
+    this.isCurrentUserCreator = false,
   });
 
   @override
@@ -22,6 +24,7 @@ class EventTimelineViewState extends Equatable {
         isSuccess,
         errorMessage,
         isCurrentUserMember,
+        isCurrentUserCreator,
       ];
 
   EventTimelineViewState copyWith({
@@ -30,6 +33,7 @@ class EventTimelineViewState extends Equatable {
     bool? isSuccess,
     String? errorMessage,
     bool? isCurrentUserMember,
+    bool? isCurrentUserCreator,
   }) {
     return EventTimelineViewState(
       eventTimelineViewModel:
@@ -38,6 +42,7 @@ class EventTimelineViewState extends Equatable {
       isSuccess: isSuccess ?? this.isSuccess,
       errorMessage: errorMessage,
       isCurrentUserMember: isCurrentUserMember ?? this.isCurrentUserMember,
+      isCurrentUserCreator: isCurrentUserCreator ?? this.isCurrentUserCreator,
     );
   }
 }

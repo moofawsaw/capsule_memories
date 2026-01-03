@@ -78,6 +78,40 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
     }
   }
 
+  /// CHECK IF CREATOR: Verify if current user is the creator of the memory
+  Future<bool> _checkCurrentUserIsCreator(String memoryId) async {
+    try {
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+
+      if (currentUser == null) {
+        print('❌ CREATOR CHECK: No authenticated user');
+        return false;
+      }
+
+      print(
+          '🔍 CREATOR CHECK: Verifying user ${currentUser.id} for memory $memoryId');
+
+      // Check if user is the creator
+      final memoryResponse = await SupabaseService.instance.client
+          ?.from('memories')
+          .select('creator_id')
+          .eq('id', memoryId)
+          .single();
+
+      final isCreator = memoryResponse != null &&
+          memoryResponse['creator_id'] == currentUser.id;
+
+      print(
+          '${isCreator ? "✅" : "❌"} CREATOR CHECK: User ${isCreator ? "is" : "is NOT"} the creator');
+
+      return isCreator;
+    } catch (e, stackTrace) {
+      print('❌ CREATOR CHECK ERROR: $e');
+      print('   Stack trace: $stackTrace');
+      return false;
+    }
+  }
+
   /// DEBUG TOAST: Validate data passing to UI elements
   Map<String, dynamic> validateDataPassing() {
     final model = state.eventTimelineViewModel;
@@ -322,6 +356,14 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         return;
       }
 
+      // Check if current user is creator and member
+      final isCreator = await _checkCurrentUserIsCreator(navArgs.memoryId);
+      final isMember = await _checkCurrentUserMembership(navArgs.memoryId);
+
+      print('🔍 TIMELINE NOTIFIER: User permissions');
+      print('   - Is Creator: $isCreator');
+      print('   - Is Member: $isMember');
+
       // Fetch memory details with category join
       final memoryResponse = await client.from('memories').select('''
             id,
@@ -431,7 +473,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
             navArgs.memoryId, memoryResponse, contributorAvatars);
       }
 
-      // Update state with fetched data
+      // Update state with fetched data including creator status
       state = state.copyWith(
         eventTimelineViewModel: EventTimelineViewModel(
           memoryId: navArgs.memoryId,
@@ -459,7 +501,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           ),
           customStoryItems: [],
         ),
-        isCurrentUserMember: isCurrentUserMember,
+        isCurrentUserMember: isMember,
+        isCurrentUserCreator: isCreator,
       );
 
       print('✅ TIMELINE NOTIFIER: State updated with all data');
@@ -468,6 +511,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('   - Event title: ${state.eventTimelineViewModel?.eventTitle}');
       print(
           '   - Category icon URL: ${state.eventTimelineViewModel?.categoryIcon}');
+      print('   - Is Creator: $isCreator');
+      print('   - Is Member: $isMember');
     } catch (e, stackTrace) {
       print('❌ ERROR in initializeFromMemory: $e');
       print('Stack trace: $stackTrace');

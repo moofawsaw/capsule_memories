@@ -64,13 +64,33 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
         final category = memory?['memory_categories'] as Map<String, dynamic>?;
         final contributor = story['user_profiles'] as Map<String, dynamic>?;
 
+        // CRITICAL FIX: Resolve category icon URL from category-icons bucket
+        String? categoryIconUrl;
+        if (category?['icon_url'] != null) {
+          final iconPath = category!['icon_url'] as String;
+
+          // Check if already a full URL
+          if (iconPath.startsWith('http://') ||
+              iconPath.startsWith('https://')) {
+            categoryIconUrl = iconPath;
+          } else {
+            // Resolve relative path from category-icons bucket
+            final supabaseService = SupabaseService.instance;
+            categoryIconUrl = supabaseService.getStorageUrl(
+                  iconPath,
+                  bucket: 'category-icons',
+                ) ??
+                iconPath;
+          }
+        }
+
         return StoryItemModel(
           userName: contributor?['display_name'] ?? 'Unknown User',
           userAvatar: _storyService.getContributorAvatar(story),
           backgroundImage: StoryService.resolveStoryMediaUrl(
               story['thumbnail_url'] as String?),
           categoryText: category?['name'] ?? 'Unknown',
-          categoryIcon: category?['icon_url'] ?? '',
+          categoryIcon: categoryIconUrl ?? '',
           timestamp: _storyService.getTimeAgo(
             DateTime.parse(story['created_at'] as String),
           ),

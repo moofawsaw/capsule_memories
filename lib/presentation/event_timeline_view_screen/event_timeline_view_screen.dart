@@ -5,6 +5,7 @@ import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_story_list.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
+import '../memory_details_screen/memory_details_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import '../qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import './notifier/event_timeline_view_notifier.dart';
@@ -191,15 +192,17 @@ class EventTimelineViewScreenState
     );
   }
 
-  /// Section Widget - Timeline section with QR button
+  /// Section Widget - Timeline section with QR and Edit buttons
   Widget _buildTimelineSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
         final isCurrentUserMember = state.isCurrentUserMember;
+        final isCurrentUserCreator = state.isCurrentUserCreator;
 
-        print(
-            '🔍 TIMELINE QR BUTTON: isCurrentUserMember = $isCurrentUserMember');
+        print('🔍 TIMELINE BUTTONS: Visibility check');
+        print('   - isCurrentUserMember = $isCurrentUserMember');
+        print('   - isCurrentUserCreator = $isCurrentUserCreator');
 
         return Container(
           margin: EdgeInsets.only(top: 6.h),
@@ -224,22 +227,42 @@ class EventTimelineViewScreenState
                   ],
                 ),
               ),
-              // CONDITIONAL QR BUTTON: Only show if current user is a member
+              // CONDITIONAL BUTTONS: Show based on user permissions
               if (isCurrentUserMember)
                 Align(
                   alignment: Alignment.topRight,
                   child: Container(
                     margin: EdgeInsets.only(right: 16.h),
-                    child: CustomIconButton(
-                      iconPath: ImageConstant.imgButtons,
-                      backgroundColor: appTheme.gray_900_03,
-                      borderRadius: 24.h,
-                      height: 48.h,
-                      width: 48.h,
-                      padding: EdgeInsets.all(12.h),
-                      onTap: () {
-                        onTapTimelineOptions(context);
-                      },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 8.h,
+                      children: [
+                        // EDIT BUTTON: Only show if current user is creator
+                        if (isCurrentUserCreator)
+                          CustomIconButton(
+                            iconPath: ImageConstant.imgEdit,
+                            backgroundColor: appTheme.gray_900_03,
+                            borderRadius: 24.h,
+                            height: 48.h,
+                            width: 48.h,
+                            padding: EdgeInsets.all(12.h),
+                            onTap: () {
+                              onTapEditMemory(context);
+                            },
+                          ),
+                        // QR BUTTON: Show for all members
+                        CustomIconButton(
+                          iconPath: ImageConstant.imgButtons,
+                          backgroundColor: appTheme.gray_900_03,
+                          borderRadius: 24.h,
+                          height: 48.h,
+                          width: 48.h,
+                          padding: EdgeInsets.all(12.h),
+                          onTap: () {
+                            onTapTimelineOptions(context);
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -485,6 +508,27 @@ class EventTimelineViewScreenState
         builder: (context) => MemoryMembersScreen(
           memoryId: memoryId,
           memoryTitle: memoryTitle,
+        ),
+      );
+    }
+  }
+
+  /// Handles edit memory button tap - opens Memory Details bottom sheet
+  void onTapEditMemory(BuildContext context) {
+    final state = ref.read(eventTimelineViewNotifier);
+    final memoryId = state.eventTimelineViewModel?.memoryId;
+
+    if (memoryId != null) {
+      print('🔍 TIMELINE: Opening Memory Details bottom sheet for editing');
+      print('   - Memory ID: $memoryId');
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.9,
+          child: MemoryDetailsScreen(memoryId: memoryId),
         ),
       );
     }
