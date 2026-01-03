@@ -924,7 +924,9 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
             Navigator.pushNamed(
               context,
               AppRoutes.appProfileUser,
-              arguments: userId,
+              arguments: {
+                'userId': userId
+              }, // ✅ FIX: Pass as Map instead of plain String
             );
           } else {
             print('⚠️ WARNING: userId is null or empty, cannot navigate');
