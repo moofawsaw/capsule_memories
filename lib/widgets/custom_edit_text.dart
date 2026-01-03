@@ -23,6 +23,7 @@ import './custom_image_view.dart';
  * @param readOnly - Whether the input field is read-only
  * @param onTap - Callback function when the field is tapped
  * @param focusNode - FocusNode for managing input focus state
+ * @param autofillHints - List of autofill hints for browser/system autofill
  */
 class CustomEditText extends StatefulWidget {
   CustomEditText({
@@ -44,6 +45,7 @@ class CustomEditText extends StatefulWidget {
     this.readOnly = false,
     this.onTap,
     this.focusNode,
+    this.autofillHints,
   }) : super(key: key);
 
   final TextEditingController? controller;
@@ -63,6 +65,7 @@ class CustomEditText extends StatefulWidget {
   final bool readOnly;
   final VoidCallback? onTap;
   final FocusNode? focusNode;
+  final Iterable<String>? autofillHints;
 
   @override
   State<CustomEditText> createState() => _CustomEditTextState();
@@ -83,6 +86,7 @@ class _CustomEditTextState extends State<CustomEditText> {
       readOnly: widget.readOnly,
       onTap: widget.onTap,
       focusNode: widget.focusNode,
+      autofillHints: widget.autofillHints,
       style: widget.textStyle ?? _getDefaultTextStyle(),
       decoration: InputDecoration(
         hintText: widget.hintText,

@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
@@ -21,25 +23,27 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
         backgroundColor: appTheme.gray_900_02,
         body: Form(
           key: _formKey,
-          child: Container(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.all(24.h),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(height: 36.h),
-                    _buildLogoSection(),
-                    SizedBox(height: 24.h),
-                    _buildLoginTitle(),
-                    SizedBox(height: 68.h),
-                    _buildLoginForm(),
-                    SizedBox(height: 50.h),
-                    _buildForgotPasswordLink(),
-                    SizedBox(height: 14.h),
-                    _buildSignUpSection(),
-                  ],
+          child: AutofillGroup(
+            child: Container(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(height: 36.h),
+                      _buildLogoSection(),
+                      SizedBox(height: 24.h),
+                      _buildLoginTitle(),
+                      SizedBox(height: 68.h),
+                      _buildLoginForm(),
+                      SizedBox(height: 50.h),
+                      _buildForgotPasswordLink(),
+                      SizedBox(height: 14.h),
+                      _buildSignUpSection(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -86,6 +90,7 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
           loginNotifier,
           (previous, current) {
             if (current.isSuccess ?? false) {
+              TextInput.finishAutofillContext();
               _clearForm();
               NavigatorService.pushNamedAndRemoveUntil(AppRoutes.appFeed);
             }
@@ -104,6 +109,7 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
               hintText: 'Email',
               prefixIcon: ImageConstant.imgMail,
               keyboardType: TextInputType.emailAddress,
+              autofillHints: [AutofillHints.email],
               validator: (value) {
                 return ref.read(loginNotifier.notifier).validateEmail(value);
               },
@@ -114,6 +120,7 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
               hintText: 'Password',
               prefixIcon: ImageConstant.imgIcon,
               isPassword: true,
+              autofillHints: [AutofillHints.password],
               validator: (value) {
                 return ref.read(loginNotifier.notifier).validatePassword(value);
               },

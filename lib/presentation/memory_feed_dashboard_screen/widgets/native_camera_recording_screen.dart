@@ -3,10 +3,18 @@ import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart';
 
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../../story_edit_screen/story_edit_screen.dart';
+
+enum CameraState {
+  idle,
+  preparingVideo,
+  recording,
+  recordingLocked,
+}
 
 class NativeCameraRecordingScreen extends StatefulWidget {
   final String memoryId;
@@ -26,23 +34,29 @@ class NativeCameraRecordingScreen extends StatefulWidget {
 }
 
 class _NativeCameraRecordingScreenState
-    extends State<NativeCameraRecordingScreen>
-    with SingleTickerProviderStateMixin {
+    extends State<NativeCameraRecordingScreen> with TickerProviderStateMixin {
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
-  bool _isRecording = false;
   bool _isInitialized = false;
   String? _errorMessage;
-  Timer? _longPressTimer;
-  bool _isLongPress = false;
-  bool _isPreparing = false; // NEW: Track when preparing to record
+
+  CameraState _state = CameraState.idle;
+
+  // NEW: Track current camera direction
+  bool _isRearCamera = true;
+
+  Timer? _releaseToleranceTimer;
 
   // Progress animation
   AnimationController? _progressController;
-  static const int _maxRecordingDurationSeconds = 60; // 60 seconds max
+  static const int _maxRecordingDurationSeconds = 60;
   Timer? _recordingTimer;
   int _elapsedSeconds = 0;
-  DateTime? _recordingStartTime; // NEW: Track actual recording start time
+  DateTime? _recordingStartTime;
+
+  // NEW: Lock animation controller
+  AnimationController? _lockAnimationController;
+  Animation<double>? _lockScaleAnimation;
 
   @override
   void initState() {
@@ -54,14 +68,28 @@ class _NativeCameraRecordingScreenState
       vsync: this,
       duration: Duration(seconds: _maxRecordingDurationSeconds),
     );
+
+    // NEW: Initialize lock animation controller
+    _lockAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+
+    _lockScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _lockAnimationController!,
+        curve: Curves.elasticOut,
+      ),
+    );
   }
 
   @override
   void dispose() {
     _cameraController?.dispose();
     _progressController?.dispose();
+    _lockAnimationController?.dispose();
     _recordingTimer?.cancel();
-    _longPressTimer?.cancel();
+    _releaseToleranceTimer?.cancel();
     super.dispose();
   }
 
@@ -83,6 +111,9 @@ class _NativeCameraRecordingScreenState
           : _cameras.firstWhere(
               (c) => c.lensDirection == CameraLensDirection.back,
               orElse: () => _cameras.first);
+
+      // Update rear camera state
+      _isRearCamera = camera.lensDirection == CameraLensDirection.back;
 
       _cameraController = CameraController(
         camera,
@@ -112,54 +143,161 @@ class _NativeCameraRecordingScreenState
     }
   }
 
-  /// Handle tap down - start timer to detect long press
-  void _handleTapDown(TapDownDetails details) {
-    _isLongPress = false;
-    // Reduced from 500ms to 250ms for lower sensitivity
-    _longPressTimer = Timer(const Duration(milliseconds: 250), () {
-      // Long press detected - start video recording
-      _isLongPress = true;
+  // NEW: Camera flip method
+  Future<void> _flipCamera() async {
+    // Prevent flip during recording
+    if (_state == CameraState.recording ||
+        _state == CameraState.recordingLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cannot flip camera during recording'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: appTheme.red_500,
+        ),
+      );
+      return;
+    }
+
+    if (_cameras.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No other camera available'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Light haptic feedback
+      await HapticFeedback.lightImpact();
+
       setState(() {
-        _isPreparing = true; // Show visual feedback immediately
+        _isInitialized = false;
       });
-      _startRecording();
-    });
-  }
 
-  /// Handle tap up - either take photo or stop recording
-  Future<void> _handleTapUp(TapUpDetails details) async {
-    _longPressTimer?.cancel();
+      // Dispose current controller
+      await _cameraController?.dispose();
 
-    setState(() {
-      _isPreparing = false; // Reset preparing state
-    });
+      // Find opposite camera
+      final newCamera = _cameras.firstWhere(
+        (camera) =>
+            camera.lensDirection ==
+            (_isRearCamera
+                ? CameraLensDirection.front
+                : CameraLensDirection.back),
+        orElse: () => _cameras.firstWhere(
+          (camera) =>
+              camera.lensDirection !=
+              (_isRearCamera
+                  ? CameraLensDirection.back
+                  : CameraLensDirection.front),
+          orElse: () => _cameras.first,
+        ),
+      );
 
-    if (_isRecording) {
-      // Check minimum recording duration (500ms) to prevent errors
-      final recordingDuration =
-          DateTime.now().difference(_recordingStartTime ?? DateTime.now());
-      if (recordingDuration.inMilliseconds < 500) {
-        // Too short - show message and continue recording briefly
-        await Future.delayed(
-            Duration(milliseconds: 500 - recordingDuration.inMilliseconds));
+      // Update camera direction state
+      _isRearCamera = newCamera.lensDirection == CameraLensDirection.back;
+
+      // Initialize new controller
+      _cameraController = CameraController(
+        newCamera,
+        kIsWeb ? ResolutionPreset.medium : ResolutionPreset.high,
+        enableAudio: true,
+      );
+
+      await _cameraController!.initialize();
+
+      // Apply platform-specific settings
+      if (!kIsWeb) {
+        try {
+          await _cameraController!.setFocusMode(FocusMode.auto);
+        } catch (e) {
+          print('⚠️ Could not set focus mode: $e');
+        }
       }
 
-      // Stop video recording
-      await _stopRecording();
-    } else if (!_isLongPress) {
-      // Quick tap - take photo
-      await _takePhoto();
+      setState(() {
+        _isInitialized = true;
+      });
+    } catch (e) {
+      print('❌ Error flipping camera: $e');
+      setState(() {
+        _errorMessage = 'Failed to flip camera: ${e.toString()}';
+      });
     }
   }
 
-  /// Handle tap cancel - stop recording if active
-  void _handleTapCancel() {
-    _longPressTimer?.cancel();
+  Future<void> _handleLongPressStart(LongPressStartDetails details) async {
+    if (_state != CameraState.idle) return;
+
+    // Light haptic feedback on press start
+    await HapticFeedback.lightImpact();
+
     setState(() {
-      _isPreparing = false; // Reset preparing state
+      _state = CameraState.preparingVideo;
     });
-    if (_isRecording) {
-      _stopRecording();
+
+    // Start recording after brief preparation
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    if (_state == CameraState.preparingVideo) {
+      await _startRecording();
+    }
+  }
+
+  void _handleLongPressEnd(LongPressEndDetails details) {
+    if (_state == CameraState.recordingLocked) {
+      // Locked - ignore release, tap to stop instead
+      return;
+    }
+
+    if (_state == CameraState.recording && _elapsedSeconds < 2) {
+      // Not locked yet - add release tolerance buffer
+      _releaseToleranceTimer?.cancel();
+      _releaseToleranceTimer = Timer(const Duration(milliseconds: 150), () {
+        if (_state == CameraState.recording) {
+          _handleRecordingStop();
+        }
+      });
+    }
+  }
+
+  void _handleLongPressCancel() {
+    _releaseToleranceTimer?.cancel();
+
+    if (_state == CameraState.preparingVideo) {
+      setState(() {
+        _state = CameraState.idle;
+      });
+    } else if (_state == CameraState.recording && _elapsedSeconds < 2) {
+      _handleRecordingStop();
+    }
+  }
+
+  Future<void> _handleTapWhenLocked() async {
+    if (_state == CameraState.recordingLocked) {
+      await _stopRecording();
+    }
+  }
+
+  Future<void> _handleRecordingStop() async {
+    if (_elapsedSeconds < 1) {
+      // Too short - discard and show toast
+      await _stopRecording(discard: true);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hold longer for video'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: appTheme.red_500,
+          ),
+        );
+      }
+    } else {
+      // Valid recording - save it
+      await _stopRecording();
     }
   }
 
@@ -169,7 +307,12 @@ class _NativeCameraRecordingScreenState
       return;
     }
 
+    if (_state != CameraState.idle) return;
+
     try {
+      // Light haptic feedback
+      await HapticFeedback.lightImpact();
+
       final photoFile = await _cameraController!.takePicture();
 
       // Navigate to story edit screen with photo
@@ -200,26 +343,34 @@ class _NativeCameraRecordingScreenState
   Future<void> _startRecording() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       setState(() {
-        _isPreparing = false;
+        _state = CameraState.idle;
       });
       return;
     }
 
     try {
-      // Start recording immediately
+      // Medium haptic feedback when recording begins
+      await HapticFeedback.mediumImpact();
+
+      // Start recording
       await _cameraController!.startVideoRecording();
-      _recordingStartTime = DateTime.now(); // Track start time
+      _recordingStartTime = DateTime.now();
 
       // Start progress animation
       _progressController?.reset();
       _progressController?.forward();
       _elapsedSeconds = 0;
 
-      // Start timer to track elapsed time and auto-stop at max duration
+      // Start timer to track elapsed time
       _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
           _elapsedSeconds++;
         });
+
+        // Auto-lock after 2 seconds
+        if (_elapsedSeconds == 2 && _state == CameraState.recording) {
+          _lockRecording();
+        }
 
         // Auto-stop at max duration
         if (_elapsedSeconds >= _maxRecordingDurationSeconds) {
@@ -228,13 +379,12 @@ class _NativeCameraRecordingScreenState
       });
 
       setState(() {
-        _isRecording = true;
-        _isPreparing = false; // Recording started successfully
+        _state = CameraState.recording;
       });
     } catch (e) {
       print('❌ Error starting recording: $e');
       setState(() {
-        _isPreparing = false;
+        _state = CameraState.idle;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -244,22 +394,44 @@ class _NativeCameraRecordingScreenState
     }
   }
 
-  Future<void> _stopRecording() async {
+  Future<void> _lockRecording() async {
+    // Light haptic feedback when locking
+    await HapticFeedback.lightImpact();
+
+    setState(() {
+      _state = CameraState.recordingLocked;
+    });
+
+    // Animate lock icon appearance
+    _lockAnimationController?.forward();
+  }
+
+  Future<void> _stopRecording({bool discard = false}) async {
     if (_cameraController == null ||
         !_cameraController!.value.isRecordingVideo) {
       return;
     }
 
     try {
+      // Light haptic feedback when stopping
+      await HapticFeedback.lightImpact();
+
       // Stop timers and animation
       _recordingTimer?.cancel();
       _progressController?.stop();
+      _lockAnimationController?.reset();
+      _releaseToleranceTimer?.cancel();
 
       final videoFile = await _cameraController!.stopVideoRecording();
 
       setState(() {
-        _isRecording = false;
+        _state = CameraState.idle;
       });
+
+      if (discard) {
+        // Just discard the file, don't navigate
+        return;
+      }
 
       // Navigate to story edit screen with video
       if (mounted) {
@@ -278,6 +450,9 @@ class _NativeCameraRecordingScreenState
       }
     } catch (e) {
       print('❌ Error stopping recording: $e');
+      setState(() {
+        _state = CameraState.idle;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to save recording')),
@@ -404,7 +579,8 @@ class _NativeCameraRecordingScreenState
               ],
             ),
 
-            SizedBox(width: 40.h), // Balance for close button
+            // Empty spacer to maintain layout balance
+            SizedBox(width: 40.h),
           ],
         ),
       ),
@@ -416,157 +592,285 @@ class _NativeCameraRecordingScreenState
       bottom: 40.h,
       left: 0,
       right: 0,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          // Recording indicator with timer
-          if (_isRecording)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: appTheme.red_500,
-                borderRadius: BorderRadius.circular(20.h),
+          // Main recording button in center
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Recording indicator with timer
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _buildStateIndicator(),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8.h,
-                    height: 8.h,
-                    decoration: BoxDecoration(
-                      color: appTheme.gray_50,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  SizedBox(width: 8.h),
-                  Text(
-                    'Recording ${_formatTime(_elapsedSeconds)}/${_formatTime(_maxRecordingDurationSeconds)}',
-                    style: TextStyleHelper.instance.body14Bold
-                        .copyWith(color: appTheme.gray_50),
-                  ),
-                ],
-              ),
-            ),
 
-          // Preparing indicator
-          if (_isPreparing && !_isRecording)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
-              margin: EdgeInsets.only(bottom: 8.h),
-              decoration: BoxDecoration(
-                color: appTheme.red_500.withAlpha(179),
-                borderRadius: BorderRadius.circular(20.h),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 12.h,
-                    height: 12.h,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: appTheme.gray_50,
-                    ),
-                  ),
-                  SizedBox(width: 8.h),
-                  Text(
-                    'Preparing...',
-                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50),
-                  ),
-                ],
-              ),
-            ),
+              SizedBox(height: 16.h),
 
-          // Instruction text
-          if (!_isRecording && !_isPreparing)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
-              margin: EdgeInsets.only(bottom: 8.h),
-              decoration: BoxDecoration(
-                color: Colors.black.withAlpha(128),
-                borderRadius: BorderRadius.circular(20.h),
-              ),
-              child: Text(
-                'Tap for photo • Hold for video',
-                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
-              ),
-            ),
-
-          SizedBox(height: 16.h),
-
-          // Record button with circular progress indicator - MADE BIGGER
-          GestureDetector(
-            onTapDown: _handleTapDown,
-            onTapUp: _handleTapUp,
-            onTapCancel: _handleTapCancel,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Animated circular progress ring (increased size)
-                if (_isRecording)
-                  AnimatedBuilder(
-                    animation: _progressController!,
-                    builder: (context, child) {
-                      return CustomPaint(
-                        size: Size(100.h, 100.h), // Increased from 80.h
-                        painter: _CircularProgressPainter(
-                          progress: _progressController!.value,
-                          strokeWidth: 4.0,
-                          progressColor: appTheme.red_500,
+              // Record button with gestures
+              GestureDetector(
+                onTap: _state == CameraState.recordingLocked
+                    ? _handleTapWhenLocked
+                    : _takePhoto,
+                onLongPressStart: _handleLongPressStart,
+                onLongPressEnd: _handleLongPressEnd,
+                onLongPressCancel: _handleLongPressCancel,
+                child: AnimatedScale(
+                  scale: _state == CameraState.preparingVideo ? 0.95 : 1.0,
+                  duration: const Duration(milliseconds: 100),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Animated circular progress ring
+                      if (_state == CameraState.recording ||
+                          _state == CameraState.recordingLocked)
+                        AnimatedBuilder(
+                          animation: _progressController!,
+                          builder: (context, child) {
+                            return CustomPaint(
+                              size: Size(100.h, 100.h),
+                              painter: _CircularProgressPainter(
+                                progress: _progressController!.value,
+                                strokeWidth: 4.0,
+                                progressColor: appTheme.red_500,
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
 
-                // Static white border when not recording (increased size)
-                if (!_isRecording)
-                  Container(
-                    width: 100.h, // Increased from 80.h
-                    height: 100.h, // Increased from 80.h
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _isPreparing
-                            ? appTheme.red_500.withAlpha(179)
-                            : appTheme.gray_50,
-                        width: _isPreparing ? 5 : 4,
-                      ),
-                    ),
-                  ),
-
-                // Inner button with pulsing animation when recording (increased size)
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: _isRecording
-                      ? 32.h
-                      : 80.h, // Increased from 28.h and 64.h
-                  height: _isRecording
-                      ? 32.h
-                      : 80.h, // Increased from 28.h and 64.h
-                  decoration: BoxDecoration(
-                    color: appTheme.red_500,
-                    shape: _isRecording ? BoxShape.rectangle : BoxShape.circle,
-                    borderRadius:
-                        _isRecording ? BorderRadius.circular(6.h) : null,
-                    boxShadow: (_isRecording || _isPreparing)
-                        ? [
-                            BoxShadow(
-                              color: appTheme.red_500.withAlpha(128),
-                              blurRadius: 12.h,
-                              spreadRadius: 2.h,
+                      // Static border when idle or preparing
+                      if (_state == CameraState.idle ||
+                          _state == CameraState.preparingVideo)
+                        Container(
+                          width: 100.h,
+                          height: 100.h,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: _state == CameraState.preparingVideo
+                                  ? appTheme.red_500.withAlpha(179)
+                                  : appTheme.gray_50,
+                              width:
+                                  _state == CameraState.preparingVideo ? 5 : 4,
                             ),
-                          ]
-                        : null,
+                          ),
+                        ),
+
+                      // Inner button with smooth shape transition
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        width: (_state == CameraState.recording ||
+                                _state == CameraState.recordingLocked)
+                            ? 32.h
+                            : 80.h,
+                        height: (_state == CameraState.recording ||
+                                _state == CameraState.recordingLocked)
+                            ? 32.h
+                            : 80.h,
+                        decoration: BoxDecoration(
+                          color: appTheme.red_500,
+                          shape: (_state == CameraState.recording ||
+                                  _state == CameraState.recordingLocked)
+                              ? BoxShape.rectangle
+                              : BoxShape.circle,
+                          borderRadius: (_state == CameraState.recording ||
+                                  _state == CameraState.recordingLocked)
+                              ? BorderRadius.circular(6.h)
+                              : null,
+                          boxShadow: (_state != CameraState.idle)
+                              ? [
+                                  BoxShadow(
+                                    color: appTheme.red_500.withAlpha(128),
+                                    blurRadius: 12.h,
+                                    spreadRadius: 2.h,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+
+          // TikTok-style vertical control stack on bottom right
+          Positioned(
+            right: 16.h,
+            bottom: 20.h,
+            child: _buildVerticalControlStack(),
           ),
         ],
       ),
     );
+  }
+
+  /// NEW METHOD: TikTok-style vertical button stack (lock + volume/mute)
+  Widget _buildVerticalControlStack() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Lock button - shows when recording is locked
+        AnimatedOpacity(
+          opacity: _state == CameraState.recordingLocked ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: _state == CameraState.recordingLocked
+              ? GestureDetector(
+                  onTap: _handleTapWhenLocked,
+                  child: Container(
+                    padding: EdgeInsets.all(12.h),
+                    decoration: BoxDecoration(
+                      color: appTheme.deep_purple_A100,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: appTheme.deep_purple_A100.withAlpha(102),
+                          blurRadius: 8.h,
+                          spreadRadius: 2.h,
+                        ),
+                      ],
+                    ),
+                    child: ScaleTransition(
+                      scale: _lockScaleAnimation!,
+                      child: Icon(
+                        Icons.lock,
+                        color: appTheme.gray_50,
+                        size: 24.h,
+                      ),
+                    ),
+                  ),
+                )
+              : SizedBox.shrink(),
+        ),
+
+        if (_state == CameraState.recordingLocked) SizedBox(height: 16.h),
+
+        // Camera flip button - always visible
+        GestureDetector(
+          onTap: _flipCamera,
+          child: Container(
+            padding: EdgeInsets.all(12.h),
+            decoration: BoxDecoration(
+              color: Colors.black.withAlpha(128),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.flip_camera_ios,
+              color: appTheme.gray_50,
+              size: 24.h,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStateIndicator() {
+    switch (_state) {
+      case CameraState.recording:
+        return Container(
+          key: ValueKey('recording'),
+          padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: appTheme.red_500,
+            borderRadius: BorderRadius.circular(20.h),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8.h,
+                height: 8.h,
+                decoration: BoxDecoration(
+                  color: appTheme.gray_50,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              SizedBox(width: 8.h),
+              Text(
+                'Recording ${_formatTime(_elapsedSeconds)}/${_formatTime(_maxRecordingDurationSeconds)}',
+                style: TextStyleHelper.instance.body14Bold
+                    .copyWith(color: appTheme.gray_50),
+              ),
+            ],
+          ),
+        );
+
+      case CameraState.recordingLocked:
+        return Container(
+          key: ValueKey('locked'),
+          padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: appTheme.deep_purple_A100,
+            borderRadius: BorderRadius.circular(20.h),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ScaleTransition(
+                scale: _lockScaleAnimation!,
+                child: Icon(
+                  Icons.lock,
+                  color: appTheme.gray_50,
+                  size: 16.h,
+                ),
+              ),
+              SizedBox(width: 8.h),
+              Text(
+                'Locked • Tap to stop ${_formatTime(_elapsedSeconds)}/${_formatTime(_maxRecordingDurationSeconds)}',
+                style: TextStyleHelper.instance.body14Bold
+                    .copyWith(color: appTheme.gray_50),
+              ),
+            ],
+          ),
+        );
+
+      case CameraState.preparingVideo:
+        return Container(
+          key: ValueKey('preparing'),
+          padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: appTheme.red_500.withAlpha(179),
+            borderRadius: BorderRadius.circular(20.h),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 12.h,
+                height: 12.h,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: appTheme.gray_50,
+                ),
+              ),
+              SizedBox(width: 8.h),
+              Text(
+                'Preparing...',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.gray_50),
+              ),
+            ],
+          ),
+        );
+
+      case CameraState.idle:
+      default:
+        return Container(
+          key: ValueKey('idle'),
+          padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(128),
+            borderRadius: BorderRadius.circular(20.h),
+          ),
+          child: Text(
+            'Tap for photo • Hold for video',
+            style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
+          ),
+        );
+    }
   }
 
   /// Format seconds to MM:SS

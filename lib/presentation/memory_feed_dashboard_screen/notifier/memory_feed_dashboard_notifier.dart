@@ -2,6 +2,7 @@ import '../../../core/app_export.dart';
 import '../../../services/feed_service.dart';
 import '../../../services/supabase_service.dart';
 import '../model/memory_feed_dashboard_model.dart';
+import '../../../utils/storage_utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 part 'memory_feed_dashboard_state.dart';
@@ -103,23 +104,38 @@ class MemoryFeedDashboardNotifier
     print('🔔 REALTIME: New story detected: ${payload.newRecord['id']}');
 
     try {
-      // Fetch full story details with joins
       final storyId = payload.newRecord['id'] as String;
+      final contributorId = payload.newRecord['contributor_id'] as String;
+      final rawThumbnailUrl = payload.newRecord['thumbnail_url'] as String?;
       final client = SupabaseService.instance.client;
 
       if (client == null) return;
 
-      final response = await client.from('stories').select('''
-            id,
-            thumbnail_url,
-            video_url,
-            created_at,
-            contributor_id,
-            memory_id,
-            user_profiles!contributor_id(
-              avatar_url,
-              display_name
-            ),
+      // CRITICAL FIX: Resolve media URLs BEFORE creating story object
+      final resolvedThumbnailUrl =
+          StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
+
+      print('🔍 REALTIME: Raw thumbnail URL: $rawThumbnailUrl');
+      print('🔍 REALTIME: Resolved thumbnail URL: $resolvedThumbnailUrl');
+
+      // CRITICAL FIX: Fetch contributor profile separately to get avatar data
+      final profileResponse = await client
+          .from('user_profiles')
+          .select('id, display_name, avatar_url')
+          .eq('id', contributorId)
+          .single();
+
+      if (_isDisposed) return;
+
+      // CRITICAL FIX: Resolve avatar URL from profile
+      final rawAvatarUrl = profileResponse['avatar_url'] as String?;
+      final resolvedAvatarUrl = StorageUtils.resolveAvatarUrl(rawAvatarUrl);
+
+      print('🔍 REALTIME: Raw avatar URL: $rawAvatarUrl');
+      print('🔍 REALTIME: Resolved avatar URL: $resolvedAvatarUrl');
+
+      // Fetch memory and category data
+      final memoryResponse = await client.from('stories').select('''
             memories!memory_id(
               title,
               memory_categories(
@@ -131,19 +147,25 @@ class MemoryFeedDashboardNotifier
 
       if (_isDisposed) return;
 
+      // Create story data with RESOLVED URLs
       final newStoryData = HappeningNowStoryData(
-        id: response['id'] as String,
-        backgroundImage: response['thumbnail_url'] as String,
-        profileImage: response['user_profiles']['avatar_url'] as String,
-        userName: response['user_profiles']['display_name'] as String,
-        categoryName:
-            response['memories']['memory_categories']['name'] as String,
-        categoryIcon:
-            response['memories']['memory_categories']['icon_url'] as String? ??
-                '',
+        id: storyId,
+        backgroundImage: resolvedThumbnailUrl ?? '', // ✅ RESOLVED URL
+        profileImage: resolvedAvatarUrl ?? '', // ✅ RESOLVED URL
+        userName: profileResponse['display_name'] as String? ?? 'Unknown User',
+        categoryName: memoryResponse['memories']['memory_categories']['name']
+                as String? ??
+            '',
+        categoryIcon: memoryResponse['memories']['memory_categories']
+                ['icon_url'] as String? ??
+            '',
         timestamp: 'Just now',
         isViewed: false,
       );
+
+      print('✅ REALTIME: Story object created with resolved URLs');
+      print('   Thumbnail: ${newStoryData.backgroundImage}');
+      print('   Avatar: ${newStoryData.profileImage}');
 
       // Add to happening now at the beginning
       final currentStories =
@@ -156,7 +178,7 @@ class MemoryFeedDashboardNotifier
 
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
 
-      print('✅ REALTIME: New story added to feed');
+      print('✅ REALTIME: New story added to feed with loaded images');
     } catch (e) {
       print('❌ REALTIME: Error handling new story: $e');
     }

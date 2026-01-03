@@ -8,6 +8,7 @@ import 'package:vibration/vibration.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_export.dart';
+import '../../core/utils/memory_categories.dart';
 import '../../services/feed_service.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
@@ -26,11 +27,10 @@ class EventStoriesViewScreen extends ConsumerStatefulWidget {
 class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     with SingleTickerProviderStateMixin {
   String? _initialStoryId;
-  String?
-      _feedType; // Track feed type: 'happening_now', 'trending', or 'memory'
+  String? _feedType;
   List<String> _storyIds = [];
   int _currentIndex = 0;
-  int _startingIndex = 0; // Track where user started viewing from
+  int _startingIndex = 0;
   Map<String, dynamic>? _storyData;
   bool _isLoading = true;
   String? _errorMessage;
@@ -42,13 +42,18 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   // Timer animation controllers
   AnimationController? _timerController;
   bool _isPaused = false;
-  bool _isMuted = false; // Track mute state
+  bool _isMuted = false;
   static const Duration _imageDuration = Duration(seconds: 5);
 
   // Swipe gesture tracking
   double _dragStartY = 0.0;
   double _dragCurrentY = 0.0;
   bool _isDragging = false;
+
+  // NEW: Memory category data
+  String? _memoryCategoryName;
+  String? _memoryCategoryIcon;
+  String? _memoryId;
 
   @override
   void initState() {
@@ -279,6 +284,12 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         return;
       }
 
+      // NEW: Fetch memory category information
+      final memoryId = storyData['memory_id'] as String?;
+      if (memoryId != null) {
+        await _fetchMemoryCategory(memoryId);
+      }
+
       setState(() {
         _storyData = storyData;
         _currentIndex = index;
@@ -307,6 +318,35 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       setState(() {
         _errorMessage = 'Error loading story: ${e.toString()}';
       });
+    }
+  }
+
+  /// NEW METHOD: Fetch memory category data
+  Future<void> _fetchMemoryCategory(String memoryId) async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) return;
+
+      // Join memories with memory_categories to get category data
+      final response = await client
+          .from('memories')
+          .select('id, category_id, memory_categories(name, icon_name)')
+          .eq('id', memoryId)
+          .single();
+
+      final categoryData = response['memory_categories'];
+
+      setState(() {
+        _memoryId = memoryId;
+        _memoryCategoryName = categoryData?['name'] as String?;
+        _memoryCategoryIcon = categoryData?['icon_name'] as String?;
+      });
+
+      print(
+          '✅ DEBUG: Fetched memory category - Name: $_memoryCategoryName, Icon: $_memoryCategoryIcon');
+    } catch (e) {
+      print('⚠️ WARNING: Failed to fetch memory category: $e');
+      // Don't block story loading if category fetch fails
     }
   }
 
@@ -596,14 +636,9 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
           final dragDistance = _dragCurrentY - _dragStartY;
           final velocity = details.primaryVelocity ?? 0;
 
-          // Close if dragged down by 100 pixels or with significant velocity
           if (dragDistance > 100 || velocity > 500) {
-            // Trigger vibration on swipe down gesture
             _triggerHapticFeedback(HapticFeedbackType.medium);
-
-            // CRITICAL FIX: Stop and dispose video BEFORE navigation
             await _stopAndDisposeVideo();
-
             Navigator.of(context).pop();
           }
 
@@ -635,9 +670,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 children: [
                   _buildStoryBackground(),
                   _buildGradientOverlays(),
-                  // Tap zones positioned BELOW UI elements so they don't block interaction
                   _buildTapZones(),
-                  // UI elements rendered ABOVE tap zones
                   SafeArea(
                     child: Column(
                       children: [
@@ -648,10 +681,10 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                       ],
                     ),
                   ),
-                  // Volume control positioned ABOVE tap zones
                   _buildVolumeControl(),
-                  // Explicitly position tappable user profile section on top layer
                   _buildTappableUserProfile(),
+                  // NEW: Category badge in top right
+                  _buildCategoryBadge(),
                 ],
               );
             },
@@ -1239,6 +1272,73 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// NEW METHOD: Build category badge in top right corner
+  Widget _buildCategoryBadge() {
+    // Only show if we have category data
+    if (_memoryCategoryName == null ||
+        _memoryCategoryIcon == null ||
+        _memoryId == null) {
+      return SizedBox.shrink();
+    }
+
+    // Get category emoji from MemoryCategories
+    final category = MemoryCategories.getByName(_memoryCategoryName!);
+
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 20.h,
+      right: 68.h, // Position before menu button
+      child: GestureDetector(
+        onTap: () async {
+          print('🔍 DEBUG: Category badge tapped - Memory ID: $_memoryId');
+
+          // CRITICAL FIX: Stop and dispose video BEFORE navigation
+          await _stopAndDisposeVideo();
+
+          // Navigate to /timeline with parent memory ID
+          // This will show the EventTimelineViewScreen with all stories from this memory
+          Navigator.pushNamed(
+            context,
+            AppRoutes.appTimeline,
+            arguments: _memoryId, // Pass memory ID to load its timeline
+          );
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: appTheme.blackCustom.withAlpha(179),
+            borderRadius: BorderRadius.circular(20.h),
+            border: Border.all(
+              color: appTheme.deep_purple_A200.withAlpha(128),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Category emoji
+              Text(
+                category.emoji,
+                style: TextStyle(fontSize: 18.h),
+              ),
+              SizedBox(width: 6.h),
+              // Category name
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 100.w),
+                child: Text(
+                  _memoryCategoryName!,
+                  style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                      .copyWith(color: appTheme.whiteCustom),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
@@ -23,19 +25,21 @@ class AccountRegistrationScreenState
         backgroundColor: appTheme.gray_900_02,
         body: Form(
           key: _formKey,
-          child: Container(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Container(
-                padding: EdgeInsets.all(24.h),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildLogo(context),
-                    _buildCreateAccountText(context),
-                    _buildRegistrationForm(context),
-                    _buildSignInLink(context),
-                  ],
+          child: AutofillGroup(
+            child: Container(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Container(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildLogo(context),
+                      _buildCreateAccountText(context),
+                      _buildRegistrationForm(context),
+                      _buildSignInLink(context),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -85,6 +89,7 @@ class AccountRegistrationScreenState
           accountRegistrationNotifier,
           (previous, current) {
             if (current.isSuccess ?? false) {
+              TextInput.finishAutofillContext();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Account created successfully!'),
@@ -117,6 +122,7 @@ class AccountRegistrationScreenState
                 hintText: 'Name',
                 prefixIcon: ImageConstant.imgIcon,
                 keyboardType: TextInputType.name,
+                autofillHints: [AutofillHints.name],
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validateName(value),
@@ -134,6 +140,7 @@ class AccountRegistrationScreenState
                 hintText: 'Email',
                 prefixIcon: ImageConstant.imgMail,
                 keyboardType: TextInputType.emailAddress,
+                autofillHints: [AutofillHints.email],
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validateEmail(value),
@@ -151,6 +158,7 @@ class AccountRegistrationScreenState
                 hintText: 'Password',
                 prefixIcon: ImageConstant.imgIcon,
                 isPassword: true,
+                autofillHints: [AutofillHints.newPassword],
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validatePassword(value),
@@ -174,6 +182,7 @@ class AccountRegistrationScreenState
                 hintText: 'Password',
                 prefixIcon: ImageConstant.imgIcon,
                 isPassword: true,
+                autofillHints: [AutofillHints.newPassword],
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validateConfirmPassword(value),
