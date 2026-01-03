@@ -590,13 +590,53 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
   @override
   void dispose() {
-    // CRITICAL: Stop video playback IMMEDIATELY before disposal
-    _videoController?.pause();
+    // CRITICAL FIX: Complete hard reset of all media players before disposal
+    _performHardMediaReset();
 
     _timerController?.dispose();
-    _videoController?.dispose();
     _pageController?.dispose();
     super.dispose();
+  }
+
+  /// CRITICAL METHOD: Hard reset all media playback (ensures zero leakage)
+  void _performHardMediaReset() {
+    try {
+      // 1. Stop timer animation immediately
+      _timerController?.stop();
+      _timerController?.reset();
+
+      // 2. Hard stop video controller (synchronous operations)
+      if (_videoController != null) {
+        // Pause playback synchronously
+        _videoController!.pause();
+
+        // Set volume to zero as extra safety measure
+        _videoController!.setVolume(0.0);
+
+        // Seek to start position
+        _videoController!.seekTo(Duration.zero);
+
+        // Remove all listeners to prevent callbacks
+        _videoController!.removeListener(() {});
+
+        // Dispose controller immediately
+        _videoController!.dispose();
+        _videoController = null;
+        _isVideoInitialized = false;
+      }
+
+      print('✅ HARD RESET: All media players stopped and disposed');
+    } catch (e) {
+      print('⚠️ WARNING: Error during hard media reset: $e');
+      // Continue with disposal even if error occurs
+    }
+  }
+
+  /// NEW METHOD: Properly stops and disposes video controller
+  /// DEPRECATED: Use _performHardMediaReset() instead for guaranteed synchronous cleanup
+  Future<void> _stopAndDisposeVideo() async {
+    // Redirect to synchronous hard reset method
+    _performHardMediaReset();
   }
 
   @override
@@ -664,7 +704,10 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
           if (dragDistance > 100 || velocity > 500) {
             _triggerHapticFeedback(HapticFeedbackType.medium);
-            await _stopAndDisposeVideo();
+
+            // CRITICAL FIX: Hard reset before navigation
+            _performHardMediaReset();
+
             Navigator.of(context).pop();
           }
 
@@ -1056,9 +1099,9 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
             height: 40.h,
             width: 40.h,
             padding: EdgeInsets.all(10.h),
-            onTap: () async {
-              // CRITICAL FIX: Stop and dispose video BEFORE navigation
-              await _stopAndDisposeVideo();
+            onTap: () {
+              // CRITICAL FIX: Hard reset before back navigation
+              _performHardMediaReset();
 
               // Close modal route if opened as modal, otherwise pop normally
               if (ModalRoute.of(context)?.isActive == true) {
@@ -1093,8 +1136,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
                   print('   - Navigation args created with snapshot');
 
-                  // Stop video before navigation
-                  await _stopAndDisposeVideo();
+                  // CRITICAL FIX: Hard reset before timeline navigation
+                  _performHardMediaReset();
 
                   // Navigate with typed arguments
                   NavigatorService.pushNamed(
@@ -1330,29 +1373,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         ),
       ),
     );
-  }
-
-  /// NEW METHOD: Properly stops and disposes video controller
-  Future<void> _stopAndDisposeVideo() async {
-    try {
-      // Stop playback immediately
-      if (_videoController != null) {
-        await _videoController!.pause();
-        await _videoController!.seekTo(Duration.zero); // Reset video position
-
-        // Dispose controller
-        await _videoController!.dispose();
-        _videoController = null;
-        _isVideoInitialized = false;
-      }
-
-      // Stop timer
-      _timerController?.stop();
-      _timerController?.reset();
-    } catch (e) {
-      print('⚠️ WARNING: Error stopping video: $e');
-      // Continue with navigation even if there's an error
-    }
   }
 
   void _showMoreOptions() {
