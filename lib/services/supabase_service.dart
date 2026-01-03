@@ -133,4 +133,23 @@ class SupabaseService {
       return null;
     }
   }
+
+  /// Resolve storage path to full Supabase Storage URL
+  /// Handles both relative paths and already-resolved full URLs
+  String? getStorageUrl(String? path, {String bucket = 'story-media'}) {
+    if (path == null || path.isEmpty) return null;
+
+    // Check if already a full URL
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+
+    // Convert relative path to full Supabase Storage URL
+    try {
+      return client?.storage.from(bucket).getPublicUrl(path);
+    } catch (e) {
+      print('❌ Error resolving storage URL for path: $path - $e');
+      return null;
+    }
+  }
 }

@@ -1,4 +1,5 @@
 import '../../../core/app_export.dart';
+import '../../../services/supabase_service.dart';
 
 /// This class is used for story items in the [memories_dashboard_screen] screen.
 
@@ -16,6 +17,7 @@ class StoryItemModel extends Equatable {
     this.videoUrl,
     this.imageUrl,
     this.contributorName,
+    this.thumbnailUrl,
   }) {
     id = id ?? "";
     backgroundImage = backgroundImage ?? "";
@@ -28,6 +30,7 @@ class StoryItemModel extends Equatable {
     videoUrl = videoUrl ?? "";
     imageUrl = imageUrl ?? "";
     contributorName = contributorName ?? "";
+    thumbnailUrl = thumbnailUrl ?? "";
   }
 
   String? id;
@@ -41,6 +44,57 @@ class StoryItemModel extends Equatable {
   String? videoUrl;
   String? imageUrl;
   String? contributorName;
+  String? thumbnailUrl;
+
+  /// Computed getter for resolved thumbnail URL
+  /// Returns full Supabase Storage URL for thumbnails
+  String get resolvedThumbnailUrl {
+    final supabaseService = SupabaseService.instance;
+
+    if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty) {
+      // Check if already a full URL
+      if (thumbnailUrl!.startsWith('http://') ||
+          thumbnailUrl!.startsWith('https://')) {
+        return thumbnailUrl!;
+      }
+
+      // Resolve relative path to full Supabase Storage URL
+      return supabaseService.getStorageUrl(thumbnailUrl!) ?? thumbnailUrl!;
+    }
+
+    return '';
+  }
+
+  /// Computed getter for resolved media URL
+  /// Returns resolved videoUrl if mediaType is 'video', otherwise returns resolved imageUrl or thumbnailUrl
+  String get resolvedMediaUrl {
+    final supabaseService = SupabaseService.instance;
+
+    if (mediaType == 'video' && videoUrl != null && videoUrl!.isNotEmpty) {
+      // Check if already a full URL
+      if (videoUrl!.startsWith('http://') || videoUrl!.startsWith('https://')) {
+        return videoUrl!;
+      }
+
+      // Resolve relative path to full Supabase Storage URL
+      return supabaseService.getStorageUrl(videoUrl!) ?? videoUrl!;
+    } else {
+      // For images, prioritize imageUrl, fallback to thumbnailUrl
+      final path = imageUrl ?? thumbnailUrl;
+
+      if (path != null && path.isNotEmpty) {
+        // Check if already a full URL
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+          return path;
+        }
+
+        // Resolve relative path to full Supabase Storage URL
+        return supabaseService.getStorageUrl(path) ?? path;
+      }
+    }
+
+    return '';
+  }
 
   StoryItemModel copyWith({
     String? id,
@@ -54,6 +108,7 @@ class StoryItemModel extends Equatable {
     String? videoUrl,
     String? imageUrl,
     String? contributorName,
+    String? thumbnailUrl,
   }) {
     return StoryItemModel(
       id: id ?? this.id,
@@ -67,6 +122,7 @@ class StoryItemModel extends Equatable {
       videoUrl: videoUrl ?? this.videoUrl,
       imageUrl: imageUrl ?? this.imageUrl,
       contributorName: contributorName ?? this.contributorName,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
     );
   }
 
@@ -83,5 +139,6 @@ class StoryItemModel extends Equatable {
         videoUrl,
         imageUrl,
         contributorName,
+        thumbnailUrl,
       ];
 }

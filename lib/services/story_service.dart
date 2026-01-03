@@ -366,19 +366,47 @@ class StoryService {
   }
 
   /// Get story media URL (prioritize video over image)
+  /// FIXED: Now resolves relative paths to full Supabase Storage URLs
   String getStoryMediaUrl(Map<String, dynamic> story) {
+    final supabaseService = SupabaseService.instance;
+
     // CRITICAL FIX: Prioritize thumbnail for story card previews to match /feed behavior
     // Story cards should ALWAYS show thumbnails, not full-resolution media
     if (story['thumbnail_url'] != null &&
         (story['thumbnail_url'] as String).isNotEmpty) {
-      return story['thumbnail_url'] as String;
+      final thumbnailPath = story['thumbnail_url'] as String;
+
+      // Check if already a full URL (starts with http:// or https://)
+      if (thumbnailPath.startsWith('http://') ||
+          thumbnailPath.startsWith('https://')) {
+        return thumbnailPath;
+      }
+
+      // Otherwise, resolve relative path using Supabase Storage
+      return supabaseService.getStorageUrl(thumbnailPath) ?? thumbnailPath;
     }
 
     // Fallback to full media URLs only if thumbnail is missing
     if (story['media_type'] == 'video' && story['video_url'] != null) {
-      return story['video_url'] as String;
+      final videoPath = story['video_url'] as String;
+
+      // Check if already a full URL
+      if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
+        return videoPath;
+      }
+
+      // Resolve relative path
+      return supabaseService.getStorageUrl(videoPath) ?? videoPath;
     } else if (story['image_url'] != null) {
-      return story['image_url'] as String;
+      final imagePath = story['image_url'] as String;
+
+      // Check if already a full URL
+      if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+        return imagePath;
+      }
+
+      // Resolve relative path
+      return supabaseService.getStorageUrl(imagePath) ?? imagePath;
     }
 
     return '';
@@ -388,7 +416,17 @@ class StoryService {
   String getContributorAvatar(Map<String, dynamic> story) {
     final contributor = story['user_profiles'];
     if (contributor != null && contributor['avatar_url'] != null) {
-      return contributor['avatar_url'] as String;
+      final avatarPath = contributor['avatar_url'] as String;
+
+      // Resolve avatar URL if it's a relative path
+      if (!avatarPath.startsWith('http://') &&
+          !avatarPath.startsWith('https://')) {
+        final supabaseService = SupabaseService.instance;
+        return supabaseService.getStorageUrl(avatarPath, bucket: 'avatars') ??
+            avatarPath;
+      }
+
+      return avatarPath;
     }
     return '';
   }
@@ -398,10 +436,29 @@ class StoryService {
     final stories = memory['stories'] as List?;
     if (stories != null && stories.isNotEmpty) {
       final latestStory = stories.first;
+
       if (latestStory['thumbnail_url'] != null) {
-        return latestStory['thumbnail_url'] as String;
+        final thumbnailPath = latestStory['thumbnail_url'] as String;
+
+        // Resolve thumbnail URL if it's a relative path
+        if (!thumbnailPath.startsWith('http://') &&
+            !thumbnailPath.startsWith('https://')) {
+          final supabaseService = SupabaseService.instance;
+          return supabaseService.getStorageUrl(thumbnailPath) ?? thumbnailPath;
+        }
+
+        return thumbnailPath;
       } else if (latestStory['image_url'] != null) {
-        return latestStory['image_url'] as String;
+        final imagePath = latestStory['image_url'] as String;
+
+        // Resolve image URL if it's a relative path
+        if (!imagePath.startsWith('http://') &&
+            !imagePath.startsWith('https://')) {
+          final supabaseService = SupabaseService.instance;
+          return supabaseService.getStorageUrl(imagePath) ?? imagePath;
+        }
+
+        return imagePath;
       }
     }
     return '';
@@ -463,15 +520,38 @@ class StoryService {
       // CRITICAL: Get the correct FULL-RESOLUTION media URL based on media_type
       // This is for story VIEWING, not story card thumbnails
       final mediaType = response['media_type'] as String? ?? 'image';
+      final supabaseService = SupabaseService.instance;
       String mediaUrl = '';
 
       if (mediaType == 'video') {
         // For video viewing, use actual video_url, fallback to thumbnail_url
-        mediaUrl = response['video_url'] ?? response['thumbnail_url'] ?? '';
+        final videoPath =
+            response['video_url'] ?? response['thumbnail_url'] ?? '';
+
+        // Resolve relative path to full URL
+        if (videoPath.isNotEmpty &&
+            !videoPath.startsWith('http://') &&
+            !videoPath.startsWith('https://')) {
+          mediaUrl = supabaseService.getStorageUrl(videoPath) ?? videoPath;
+        } else {
+          mediaUrl = videoPath;
+        }
+
         print('🎬 STORY SERVICE: Video story - using video_url: $mediaUrl');
       } else {
         // For image viewing, use actual image_url, fallback to thumbnail_url
-        mediaUrl = response['image_url'] ?? response['thumbnail_url'] ?? '';
+        final imagePath =
+            response['image_url'] ?? response['thumbnail_url'] ?? '';
+
+        // Resolve relative path to full URL
+        if (imagePath.isNotEmpty &&
+            !imagePath.startsWith('http://') &&
+            !imagePath.startsWith('https://')) {
+          mediaUrl = supabaseService.getStorageUrl(imagePath) ?? imagePath;
+        } else {
+          mediaUrl = imagePath;
+        }
+
         print('📸 STORY SERVICE: Image story - using image_url: $mediaUrl');
       }
 
