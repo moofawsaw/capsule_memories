@@ -56,4 +56,26 @@ class StorageUtils {
         .from('avatars')
         .getPublicUrl(normalized);
   }
+
+  /// Resolves category icon URL from icon_name to full Supabase Storage URL
+  ///
+  /// Returns null for null/empty icon names
+  /// Constructs proper path for category-icons bucket
+  ///
+  /// Example: resolveMemoryCategoryIconUrl('graduation')
+  /// → https://resdvutqgrbbylknaxjp.supabase.co/storage/v1/object/public/category-icons/graduation.svg
+  static String? resolveMemoryCategoryIconUrl(String? iconName) {
+    if (iconName == null || iconName.isEmpty) return null;
+
+    // Normalize: remove any path separators or file extensions
+    String normalized = iconName.replaceAll('/', '').replaceAll('.svg', '');
+
+    // Construct full path with .svg extension
+    String path = '$normalized.svg';
+
+    // Use Supabase client to get public URL from category-icons bucket
+    return Supabase.instance.client.storage
+        .from('category-icons')
+        .getPublicUrl(path);
+  }
 }

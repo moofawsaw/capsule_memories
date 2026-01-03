@@ -8,14 +8,22 @@ import 'package:vibration/vibration.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_export.dart';
-import '../../core/utils/memory_categories.dart';
+import '../../core/utils/memory_nav_args.dart';
 import '../../services/feed_service.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/story_reactions.dart';
 import 'models/event_stories_view_model.dart';
+
+/// Enum for different haptic feedback types
+enum HapticFeedbackType {
+  light, // Subtle feedback for progress transitions
+  medium, // Navigation feedback for swipes
+  selection // Toggle feedback for button presses
+}
 
 class EventStoriesViewScreen extends ConsumerStatefulWidget {
   const EventStoriesViewScreen({Key? key}) : super(key: key);
@@ -327,23 +335,41 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       final client = SupabaseService.instance.client;
       if (client == null) return;
 
-      // Join memories with memory_categories to get category data
-      final response = await client
-          .from('memories')
-          .select('id, category_id, memory_categories(name, icon_name)')
-          .eq('id', memoryId)
-          .single();
+      // ENHANCED: Join with memories table to get full memory context for timeline navigation
+      final response = await client.from('memories').select('''
+            id, 
+            name,
+            created_at,
+            location,
+            visibility,
+            category_id, 
+            memory_categories(name, icon_name)
+          ''').eq('id', memoryId).single();
 
       final categoryData = response['memory_categories'];
+      final iconName = categoryData?['icon_name'] as String?;
 
       setState(() {
         _memoryId = memoryId;
         _memoryCategoryName = categoryData?['name'] as String?;
-        _memoryCategoryIcon = categoryData?['icon_name'] as String?;
+        // CRITICAL FIX: Use StorageUtils to generate database icon URL
+        _memoryCategoryIcon = iconName != null
+            ? StorageUtils.resolveMemoryCategoryIconUrl(iconName)
+            : null;
       });
 
-      print(
-          '✅ DEBUG: Fetched memory category - Name: $_memoryCategoryName, Icon: $_memoryCategoryIcon');
+      // CRITICAL: Store memory data in _storyData for category badge navigation
+      if (_storyData != null) {
+        _storyData!['memory_title'] = response['name'] as String?;
+        _storyData!['memory_date'] = response['created_at'] as String?;
+        _storyData!['memory_location'] = response['location'] as String?;
+        _storyData!['memory_visibility'] = response['visibility'] as String?;
+      }
+
+      print('✅ DEBUG: Fetched memory category - Name: $_memoryCategoryName');
+      print('   - Icon Name: $iconName');
+      print('   - Icon URL: $_memoryCategoryIcon');
+      print('   - Memory Title: ${response['name']}');
     } catch (e) {
       print('⚠️ WARNING: Failed to fetch memory category: $e');
       // Don't block story loading if category fetch fails
@@ -681,10 +707,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                       ],
                     ),
                   ),
-                  _buildVolumeControl(),
                   _buildTappableUserProfile(),
-                  // NEW: Category badge in top right
-                  _buildCategoryBadge(),
                 ],
               );
             },
@@ -1017,6 +1040,11 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   }
 
   Widget _buildTopBar() {
+    // Determine if category badge should be shown
+    final hasCategoryBadge = _memoryCategoryName != null &&
+        _memoryCategoryIcon != null &&
+        _memoryId != null;
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
       child: Row(
@@ -1039,15 +1067,90 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
             },
           ),
           Spacer(),
-          CustomIconButton(
-            iconPath: ImageConstant.imgIcon,
-            backgroundColor: appTheme.blackCustom.withAlpha(128),
-            borderRadius: 20.h,
-            height: 40.h,
-            width: 40.h,
-            padding: EdgeInsets.all(10.h),
-            onTap: () => _showMoreOptions(),
-          ),
+          // NEW: Category badge positioned in header top right
+          if (hasCategoryBadge)
+            GestureDetector(
+              onTap: () async {
+                // CRITICAL FIX: Pass proper MemoryNavArgs with current story data
+                if (_memoryId != null && _storyData != null) {
+                  print('🔍 CATEGORY BADGE: Navigating to timeline');
+                  print('   - Memory ID: $_memoryId');
+
+                  // Create MemoryNavArgs with snapshot from current story data
+                  final navArgs = MemoryNavArgs(
+                    memoryId: _memoryId!,
+                    snapshot: MemorySnapshot(
+                      title: _storyData?['memory_title'] as String? ?? 'Memory',
+                      date: _storyData?['memory_date'] as String? ??
+                          _formatDate(_storyData?['created_at'] as String?),
+                      location: _storyData?['memory_location'] as String?,
+                      categoryIcon: _memoryCategoryIcon,
+                      participantAvatars:
+                          null, // Will be fetched by timeline notifier
+                      isPrivate: _storyData?['memory_visibility'] == 'private',
+                    ),
+                  );
+
+                  print('   - Navigation args created with snapshot');
+
+                  // Stop video before navigation
+                  await _stopAndDisposeVideo();
+
+                  // Navigate with typed arguments
+                  NavigatorService.pushNamed(
+                    AppRoutes.appTimeline,
+                    arguments: navArgs,
+                  );
+                }
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
+                decoration: BoxDecoration(
+                  color: appTheme.blackCustom.withAlpha(153),
+                  borderRadius: BorderRadius.circular(20.h),
+                  border: Border.all(
+                    color: appTheme.whiteCustom.withAlpha(77),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Category icon from database storage bucket
+                    if (_memoryCategoryIcon != null)
+                      CachedNetworkImage(
+                        imageUrl: _memoryCategoryIcon!,
+                        width: 20.h,
+                        height: 20.h,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => SizedBox(
+                          width: 20.h,
+                          height: 20.h,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: appTheme.whiteCustom,
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Icon(
+                          Icons.category,
+                          size: 20.h,
+                          color: appTheme.whiteCustom,
+                        ),
+                      ),
+                    SizedBox(width: 6.h),
+                    // Category name
+                    Text(
+                      _memoryCategoryName!,
+                      style: TextStyleHelper
+                          .instance.body14MediumPlusJakartaSans
+                          .copyWith(color: appTheme.whiteCustom),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1062,8 +1165,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Volume control - positioned above reactions
-        if (storyId != null) _buildVolumeButtonAboveReactions(),
+        // NEW: Bottom right vertical control stack (category badge + volume button)
+        if (storyId != null) _buildBottomRightControls(),
 
         SizedBox(height: 12.h),
 
@@ -1173,41 +1276,57 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   }
 
   Widget _buildVolumeControl() {
-    // This method is now replaced by _buildVolumeButtonAboveReactions
+    // This method is now replaced by _buildBottomRightControls
     // Return empty widget to avoid duplicate rendering
     return SizedBox.shrink();
   }
 
-  /// New method: Volume button positioned above reactions
-  Widget _buildVolumeButtonAboveReactions() {
+  /// NEW METHOD: Bottom right vertical control stack (TikTok-style)
+  /// Contains lock icon button and volume button only (category badge moved to header)
+  Widget _buildBottomRightControls() {
     final mediaType = _storyData?['media_type'] as String? ?? 'image';
-
-    // Only show volume control for videos
-    if (mediaType != 'video' ||
-        _videoController == null ||
-        !_isVideoInitialized) {
-      return SizedBox.shrink();
-    }
+    final showVolumeButton =
+        mediaType == 'video' && _videoController != null && _isVideoInitialized;
 
     return Align(
       alignment: Alignment.centerRight,
       child: Padding(
         padding: EdgeInsets.only(right: 16.h),
-        child: GestureDetector(
-          onTap: _toggleMute,
-          child: Container(
-            width: 44.h,
-            height: 44.h,
-            decoration: BoxDecoration(
-              color: appTheme.blackCustom.withAlpha(128),
-              shape: BoxShape.circle,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Lock icon button (top position in vertical stack)
+            CustomIconButton(
+              iconPath: ImageConstant.imgIcon,
+              backgroundColor: appTheme.blackCustom.withAlpha(128),
+              borderRadius: 20.h,
+              height: 40.h,
+              width: 40.h,
+              padding: EdgeInsets.all(10.h),
+              onTap: () => _showMoreOptions(),
             ),
-            child: Icon(
-              _isMuted ? Icons.volume_off : Icons.volume_up,
-              color: Colors.white,
-              size: 24.h,
-            ),
-          ),
+
+            SizedBox(height: 12.h), // Spacing between controls
+
+            // Volume button (bottom position)
+            if (showVolumeButton)
+              GestureDetector(
+                onTap: _toggleMute,
+                child: Container(
+                  width: 44.h,
+                  height: 44.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.blackCustom.withAlpha(128),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isMuted ? Icons.volume_off : Icons.volume_up,
+                    color: Colors.white,
+                    size: 24.h,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -1277,77 +1396,17 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     );
   }
 
-  /// NEW METHOD: Build category badge in top right corner
-  Widget _buildCategoryBadge() {
-    // Only show if we have category data
-    if (_memoryCategoryName == null ||
-        _memoryCategoryIcon == null ||
-        _memoryId == null) {
-      return SizedBox.shrink();
+  /// NEW METHOD: Format date for snapshot if memory_date not available
+  String _formatDate(String? timestamp) {
+    if (timestamp == null || timestamp.isEmpty) {
+      return DateTime.now().toString().split(' ')[0];
     }
 
-    // Get category emoji from MemoryCategories
-    final category = MemoryCategories.getByName(_memoryCategoryName!);
-
-    return Positioned(
-      top: MediaQuery.of(context).padding.top + 20.h,
-      right: 68.h, // Position before menu button
-      child: GestureDetector(
-        onTap: () async {
-          print('🔍 DEBUG: Category badge tapped - Memory ID: $_memoryId');
-
-          // CRITICAL FIX: Stop and dispose video BEFORE navigation
-          await _stopAndDisposeVideo();
-
-          // Navigate to /timeline with parent memory ID
-          // This will show the EventTimelineViewScreen with all stories from this memory
-          Navigator.pushNamed(
-            context,
-            AppRoutes.appTimeline,
-            arguments: _memoryId, // Pass memory ID to load its timeline
-          );
-        },
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
-          decoration: BoxDecoration(
-            color: appTheme.blackCustom.withAlpha(179),
-            borderRadius: BorderRadius.circular(20.h),
-            border: Border.all(
-              color: appTheme.deep_purple_A200.withAlpha(128),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Category emoji
-              Text(
-                category.emoji,
-                style: TextStyle(fontSize: 18.h),
-              ),
-              SizedBox(width: 6.h),
-              // Category name
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 100.w),
-                child: Text(
-                  _memoryCategoryName!,
-                  style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                      .copyWith(color: appTheme.whiteCustom),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    try {
+      final dateTime = DateTime.parse(timestamp);
+      return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return DateTime.now().toString().split(' ')[0];
+    }
   }
-}
-
-/// Enum for different haptic feedback types
-enum HapticFeedbackType {
-  light, // Subtle feedback for progress transitions
-  medium, // Navigation feedback for swipes
-  selection // Toggle feedback for button presses
 }

@@ -19,15 +19,18 @@ class StoryReactionsWidget extends StatefulWidget {
 class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
   final _reactionService = ReactionService();
   Map<String, int> _counts = {};
-  Map<String, int> _userTapCounts = {}; // Track user's tap count per reaction
+  Map<String, int> _userTapCounts = {};
   bool _loading = true;
   final Map<String, GlobalKey> _reactionKeys = {};
+
+  // Queue for pending database operations
+  final List<Future<void>> _pendingOperations = [];
+  bool _isProcessingQueue = false;
 
   @override
   void initState() {
     super.initState();
     _loadReactions();
-    // Initialize keys for each reaction
     for (final reaction in Reactions.all) {
       _reactionKeys[reaction.id] = GlobalKey();
     }
@@ -36,7 +39,6 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
   @override
   void didUpdateWidget(StoryReactionsWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Reload reactions when story ID changes
     if (oldWidget.storyId != widget.storyId) {
       _loadReactions();
     }
@@ -45,10 +47,8 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
   Future<void> _loadReactions() async {
     setState(() => _loading = true);
     try {
-      // Get total reaction counts for this story
       final counts = await _reactionService.getReactionCounts(widget.storyId);
 
-      // Get user's tap counts for each reaction type
       final userTapCounts = <String, int>{};
       for (final type in Reactions.all) {
         final userCount =
@@ -69,11 +69,10 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
     }
   }
 
-  Future<void> _onReactionTap(ReactionType reaction) async {
+  void _onReactionTap(ReactionType reaction) {
     // Check if user has reached max taps
     final currentUserTaps = _userTapCounts[reaction.id] ?? 0;
     if (currentUserTaps >= ReactionService.maxTapsPerUser) {
-      // Show feedback that max taps reached
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -85,32 +84,58 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
       return;
     }
 
-    // Show floating animation
+    // Immediate visual feedback - show animation
     _showFloatingReaction(reaction);
 
-    // Optimistic update - increment counts
+    // Immediate counter update - no await
     setState(() {
       _counts[reaction.id] = (_counts[reaction.id] ?? 0) + 1;
       _userTapCounts[reaction.id] = (_userTapCounts[reaction.id] ?? 0) + 1;
     });
 
-    try {
-      final success = await _reactionService.addReaction(
-        storyId: widget.storyId,
-        reactionType: reaction.id,
-      );
+    // Queue database operation without blocking
+    _queueReactionOperation(reaction);
+  }
 
-      if (!success) {
-        // Max reached on server, reload to sync
-        await _loadReactions();
-      } else {
+  void _queueReactionOperation(ReactionType reaction) {
+    final operation = _reactionService
+        .addReaction(
+      storyId: widget.storyId,
+      reactionType: reaction.id,
+    )
+        .then((success) {
+      if (success) {
         widget.onReactionAdded?.call();
       }
-    } catch (e) {
+      return success;
+    }).catchError((e) {
       print('❌ ERROR adding reaction: $e');
-      // Revert on error
-      await _loadReactions();
+      return false;
+    });
+
+    _pendingOperations.add(operation);
+
+    if (!_isProcessingQueue) {
+      _processQueue();
     }
+  }
+
+  Future<void> _processQueue() async {
+    _isProcessingQueue = true;
+
+    while (_pendingOperations.isNotEmpty) {
+      final operation = _pendingOperations.removeAt(0);
+      try {
+        await operation;
+      } catch (e) {
+        print('❌ ERROR processing queued reaction: $e');
+      }
+    }
+
+    _isProcessingQueue = false;
+
+    // REMOVED: await _loadReactions() - this was causing widget to reload
+    // Optimistic UI updates are sufficient; no need to sync back from server on every tap
   }
 
   void _showFloatingReaction(ReactionType reaction) {
@@ -125,11 +150,14 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
     final overlayState = Overlay.of(context);
     late OverlayEntry overlayEntry;
 
+    // Add slight random horizontal offset for multiple emojis
+    final randomOffset = (DateTime.now().millisecond % 40) - 20.0;
+
     overlayEntry = OverlayEntry(
       builder: (context) => FloatingReactionAnimation(
         emoji: reaction.display,
         startPosition: Offset(
-          position.dx + size.width / 2,
+          position.dx + size.width / 2 + randomOffset,
           position.dy + size.height / 2,
         ),
         onComplete: () => overlayEntry.remove(),
@@ -155,23 +183,31 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top row: Text-only reactions (LOL, HOTT, WILD, OMG)
-        Wrap(
-          spacing: 8.h,
-          runSpacing: 8.h,
+        // Top row: Text-only reactions (LOL, HOTT, WILD, OMG) - Full width distributed evenly
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: Reactions.textReactions.map((reaction) {
-            return _buildReactionButton(reaction, isTextReaction: true);
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.h),
+                child: _buildReactionButton(reaction, isTextReaction: true),
+              ),
+            );
           }).toList(),
         ),
         SizedBox(height: 12.h),
-        // Bottom row: Emoji-only reactions with larger size
-        Wrap(
-          spacing: 8.h,
-          runSpacing: 8.h,
+        // Bottom row: Emoji-only reactions with larger size - Full width distributed evenly
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: Reactions.emojiReactions.map((reaction) {
-            return _buildReactionButton(reaction, isTextReaction: false);
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.h),
+                child: _buildReactionButton(reaction, isTextReaction: false),
+              ),
+            );
           }).toList(),
         ),
       ],
@@ -190,15 +226,16 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
       onTap: () => _onReactionTap(reaction),
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: isTextReaction ? 16.h : 12.h,
+          horizontal: isTextReaction ? 12.h : 8.h,
           vertical: isTextReaction ? 10.h : 8.h,
         ),
         decoration: BoxDecoration(
           color: appTheme.whiteCustom.withAlpha(26),
           borderRadius: BorderRadius.circular(20.h),
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Opacity(
               opacity: isMaxedOut ? 0.5 : 1.0,
@@ -210,35 +247,17 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
                       isTextReaction ? FontWeight.bold : FontWeight.normal,
                   color: isTextReaction ? appTheme.whiteCustom : null,
                 ),
+                textAlign: TextAlign.center,
               ),
             ),
             if (count > 0) ...[
-              SizedBox(width: 6.h),
+              SizedBox(height: 4.h),
               Text(
                 count.toString(),
                 style: TextStyle(
-                  fontSize: isTextReaction ? 14.fSize : 16.fSize,
+                  fontSize: isTextReaction ? 12.fSize : 14.fSize,
                   fontWeight: FontWeight.bold,
                   color: appTheme.whiteCustom.withAlpha(179),
-                ),
-              ),
-            ],
-            // Show user's tap count if they have reacted
-            if (userTaps > 0) ...[
-              SizedBox(width: 4.h),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6.h, vertical: 2.h),
-                decoration: BoxDecoration(
-                  color: appTheme.colorFF3A3A,
-                  borderRadius: BorderRadius.circular(10.h),
-                ),
-                child: Text(
-                  userTaps.toString(),
-                  style: TextStyle(
-                    fontSize: 10.fSize,
-                    fontWeight: FontWeight.bold,
-                    color: appTheme.whiteCustom,
-                  ),
                 ),
               ),
             ],

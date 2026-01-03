@@ -1,5 +1,4 @@
 import '../../../core/app_export.dart';
-import '../../../core/utils/memory_categories.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../models/story_item_model.dart';
 
@@ -19,18 +18,11 @@ class StoryGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get category emoji from MemoryCategories
-    String categoryEmoji = '';
-    if (model?.categoryText != null) {
-      final category = MemoryCategories.getByName(model!.categoryText!);
-      categoryEmoji = category.emoji;
-    }
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: width ?? 116.h,
-        height: height ?? 250.h,
+        height: height ?? 300.h,
         decoration: BoxDecoration(
           color: appTheme.gray_900_01,
           borderRadius: BorderRadius.circular(1.h),
@@ -77,7 +69,8 @@ class StoryGridItem extends StatelessWidget {
                         .copyWith(color: appTheme.white_A700),
                   ),
                   SizedBox(height: 18.h),
-                  if (model?.categoryText != null && categoryEmoji.isNotEmpty)
+                  if (model?.categoryText != null &&
+                      (model?.categoryIcon?.isNotEmpty ?? false))
                     Container(
                       padding:
                           EdgeInsets.symmetric(horizontal: 6.h, vertical: 4.h),
@@ -89,9 +82,11 @@ class StoryGridItem extends StatelessWidget {
                         spacing: 6.h,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            categoryEmoji,
-                            style: TextStyle(fontSize: 18.h),
+                          CustomImageView(
+                            imagePath: model?.categoryIcon ?? '',
+                            width: 18.h,
+                            height: 18.h,
+                            fit: BoxFit.contain,
                           ),
                           Text(
                             model?.categoryText ?? '',

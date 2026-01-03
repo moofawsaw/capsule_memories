@@ -1,7 +1,6 @@
 import '../core/app_export.dart';
-import '../core/utils/memory_categories.dart';
-import './custom_icon_button.dart';
 import './custom_image_view.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /** 
  * CustomEventCard - A reusable event card component that displays event information
@@ -14,6 +13,7 @@ import './custom_image_view.dart';
  * - Interactive back navigation and icon button
  * - Responsive design with consistent styling
  * - Flexible content configuration
+ * - Database-backed category icons from category-icons bucket
  */
 class CustomEventCard extends StatelessWidget {
   final String? eventTitle;
@@ -45,27 +45,6 @@ class CustomEventCard extends StatelessWidget {
     print('   - eventDate: "$eventDate"');
     print('   - participantImages count: ${participantImages?.length ?? 0}');
     print('   - iconButtonImagePath: "$iconButtonImagePath"');
-    print('   - Using fallback title: ${eventTitle == "Event Title"}');
-    print('   - Using fallback date: ${eventDate == "Event Date"}');
-
-    // Extract category name from icon path URL to look up the proper category
-    String? categoryName;
-    if (iconButtonImagePath != null &&
-        iconButtonImagePath!.contains('icon_url=')) {
-      // Parse category name from Supabase URL format
-      final uri = Uri.parse(iconButtonImagePath!);
-      categoryName = uri.queryParameters['icon_url'];
-      print(
-          '🔍 DEBUG CustomEventCard: Extracted category name = "$categoryName"');
-    }
-
-    // Get category using the same successful pattern as story cards
-    final category = categoryName != null
-        ? MemoryCategories.getByName(categoryName)
-        : MemoryCategories.custom; // fallback to custom category
-
-    print(
-        '🔍 DEBUG CustomEventCard: Using category = "${category.name}" with emoji = "${category.emoji}"');
 
     return Container(
       width: double.infinity,
@@ -114,16 +93,51 @@ class CustomEventCard extends StatelessWidget {
   }
 
   Widget _buildIconButton() {
+    // CRITICAL FIX: Use database icon URL if provided, otherwise fallback
+    final String iconPath =
+        iconButtonImagePath != null && iconButtonImagePath!.isNotEmpty
+            ? iconButtonImagePath!
+            : ImageConstant.imgFrame13;
+
+    print('🔍 DEBUG CustomEventCard: Using icon path = "$iconPath"');
+
     return Padding(
       padding: EdgeInsets.only(top: 14.h),
-      child: CustomIconButton(
-        iconPath: iconButtonImagePath ?? ImageConstant.imgFrame13,
-        height: 36.h,
+      child: Container(
         width: 36.h,
-        backgroundColor: appTheme.color41C124,
-        borderRadius: 18.h,
-        padding: EdgeInsets.all(6.h),
-        onTap: onIconButtonTap,
+        height: 36.h,
+        decoration: BoxDecoration(
+          color: appTheme.color41C124,
+          borderRadius: BorderRadius.circular(18.h),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18.h),
+          child: CachedNetworkImage(
+            imageUrl: iconPath,
+            width: 36.h,
+            height: 36.h,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Center(
+              child: SizedBox(
+                width: 20.h,
+                height: 20.h,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: appTheme.whiteCustom,
+                ),
+              ),
+            ),
+            errorWidget: (context, url, error) {
+              // Fallback to local asset if database icon fails
+              return CustomImageView(
+                imagePath: ImageConstant.imgFrame13,
+                width: 36.h,
+                height: 36.h,
+                fit: BoxFit.cover,
+              );
+            },
+          ),
+        ),
       ),
     );
   }
