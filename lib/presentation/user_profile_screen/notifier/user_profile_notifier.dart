@@ -67,7 +67,8 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
         return StoryItemModel(
           userName: contributor?['display_name'] ?? 'Unknown User',
           userAvatar: _storyService.getContributorAvatar(story),
-          backgroundImage: StoryService.getStoryMediaUrl(story['thumbnail_url'] as String?),
+          backgroundImage: StoryService.resolveStoryMediaUrl(
+              story['thumbnail_url'] as String?),
           categoryText: category?['name'] ?? 'Unknown',
           categoryIcon: category?['icon_url'] ?? '',
           timestamp: _storyService.getTimeAgo(
