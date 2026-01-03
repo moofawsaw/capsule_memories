@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './avatar_helper_service.dart';
+import './story_service.dart';
 import './supabase_service.dart';
 
 /// Service for fetching feed data from Supabase
@@ -13,6 +14,9 @@ class FeedService {
 
   // Pagination constants
   static const int _pageSize = 10;
+
+  // CRITICAL FIX: Add StoryService for URL resolution (same pattern as /memories)
+  final _storyService = StoryService();
 
   /// 🛡️ VALIDATION: Validates story data completeness before rendering
   /// Returns true if all critical data is present, false if validation fails
@@ -149,9 +153,12 @@ class FeedService {
           final category =
               memory?['memory_categories'] as Map<String, dynamic>?;
 
+          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
           validatedStories.add({
             'id': item['id'] ?? '',
-            'thumbnail_url': item['thumbnail_url'] ?? '',
+            'thumbnail_url': resolvedThumbnailUrl ?? '',
             'created_at': item['created_at'] ?? '',
             'memory_id': item['memory_id'] ?? '',
             'contributor_name': contributor['display_name'] ?? 'Unknown User',
@@ -342,9 +349,12 @@ class FeedService {
           final category =
               memory?['memory_categories'] as Map<String, dynamic>?;
 
+          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
           validatedStories.add({
             'id': item['id'] ?? '',
-            'thumbnail_url': item['thumbnail_url'] ?? '',
+            'thumbnail_url': resolvedThumbnailUrl ?? '',
             'created_at': item['created_at'] ?? '',
             'view_count': item['view_count'] ?? 0,
             'contributor_name': contributor['display_name'] ?? 'Unknown User',
@@ -419,9 +429,12 @@ class FeedService {
           final category =
               memory?['memory_categories'] as Map<String, dynamic>?;
 
+          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
           validatedStories.add({
             'id': item['id'] ?? '',
-            'thumbnail_url': item['thumbnail_url'] ?? '',
+            'thumbnail_url': resolvedThumbnailUrl ?? '',
             'created_at': item['created_at'] ?? '',
             'memory_id': item['memory_id'] ?? '',
             'contributor_name': contributor['display_name'] ?? 'Unknown User',
@@ -497,9 +510,12 @@ class FeedService {
           final category =
               memory?['memory_categories'] as Map<String, dynamic>?;
 
+          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
           validatedStories.add({
             'id': item['id'] ?? '',
-            'thumbnail_url': item['thumbnail_url'] ?? '',
+            'thumbnail_url': resolvedThumbnailUrl ?? '',
             'created_at': item['created_at'] ?? '',
             'memory_id': item['memory_id'] ?? '',
             'contributor_name': contributor['display_name'] ?? 'Unknown User',
@@ -713,9 +729,12 @@ class FeedService {
           final category =
               memory?['memory_categories'] as Map<String, dynamic>?;
 
+          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
           validatedStories.add({
             'id': item['id'] ?? '',
-            'thumbnail_url': item['thumbnail_url'] ?? '',
+            'thumbnail_url': resolvedThumbnailUrl ?? '',
             'created_at': item['created_at'] ?? '',
             'memory_id': item['memory_id'] ?? '',
             'contributor_name': contributor['display_name'] ?? 'Unknown User',
@@ -995,6 +1014,7 @@ class FeedService {
             created_at,
             view_count,
             contributor_id,
+            memory_id,
             user_profiles!stories_contributor_id_fkey(
               id,
               display_name,
@@ -1012,22 +1032,37 @@ class FeedService {
         caption = textOverlays[0]['text'] as String?;
       }
 
-      // Get the correct media URL based on media_type from database
+      // CRITICAL FIX: Properly resolve video/image URLs from Supabase storage
       final mediaType = response['media_type'] as String? ?? 'image';
       String mediaUrl = '';
 
       if (mediaType == 'video') {
         // For video, prefer video_url, fallback to thumbnail_url
-        mediaUrl = response['video_url'] ?? response['thumbnail_url'] ?? '';
+        final rawVideoPath =
+            response['video_url'] ?? response['thumbnail_url'] ?? '';
+
+        // CRITICAL: Use static helper to resolve storage URL
+        mediaUrl = StoryService.resolveStoryMediaUrl(rawVideoPath) ?? '';
+
+        print(
+            '🎬 FEED SERVICE: Resolved video URL from "$rawVideoPath" to "$mediaUrl"');
       } else {
         // For image, prefer image_url, fallback to thumbnail_url
-        mediaUrl = response['image_url'] ?? response['thumbnail_url'] ?? '';
+        final rawImagePath =
+            response['image_url'] ?? response['thumbnail_url'] ?? '';
+
+        // CRITICAL: Use static helper to resolve storage URL
+        mediaUrl = StoryService.resolveStoryMediaUrl(rawImagePath) ?? '';
+
+        print(
+            '📸 FEED SERVICE: Resolved image URL from "$rawImagePath" to "$mediaUrl"');
       }
 
       return {
         'media_url': mediaUrl,
         'media_type': mediaType,
         'user_name': contributor?['display_name'] ?? 'Unknown User',
+        'user_id': contributor?['id'] ?? '',
         'user_avatar': AvatarHelperService.getAvatarUrl(
           contributor?['avatar_url'],
         ),
@@ -1035,6 +1070,7 @@ class FeedService {
         'location': response['location_name'],
         'caption': caption,
         'view_count': response['view_count'] ?? 0,
+        'memory_id': response['memory_id'] ?? '',
       };
     } catch (e) {
       print('❌ ERROR fetching story details: $e');
