@@ -47,8 +47,11 @@ class CustomPublicMemories extends StatelessWidget {
     return Container(
         margin: margin ?? EdgeInsets.only(top: 30.h, left: 24.h),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _buildSectionHeader(context),
-          SizedBox(height: 24.h),
+          // Only show section header if sectionTitle or sectionIcon is provided
+          if (sectionTitle != null || sectionIcon != null)
+            _buildSectionHeader(context),
+          if (sectionTitle != null || sectionIcon != null)
+            SizedBox(height: 24.h),
           _buildMemoriesScroll(context),
         ]));
   }

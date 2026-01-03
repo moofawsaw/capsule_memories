@@ -140,7 +140,12 @@ class _MemorySelectionBottomSheetState
           );
         }
 
-        if (state.activeMemories?.isEmpty ?? true) {
+        // Use filtered memories if search is active, otherwise use active memories
+        final memoriesToDisplay = state.searchQuery?.isNotEmpty ?? false
+            ? state.filteredMemories
+            : state.activeMemories;
+
+        if (memoriesToDisplay?.isEmpty ?? true) {
           return _buildEmptyState(context);
         }
 
@@ -149,11 +154,16 @@ class _MemorySelectionBottomSheetState
           child: ListView.separated(
             shrinkWrap: true,
             padding: EdgeInsets.symmetric(horizontal: 24.h),
-            itemCount: state.activeMemories!.length,
+            itemCount: memoriesToDisplay!.length,
             separatorBuilder: (context, index) => SizedBox(height: 12.h),
             itemBuilder: (context, index) {
-              final memory = state.activeMemories![index];
+              final memory = memoriesToDisplay[index];
               final isSelected = selectedMemoryId == memory.id;
+              final isPublic = memory.visibility == 'public';
+
+              // Debug logging
+              print(
+                  '🔍 Memory: ${memory.title}, Visibility: ${memory.visibility}, isPublic: $isPublic');
 
               return GestureDetector(
                 onTap: () {
@@ -230,13 +240,11 @@ class _MemorySelectionBottomSheetState
                           ],
                         ),
                       ),
-                      // Camera icon
+                      // Visibility icon
                       Icon(
-                        Icons.photo_camera,
+                        isPublic ? Icons.public : Icons.lock,
                         size: 20.h,
-                        color: isSelected
-                            ? appTheme.deep_purple_A100
-                            : appTheme.blue_gray_300,
+                        color: isPublic ? Colors.green : Colors.pink,
                       ),
                     ],
                   ),

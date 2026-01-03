@@ -367,17 +367,20 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       // Fetch memory details with category join
       final memoryResponse = await client.from('memories').select('''
             id,
-            name,
-            is_private,
+            title,
+            visibility,
             created_at,
             start_time,
             end_time,
+            state,
             memory_categories(name, icon_name)
           ''').eq('id', navArgs.memoryId).single();
 
       print('✅ TIMELINE NOTIFIER: Memory data fetched');
-      print('   - Memory name: ${memoryResponse['name']}');
-      print('   - Is private: ${memoryResponse['is_private']}');
+      print('   - Memory title: ${memoryResponse['title']}');
+      print(
+          '   - Memory state: ${memoryResponse['state']}'); // Log state from DB
+      print('   - Visibility: ${memoryResponse['visibility']}');
 
       // Extract category data
       final categoryData = memoryResponse['memory_categories'];
@@ -411,75 +414,13 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
               .toList() ??
           [];
 
-      // Fetch stories count for validation
-      final storiesResponse = await client
-          .from('stories')
-          .select('id')
-          .eq('memory_id', navArgs.memoryId);
-
-      final storyCount = (storiesResponse as List?)?.length ?? 0;
-
-      // Validate against current state data
-      final currentModel = state.eventTimelineViewModel;
-      final validationResults = <String, bool>{};
-
-      // Compare title
-      final dbTitle = memoryResponse['name'] as String?;
-      validationResults['title'] = currentModel?.eventTitle == dbTitle &&
-          dbTitle != null &&
-          dbTitle.isNotEmpty;
-
-      // Compare memory ID
-      validationResults['memoryId'] =
-          currentModel?.memoryId == navArgs.memoryId;
-
-      // Compare location
-      final dbLocation = memoryResponse['location_name'] as String?;
-      validationResults['location'] =
-          currentModel?.timelineDetail?.centerLocation == dbLocation &&
-              dbLocation != null;
-
-      // Compare visibility
-      final dbVisibility = memoryResponse['visibility'] as String?;
-      validationResults['visibility'] =
-          currentModel?.isPrivate == (dbVisibility == 'private');
-
-      // Compare contributors count
-      validationResults['contributorCount'] =
-          (currentModel?.participantImages?.length ?? 0) ==
-              contributorAvatars.length;
-
-      // Compare stories count
-      validationResults['storiesCount'] =
-          (currentModel?.customStoryItems?.length ?? 0) == storyCount;
-
-      // Log validation results
-      final passedCount =
-          validationResults.values.where((v) => v == true).length;
-      final totalCount = validationResults.length;
-
-      print('📊 VALIDATION RESULTS: $passedCount/$totalCount checks passed');
-      validationResults.forEach((field, isValid) {
-        print(
-            '   ${isValid ? "✅" : "❌"} $field: ${isValid ? "MATCH" : "MISMATCH"}');
-      });
-
-      // If critical fields mismatch, refresh data
-      if (!validationResults['memoryId']! || !validationResults['title']!) {
-        print('⚠️ CRITICAL MISMATCH: Refreshing memory data from database');
-
-        // Force reload from database with validated data
-        await _reloadValidatedData(
-            navArgs.memoryId, memoryResponse, contributorAvatars);
-      }
-
       // Update state with fetched data including creator status
       state = state.copyWith(
         eventTimelineViewModel: EventTimelineViewModel(
           memoryId: navArgs.memoryId,
-          eventTitle: memoryResponse['name'] ?? 'Memory',
+          eventTitle: memoryResponse['title'] ?? 'Memory',
           eventDate: _formatTimestamp(memoryResponse['created_at'] ?? ''),
-          isPrivate: memoryResponse['is_private'] ?? true,
+          isPrivate: memoryResponse['visibility'] == 'private',
           categoryIcon: categoryIconUrl, // Use database icon URL
           participantImages: contributorAvatars,
           timelineDetail: TimelineDetailModel(
@@ -495,9 +436,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
             memoryEndTime: memoryResponse['end_time'] != null
                 ? DateTime.parse(memoryResponse['end_time'] as String)
                 : null,
-            timelineStories:
-                state.eventTimelineViewModel?.timelineDetail?.timelineStories ??
-                    [],
+            timelineStories: [],
           ),
           customStoryItems: [],
         ),
@@ -513,9 +452,212 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           '   - Category icon URL: ${state.eventTimelineViewModel?.categoryIcon}');
       print('   - Is Creator: $isCreator');
       print('   - Is Member: $isMember');
+
+      // CRITICAL FIX: Properly await story loading to ensure stories appear
+      print('🔍 TIMELINE NOTIFIER: Loading stories for memory...');
+      print('   - IMPORTANT: This works for ALL memory states (open & sealed)');
+      await loadMemoryStories(navArgs.memoryId);
+      print('✅ TIMELINE NOTIFIER: Stories loading complete');
     } catch (e, stackTrace) {
       print('❌ ERROR in initializeFromMemory: $e');
       print('Stack trace: $stackTrace');
+    }
+  }
+
+  // CRITICAL FIX: Make _loadMemoryStories public so it can be called from initializeFromMemory
+  Future<void> loadMemoryStories(String memoryId) async {
+    try {
+      print('🔍 TIMELINE DEBUG: Loading stories for memory: $memoryId');
+
+      // CRITICAL FIX: Store memory ID in state immediately for debugging
+      state = state.copyWith(
+        eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
+          memoryId: memoryId,
+        ),
+      );
+
+      // Fetch stories from database
+      final storiesData = await _storyService.fetchMemoryStories(memoryId);
+
+      print(
+          '🔍 TIMELINE DEBUG: Fetched ${storiesData.length} stories from database');
+
+      // CRITICAL FIX: If no stories found, log detailed error and keep loading state
+      if (storiesData.isEmpty) {
+        print('❌ TIMELINE DEBUG: No stories found for memory $memoryId');
+
+        // Verify memory exists
+        final memoryExists = await SupabaseService.instance.client
+            ?.from('memories')
+            .select('id')
+            .eq('id', memoryId)
+            .maybeSingle();
+
+        if (memoryExists == null) {
+          print(
+              '❌ TIMELINE DEBUG: Memory $memoryId does not exist in database');
+          state = state.copyWith(
+            errorMessage: 'Memory not found',
+            isLoading: false,
+          );
+          return;
+        }
+
+        print('✅ TIMELINE DEBUG: Memory exists but has no stories yet');
+
+        // Set empty state but no error - memory exists, just no stories
+        state = state.copyWith(
+          eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
+            customStoryItems: [],
+            timelineDetail: TimelineDetailModel(
+              centerLocation: state
+                      .eventTimelineViewModel?.timelineDetail?.centerLocation ??
+                  'Unknown Location',
+              centerDistance: '0km',
+              timelineStories: [],
+            ),
+          ),
+          errorMessage: null,
+          isLoading: false,
+        );
+        return;
+      }
+
+      // CRITICAL FIX: Extract story IDs in order for cycling
+      _currentMemoryStoryIds =
+          storiesData.map((storyData) => storyData['id'] as String).toList();
+
+      print(
+          '🔍 TIMELINE DEBUG: Story IDs for cycling: $_currentMemoryStoryIds');
+
+      // CRITICAL FIX: Use memory's actual start_time and end_time window
+      // This represents the ACTUAL EVENT DURATION when stories should be positioned
+      final memoryResponse = await SupabaseService.instance.client
+          ?.from('memories')
+          .select('start_time, end_time')
+          .eq('id', memoryId)
+          .single();
+
+      DateTime memoryStartTime;
+      DateTime memoryEndTime;
+
+      if (memoryResponse != null &&
+          memoryResponse['start_time'] != null &&
+          memoryResponse['end_time'] != null) {
+        // Use actual event window from database
+        memoryStartTime =
+            DateTime.parse(memoryResponse['start_time'] as String);
+        memoryEndTime = DateTime.parse(memoryResponse['end_time'] as String);
+
+        print('✅ TIMELINE DEBUG: Using memory window timestamps:');
+        print('   - Event start: $memoryStartTime');
+        print('   - Event end: $memoryEndTime');
+        print(
+            '   - Event duration: ${memoryEndTime.difference(memoryStartTime).inMinutes} minutes');
+      } else {
+        // Fallback: use story timestamps if memory window not available
+        if (storiesData.isNotEmpty) {
+          final storyTimes = storiesData
+              .map((s) => DateTime.parse(s['created_at'] as String))
+              .toList();
+          storyTimes.sort();
+
+          memoryStartTime = storyTimes.first;
+          memoryEndTime = storyTimes.last;
+
+          // Add padding
+          final padding = memoryEndTime.difference(memoryStartTime) * 0.1;
+          memoryStartTime = memoryStartTime.subtract(padding);
+          memoryEndTime = memoryEndTime.add(padding);
+
+          print(
+              '⚠️ TIMELINE DEBUG: Memory window unavailable, using story range with padding');
+          print('   - Earliest story: ${storyTimes.first}');
+          print('   - Latest story: ${storyTimes.last}');
+        } else {
+          // Ultimate fallback
+          memoryEndTime = DateTime.now();
+          memoryStartTime = memoryEndTime.subtract(Duration(hours: 2));
+          print('⚠️ TIMELINE DEBUG: Using default 2-hour fallback window');
+        }
+      }
+
+      // Convert to CustomStoryItem format for horizontal story list
+      final storyItems = storiesData.map((storyData) {
+        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final createdAt = DateTime.parse(storyData['created_at'] as String);
+
+        final backgroundImage = _storyService.getStoryMediaUrl(storyData);
+        final profileImage = AvatarHelperService.getAvatarUrl(
+          contributor?['avatar_url'] as String?,
+        );
+
+        return CustomStoryItem(
+          backgroundImage: backgroundImage,
+          profileImage: profileImage,
+          timestamp: _storyService.getTimeAgo(createdAt),
+          navigateTo: storyData['id'] as String,
+        );
+      }).toList();
+
+      // Create timeline story items positioned within memory window
+      final timelineStories = storiesData.map((storyData) {
+        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final createdAt = DateTime.parse(storyData['created_at'] as String);
+        final storyId = storyData['id'] as String;
+
+        final backgroundImage = _storyService.getStoryMediaUrl(storyData);
+        final profileImage = AvatarHelperService.getAvatarUrl(
+          contributor?['avatar_url'] as String?,
+        );
+
+        print('🔍 TIMELINE STORY: $storyId');
+        print('   - Posted at: $createdAt');
+        print(
+            '   - Minutes after event start: ${createdAt.difference(memoryStartTime).inMinutes}');
+
+        return TimelineStoryItem(
+          backgroundImage: backgroundImage,
+          userAvatar: profileImage,
+          postedAt: createdAt,
+          timeLabel: _storyService.getTimeAgo(createdAt),
+          storyId: storyId,
+        );
+      }).toList();
+
+      // Update state with memory window timeline
+      state = state.copyWith(
+        eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
+          customStoryItems: storyItems,
+          timelineDetail: TimelineDetailModel(
+            centerLocation:
+                state.eventTimelineViewModel?.timelineDetail?.centerLocation ??
+                    'Unknown Location',
+            centerDistance:
+                state.eventTimelineViewModel?.timelineDetail?.centerDistance ??
+                    '0km',
+            memoryStartTime: memoryStartTime,
+            memoryEndTime: memoryEndTime,
+            timelineStories: timelineStories,
+          ),
+        ),
+        errorMessage: null,
+      );
+
+      print('✅ TIMELINE DEBUG: Timeline updated with memory window');
+      print('   - ${storyItems.length} horizontal story items');
+      print('   - ${timelineStories.length} positioned timeline stories');
+      print(
+          '   - Timeline window: $memoryStartTime to $memoryEndTime (${memoryEndTime.difference(memoryStartTime).inMinutes} min)');
+    } catch (e, stackTrace) {
+      print('❌ TIMELINE DEBUG: Error loading memory stories: $e');
+      print('❌ TIMELINE DEBUG: Stack trace: $stackTrace');
+
+      // CRITICAL FIX: Set error state instead of silently failing
+      state = state.copyWith(
+        errorMessage: 'Failed to load memory data. Please try refreshing.',
+        isLoading: false,
+      );
     }
   }
 

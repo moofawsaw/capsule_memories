@@ -65,6 +65,7 @@ class MemoryItem {
   final int? memberCount;
   final String? timeRemaining;
   final DateTime? expiresAt;
+  final String? visibility;
 
   const MemoryItem({
     this.id,
@@ -74,6 +75,7 @@ class MemoryItem {
     this.memberCount,
     this.timeRemaining,
     this.expiresAt,
+    this.visibility,
   });
 
   MemoryItem copyWith({
@@ -84,6 +86,7 @@ class MemoryItem {
     int? memberCount,
     String? timeRemaining,
     DateTime? expiresAt,
+    String? visibility,
   }) {
     return MemoryItem(
       id: id ?? this.id,
@@ -93,6 +96,7 @@ class MemoryItem {
       memberCount: memberCount ?? this.memberCount,
       timeRemaining: timeRemaining ?? this.timeRemaining,
       expiresAt: expiresAt ?? this.expiresAt,
+      visibility: visibility ?? this.visibility,
     );
   }
 
@@ -105,6 +109,7 @@ class MemoryItem {
       'memberCount': memberCount,
       'timeRemaining': timeRemaining,
       'expiresAt': expiresAt?.toIso8601String(),
+      'visibility': visibility,
     };
   }
 
@@ -119,6 +124,7 @@ class MemoryItem {
       expiresAt: json['expiresAt'] != null
           ? DateTime.parse(json['expiresAt'] as String)
           : null,
+      visibility: json['visibility'] as String?,
     );
   }
 }

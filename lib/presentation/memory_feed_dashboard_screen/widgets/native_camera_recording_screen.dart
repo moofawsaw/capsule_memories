@@ -594,105 +594,109 @@ class _NativeCameraRecordingScreenState
       right: 0,
       child: Stack(
         children: [
-          // Main recording button in center
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Recording indicator with timer
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: _buildStateIndicator(),
-              ),
+          // Main recording button in center - EXPLICITLY CENTERED
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Recording indicator with timer
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildStateIndicator(),
+                ),
 
-              SizedBox(height: 16.h),
+                SizedBox(height: 16.h),
 
-              // Record button with gestures
-              GestureDetector(
-                onTap: _state == CameraState.recordingLocked
-                    ? _handleTapWhenLocked
-                    : _takePhoto,
-                onLongPressStart: _handleLongPressStart,
-                onLongPressEnd: _handleLongPressEnd,
-                onLongPressCancel: _handleLongPressCancel,
-                child: AnimatedScale(
-                  scale: _state == CameraState.preparingVideo ? 0.95 : 1.0,
-                  duration: const Duration(milliseconds: 100),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Animated circular progress ring
-                      if (_state == CameraState.recording ||
-                          _state == CameraState.recordingLocked)
-                        AnimatedBuilder(
-                          animation: _progressController!,
-                          builder: (context, child) {
-                            return CustomPaint(
-                              size: Size(100.h, 100.h),
-                              painter: _CircularProgressPainter(
-                                progress: _progressController!.value,
-                                strokeWidth: 4.0,
-                                progressColor: appTheme.red_500,
+                // Record button with gestures - INCREASED SIZE
+                GestureDetector(
+                  onTap: _state == CameraState.recordingLocked
+                      ? _handleTapWhenLocked
+                      : _takePhoto,
+                  onLongPressStart: _handleLongPressStart,
+                  onLongPressEnd: _handleLongPressEnd,
+                  onLongPressCancel: _handleLongPressCancel,
+                  child: AnimatedScale(
+                    scale: _state == CameraState.preparingVideo ? 0.95 : 1.0,
+                    duration: const Duration(milliseconds: 100),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Animated circular progress ring - INCREASED SIZE
+                        if (_state == CameraState.recording ||
+                            _state == CameraState.recordingLocked)
+                          AnimatedBuilder(
+                            animation: _progressController!,
+                            builder: (context, child) {
+                              return CustomPaint(
+                                size: Size(120.h, 120.h),
+                                painter: _CircularProgressPainter(
+                                  progress: _progressController!.value,
+                                  strokeWidth: 4.0,
+                                  progressColor: appTheme.red_500,
+                                ),
+                              );
+                            },
+                          ),
+
+                        // Static border when idle or preparing - INCREASED SIZE
+                        if (_state == CameraState.idle ||
+                            _state == CameraState.preparingVideo)
+                          Container(
+                            width: 120.h,
+                            height: 120.h,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _state == CameraState.preparingVideo
+                                    ? appTheme.red_500.withAlpha(179)
+                                    : appTheme.gray_50,
+                                width: _state == CameraState.preparingVideo
+                                    ? 5
+                                    : 4,
                               ),
-                            );
-                          },
-                        ),
-
-                      // Static border when idle or preparing
-                      if (_state == CameraState.idle ||
-                          _state == CameraState.preparingVideo)
-                        Container(
-                          width: 100.h,
-                          height: 100.h,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: _state == CameraState.preparingVideo
-                                  ? appTheme.red_500.withAlpha(179)
-                                  : appTheme.gray_50,
-                              width:
-                                  _state == CameraState.preparingVideo ? 5 : 4,
                             ),
                           ),
-                        ),
 
-                      // Inner button with smooth shape transition
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeInOut,
-                        width: (_state == CameraState.recording ||
-                                _state == CameraState.recordingLocked)
-                            ? 32.h
-                            : 80.h,
-                        height: (_state == CameraState.recording ||
-                                _state == CameraState.recordingLocked)
-                            ? 32.h
-                            : 80.h,
-                        decoration: BoxDecoration(
-                          color: appTheme.red_500,
-                          shape: (_state == CameraState.recording ||
+                        // Inner button with smooth shape transition - INCREASED SIZE
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeInOut,
+                          width: (_state == CameraState.recording ||
                                   _state == CameraState.recordingLocked)
-                              ? BoxShape.rectangle
-                              : BoxShape.circle,
-                          borderRadius: (_state == CameraState.recording ||
+                              ? 38.h
+                              : 95.h,
+                          height: (_state == CameraState.recording ||
                                   _state == CameraState.recordingLocked)
-                              ? BorderRadius.circular(6.h)
-                              : null,
-                          boxShadow: (_state != CameraState.idle)
-                              ? [
-                                  BoxShadow(
-                                    color: appTheme.red_500.withAlpha(128),
-                                    blurRadius: 12.h,
-                                    spreadRadius: 2.h,
-                                  ),
-                                ]
-                              : null,
+                              ? 38.h
+                              : 95.h,
+                          decoration: BoxDecoration(
+                            color: appTheme.red_500,
+                            shape: (_state == CameraState.recording ||
+                                    _state == CameraState.recordingLocked)
+                                ? BoxShape.rectangle
+                                : BoxShape.circle,
+                            borderRadius: (_state == CameraState.recording ||
+                                    _state == CameraState.recordingLocked)
+                                ? BorderRadius.circular(6.h)
+                                : null,
+                            boxShadow: (_state != CameraState.idle)
+                                ? [
+                                    BoxShadow(
+                                      color: appTheme.red_500.withAlpha(128),
+                                      blurRadius: 12.h,
+                                      spreadRadius: 2.h,
+                                    ),
+                                  ]
+                                : null,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
 
           // TikTok-style vertical control stack on bottom right

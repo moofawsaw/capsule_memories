@@ -852,6 +852,7 @@ class FeedService {
             id,
             title,
             state,
+            created_at,
             expires_at,
             category_id,
             memory_categories:category_id(
@@ -866,12 +867,18 @@ class FeedService {
 
       final activeMemories = (response as List).map((memory) {
         final category = memory['memory_categories'] as Map<String, dynamic>?;
+        final createdAt = DateTime.parse(memory['created_at']);
+        final expiresAt = DateTime.parse(memory['expires_at']);
+
         return {
           'id': memory['id'] ?? '',
           'title': memory['title'] ?? 'Untitled Memory',
           'category_name': category?['name'] ?? 'Custom',
           'category_icon': category?['icon_url'] ?? '',
+          'created_at': memory['created_at'] ?? '',
           'expires_at': memory['expires_at'] ?? '',
+          'created_date': _formatDate(createdAt),
+          'expiration_text': _formatExpirationTime(expiresAt),
         };
       }).toList();
 
@@ -901,6 +908,25 @@ class FeedService {
       'Dec'
     ];
     return '${months[date.month - 1]} ${date.day}';
+  }
+
+  /// Helper method to format expiration time as human-readable text
+  String _formatExpirationTime(DateTime expiresAt) {
+    final now = DateTime.now();
+    final difference = expiresAt.difference(now);
+
+    if (difference.isNegative) {
+      return 'expired';
+    } else if (difference.inMinutes < 60) {
+      final minutes = difference.inMinutes;
+      return 'expires in ${minutes} ${minutes == 1 ? 'minute' : 'minutes'}';
+    } else if (difference.inHours < 24) {
+      final hours = difference.inHours;
+      return 'expires in ${hours} ${hours == 1 ? 'hour' : 'hours'}';
+    } else {
+      final days = difference.inDays;
+      return 'expires in ${days} ${days == 1 ? 'day' : 'days'}';
+    }
   }
 
   /// Helper method to format time

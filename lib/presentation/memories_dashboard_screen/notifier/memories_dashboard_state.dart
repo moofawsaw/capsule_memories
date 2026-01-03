@@ -6,6 +6,8 @@ class MemoriesDashboardState extends Equatable {
   final bool? isError;
   final String? errorMessage;
   final int? selectedTabIndex;
+  final String? selectedOwnership; // NEW: "created" or "joined"
+  final String? selectedState; // NEW: "all", "live", or "sealed"
   final MemoriesDashboardModel? memoriesDashboardModel;
 
   MemoriesDashboardState({
@@ -14,6 +16,8 @@ class MemoriesDashboardState extends Equatable {
     this.isError = false,
     this.errorMessage,
     this.selectedTabIndex = 0,
+    this.selectedOwnership = 'created', // Default: "Created by Me"
+    this.selectedState = 'all', // Default: "All"
     this.memoriesDashboardModel,
   });
 
@@ -24,6 +28,8 @@ class MemoriesDashboardState extends Equatable {
         isError,
         errorMessage,
         selectedTabIndex,
+        selectedOwnership,
+        selectedState,
         memoriesDashboardModel,
       ];
 
@@ -33,6 +39,8 @@ class MemoriesDashboardState extends Equatable {
     bool? isError,
     String? errorMessage,
     int? selectedTabIndex,
+    String? selectedOwnership,
+    String? selectedState,
     MemoriesDashboardModel? memoriesDashboardModel,
   }) {
     return MemoriesDashboardState(
@@ -41,6 +49,8 @@ class MemoriesDashboardState extends Equatable {
       isError: isError ?? this.isError,
       errorMessage: errorMessage ?? this.errorMessage,
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
+      selectedOwnership: selectedOwnership ?? this.selectedOwnership,
+      selectedState: selectedState ?? this.selectedState,
       memoriesDashboardModel:
           memoriesDashboardModel ?? this.memoriesDashboardModel,
     );

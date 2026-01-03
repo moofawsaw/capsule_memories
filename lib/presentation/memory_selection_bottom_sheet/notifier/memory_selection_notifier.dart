@@ -41,6 +41,7 @@ class MemorySelectionNotifier extends StateNotifier<MemorySelectionState> {
               expires_at,
               state,
               contributor_count,
+              visibility,
               memory_categories(
                 name,
                 icon_url
@@ -58,6 +59,10 @@ class MemorySelectionNotifier extends StateNotifier<MemorySelectionState> {
         final expiresAt = DateTime.parse(memory['expires_at'] as String);
         final timeRemaining = _calculateTimeRemaining(expiresAt);
 
+        // Debug logging
+        print(
+            '🔍 DEBUG - Memory from DB: ${memory['title']}, visibility: ${memory['visibility']}');
+
         return MemoryItem(
           id: memory['id'] as String,
           title: memory['title'] as String?,
@@ -66,8 +71,13 @@ class MemorySelectionNotifier extends StateNotifier<MemorySelectionState> {
           memberCount: memory['contributor_count'] as int?,
           timeRemaining: timeRemaining,
           expiresAt: expiresAt,
+          visibility: memory['visibility'] as String?,
         );
       }).toList();
+
+      print('🔍 DEBUG - Total memories loaded: ${memories.length}');
+      print(
+          '🔍 DEBUG - Visibility values: ${memories.map((m) => '${m.title}: ${m.visibility}').join(', ')}');
 
       state = MemorySelectionState(
         isLoading: false,

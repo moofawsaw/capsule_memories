@@ -87,16 +87,17 @@ class EventTimelineViewScreenState
 
         if (!isValid) {
           print('⚠️ TIMELINE: Data validation detected mismatches');
-          // Optionally show user feedback
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Memory data refreshed from database'),
-                duration: Duration(seconds: 2),
-                backgroundColor: appTheme.deep_purple_A100,
-              ),
-            );
-          }
+          // REMOVED: Toast message that was showing when clicking memory card
+          // User requested to remove "Memory data refreshed from database" toast
+          // if (mounted) {
+          //   ScaffoldMessenger.of(context).showSnackBar(
+          //     SnackBar(
+          //       content: Text('Memory data refreshed from database'),
+          //       duration: Duration(seconds: 2),
+          //       backgroundColor: appTheme.deep_purple_A100,
+          //     ),
+          //   );
+          // }
         }
       });
     });

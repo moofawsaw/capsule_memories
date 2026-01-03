@@ -66,6 +66,23 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
   }
 
   Widget _buildMemoryCard(BuildContext context, Map<String, dynamic> memory) {
+    // Calculate if expiration is less than 3 hours for text color
+    bool isExpiringUrgently = false;
+    final expirationText = memory['expiration_text'] ?? '';
+    if (expirationText.isNotEmpty) {
+      final regex = RegExp(r'(\d+)\s*(hour|minute)');
+      final match = regex.firstMatch(expirationText);
+      if (match != null) {
+        final value = int.tryParse(match.group(1) ?? '0') ?? 0;
+        final unit = match.group(2);
+        if (unit == 'hour' && value < 3) {
+          isExpiringUrgently = true;
+        } else if (unit == 'minute') {
+          isExpiringUrgently = true;
+        }
+      }
+    }
+
     return GestureDetector(
       onTap: () {
         Navigator.pop(context);
@@ -85,10 +102,6 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
         decoration: BoxDecoration(
           color: appTheme.blue_gray_900_01,
           borderRadius: BorderRadius.circular(12.h),
-          border: Border.all(
-            color: appTheme.blue_gray_300.withAlpha(51),
-            width: 1,
-          ),
         ),
         child: Row(
           children: [
@@ -105,27 +118,78 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    memory['title'] ?? 'Untitled Memory',
-                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          memory['title'] ?? 'Untitled Memory',
+                          style: TextStyleHelper
+                              .instance.title16BoldPlusJakartaSans
+                              .copyWith(color: appTheme.gray_50),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(width: 8.h),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8.h,
+                          vertical: 4.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: memory['visibility'] == 'public'
+                              ? appTheme.green_500.withAlpha(26)
+                              : appTheme.pink_200.withAlpha(26),
+                          borderRadius: BorderRadius.circular(12.h),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              memory['visibility'] == 'public'
+                                  ? Icons.public
+                                  : Icons.lock,
+                              size: 14.h,
+                              color: memory['visibility'] == 'public'
+                                  ? appTheme.green_500
+                                  : Colors.pinkAccent,
+                            ),
+                            SizedBox(width: 4.h),
+                            Text(
+                              memory['visibility'] == 'public'
+                                  ? 'Public'
+                                  : 'Private',
+                              style: TextStyleHelper
+                                  .instance.body12MediumPlusJakartaSans
+                                  .copyWith(
+                                color: memory['visibility'] == 'public'
+                                    ? appTheme.green_500
+                                    : Colors.pinkAccent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 4.h),
+                  SizedBox(height: 8.h),
                   Text(
-                    memory['category_name'] ?? 'Custom',
+                    'created at: ${memory['created_date'] ?? 'Unknown'}',
                     style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
+                        .copyWith(color: appTheme.blue_gray_300.withAlpha(179)),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    memory['expiration_text'] ?? 'No expiration',
+                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                        .copyWith(
+                      color: isExpiringUrgently
+                          ? appTheme.deep_orange_A700
+                          : appTheme.blue_gray_300.withAlpha(179),
+                    ),
                   ),
                 ],
               ),
-            ),
-            CustomImageView(
-              imagePath: ImageConstant.imgArrowLeft,
-              width: 20.h,
-              height: 20.h,
-              color: appTheme.gray_50,
             ),
           ],
         ),

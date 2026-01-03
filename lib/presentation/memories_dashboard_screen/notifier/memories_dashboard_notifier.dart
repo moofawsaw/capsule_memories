@@ -2,6 +2,7 @@ import '../../../core/app_export.dart';
 import '../../../services/memory_cache_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/memories_dashboard_model.dart';
+import '../models/memory_item_model.dart';
 
 part 'memories_dashboard_state.dart';
 
@@ -42,6 +43,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       state = state.copyWith(
         isLoading: false,
         selectedTabIndex: 0,
+        selectedOwnership: 'created', // Default: "Created by Me"
+        selectedState: 'all', // Default: "All"
       );
 
       print('✅ MEMORIES DEBUG: Initialization complete');
@@ -86,6 +89,61 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
   void updateSelectedTabIndex(int index) {
     state = state.copyWith(selectedTabIndex: index);
+  }
+
+  /// Update ownership filter ("created" or "joined")
+  void updateOwnershipFilter(String ownership) {
+    print('🔍 MEMORIES DEBUG: Updating ownership filter to: $ownership');
+    state = state.copyWith(selectedOwnership: ownership);
+  }
+
+  /// Update state filter ("all", "live", or "sealed")
+  void updateStateFilter(String stateFilter) {
+    print('🔍 MEMORIES DEBUG: Updating state filter to: $stateFilter');
+    state = state.copyWith(selectedState: stateFilter);
+  }
+
+  /// Get filtered memories based on ownership and state filters
+  List<MemoryItemModel> getFilteredMemories(String userId) {
+    final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
+    final ownership = state.selectedOwnership ?? 'created';
+    final stateFilter = state.selectedState ?? 'all';
+
+    print('🔍 MEMORIES DEBUG: Filtering memories');
+    print('   - Ownership: $ownership');
+    print('   - State: $stateFilter');
+    print('   - Total memories: ${allMemories.length}');
+
+    // Step 1: Filter by ownership
+    List<MemoryItemModel> filteredByOwnership;
+    if (ownership == 'created') {
+      filteredByOwnership =
+          allMemories.where((m) => m.creatorId == userId).toList();
+      print(
+          '   - Filtered by "Created by Me": ${filteredByOwnership.length} memories');
+    } else {
+      // "joined" - memories where user is NOT the creator
+      filteredByOwnership =
+          allMemories.where((m) => m.creatorId != userId).toList();
+      print(
+          '   - Filtered by "Joined": ${filteredByOwnership.length} memories');
+    }
+
+    // Step 2: Filter by state
+    List<MemoryItemModel> finalFiltered;
+    if (stateFilter == 'all') {
+      finalFiltered = filteredByOwnership;
+    } else if (stateFilter == 'live') {
+      finalFiltered =
+          filteredByOwnership.where((m) => m.state == 'open').toList();
+    } else {
+      // sealed
+      finalFiltered =
+          filteredByOwnership.where((m) => m.state == 'sealed').toList();
+    }
+
+    print('✅ MEMORIES DEBUG: Final filtered count: ${finalFiltered.length}');
+    return finalFiltered;
   }
 
   void loadAllStories() async {

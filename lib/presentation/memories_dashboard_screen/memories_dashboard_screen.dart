@@ -1,14 +1,15 @@
 import '../../core/app_export.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
+import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../widgets/custom_public_memories.dart' as unified_widget;
 import '../../widgets/custom_story_list.dart';
 import '../create_memory_screen/create_memory_screen.dart';
 import '../friends_management_screen/widgets/qr_scanner_overlay.dart';
 import './models/memory_item_model.dart';
-import './widgets/memory_card_widget.dart';
-import 'notifier/memories_dashboard_notifier.dart';
+import './notifier/memories_dashboard_notifier.dart';
 
 class MemoriesDashboardScreen extends ConsumerStatefulWidget {
   const MemoriesDashboardScreen({Key? key}) : super(key: key);
@@ -204,42 +205,126 @@ class _MemoriesDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoriesDashboardNotifier);
-        final selectedIndex = state.selectedTabIndex ?? 0;
+        final selectedOwnership = state.selectedOwnership ?? 'created';
+        final selectedState = state.selectedState ?? 'all';
 
         return Container(
           margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
-          padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 4.h),
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_02.withAlpha(128),
-            borderRadius: BorderRadius.circular(24.h),
-            border: Border.all(
-              color: appTheme.blue_gray_300.withAlpha(51),
-              width: 1.0,
-            ),
-          ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildFilterButton(
-                context: context,
-                label: 'All',
-                count: state.memoriesDashboardModel?.allCount ?? 0,
-                isSelected: selectedIndex == 0,
-                onTap: () => _onFilterTap(context, 0),
+              // Ownership Toggle (left side)
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_02.withAlpha(128),
+                    borderRadius: BorderRadius.circular(24.h),
+                    border: Border.all(
+                      color: appTheme.blue_gray_300.withAlpha(51),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _onOwnershipTap(context, 'created'),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12.h,
+                              vertical: 10.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selectedOwnership == 'created'
+                                  ? appTheme.deep_purple_A100
+                                  : appTheme.transparentCustom,
+                              borderRadius: BorderRadius.circular(20.h),
+                            ),
+                            child: Text(
+                              'Created by Me',
+                              textAlign: TextAlign.center,
+                              style: selectedOwnership == 'created'
+                                  ? TextStyleHelper
+                                      .instance.body14BoldPlusJakartaSans
+                                      .copyWith(color: appTheme.gray_900_02)
+                                  : TextStyleHelper
+                                      .instance.body14RegularPlusJakartaSans
+                                      .copyWith(
+                                          color:
+                                              appTheme.gray_50.withAlpha(179)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _onOwnershipTap(context, 'joined'),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12.h,
+                              vertical: 10.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selectedOwnership == 'joined'
+                                  ? appTheme.deep_purple_A100
+                                  : appTheme.transparentCustom,
+                              borderRadius: BorderRadius.circular(20.h),
+                            ),
+                            child: Text(
+                              'Joined',
+                              textAlign: TextAlign.center,
+                              style: selectedOwnership == 'joined'
+                                  ? TextStyleHelper
+                                      .instance.body14BoldPlusJakartaSans
+                                      .copyWith(color: appTheme.gray_900_02)
+                                  : TextStyleHelper
+                                      .instance.body14RegularPlusJakartaSans
+                                      .copyWith(
+                                          color:
+                                              appTheme.gray_50.withAlpha(179)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              _buildFilterButton(
-                context: context,
-                label: 'Live',
-                count: state.memoriesDashboardModel?.liveCount ?? 0,
-                isSelected: selectedIndex == 1,
-                onTap: () => _onFilterTap(context, 1),
-              ),
-              _buildFilterButton(
-                context: context,
-                label: 'Sealed',
-                count: state.memoriesDashboardModel?.sealedCount ?? 0,
-                isSelected: selectedIndex == 2,
-                onTap: () => _onFilterTap(context, 2),
+
+              SizedBox(width: 12.h),
+
+              // State Dropdown (right side)
+              GestureDetector(
+                onTap: () => _showStateDropdown(context),
+                child: Container(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_02.withAlpha(128),
+                    borderRadius: BorderRadius.circular(24.h),
+                    border: Border.all(
+                      color: appTheme.blue_gray_300.withAlpha(51),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _getStateLabel(selectedState),
+                        style: TextStyleHelper
+                            .instance.body14RegularPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                      ),
+                      SizedBox(width: 6.h),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 18.h,
+                        color: appTheme.gray_50,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -248,58 +333,12 @@ class _MemoriesDashboardScreenState
     );
   }
 
-  Widget _buildFilterButton({
-    required BuildContext context,
-    required String label,
-    required int count,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? appTheme.deep_purple_A100
-                : appTheme.transparentCustom,
-            borderRadius: BorderRadius.circular(20.h),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: isSelected
-                    ? TextStyleHelper.instance.body14BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_900_02)
-                    : TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50.withAlpha(179)),
-              ),
-              SizedBox(width: 4.h),
-              Text(
-                '$count',
-                style: isSelected
-                    ? TextStyleHelper.instance.body14BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_900_02)
-                    : TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50.withAlpha(179)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   /// Section Widget - Memories Content
   Widget _buildMemoriesContent(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoriesDashboardNotifier);
-        final selectedIndex = state.selectedTabIndex ?? 0;
+        final notifier = ref.read(memoriesDashboardNotifier.notifier);
 
         ref.listen(
           memoriesDashboardNotifier,
@@ -325,67 +364,113 @@ class _MemoriesDashboardScreenState
           );
         }
 
-        // Get filtered memories based on selected filter
-        List<MemoryItemModel> filteredMemories;
-        if (selectedIndex == 0) {
-          filteredMemories = state.memoriesDashboardModel?.memoryItems ?? [];
-        } else if (selectedIndex == 1) {
-          filteredMemories =
-              state.memoriesDashboardModel?.liveMemoryItems ?? [];
-        } else {
-          filteredMemories =
-              state.memoriesDashboardModel?.sealedMemoryItems ?? [];
+        // Get filtered memories based on BOTH ownership and state filters
+        final currentUser = SupabaseService.instance.client?.auth.currentUser;
+        if (currentUser == null) {
+          return Center(
+            child: Text(
+              'Please log in to view memories',
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+          );
         }
+
+        final filteredMemories = notifier.getFilteredMemories(currentUser.id);
 
         return Container(
           margin: EdgeInsets.fromLTRB(16.h, 20.h, 16.h, 24.h),
-          child: _buildMemoryList(context, filteredMemories, selectedIndex),
+          child: _buildMemoryList(context, filteredMemories),
         );
       },
     );
   }
 
   /// Section Widget - Memory List
-  Widget _buildMemoryList(BuildContext context,
-      List<MemoryItemModel> memoryItems, int selectedIndex) {
+  Widget _buildMemoryList(
+      BuildContext context, List<MemoryItemModel> memoryItems) {
     if (memoryItems.isEmpty) {
-      return _buildMemoriesEmptyState(context, selectedIndex);
+      final state = ref.read(memoriesDashboardNotifier);
+      final ownership = state.selectedOwnership ?? 'created';
+      final stateFilter = state.selectedState ?? 'all';
+      return _buildMemoriesEmptyState(context, ownership, stateFilter);
     }
 
-    return ListView.separated(
-      padding: EdgeInsets.only(bottom: 20.h),
+    // Convert MemoryItemModel to unified CustomMemoryItem format
+    final convertedMemories = memoryItems.map((memoryItem) {
+      return unified_widget.CustomMemoryItem(
+        id: memoryItem.id,
+        title: memoryItem.title,
+        date: memoryItem.date,
+        iconPath: memoryItem.categoryIconUrl,
+        profileImages: memoryItem.participantAvatars,
+        mediaItems: null,
+        startDate: memoryItem.eventDate,
+        startTime: memoryItem.eventTime,
+        endDate: memoryItem.endDate,
+        endTime: memoryItem.endTime,
+        location: memoryItem.location,
+        distance: memoryItem.distance,
+        isLiked: false,
+      );
+    }).toList();
+
+    return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      padding: EdgeInsets.only(bottom: 20.h),
       physics: BouncingScrollPhysics(),
-      separatorBuilder: (context, index) => SizedBox(width: 12.h),
-      itemCount: memoryItems.length,
-      itemBuilder: (context, index) {
-        final memoryItem = memoryItems[index];
-        return MemoryCardWidget(
-          memoryItem: memoryItem,
-          onTap: () => _onMemoryTap(context, memoryItem),
-        );
-      },
+      child: Row(
+        children: List.generate(convertedMemories.length, (index) {
+          final memory = convertedMemories[index];
+          final memoryItem = memoryItems[index];
+          return Container(
+            margin: EdgeInsets.only(
+              right: index == convertedMemories.length - 1 ? 0 : 12.h,
+            ),
+            child: unified_widget.CustomPublicMemories(
+              sectionTitle: null,
+              sectionIcon: null,
+              memories: [memory],
+              onMemoryTap: (tappedMemory) => _onMemoryTap(context, memoryItem),
+              margin: EdgeInsets.zero,
+            ),
+          );
+        }),
+      ),
     );
   }
 
   /// Empty State - Memories Feed
-  Widget _buildMemoriesEmptyState(BuildContext context, int selectedIndex) {
+  Widget _buildMemoriesEmptyState(
+      BuildContext context, String ownership, String stateFilter) {
     String title;
     String subtitle;
     String iconPath = ImageConstant.imgIcon10;
 
-    switch (selectedIndex) {
-      case 1: // Live
-        title = 'No live memories';
-        subtitle = 'Create a memory to start capturing moments';
-        break;
-      case 2: // Sealed
-        title = 'No sealed memories';
-        subtitle = 'Sealed memories will appear here';
-        break;
-      default: // All
-        title = 'No memories yet';
+    // Generate appropriate empty state message based on filters
+    if (ownership == 'created') {
+      if (stateFilter == 'all') {
+        title = 'No memories created yet';
         subtitle = 'Start creating memories to preserve your moments';
+      } else if (stateFilter == 'live') {
+        title = 'No live memories created';
+        subtitle = 'Create a memory to start capturing moments';
+      } else {
+        title = 'No sealed memories created';
+        subtitle = 'Sealed memories you created will appear here';
+      }
+    } else {
+      // joined
+      if (stateFilter == 'all') {
+        title = 'No joined memories yet';
+        subtitle = 'Memories you join will appear here';
+      } else if (stateFilter == 'live') {
+        title = 'No live joined memories';
+        subtitle = 'Join a live memory to see it here';
+      } else {
+        title = 'No sealed joined memories';
+        subtitle = 'Sealed memories you joined will appear here';
+      }
     }
 
     return Center(
@@ -507,5 +592,111 @@ class _MemoriesDashboardScreenState
 
   void _onNotificationTap(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.appNotifications);
+  }
+
+  /// Handle ownership toggle tap
+  void _onOwnershipTap(BuildContext context, String ownership) {
+    final notifier = ref.read(memoriesDashboardNotifier.notifier);
+    notifier.updateOwnershipFilter(ownership);
+  }
+
+  /// Show state dropdown menu
+  void _showStateDropdown(BuildContext context) {
+    final notifier = ref.read(memoriesDashboardNotifier.notifier);
+    final currentState =
+        ref.read(memoriesDashboardNotifier).selectedState ?? 'all';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: appTheme.gray_900_01,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24.h)),
+      ),
+      builder: (context) => Container(
+        padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 24.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Filter by State',
+              style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+            SizedBox(height: 20.h),
+            _buildStateOption(context, 'all', 'All', currentState, notifier),
+            SizedBox(height: 12.h),
+            _buildStateOption(context, 'live', 'Live', currentState, notifier),
+            SizedBox(height: 12.h),
+            _buildStateOption(
+                context, 'sealed', 'Sealed', currentState, notifier),
+            SizedBox(height: 20.h),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build state dropdown option
+  Widget _buildStateOption(
+    BuildContext context,
+    String value,
+    String label,
+    String currentState,
+    MemoriesDashboardNotifier notifier,
+  ) {
+    final isSelected = currentState == value;
+
+    return GestureDetector(
+      onTap: () {
+        notifier.updateStateFilter(value);
+        Navigator.pop(context);
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 14.h),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? appTheme.deep_purple_A100.withAlpha(26)
+              : appTheme.gray_900_02.withAlpha(128),
+          borderRadius: BorderRadius.circular(12.h),
+          border: Border.all(
+            color: isSelected
+                ? appTheme.deep_purple_A100
+                : appTheme.blue_gray_300.withAlpha(51),
+            width: 1.0,
+          ),
+        ),
+        child: Row(
+          children: [
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                size: 20.h,
+                color: appTheme.deep_purple_A100,
+              ),
+            if (isSelected) SizedBox(width: 12.h),
+            Text(
+              label,
+              style: isSelected
+                  ? TextStyleHelper.instance.body16BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50)
+                  : TextStyleHelper.instance.body16RegularPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50.withAlpha(179)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Get state label for dropdown display
+  String _getStateLabel(String state) {
+    switch (state) {
+      case 'live':
+        return 'Live';
+      case 'sealed':
+        return 'Sealed';
+      default:
+        return 'All';
+    }
   }
 }
