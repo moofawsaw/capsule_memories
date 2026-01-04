@@ -34,6 +34,9 @@ class MemoryMembersNotifier extends StateNotifier<MemoryMembersState> {
       // Fetch all members (creator + contributors)
       final membersData = await _membersService.fetchAllMemoryMembers(memoryId);
 
+      // Fetch group information if memory was created from a group
+      final groupInfo = await _membersService.fetchMemoryGroupInfo(memoryId);
+
       // Convert to MemberModel objects
       final members = membersData.map((data) {
         return MemberModel(
@@ -47,10 +50,12 @@ class MemoryMembersNotifier extends StateNotifier<MemoryMembersState> {
         );
       }).toList();
 
-      // Update state with fetched members
+      // Update state with fetched members and group info
       state = state.copyWith(
         memoryMembersModel: state.memoryMembersModel?.copyWith(
           members: members,
+          groupId: groupInfo?['group_id'] as String?,
+          groupName: groupInfo?['group_name'] as String?,
           isLoading: false,
           errorMessage: null,
         ),

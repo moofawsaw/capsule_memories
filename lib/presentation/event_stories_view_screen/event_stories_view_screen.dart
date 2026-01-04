@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:video_player/video_player.dart';
 
@@ -58,10 +59,16 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   double _dragCurrentY = 0.0;
   bool _isDragging = false;
 
-  // NEW: Memory category data
+  // Memory category data
   String? _memoryCategoryName;
   String? _memoryCategoryIcon;
   String? _memoryId;
+
+  // NEW: Prefetching state management
+  Map<String, dynamic>? _prefetchedStoryData;
+  VideoPlayerController? _prefetchedVideoController;
+  bool _isPrefetchedVideoInitialized = false;
+  bool _isPrefetching = false;
 
   @override
   void initState() {
@@ -124,6 +131,11 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           _errorMessage = 'Invalid story data provided';
         });
       }
+    });
+
+    // Mark story as viewed when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _markStoryAsViewed();
     });
   }
 
@@ -274,6 +286,28 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       _timerController?.stop();
       _timerController?.reset();
 
+      // CRITICAL: Check if we have prefetched data for this story
+      final storyId = _storyIds[index];
+      Map<String, dynamic>? storyData;
+      VideoPlayerController? videoController;
+      bool isVideoInitialized = false;
+
+      if (_prefetchedStoryData != null &&
+          _prefetchedStoryData!['id'] == storyId) {
+        print('✅ DEBUG: Using prefetched data for story $storyId');
+        storyData = _prefetchedStoryData;
+        videoController = _prefetchedVideoController;
+        isVideoInitialized = _isPrefetchedVideoInitialized;
+
+        // Clear prefetch state
+        _prefetchedStoryData = null;
+        _prefetchedVideoController = null;
+        _isPrefetchedVideoInitialized = false;
+      } else {
+        print('🔄 DEBUG: Fetching story data from service');
+        storyData = await _feedService.fetchStoryDetails(storyId);
+      }
+
       // Dispose previous video controller if exists
       if (_videoController != null) {
         await _videoController!.pause();
@@ -282,17 +316,15 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _isVideoInitialized = false;
       }
 
-      final storyData = await _feedService.fetchStoryDetails(_storyIds[index]);
-
       if (storyData == null) {
-        print('❌ ERROR: Story data is null for ID ${_storyIds[index]}');
+        print('❌ ERROR: Story data is null for ID $storyId');
         setState(() {
           _errorMessage = 'Story not found';
         });
         return;
       }
 
-      // NEW: Fetch memory category information
+      // Fetch memory category information
       final memoryId = storyData['memory_id'] as String?;
       if (memoryId != null) {
         await _fetchMemoryCategory(memoryId);
@@ -303,16 +335,33 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _currentIndex = index;
         _isLoading = false;
         _isPaused = false;
+
+        // Transfer prefetched video controller if available
+        if (videoController != null && isVideoInitialized) {
+          _videoController = videoController;
+          _isVideoInitialized = true;
+        }
       });
 
-      // Initialize video player if media type is video
+      // Initialize video player if media type is video and not already prefetched
       final mediaType = storyData['media_type'] as String? ?? 'image';
       final mediaUrl = storyData['media_url'] as String?;
 
       print('📹 DEBUG: Media type: $mediaType, URL: $mediaUrl');
 
       if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
-        await _initializeVideoPlayer(mediaUrl);
+        if (_videoController == null || !_isVideoInitialized) {
+          await _initializeVideoPlayer(mediaUrl);
+        } else {
+          // Start prefetched video
+          print('▶️ DEBUG: Starting prefetched video');
+          _videoController!.setVolume(_isMuted ? 0.0 : 1.0);
+          _videoController!.play();
+
+          final videoDuration = _videoController!.value.duration;
+          _timerController?.duration = videoDuration;
+          _timerController?.forward();
+        }
       } else {
         // Start timer for images
         print('⏱️ DEBUG: Starting timer for image at index $index');
@@ -320,12 +369,76 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _timerController?.forward();
       }
 
+      // NEW: Prefetch next story in background
+      _prefetchNextStory(index);
+
       print('✅ DEBUG: Successfully loaded story at index $index');
     } catch (e) {
       print('❌ ERROR loading story at index $index: $e');
       setState(() {
         _errorMessage = 'Error loading story: ${e.toString()}';
       });
+    }
+  }
+
+  /// NEW METHOD: Prefetch next story media in background
+  Future<void> _prefetchNextStory(int currentIndex) async {
+    // Skip if already prefetching or no next story
+    if (_isPrefetching || currentIndex >= _storyIds.length - 1) {
+      return;
+    }
+
+    try {
+      _isPrefetching = true;
+      final nextIndex = currentIndex + 1;
+      final nextStoryId = _storyIds[nextIndex];
+
+      print(
+          '🔄 DEBUG: Prefetching next story at index $nextIndex (ID: $nextStoryId)');
+
+      // Fetch next story data
+      final nextStoryData = await _feedService.fetchStoryDetails(nextStoryId);
+
+      if (nextStoryData == null) {
+        print('⚠️ WARNING: Failed to prefetch story $nextStoryId');
+        _isPrefetching = false;
+        return;
+      }
+
+      final mediaType = nextStoryData['media_type'] as String? ?? 'image';
+      final mediaUrl = nextStoryData['media_url'] as String?;
+
+      print('📹 DEBUG: Prefetch media type: $mediaType, URL: $mediaUrl');
+
+      if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
+        // Prefetch video - initialize but don't play
+        print('📹 DEBUG: Prefetching video controller');
+        final prefetchController =
+            VideoPlayerController.networkUrl(Uri.parse(mediaUrl));
+        await prefetchController.initialize();
+        prefetchController.setLooping(false);
+
+        _prefetchedVideoController = prefetchController;
+        _isPrefetchedVideoInitialized = true;
+
+        print('✅ DEBUG: Video prefetched successfully');
+      } else if (mediaType == 'image' &&
+          mediaUrl != null &&
+          mediaUrl.isNotEmpty) {
+        // Prefetch image using CachedNetworkImage's precaching
+        print('🖼️ DEBUG: Prefetching image');
+        await precacheImage(CachedNetworkImageProvider(mediaUrl), context);
+        print('✅ DEBUG: Image prefetched successfully');
+      }
+
+      _prefetchedStoryData = nextStoryData;
+      _isPrefetching = false;
+
+      print('✅ DEBUG: Story $nextStoryId prefetched successfully');
+    } catch (e) {
+      print('⚠️ WARNING: Error prefetching next story: $e');
+      _isPrefetching = false;
+      // Don't block current story if prefetch fails
     }
   }
 
@@ -590,7 +703,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
   @override
   void dispose() {
-    // CRITICAL FIX: Complete hard reset of all media players before disposal
+    // CRITICAL FIX: Dispose prefetched video controller as well
     _performHardMediaReset();
 
     _timerController?.dispose();
@@ -607,25 +720,32 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
       // 2. Hard stop video controller (synchronous operations)
       if (_videoController != null) {
-        // Pause playback synchronously
         _videoController!.pause();
-
-        // Set volume to zero as extra safety measure
         _videoController!.setVolume(0.0);
-
-        // Seek to start position
         _videoController!.seekTo(Duration.zero);
-
-        // Remove all listeners to prevent callbacks
         _videoController!.removeListener(() {});
-
-        // Dispose controller immediately
         _videoController!.dispose();
         _videoController = null;
         _isVideoInitialized = false;
       }
 
-      print('✅ HARD RESET: All media players stopped and disposed');
+      // 3. NEW: Dispose prefetched video controller
+      if (_prefetchedVideoController != null) {
+        _prefetchedVideoController!.pause();
+        _prefetchedVideoController!.setVolume(0.0);
+        _prefetchedVideoController!.seekTo(Duration.zero);
+        _prefetchedVideoController!.removeListener(() {});
+        _prefetchedVideoController!.dispose();
+        _prefetchedVideoController = null;
+        _isPrefetchedVideoInitialized = false;
+      }
+
+      // 4. Clear prefetched data
+      _prefetchedStoryData = null;
+      _isPrefetching = false;
+
+      print(
+          '✅ HARD RESET: All media players (including prefetched) stopped and disposed');
     } catch (e) {
       print('⚠️ WARNING: Error during hard media reset: $e');
       // Continue with disposal even if error occurs
@@ -637,6 +757,35 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   Future<void> _stopAndDisposeVideo() async {
     // Redirect to synchronous hard reset method
     _performHardMediaReset();
+  }
+
+  /// Mark the current story as viewed in the database
+  Future<void> _markStoryAsViewed() async {
+    try {
+      final client = Supabase.instance.client;
+      final currentUserId = client.auth.currentUser?.id;
+
+      if (currentUserId == null) {
+        print(
+            '⚠️ WARNING: No authenticated user, skipping story view tracking');
+        return;
+      }
+
+      // Use _initialStoryId from state instead of widget.initialStoryId
+      final currentStoryId = _initialStoryId;
+
+      // Upsert into story_views (will insert if not exists, do nothing if exists due to unique constraint)
+      await client.from('story_views').upsert({
+        'story_id': currentStoryId,
+        'user_id': currentUserId,
+        'viewed_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'story_id,user_id'); // Prevent duplicate entries
+
+      print('✅ SUCCESS: Marked story "$currentStoryId" as viewed');
+    } catch (e) {
+      print('❌ ERROR marking story as viewed: $e');
+      // Don't block UI if view tracking fails
+    }
   }
 
   @override
@@ -1010,34 +1159,34 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     final userName = _storyData?['user_name'] as String? ?? 'Unknown User';
     final userAvatar = _storyData?['user_avatar'] as String?;
     final userId = _storyData?['user_id'] as String?;
+    final memoryTitle = _storyData?['memory_title'] as String?;
 
     return Positioned(
       top: MediaQuery.of(context).padding.top +
           20.h, // Position below timer bars
-      left: 68
+      left: 16
           .h, // Position after back button (40.h width + 16.h padding + 12.h gap)
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          print('🔍 DEBUG: User profile tapped - userId: $userId');
-          if (userId != null && userId.isNotEmpty) {
-            Navigator.pushNamed(
-              context,
-              AppRoutes.appProfileUser,
-              arguments: {
-                'userId': userId
-              }, // ✅ FIX: Pass as Map instead of plain String
-            );
-          } else {
-            print('⚠️ WARNING: userId is null or empty, cannot navigate');
-          }
-        },
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ONLY avatar is tappable for profile navigation
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                print('🔍 DEBUG: User avatar tapped - userId: $userId');
+                if (userId != null && userId.isNotEmpty) {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.appProfileUser,
+                    arguments: {'userId': userId},
+                  );
+                } else {
+                  print('⚠️ WARNING: userId is null or empty, cannot navigate');
+                }
+              },
+              child: Container(
                 width: 40.h,
                 height: 40.h,
                 decoration: BoxDecoration(
@@ -1051,32 +1200,79 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                   ),
                 ),
               ),
-              SizedBox(width: 12.h),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 180.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      userName,
-                      style: TextStyleHelper.instance.body16BoldPlusJakartaSans
-                          .copyWith(color: appTheme.whiteCustom),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            ),
+            SizedBox(width: 12.h),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 180.w),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // User name is NOT tappable (no GestureDetector)
+                  Text(
+                    userName,
+                    style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.whiteCustom),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // ONLY memory title is tappable for timeline navigation
+                  if (memoryTitle != null && memoryTitle.isNotEmpty)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (_memoryId != null && _storyData != null) {
+                          print('🔍 MEMORY TITLE: Navigating to timeline');
+                          print('   - Memory ID: $_memoryId');
+                          print('   - Memory Title: $memoryTitle');
+
+                          final navArgs = MemoryNavArgs(
+                            memoryId: _memoryId!,
+                            snapshot: MemorySnapshot(
+                              title: memoryTitle,
+                              date: _storyData?['memory_date'] as String? ??
+                                  _formatDate(
+                                      _storyData?['created_at'] as String?),
+                              location:
+                                  _storyData?['memory_location'] as String?,
+                              categoryIcon: _memoryCategoryIcon,
+                              participantAvatars: null,
+                              isPrivate:
+                                  _storyData?['memory_visibility'] == 'private',
+                            ),
+                          );
+
+                          _performHardMediaReset();
+
+                          NavigatorService.pushNamed(
+                            AppRoutes.appTimeline,
+                            arguments: navArgs,
+                          );
+                        }
+                      },
+                      child: Text(
+                        memoryTitle,
+                        style: TextStyleHelper
+                            .instance.body14RegularPlusJakartaSans
+                            .copyWith(
+                          color: appTheme.whiteCustom
+                              .withAlpha(204), // 80% opacity
+                          decoration: TextDecoration.none,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    Text(
-                      _formatTimeAgo(
-                          _storyData?['created_at'] as String? ?? ''),
-                      style: TextStyleHelper
-                          .instance.body14RegularPlusJakartaSans
-                          .copyWith(color: Colors.white70),
-                    ),
-                  ],
-                ),
+                  // Time ago is NOT tappable (no GestureDetector)
+                  Text(
+                    _formatTimeAgo(_storyData?['created_at'] as String? ?? ''),
+                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                        .copyWith(color: Colors.white70),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1088,28 +1284,46 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         _memoryCategoryIcon != null &&
         _memoryId != null;
 
+    // Get location from story data
+    final location = _storyData?['location'] as String?;
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
       child: Row(
         children: [
-          CustomIconButton(
-            iconPath: ImageConstant.imgArrowLeft,
-            backgroundColor: appTheme.blackCustom.withAlpha(128),
-            borderRadius: 20.h,
-            height: 40.h,
-            width: 40.h,
-            padding: EdgeInsets.all(10.h),
-            onTap: () {
-              // CRITICAL FIX: Hard reset before back navigation
-              _performHardMediaReset();
-
-              // Close modal route if opened as modal, otherwise pop normally
-              if (ModalRoute.of(context)?.isActive == true) {
-                Navigator.of(context).pop();
-              }
-            },
-          ),
           Spacer(),
+          // Location display in top right (before category badge)
+          if (location != null && location.isNotEmpty)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
+              margin: EdgeInsets.only(right: 8.h),
+              decoration: BoxDecoration(
+                color: appTheme.blackCustom.withAlpha(153),
+                borderRadius: BorderRadius.circular(16.h),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.location_on,
+                    size: 14.h,
+                    color: Colors.white70,
+                  ),
+                  SizedBox(width: 4.h),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 100.w),
+                    child: Text(
+                      location,
+                      style: TextStyleHelper
+                          .instance.body12RegularPlusJakartaSans
+                          .copyWith(color: Colors.white70),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // NEW: Category badge positioned in header top right
           if (hasCategoryBadge)
             GestureDetector(
@@ -1201,7 +1415,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
   Widget _buildBottomInfo() {
     final caption = _storyData?['caption'] as String?;
-    final location = _storyData?['location'] as String?;
     final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : null;
 
     return Column(
@@ -1236,9 +1449,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
             ),
           ),
 
-        // Caption and location section (separate from reactions)
-        if ((caption != null && caption.isNotEmpty) ||
-            (location != null && location.isNotEmpty))
+        // Caption section only (location moved to header)
+        if (caption != null && caption.isNotEmpty)
           Container(
             width: double.infinity,
             padding: EdgeInsets.all(16.h),
@@ -1252,42 +1464,12 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 ],
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (caption != null && caption.isNotEmpty)
-                  Text(
-                    caption,
-                    style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                        .copyWith(color: appTheme.whiteCustom),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (location != null && location.isNotEmpty) ...[
-                  SizedBox(height: 8.h),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 16.h,
-                        color: Colors.white70,
-                      ),
-                      SizedBox(width: 4.h),
-                      Expanded(
-                        child: Text(
-                          location,
-                          style: TextStyleHelper
-                              .instance.body14RegularPlusJakartaSans
-                              .copyWith(color: Colors.white70),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
+            child: Text(
+              caption,
+              style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                  .copyWith(color: appTheme.whiteCustom),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
       ],

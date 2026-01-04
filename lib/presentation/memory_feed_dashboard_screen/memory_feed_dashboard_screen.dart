@@ -6,6 +6,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_category_badge.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_public_memories.dart' as custom_widget;
+import '../../widgets/custom_story_skeleton.dart';
 import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../create_memory_screen/create_memory_screen.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
@@ -391,13 +392,17 @@ class _MemoryFeedDashboardScreenState
             SizedBox(
               height: 240.h,
               child: isLoading
-                  ? Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24.h),
-                        child: CircularProgressIndicator(
-                          color: appTheme.deep_purple_A100,
-                        ),
-                      ),
+                  ? ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.only(left: 24.h),
+                      itemCount: 3,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          width: 140.h,
+                          margin: EdgeInsets.only(right: 12.h),
+                          child: CustomStorySkeleton(),
+                        );
+                      },
                     )
                   : latestStories.isEmpty
                       ? Center(
@@ -444,10 +449,10 @@ class _MemoryFeedDashboardScreenState
                                 final feedContext = FeedStoryContext(
                                   feedType: 'latest_stories',
                                   storyIds: latestStories
-                                      .map((s) => s.id ?? '')
+                                      .map((s) => s.storyId)
                                       .where((id) => id.isNotEmpty)
                                       .toList(),
-                                  initialStoryId: story.id ?? '',
+                                  initialStoryId: story.storyId,
                                 );
 
                                 NavigatorService.pushNamed(
@@ -498,13 +503,17 @@ class _MemoryFeedDashboardScreenState
             SizedBox(
               height: 240.h,
               child: isLoading
-                  ? Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24.h),
-                        child: CircularProgressIndicator(
-                          color: appTheme.deep_purple_A100,
-                        ),
-                      ),
+                  ? ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.only(left: 24.h),
+                      itemCount: 3,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          width: 140.h,
+                          margin: EdgeInsets.only(right: 12.h),
+                          child: CustomStorySkeleton(),
+                        );
+                      },
                     )
                   : stories.isEmpty
                       ? Center(
@@ -551,10 +560,10 @@ class _MemoryFeedDashboardScreenState
                                 final feedContext = FeedStoryContext(
                                   feedType: 'happening_now',
                                   storyIds: stories
-                                      .map((s) => s.id ?? '')
+                                      .map((s) => s.storyId)
                                       .where((id) => id.isNotEmpty)
                                       .toList(),
-                                  initialStoryId: story.id ?? '',
+                                  initialStoryId: story.storyId,
                                 );
 
                                 NavigatorService.pushNamed(
@@ -683,6 +692,7 @@ class _MemoryFeedDashboardScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
         final stories = state.memoryFeedDashboardModel?.trendingStories ?? [];
+        final isLoading = state.isLoading ?? false;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -709,33 +719,46 @@ class _MemoryFeedDashboardScreenState
             SizedBox(height: 16.h),
             SizedBox(
               height: 240.h,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.only(left: 24.h),
-                itemCount: stories.length,
-                itemBuilder: (context, index) {
-                  final story = stories[index];
-                  return HappeningNowStoryCard(
-                    story: story,
-                    onTap: () {
-                      // Create feed context with all story IDs from trending feed
-                      final feedContext = FeedStoryContext(
-                        feedType: 'trending',
-                        storyIds: stories
-                            .map((s) => s.id ?? '')
-                            .where((id) => id.isNotEmpty)
-                            .toList(),
-                        initialStoryId: story.id ?? '',
-                      );
+              child: isLoading
+                  ? ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.only(left: 24.h),
+                      itemCount: 3,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          width: 140.h,
+                          margin: EdgeInsets.only(right: 12.h),
+                          child: CustomStorySkeleton(),
+                        );
+                      },
+                    )
+                  : ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.only(left: 24.h),
+                      itemCount: stories.length,
+                      itemBuilder: (context, index) {
+                        final story = stories[index];
+                        return HappeningNowStoryCard(
+                          story: story,
+                          onTap: () {
+                            // Create feed context with all story IDs from trending feed
+                            final feedContext = FeedStoryContext(
+                              feedType: 'trending',
+                              storyIds: stories
+                                  .map((s) => s.storyId)
+                                  .where((id) => id.isNotEmpty)
+                                  .toList(),
+                              initialStoryId: story.storyId,
+                            );
 
-                      NavigatorService.pushNamed(
-                        AppRoutes.appStoryView,
-                        arguments: feedContext,
-                      );
-                    },
-                  );
-                },
-              ),
+                            NavigatorService.pushNamed(
+                              AppRoutes.appStoryView,
+                              arguments: feedContext,
+                            );
+                          },
+                        );
+                      },
+                    ),
             ),
           ],
         );
@@ -839,6 +862,7 @@ class _MemoryFeedDashboardScreenState
         final state = ref.watch(memoryFeedDashboardProvider);
         final stories =
             state.memoryFeedDashboardModel?.longestStreakStories ?? [];
+        final isLoading = state.isLoading ?? false;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -865,64 +889,77 @@ class _MemoryFeedDashboardScreenState
             SizedBox(height: 16.h),
             SizedBox(
               height: 240.h,
-              child: stories.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24.h),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CustomImageView(
-                              imagePath:
-                                  ImageConstant.imgIconDeepPurpleA10022x22,
-                              height: 48.h,
-                              width: 48.h,
-                              color: appTheme.blue_gray_300,
-                            ),
-                            SizedBox(height: 12.h),
-                            Text(
-                              'No streak stories yet',
-                              style: TextStyleHelper
-                                  .instance.title16MediumPlusJakartaSans
-                                  .copyWith(color: appTheme.blue_gray_300),
-                            ),
-                            SizedBox(height: 4.h),
-                            Text(
-                              'Check back for consistent creators',
-                              style: TextStyleHelper
-                                  .instance.body12MediumPlusJakartaSans
-                                  .copyWith(color: appTheme.blue_gray_300),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
+              child: isLoading
+                  ? ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.only(left: 24.h),
-                      itemCount: stories.length,
+                      itemCount: 3,
                       itemBuilder: (context, index) {
-                        final story = stories[index];
-                        return HappeningNowStoryCard(
-                          story: story,
-                          onTap: () {
-                            final feedContext = FeedStoryContext(
-                              feedType: 'longest_streaks',
-                              storyIds: stories
-                                  .map((s) => s.id ?? '')
-                                  .where((id) => id.isNotEmpty)
-                                  .toList(),
-                              initialStoryId: story.id ?? '',
-                            );
-
-                            NavigatorService.pushNamed(
-                              AppRoutes.appStoryView,
-                              arguments: feedContext,
-                            );
-                          },
+                        return Container(
+                          width: 140.h,
+                          margin: EdgeInsets.only(right: 12.h),
+                          child: CustomStorySkeleton(),
                         );
                       },
-                    ),
+                    )
+                  : stories.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24.h),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CustomImageView(
+                                  imagePath:
+                                      ImageConstant.imgIconDeepPurpleA10022x22,
+                                  height: 48.h,
+                                  width: 48.h,
+                                  color: appTheme.blue_gray_300,
+                                ),
+                                SizedBox(height: 12.h),
+                                Text(
+                                  'No streak stories yet',
+                                  style: TextStyleHelper
+                                      .instance.title16MediumPlusJakartaSans
+                                      .copyWith(color: appTheme.blue_gray_300),
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  'Check back for consistent creators',
+                                  style: TextStyleHelper
+                                      .instance.body12MediumPlusJakartaSans
+                                      .copyWith(color: appTheme.blue_gray_300),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.only(left: 24.h),
+                          itemCount: stories.length,
+                          itemBuilder: (context, index) {
+                            final story = stories[index];
+                            return HappeningNowStoryCard(
+                              story: story,
+                              onTap: () {
+                                final feedContext = FeedStoryContext(
+                                  feedType: 'longest_streaks',
+                                  storyIds: stories
+                                      .map((s) => s.storyId)
+                                      .where((id) => id.isNotEmpty)
+                                      .toList(),
+                                  initialStoryId: story.storyId,
+                                );
+
+                                NavigatorService.pushNamed(
+                                  AppRoutes.appStoryView,
+                                  arguments: feedContext,
+                                );
+                              },
+                            );
+                          },
+                        ),
             ),
           ],
         );
@@ -936,6 +973,7 @@ class _MemoryFeedDashboardScreenState
         final state = ref.watch(memoryFeedDashboardProvider);
         final stories =
             state.memoryFeedDashboardModel?.popularUserStories ?? [];
+        final isLoading = state.isLoading ?? false;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -962,63 +1000,76 @@ class _MemoryFeedDashboardScreenState
             SizedBox(height: 16.h),
             SizedBox(
               height: 240.h,
-              child: stories.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24.h),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CustomImageView(
-                              imagePath: ImageConstant.imgIconGreen500,
-                              height: 48.h,
-                              width: 48.h,
-                              color: appTheme.blue_gray_300,
-                            ),
-                            SizedBox(height: 12.h),
-                            Text(
-                              'No popular users yet',
-                              style: TextStyleHelper
-                                  .instance.title16MediumPlusJakartaSans
-                                  .copyWith(color: appTheme.blue_gray_300),
-                            ),
-                            SizedBox(height: 4.h),
-                            Text(
-                              'Check back for trending creators',
-                              style: TextStyleHelper
-                                  .instance.body12MediumPlusJakartaSans
-                                  .copyWith(color: appTheme.blue_gray_300),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
+              child: isLoading
+                  ? ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.only(left: 24.h),
-                      itemCount: stories.length,
+                      itemCount: 3,
                       itemBuilder: (context, index) {
-                        final story = stories[index];
-                        return HappeningNowStoryCard(
-                          story: story,
-                          onTap: () {
-                            final feedContext = FeedStoryContext(
-                              feedType: 'popular_users',
-                              storyIds: stories
-                                  .map((s) => s.id ?? '')
-                                  .where((id) => id.isNotEmpty)
-                                  .toList(),
-                              initialStoryId: story.id ?? '',
-                            );
-
-                            NavigatorService.pushNamed(
-                              AppRoutes.appStoryView,
-                              arguments: feedContext,
-                            );
-                          },
+                        return Container(
+                          width: 140.h,
+                          margin: EdgeInsets.only(right: 12.h),
+                          child: CustomStorySkeleton(),
                         );
                       },
-                    ),
+                    )
+                  : stories.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24.h),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CustomImageView(
+                                  imagePath: ImageConstant.imgIconGreen500,
+                                  height: 48.h,
+                                  width: 48.h,
+                                  color: appTheme.blue_gray_300,
+                                ),
+                                SizedBox(height: 12.h),
+                                Text(
+                                  'No popular users yet',
+                                  style: TextStyleHelper
+                                      .instance.title16MediumPlusJakartaSans
+                                      .copyWith(color: appTheme.blue_gray_300),
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  'Check back for trending creators',
+                                  style: TextStyleHelper
+                                      .instance.body12MediumPlusJakartaSans
+                                      .copyWith(color: appTheme.blue_gray_300),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.only(left: 24.h),
+                          itemCount: stories.length,
+                          itemBuilder: (context, index) {
+                            final story = stories[index];
+                            return HappeningNowStoryCard(
+                              story: story,
+                              onTap: () {
+                                final feedContext = FeedStoryContext(
+                                  feedType: 'popular_users',
+                                  storyIds: stories
+                                      .map((s) => s.storyId)
+                                      .where((id) => id.isNotEmpty)
+                                      .toList(),
+                                  initialStoryId: story.storyId,
+                                );
+
+                                NavigatorService.pushNamed(
+                                  AppRoutes.appStoryView,
+                                  arguments: feedContext,
+                                );
+                              },
+                            );
+                          },
+                        ),
             ),
           ],
         );

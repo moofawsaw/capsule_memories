@@ -150,16 +150,29 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
     final overlayState = Overlay.of(context);
     late OverlayEntry overlayEntry;
 
-    // Add slight random horizontal offset for multiple emojis
-    final randomOffset = (DateTime.now().millisecond % 40) - 20.0;
+    // Enhanced random offsets for more spread during rapid-fire
+    final now = DateTime.now();
+    final randomSeed = now.microsecond;
+    final horizontalOffset = ((randomSeed % 80) - 40.0); // Range: -40 to +40
+    final verticalOffset =
+        ((randomSeed ~/ 100) % 30) - 15.0; // Range: -15 to +15
+    final rotationOffset =
+        ((randomSeed ~/ 200) % 60) - 30.0; // Range: -30 to +30 degrees
+
+    // Slight variation in animation duration for more organic feel
+    final baseDuration = 1500;
+    final durationVariation = (randomSeed % 300) - 150; // ±150ms variation
+    final animationDuration = baseDuration + durationVariation;
 
     overlayEntry = OverlayEntry(
       builder: (context) => FloatingReactionAnimation(
         emoji: reaction.display,
         startPosition: Offset(
-          position.dx + size.width / 2 + randomOffset,
-          position.dy + size.height / 2,
+          position.dx + size.width / 2 + horizontalOffset,
+          position.dy + size.height / 2 + verticalOffset,
         ),
+        rotationDegrees: rotationOffset,
+        duration: Duration(milliseconds: animationDuration),
         onComplete: () => overlayEntry.remove(),
       ),
     );
@@ -233,36 +246,60 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
           color: appTheme.whiteCustom.withAlpha(26),
           borderRadius: BorderRadius.circular(20.h),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Opacity(
-              opacity: isMaxedOut ? 0.5 : 1.0,
-              child: Text(
-                reaction.display,
-                style: TextStyle(
-                  fontSize: isTextReaction ? 16.fSize : 32.fSize,
-                  fontWeight:
-                      isTextReaction ? FontWeight.bold : FontWeight.normal,
-                  color: isTextReaction ? appTheme.whiteCustom : null,
-                ),
-                textAlign: TextAlign.center,
+        child: isTextReaction
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Opacity(
+                    opacity: isMaxedOut ? 0.5 : 1.0,
+                    child: Text(
+                      reaction.display,
+                      style: TextStyle(
+                        fontSize: 16.fSize,
+                        fontWeight: FontWeight.bold,
+                        color: appTheme.whiteCustom,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  SizedBox(width: 6.h),
+                  Text(
+                    count.toString(),
+                    style: TextStyle(
+                      fontSize: 12.fSize,
+                      fontWeight: FontWeight.bold,
+                      color: appTheme.whiteCustom.withAlpha(179),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Opacity(
+                    opacity: isMaxedOut ? 0.5 : 1.0,
+                    child: Text(
+                      reaction.display,
+                      style: TextStyle(
+                        fontSize: 32.fSize,
+                        fontWeight: FontWeight.normal,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    count.toString(),
+                    style: TextStyle(
+                      fontSize: 14.fSize,
+                      fontWeight: FontWeight.bold,
+                      color: appTheme.whiteCustom.withAlpha(179),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            if (count > 0) ...[
-              SizedBox(height: 4.h),
-              Text(
-                count.toString(),
-                style: TextStyle(
-                  fontSize: isTextReaction ? 12.fSize : 14.fSize,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.whiteCustom.withAlpha(179),
-                ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -271,12 +308,16 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
 class FloatingReactionAnimation extends StatefulWidget {
   final String emoji;
   final Offset startPosition;
+  final double rotationDegrees;
+  final Duration duration;
   final VoidCallback onComplete;
 
   const FloatingReactionAnimation({
     Key? key,
     required this.emoji,
     required this.startPosition,
+    this.rotationDegrees = 0.0,
+    this.duration = const Duration(milliseconds: 1500),
     required this.onComplete,
   }) : super(key: key);
 
@@ -291,13 +332,14 @@ class _FloatingReactionAnimationState extends State<FloatingReactionAnimation>
   late Animation<double> _positionAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
+  late Animation<double> _rotationAnimation;
 
   @override
   void initState() {
     super.initState();
 
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: widget.duration,
       vsync: this,
     );
 
@@ -323,6 +365,15 @@ class _FloatingReactionAnimationState extends State<FloatingReactionAnimation>
         weight: 70.0,
       ),
     ]).animate(_controller);
+
+    // Rotation animation for more dynamic movement
+    _rotationAnimation = Tween<double>(
+      begin: widget.rotationDegrees * 3.14159 / 180, // Convert to radians
+      end: 0.0, // Rotate back to normal
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    ));
 
     // Fade out animation (starts fading after 50% of animation)
     _opacityAnimation = Tween<double>(
@@ -350,14 +401,17 @@ class _FloatingReactionAnimationState extends State<FloatingReactionAnimation>
         return Positioned(
           left: widget.startPosition.dx - 20.h,
           top: widget.startPosition.dy + _positionAnimation.value,
-          child: Transform.scale(
-            scale: _scaleAnimation.value,
-            child: Opacity(
-              opacity: _opacityAnimation.value,
-              child: Text(
-                widget.emoji,
-                style: TextStyle(
-                  fontSize: 40.fSize,
+          child: Transform.rotate(
+            angle: _rotationAnimation.value,
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Opacity(
+                opacity: _opacityAnimation.value,
+                child: Text(
+                  widget.emoji,
+                  style: TextStyle(
+                    fontSize: 40.fSize,
+                  ),
                 ),
               ),
             ),

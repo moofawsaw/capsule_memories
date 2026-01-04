@@ -8,6 +8,8 @@ class MemoryMembersModel extends Equatable {
     this.members,
     this.memoryTitle,
     this.memoryId,
+    this.groupId,
+    this.groupName,
     this.isLoading = false,
     this.errorMessage,
   }) {
@@ -19,6 +21,8 @@ class MemoryMembersModel extends Equatable {
   List<MemberModel>? members;
   String? memoryTitle;
   String? memoryId;
+  String? groupId;
+  String? groupName;
   bool isLoading;
   String? errorMessage;
 
@@ -26,6 +30,8 @@ class MemoryMembersModel extends Equatable {
     List<MemberModel>? members,
     String? memoryTitle,
     String? memoryId,
+    String? groupId,
+    String? groupName,
     bool? isLoading,
     String? errorMessage,
   }) {
@@ -33,14 +39,23 @@ class MemoryMembersModel extends Equatable {
       members: members ?? this.members,
       memoryTitle: memoryTitle ?? this.memoryTitle,
       memoryId: memoryId ?? this.memoryId,
+      groupId: groupId ?? this.groupId,
+      groupName: groupName ?? this.groupName,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [members, memoryTitle, memoryId, isLoading, errorMessage];
+  List<Object?> get props => [
+        members,
+        memoryTitle,
+        memoryId,
+        groupId,
+        groupName,
+        isLoading,
+        errorMessage
+      ];
 }
 
 // ignore_for_file: must_be_immutable

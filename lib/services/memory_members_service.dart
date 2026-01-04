@@ -108,7 +108,7 @@ class MemoryMembersService {
     }
   }
 
-  /// Get complete members list including creator
+  /// Get complete members list including creator and group information
   Future<List<Map<String, dynamic>>> fetchAllMemoryMembers(
       String memoryId) async {
     try {
@@ -135,6 +135,39 @@ class MemoryMembersService {
     } catch (e) {
       print('Error fetching all memory members: $e');
       rethrow;
+    }
+  }
+
+  /// Fetch group information for a memory if it was created from a group
+  Future<Map<String, dynamic>?> fetchMemoryGroupInfo(String memoryId) async {
+    try {
+      final response =
+          await _supabaseService.client?.from('memories').select('''
+            group_id,
+            groups!inner(
+              id,
+              name
+            )
+          ''').eq('id', memoryId).maybeSingle();
+
+      // Handle null response or no group
+      if (response == null || response['group_id'] == null) {
+        return null;
+      }
+
+      final groupData = response['groups'] as Map<String, dynamic>?;
+
+      if (groupData != null) {
+        return {
+          'group_id': groupData['id'],
+          'group_name': groupData['name'],
+        };
+      }
+
+      return null;
+    } catch (e) {
+      print('Error fetching memory group info: $e');
+      return null;
     }
   }
 }

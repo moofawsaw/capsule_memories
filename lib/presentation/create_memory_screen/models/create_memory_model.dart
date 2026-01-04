@@ -6,6 +6,7 @@ class CreateMemoryModel {
   bool isPublic;
   String? selectedGroup;
   String? selectedCategory;
+  String? selectedDuration;
   String? searchQuery;
   List<Map<String, dynamic>> searchResults;
   Set<String> invitedUserIds;
@@ -18,6 +19,7 @@ class CreateMemoryModel {
     this.isPublic = true,
     this.selectedGroup,
     this.selectedCategory,
+    this.selectedDuration = '12_hours',
     this.searchQuery,
     List<Map<String, dynamic>>? searchResults,
     Set<String>? invitedUserIds,
@@ -35,6 +37,7 @@ class CreateMemoryModel {
     bool? isPublic,
     String? selectedGroup,
     String? selectedCategory,
+    String? selectedDuration,
     String? searchQuery,
     List<Map<String, dynamic>>? searchResults,
     Set<String>? invitedUserIds,
@@ -47,6 +50,7 @@ class CreateMemoryModel {
       isPublic: isPublic ?? this.isPublic,
       selectedGroup: selectedGroup ?? this.selectedGroup,
       selectedCategory: selectedCategory ?? this.selectedCategory,
+      selectedDuration: selectedDuration ?? this.selectedDuration,
       searchQuery: searchQuery ?? this.searchQuery,
       searchResults: searchResults ?? this.searchResults,
       invitedUserIds: invitedUserIds ?? this.invitedUserIds,

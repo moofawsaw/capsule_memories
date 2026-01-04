@@ -38,6 +38,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         memoryName: null,
         selectedGroup: null,
         selectedCategory: null,
+        selectedDuration: '12_hours',
         searchQuery: null,
         searchResults: [],
         invitedUserIds: {},
@@ -131,6 +132,15 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       return 'Please select a category';
     }
     return null;
+  }
+
+  /// NEW: Update selected duration
+  void updateSelectedDuration(String? duration) {
+    state = state.copyWith(
+      createMemoryModel: state.createMemoryModel?.copyWith(
+        selectedDuration: duration,
+      ),
+    );
   }
 
   void togglePrivacySetting(bool isPublic) {
@@ -317,6 +327,9 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       return;
     }
 
+    // Get selected duration
+    final duration = state.createMemoryModel?.selectedDuration ?? '12_hours';
+
     // Set loading state
     state = state.copyWith(isLoading: true);
 
@@ -366,13 +379,13 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       final visibility =
           state.createMemoryModel?.isPublic == true ? 'public' : 'private';
 
-      // Create memory in database with category_id
+      // Create memory in database with category_id and selected duration
       final memoryId = await _storyService.createMemory(
         title: memoryName,
         creatorId: currentUser.id,
         visibility: visibility,
-        duration: '12_hours', // Default duration
-        categoryId: categoryId, // Pass category ID
+        duration: duration,
+        categoryId: categoryId,
         invitedUserIds: invitedUserIds.toList(),
       );
 
@@ -397,6 +410,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
           memoryName: null,
           selectedGroup: null,
           selectedCategory: null,
+          selectedDuration: '12_hours',
         ),
       );
 
@@ -424,6 +438,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         isPublic: true,
         memoryName: null,
         selectedGroup: null,
+        selectedDuration: '12_hours',
       ),
     );
 

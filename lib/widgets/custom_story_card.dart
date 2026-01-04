@@ -61,8 +61,9 @@ class CustomStoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Resolve category emoji from database category name
-    final category = categoryText != null
+    // CRITICAL FIX: Only use MemoryCategories as fallback when NO database icon is available
+    // If categoryIcon is provided from database, use it directly
+    final category = categoryText != null && categoryIcon == null
         ? MemoryCategories.getByName(categoryText!)
         : MemoryCategories.custom;
 
@@ -181,11 +182,21 @@ class CustomStoryCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Use emoji from MemoryCategories instead of image path
-          Text(
-            category.emoji,
-            style: TextStyle(fontSize: 20.h),
-          ),
+          // CRITICAL FIX: Use database icon URL first, fallback to emoji from MemoryCategories
+          if (categoryIcon != null && categoryIcon!.isNotEmpty)
+            // Database icon URL exists - display it
+            CustomImageView(
+              imagePath: categoryIcon!,
+              width: 20.h,
+              height: 20.h,
+              fit: BoxFit.contain,
+            )
+          else
+            // No database icon - fallback to static emoji from MemoryCategories
+            Text(
+              category.emoji,
+              style: TextStyle(fontSize: 20.h),
+            ),
           SizedBox(width: 8.h),
           Text(
             categoryText ?? '',

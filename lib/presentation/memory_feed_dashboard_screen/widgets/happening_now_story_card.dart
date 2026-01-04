@@ -2,11 +2,19 @@ import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../model/memory_feed_dashboard_model.dart';
 
+// IMPORTANT: This widget CANNOT be const because it uses runtime values:
+// - .h/.w extensions from Sizer package (runtime calculations)
+// - appTheme theme values (runtime theme access)
+// - TextStyleHelper.instance (runtime singleton access)
+// Flutter hot reload may fail when switching between const/non-const.
+// Solution: Perform Hot Restart (not Hot Reload) when you see const-related errors.
+
 class HappeningNowStoryCard extends StatelessWidget {
   final HappeningNowStoryData story;
   final VoidCallback? onTap;
 
-  const HappeningNowStoryCard({
+  // Explicitly non-const constructor (required due to runtime values in build method)
+  HappeningNowStoryCard({
     Key? key,
     required this.story,
     this.onTap,
@@ -14,10 +22,6 @@ class HappeningNowStoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Debug: Log what the widget receives
-    print(
-        '🔍 DEBUG: Widget rendering story by "${story.userName}" with categoryIcon: "${story.categoryIcon}"');
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -50,7 +54,7 @@ class HappeningNowStoryCard extends StatelessWidget {
                         Colors.transparent,
                         Colors.black.withAlpha(102),
                       ],
-                      stops: [0.0, 0.4, 1.0],
+                      stops: const [0.0, 0.4, 1.0],
                     ),
                   ),
                 ),
@@ -63,23 +67,47 @@ class HappeningNowStoryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Profile avatar
+                    // Profile avatar with read/unread ring
                     Container(
-                      width: 42.h,
-                      height: 42.h,
+                      width: 46.h,
+                      height: 46.h,
+                      padding:
+                          EdgeInsets.all(2.h), // Gap between ring and avatar
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: appTheme.gray_50,
-                          width: 2.0,
-                        ),
+                        gradient: story.isRead
+                            ? null // No gradient for read stories
+                            : LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: const [
+                                  Color(0xFF8B5CF6), // Purple
+                                  Color(0xFFF97316), // Orange
+                                ],
+                              ),
+                        color: story.isRead
+                            ? Color(0xFF9CA3AF)
+                            : null, // Gray for read
+                        border: story.isRead
+                            ? Border.all(color: Color(0xFF9CA3AF), width: 2.h)
+                            : null,
                       ),
-                      child: ClipOval(
-                        child: CustomImageView(
-                          imagePath: story.profileImage ?? '',
-                          height: 42.h,
-                          width: 42.h,
-                          fit: BoxFit.cover,
+                      child: Container(
+                        width: 38.h,
+                        height: 38.h,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color:
+                              appTheme.gray_900, // Background color for padding
+                        ),
+                        padding: EdgeInsets.all(2.h),
+                        child: ClipOval(
+                          child: CustomImageView(
+                            imagePath: story.profileImage ?? '',
+                            height: 38.h,
+                            width: 38.h,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ),
@@ -120,27 +148,15 @@ class HappeningNowStoryCard extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (story.categoryIcon.isNotEmpty)
-                            Builder(
-                              builder: (context) {
-                                print(
-                                    '🔍 DEBUG: Displaying category icon: "${story.categoryIcon}"');
-                                return CustomImageView(
-                                  imagePath: story.categoryIcon,
-                                  height: 14.h,
-                                  width: 14.h,
-                                );
-                              },
+                            CustomImageView(
+                              imagePath: story.categoryIcon,
+                              height: 14.h,
+                              width: 14.h,
                             ),
                           if (story.categoryIcon.isEmpty)
-                            Builder(
-                              builder: (context) {
-                                print(
-                                    '⚠️ WARNING: No category icon, showing camera fallback');
-                                return Text(
-                                  '📸',
-                                  style: TextStyle(fontSize: 14.h),
-                                );
-                              },
+                            Text(
+                              '📸',
+                              style: TextStyle(fontSize: 14.h),
                             ),
                           SizedBox(width: 4.h),
                           Text(

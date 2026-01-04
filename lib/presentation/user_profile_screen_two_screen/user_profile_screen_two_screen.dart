@@ -409,7 +409,7 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
               crossAxisCount: 3,
               crossAxisSpacing: 1.h,
               mainAxisSpacing: 1.h,
-              childAspectRatio: 0.75,
+              childAspectRatio: 0.45,
             ),
             itemCount: 3,
             itemBuilder: (context, index) {

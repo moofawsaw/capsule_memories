@@ -117,13 +117,59 @@ class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryMembersNotifier);
-        final memberCount = state.memoryMembersModel?.members?.length ?? 0;
+        final model = state.memoryMembersModel;
+        final memberCount = model?.members?.length ?? 0;
+        final groupName = model?.groupName;
 
         return Container(
           width: double.maxFinite,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Group name section (if memory was created from a group)
+              if (groupName != null && groupName.isNotEmpty)
+                GestureDetector(
+                  onTap: () => _navigateToGroups(context),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.h,
+                      vertical: 6.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: appTheme.deep_purple_A100.withAlpha(26),
+                      borderRadius: BorderRadius.circular(8.h),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.group_outlined,
+                          size: 16.h,
+                          color: appTheme.deep_purple_A100,
+                        ),
+                        SizedBox(width: 6.h),
+                        Text(
+                          groupName,
+                          style: TextStyleHelper
+                              .instance.body14RegularPlusJakartaSans
+                              .copyWith(
+                            color: appTheme.deep_purple_A100,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 4.h),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 12.h,
+                          color: appTheme.deep_purple_A100,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              SizedBox(height: groupName != null ? 12.h : 0),
+
               Text(
                 'Memory Members',
                 style: TextStyleHelper
@@ -144,6 +190,15 @@ class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
         );
       },
     );
+  }
+
+  /// Navigate to groups screen
+  void _navigateToGroups(BuildContext context) {
+    // Close the bottom sheet first
+    Navigator.of(context).pop();
+
+    // Navigate to groups management screen
+    NavigatorService.pushNamed(AppRoutes.appGroups);
   }
 
   /// Section Widget

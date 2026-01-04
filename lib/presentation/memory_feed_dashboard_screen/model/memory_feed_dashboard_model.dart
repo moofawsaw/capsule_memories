@@ -49,58 +49,59 @@ class MemoryFeedDashboardModel extends Equatable {
 
 /// Data model for happening now stories and trending stories
 class HappeningNowStoryData extends Equatable {
-  final String id;
+  final String storyId;
   final String backgroundImage;
   final String profileImage;
   final String userName;
-  final String categoryName;
   final String categoryIcon;
+  final String categoryName;
   final String timestamp;
-  final bool isViewed;
+  final bool isRead; // Existing field for read/unread status
 
-  HappeningNowStoryData({
-    required this.id,
+  const HappeningNowStoryData({
+    required this.storyId,
     required this.backgroundImage,
     required this.profileImage,
     required this.userName,
-    required this.categoryName,
     required this.categoryIcon,
+    required this.categoryName,
     required this.timestamp,
-    this.isViewed = false,
+    required this.isRead,
   });
 
+  // NEW: Add copyWith method for updating individual fields
   HappeningNowStoryData copyWith({
-    String? id,
+    String? storyId,
     String? backgroundImage,
     String? profileImage,
     String? userName,
-    String? categoryName,
     String? categoryIcon,
+    String? categoryName,
     String? timestamp,
-    bool? isViewed,
+    bool? isRead,
   }) {
     return HappeningNowStoryData(
-      id: id ?? this.id,
+      storyId: storyId ?? this.storyId,
       backgroundImage: backgroundImage ?? this.backgroundImage,
       profileImage: profileImage ?? this.profileImage,
       userName: userName ?? this.userName,
-      categoryName: categoryName ?? this.categoryName,
       categoryIcon: categoryIcon ?? this.categoryIcon,
+      categoryName: categoryName ?? this.categoryName,
       timestamp: timestamp ?? this.timestamp,
-      isViewed: isViewed ?? this.isViewed,
+      isRead: isRead ?? this.isRead,
     );
   }
 
   @override
   List<Object?> get props => [
-        id,
+        storyId,
         backgroundImage,
         profileImage,
         userName,
-        categoryName,
         categoryIcon,
+        categoryName,
         timestamp,
-        isViewed
+        isRead,
       ];
 }
 

@@ -2,7 +2,6 @@ import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_dropdown.dart';
 import '../../widgets/custom_edit_text.dart';
-import '../../widgets/custom_feature_card.dart';
 import '../../widgets/custom_header_section.dart';
 import '../../widgets/custom_icon_button_row.dart';
 import '../../widgets/custom_image_view.dart';
@@ -111,12 +110,145 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
           margin: EdgeInsets.only(left: 10.h, right: 10.h),
         ),
         _buildNameSection(context),
+        _buildDurationSelector(context),
         _buildCategorySection(context),
         _buildPrivacySettings(context),
-        _buildFeatureCard(context),
         _buildStep1ActionButtons(context),
         SizedBox(height: 20.h),
       ],
+    );
+  }
+
+  /// Section Widget
+  Widget _buildNameSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(createMemoryNotifier);
+
+        return Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(top: 28.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Name your memory',
+                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+              SizedBox(height: 10.h),
+              CustomEditText(
+                controller: state.memoryNameController,
+                hintText: 'e.g Family Xmas 2026',
+                validator: (value) {
+                  final notifier = ref.read(createMemoryNotifier.notifier);
+                  return notifier.validateMemoryName(value);
+                },
+                fillColor: appTheme.gray_900,
+                borderRadius: 8.h,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// NEW: Duration Selector Section
+  Widget _buildDurationSelector(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(createMemoryNotifier);
+        final selectedDuration =
+            state.createMemoryModel?.selectedDuration ?? '12_hours';
+
+        return Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(top: 20.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Memory duration',
+                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+              SizedBox(height: 10.h),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDurationTab(
+                      context,
+                      ref,
+                      '12 hours',
+                      '12_hours',
+                      selectedDuration == '12_hours',
+                    ),
+                  ),
+                  SizedBox(width: 8.h),
+                  Expanded(
+                    child: _buildDurationTab(
+                      context,
+                      ref,
+                      '1 day',
+                      '24_hours',
+                      selectedDuration == '24_hours',
+                    ),
+                  ),
+                  SizedBox(width: 8.h),
+                  Expanded(
+                    child: _buildDurationTab(
+                      context,
+                      ref,
+                      '3 days',
+                      '3_days',
+                      selectedDuration == '3_days',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Helper: Build individual duration tab
+  Widget _buildDurationTab(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    String value,
+    bool isSelected,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        ref.read(createMemoryNotifier.notifier).updateSelectedDuration(value);
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12.h),
+        decoration: BoxDecoration(
+          color: isSelected ? appTheme.deep_purple_A100 : appTheme.gray_900,
+          borderRadius: BorderRadius.circular(8.h),
+          border: Border.all(
+            color: isSelected
+                ? appTheme.deep_purple_A100
+                : appTheme.blue_gray_300.withAlpha(77),
+            width: 1.5,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style:
+                TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
+              color: isSelected ? appTheme.gray_50 : appTheme.blue_gray_300,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -310,41 +442,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   }
 
   /// Section Widget
-  Widget _buildNameSection(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(createMemoryNotifier);
-
-        return Container(
-          width: double.infinity,
-          margin: EdgeInsets.only(top: 28.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Name your memory',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-              SizedBox(height: 10.h),
-              CustomEditText(
-                controller: state.memoryNameController,
-                hintText: 'e.g Family Xmas 2026',
-                validator: (value) {
-                  final notifier = ref.read(createMemoryNotifier.notifier);
-                  return notifier.validateMemoryName(value);
-                },
-                fillColor: appTheme.gray_900,
-                borderRadius: 8.h,
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// Section Widget
   Widget _buildPrivacySettings(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -372,23 +469,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
           ),
         );
       },
-    );
-  }
-
-  /// Section Widget
-  Widget _buildFeatureCard(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(top: 20.h),
-      child: CustomFeatureCard(
-        iconPath: ImageConstant.imgFrameDeepPurpleA200,
-        title: '12-hour posting window',
-        description:
-            'Memories are open for 12 hours but don\'t sweat it if you missed someone, footage can be added later.',
-        backgroundColor: appTheme.colorF716A8,
-        iconBackgroundColor: appTheme.color41C124,
-        titleColor: appTheme.deep_purple_A200,
-        margin: EdgeInsets.zero,
-      ),
     );
   }
 

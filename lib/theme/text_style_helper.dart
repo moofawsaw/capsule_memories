@@ -216,6 +216,13 @@ class TextStyleHelper {
         color: appTheme.gray_50,
       );
 
+  TextStyle get body12RegularPlusJakartaSans => TextStyle(
+        fontSize: 12.fSize,
+        fontWeight: FontWeight.w400,
+        fontFamily: 'Plus Jakarta Sans',
+        color: appTheme.blue_gray_300,
+      );
+
   // Label Styles
   // Small text styles for labels, captions, and hints
 

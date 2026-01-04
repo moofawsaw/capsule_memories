@@ -18,6 +18,9 @@ class FeedService {
   // CRITICAL FIX: Add StoryService for URL resolution (same pattern as /memories)
   final _storyService = StoryService();
 
+  // NEW: Real-time subscription management
+  RealtimeChannel? _storyViewsChannel;
+
   /// 🛡️ VALIDATION: Validates story data completeness before rendering
   /// Returns true if all critical data is present, false if validation fails
   bool _validateStoryData(Map<String, dynamic> item, String context) {
@@ -101,8 +104,62 @@ class FeedService {
     return true;
   }
 
+  /// NEW METHOD: Subscribe to real-time story_views updates
+  /// Calls the provided callback whenever a story view is inserted
+  RealtimeChannel? subscribeToStoryViews({
+    required Function(String storyId, String userId) onStoryViewed,
+  }) {
+    if (_client == null) {
+      print('❌ ERROR: Cannot subscribe to story views - client is null');
+      return null;
+    }
+
+    try {
+      // Dispose existing subscription if any
+      _storyViewsChannel?.unsubscribe();
+
+      // Create new real-time channel for story_views table
+      _storyViewsChannel = _client!
+          .channel('story_views_realtime')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'story_views',
+            callback: (payload) {
+              print('🔄 REALTIME: Story view detected');
+              print('   - Payload: ${payload.newRecord}');
+
+              final storyId = payload.newRecord['story_id'] as String?;
+              final userId = payload.newRecord['user_id'] as String?;
+
+              if (storyId != null && userId != null) {
+                print('   - Story ID: $storyId');
+                print('   - User ID: $userId');
+                onStoryViewed(storyId, userId);
+              }
+            },
+          )
+          .subscribe();
+
+      print('✅ SUCCESS: Subscribed to real-time story views');
+      return _storyViewsChannel;
+    } catch (e) {
+      print('❌ ERROR subscribing to story views: $e');
+      return null;
+    }
+  }
+
+  /// NEW METHOD: Unsubscribe from real-time story_views updates
+  void unsubscribeFromStoryViews() {
+    if (_storyViewsChannel != null) {
+      _storyViewsChannel!.unsubscribe();
+      _storyViewsChannel = null;
+      print('✅ SUCCESS: Unsubscribed from real-time story views');
+    }
+  }
+
   /// Fetch recent stories for "Happening Now" section with pagination
-  /// Returns stories from the last 7 days sorted by creation time
+  /// Returns stories from the last 24 hours sorted by creation time
   Future<List<Map<String, dynamic>>> fetchHappeningNowStories({
     int offset = 0,
     int limit = _pageSize,
@@ -110,6 +167,10 @@ class FeedService {
     if (_client == null) return [];
 
     try {
+      // Get current user ID for read status check
+      final currentUserId = _client!.auth.currentUser?.id;
+
+      // CRITICAL: Use user_profiles_public for anonymous/public access
       final response = await _client!
           .from('stories')
           .select('''
@@ -130,7 +191,7 @@ class FeedService {
                 icon_url
               )
             ),
-            user_profiles!stories_contributor_id_fkey(
+            user_profiles_public!stories_contributor_id_fkey(
               id,
               display_name,
               avatar_url
@@ -138,7 +199,7 @@ class FeedService {
           ''')
           .eq('memories.visibility', 'public')
           .gte('created_at',
-              DateTime.now().subtract(Duration(days: 7)).toIso8601String())
+              DateTime.now().subtract(Duration(hours: 24)).toIso8601String())
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -146,30 +207,56 @@ class FeedService {
       final validatedStories = <Map<String, dynamic>>[];
 
       for (final item in response) {
-        if (_validateStoryData(item, 'HappeningNow')) {
-          final memory = item['memories'] as Map<String, dynamic>?;
-          final contributor =
-              item['user_profiles'] as Map<String, dynamic>? ?? {};
-          final category =
-              memory?['memory_categories'] as Map<String, dynamic>?;
+        // CRITICAL FIX: Update validation to use user_profiles_public
+        final memory = item['memories'] as Map<String, dynamic>?;
+        final contributor =
+            item['user_profiles_public'] as Map<String, dynamic>? ?? {};
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
-          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
-          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
-
-          validatedStories.add({
-            'id': item['id'] ?? '',
-            'thumbnail_url': resolvedThumbnailUrl ?? '',
-            'created_at': item['created_at'] ?? '',
-            'memory_id': item['memory_id'] ?? '',
-            'contributor_name': contributor['display_name'] ?? 'Unknown User',
-            'contributor_avatar': AvatarHelperService.getAvatarUrl(
-              contributor['avatar_url'],
-            ),
-            'memory_title': memory?['title'] ?? 'Untitled Memory',
-            'category_name': category?['name'] ?? 'Custom',
-            'category_icon': category?['icon_url'] ?? '',
-          });
+        // Validate required fields
+        if (memory?['title'] == null ||
+            contributor['display_name'] == null ||
+            item['thumbnail_url'] == null) {
+          print(
+              '⚠️ WARNING: Skipping story "${item['id']}" - missing required data');
+          continue;
         }
+
+        // NEW: Check if current user has viewed this story
+        bool isRead = false;
+        if (currentUserId != null) {
+          try {
+            final viewResponse = await _client!
+                .from('story_views')
+                .select('id')
+                .eq('story_id', item['id'])
+                .eq('user_id', currentUserId)
+                .maybeSingle();
+
+            isRead = viewResponse != null;
+          } catch (e) {
+            print(
+                '⚠️ WARNING: Failed to check view status for story "${item['id']}": $e');
+          }
+        }
+
+        // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+        final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
+        validatedStories.add({
+          'id': item['id'] ?? '',
+          'thumbnail_url': resolvedThumbnailUrl ?? '',
+          'created_at': item['created_at'] ?? '',
+          'memory_id': item['memory_id'] ?? '',
+          'contributor_name': contributor['display_name'] ?? 'Unknown User',
+          'contributor_avatar': AvatarHelperService.getAvatarUrl(
+            contributor['avatar_url'],
+          ),
+          'memory_title': memory?['title'] ?? 'Untitled Memory',
+          'category_name': category?['name'] ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+          'is_read': isRead, // NEW: Include read status
+        });
       }
 
       print(
@@ -234,16 +321,17 @@ class FeedService {
         print(
             '🔍 DEBUG: Memory "${memory['title']}" - Category: ${category?['name']}, Icon URL: "$categoryIconUrl"');
 
-        // Fetch contributors for this memory
+        // CRITICAL: Fetch contributors using user_profiles_public for anonymous access
         final contributorsResponse = await _client!
             .from('memory_contributors')
-            .select('user_id, user_profiles!inner(avatar_url)')
+            .select('user_id, user_profiles_public!inner(avatar_url)')
             .eq('memory_id', memory['id'])
             .limit(3);
 
         final contributorAvatars = (contributorsResponse as List)
             .map((c) {
-              final profile = c['user_profiles'] as Map<String, dynamic>?;
+              final profile =
+                  c['user_profiles_public'] as Map<String, dynamic>?;
               return AvatarHelperService.getAvatarUrl(
                 profile?['avatar_url'],
               );
@@ -306,6 +394,7 @@ class FeedService {
     if (_client == null) return [];
 
     try {
+      // CRITICAL: Use user_profiles_public for anonymous/public access
       final response = await _client!
           .from('stories')
           .select('''
@@ -326,7 +415,7 @@ class FeedService {
                 icon_url
               )
             ),
-            user_profiles!stories_contributor_id_fkey(
+            user_profiles_public!stories_contributor_id_fkey(
               id,
               display_name,
               avatar_url
@@ -342,30 +431,37 @@ class FeedService {
       final validatedStories = <Map<String, dynamic>>[];
 
       for (final item in response) {
-        if (_validateStoryData(item, 'TrendingStories')) {
-          final memory = item['memories'] as Map<String, dynamic>?;
-          final contributor =
-              item['user_profiles'] as Map<String, dynamic>? ?? {};
-          final category =
-              memory?['memory_categories'] as Map<String, dynamic>?;
+        // CRITICAL FIX: Update to use user_profiles_public
+        final memory = item['memories'] as Map<String, dynamic>?;
+        final contributor =
+            item['user_profiles_public'] as Map<String, dynamic>? ?? {};
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
-          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
-          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
-
-          validatedStories.add({
-            'id': item['id'] ?? '',
-            'thumbnail_url': resolvedThumbnailUrl ?? '',
-            'created_at': item['created_at'] ?? '',
-            'view_count': item['view_count'] ?? 0,
-            'contributor_name': contributor['display_name'] ?? 'Unknown User',
-            'contributor_avatar': AvatarHelperService.getAvatarUrl(
-              contributor['avatar_url'],
-            ),
-            'memory_title': memory?['title'] ?? 'Untitled Memory',
-            'category_name': category?['name'] ?? 'Custom',
-            'category_icon': category?['icon_url'] ?? '',
-          });
+        // Validate required fields
+        if (memory?['title'] == null ||
+            contributor['display_name'] == null ||
+            item['thumbnail_url'] == null) {
+          print(
+              '⚠️ WARNING: Skipping trending story "${item['id']}" - missing required data');
+          continue;
         }
+
+        // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+        final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
+        validatedStories.add({
+          'id': item['id'] ?? '',
+          'thumbnail_url': resolvedThumbnailUrl ?? '',
+          'created_at': item['created_at'] ?? '',
+          'view_count': item['view_count'] ?? 0,
+          'contributor_name': contributor['display_name'] ?? 'Unknown User',
+          'contributor_avatar': AvatarHelperService.getAvatarUrl(
+            contributor['avatar_url'],
+          ),
+          'memory_title': memory?['title'] ?? 'Untitled Memory',
+          'category_name': category?['name'] ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+        });
       }
 
       print(
@@ -385,6 +481,7 @@ class FeedService {
     if (_client == null) return [];
 
     try {
+      // CRITICAL: Use user_profiles_public for anonymous/public access
       final response = await _client!
           .from('stories')
           .select('''
@@ -405,7 +502,7 @@ class FeedService {
                 icon_url
               )
             ),
-            user_profiles!stories_contributor_id_fkey(
+            user_profiles_public!stories_contributor_id_fkey(
               id,
               display_name,
               avatar_url,
@@ -415,38 +512,45 @@ class FeedService {
           .eq('memories.visibility', 'public')
           .gte('created_at',
               DateTime.now().subtract(Duration(days: 30)).toIso8601String())
-          .order('user_profiles(posting_streak)', ascending: false)
+          .order('user_profiles_public(posting_streak)', ascending: false)
           .range(offset, offset + limit - 1);
 
       // 🛡️ VALIDATION: Filter out stories with incomplete data
       final validatedStories = <Map<String, dynamic>>[];
 
       for (final item in response) {
-        if (_validateStoryData(item, 'LongestStreaks')) {
-          final memory = item['memories'] as Map<String, dynamic>?;
-          final contributor =
-              item['user_profiles'] as Map<String, dynamic>? ?? {};
-          final category =
-              memory?['memory_categories'] as Map<String, dynamic>?;
+        // CRITICAL FIX: Update to use user_profiles_public
+        final memory = item['memories'] as Map<String, dynamic>?;
+        final contributor =
+            item['user_profiles_public'] as Map<String, dynamic>? ?? {};
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
-          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
-          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
-
-          validatedStories.add({
-            'id': item['id'] ?? '',
-            'thumbnail_url': resolvedThumbnailUrl ?? '',
-            'created_at': item['created_at'] ?? '',
-            'memory_id': item['memory_id'] ?? '',
-            'contributor_name': contributor['display_name'] ?? 'Unknown User',
-            'contributor_avatar': AvatarHelperService.getAvatarUrl(
-              contributor['avatar_url'],
-            ),
-            'posting_streak': contributor['posting_streak'] ?? 0,
-            'memory_title': memory?['title'] ?? 'Untitled Memory',
-            'category_name': category?['name'] ?? 'Custom',
-            'category_icon': category?['icon_url'] ?? '',
-          });
+        // Validate required fields
+        if (memory?['title'] == null ||
+            contributor['display_name'] == null ||
+            item['thumbnail_url'] == null) {
+          print(
+              '⚠️ WARNING: Skipping longest streak story "${item['id']}" - missing required data');
+          continue;
         }
+
+        // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+        final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
+        validatedStories.add({
+          'id': item['id'] ?? '',
+          'thumbnail_url': resolvedThumbnailUrl ?? '',
+          'created_at': item['created_at'] ?? '',
+          'memory_id': item['memory_id'] ?? '',
+          'contributor_name': contributor['display_name'] ?? 'Unknown User',
+          'contributor_avatar': AvatarHelperService.getAvatarUrl(
+            contributor['avatar_url'],
+          ),
+          'posting_streak': contributor['posting_streak'] ?? 0,
+          'memory_title': memory?['title'] ?? 'Untitled Memory',
+          'category_name': category?['name'] ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+        });
       }
 
       print(
@@ -466,6 +570,7 @@ class FeedService {
     if (_client == null) return [];
 
     try {
+      // CRITICAL: Use user_profiles_public for anonymous/public access
       final response = await _client!
           .from('stories')
           .select('''
@@ -486,7 +591,7 @@ class FeedService {
                 icon_url
               )
             ),
-            user_profiles!stories_contributor_id_fkey(
+            user_profiles_public!stories_contributor_id_fkey(
               id,
               display_name,
               avatar_url,
@@ -496,38 +601,45 @@ class FeedService {
           .eq('memories.visibility', 'public')
           .gte('created_at',
               DateTime.now().subtract(Duration(days: 30)).toIso8601String())
-          .order('user_profiles(popularity_score)', ascending: false)
+          .order('user_profiles_public(popularity_score)', ascending: false)
           .range(offset, offset + limit - 1);
 
       // 🛡️ VALIDATION: Filter out stories with incomplete data
       final validatedStories = <Map<String, dynamic>>[];
 
       for (final item in response) {
-        if (_validateStoryData(item, 'PopularUsers')) {
-          final memory = item['memories'] as Map<String, dynamic>?;
-          final contributor =
-              item['user_profiles'] as Map<String, dynamic>? ?? {};
-          final category =
-              memory?['memory_categories'] as Map<String, dynamic>?;
+        // CRITICAL FIX: Update to use user_profiles_public
+        final memory = item['memories'] as Map<String, dynamic>?;
+        final contributor =
+            item['user_profiles_public'] as Map<String, dynamic>? ?? {};
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
-          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
-          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
-
-          validatedStories.add({
-            'id': item['id'] ?? '',
-            'thumbnail_url': resolvedThumbnailUrl ?? '',
-            'created_at': item['created_at'] ?? '',
-            'memory_id': item['memory_id'] ?? '',
-            'contributor_name': contributor['display_name'] ?? 'Unknown User',
-            'contributor_avatar': AvatarHelperService.getAvatarUrl(
-              contributor['avatar_url'],
-            ),
-            'popularity_score': contributor['popularity_score'] ?? 0,
-            'memory_title': memory?['title'] ?? 'Untitled Memory',
-            'category_name': category?['name'] ?? 'Custom',
-            'category_icon': category?['icon_url'] ?? '',
-          });
+        // Validate required fields
+        if (memory?['title'] == null ||
+            contributor['display_name'] == null ||
+            item['thumbnail_url'] == null) {
+          print(
+              '⚠️ WARNING: Skipping popular user story "${item['id']}" - missing required data');
+          continue;
         }
+
+        // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+        final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
+        validatedStories.add({
+          'id': item['id'] ?? '',
+          'thumbnail_url': resolvedThumbnailUrl ?? '',
+          'created_at': item['created_at'] ?? '',
+          'memory_id': item['memory_id'] ?? '',
+          'contributor_name': contributor['display_name'] ?? 'Unknown User',
+          'contributor_avatar': AvatarHelperService.getAvatarUrl(
+            contributor['avatar_url'],
+          ),
+          'popularity_score': contributor['popularity_score'] ?? 0,
+          'memory_title': memory?['title'] ?? 'Untitled Memory',
+          'category_name': category?['name'] ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+        });
       }
 
       print(
@@ -593,16 +705,17 @@ class FeedService {
         print(
             '🔍 DEBUG: Popular Memory "${memory['title']}" - Category: ${category?['name']}, Icon URL: "$categoryIconUrl", Popularity Score: ${memory['popularity_score']}');
 
-        // Fetch contributors for this memory
+        // CRITICAL: Fetch contributors using user_profiles_public for anonymous access
         final contributorsResponse = await _client!
             .from('memory_contributors')
-            .select('user_id, user_profiles!inner(avatar_url)')
+            .select('user_id, user_profiles_public!inner(avatar_url)')
             .eq('memory_id', memory['id'])
             .limit(3);
 
         final contributorAvatars = (contributorsResponse as List)
             .map((c) {
-              final profile = c['user_profiles'] as Map<String, dynamic>?;
+              final profile =
+                  c['user_profiles_public'] as Map<String, dynamic>?;
               return AvatarHelperService.getAvatarUrl(
                 profile?['avatar_url'],
               );
@@ -969,12 +1082,12 @@ class FeedService {
             contributor_count
           ''').eq('id', memoryId).single();
 
-      // Fetch contributors for this memory
+      // CRITICAL: Fetch contributors using user_profiles_public for anonymous access
       final contributorsResponse =
           await _client!.from('memory_contributors').select('''
             id,
             user_id,
-            user_profiles!inner(
+            user_profiles_public!inner(
               id,
               display_name,
               avatar_url
@@ -982,7 +1095,7 @@ class FeedService {
           ''').eq('memory_id', memoryId);
 
       final contributors = (contributorsResponse as List).map((c) {
-        final profile = c['user_profiles'] as Map<String, dynamic>?;
+        final profile = c['user_profiles_public'] as Map<String, dynamic>?;
         return {
           'contributorId': c['user_id'] ?? '',
           'contributorName': profile?['display_name'] ?? 'Unknown User',
@@ -1029,6 +1142,7 @@ class FeedService {
     if (_client == null) return null;
 
     try {
+      // CRITICAL FIX: Join with memories table to fetch memory name
       final response = await _client!.from('stories').select('''
             id,
             image_url,
@@ -1041,7 +1155,14 @@ class FeedService {
             view_count,
             contributor_id,
             memory_id,
-            user_profiles!stories_contributor_id_fkey(
+            memories!inner(
+              id,
+              title,
+              created_at,
+              location_name,
+              visibility
+            ),
+            user_profiles_public!stories_contributor_id_fkey(
               id,
               display_name,
               avatar_url,
@@ -1049,7 +1170,9 @@ class FeedService {
             )
           ''').eq('id', storyId).single();
 
-      final contributor = response['user_profiles'] as Map<String, dynamic>?;
+      final contributor =
+          response['user_profiles_public'] as Map<String, dynamic>?;
+      final memory = response['memories'] as Map<String, dynamic>?;
       final textOverlays = response['text_overlays'] as List? ?? [];
 
       // Extract caption from text overlays
@@ -1084,6 +1207,7 @@ class FeedService {
             '📸 FEED SERVICE: Resolved image URL from "$rawImagePath" to "$mediaUrl"');
       }
 
+      // CRITICAL FIX: Use correct column name 'title' instead of 'name'
       return {
         'media_url': mediaUrl,
         'media_type': mediaType,
@@ -1097,6 +1221,10 @@ class FeedService {
         'caption': caption,
         'view_count': response['view_count'] ?? 0,
         'memory_id': response['memory_id'] ?? '',
+        'memory_title': memory?['title'] ?? 'Untitled Memory',
+        'memory_date': memory?['created_at'] ?? '',
+        'memory_location': memory?['location_name'] ?? '',
+        'memory_visibility': memory?['visibility'] ?? '',
       };
     } catch (e) {
       print('❌ ERROR fetching story details: $e');

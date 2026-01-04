@@ -350,6 +350,7 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   Expanded(
                     child: StoryGridItem(
                       model: state.userProfileModel?.storyItems?[1],
+                      height: 160.h, // <-- set your desired height
                       onTap: () => onTapStoryItem(context, 1),
                     ),
                   ),
@@ -357,6 +358,7 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   Expanded(
                     child: StoryGridItem(
                       model: state.userProfileModel?.storyItems?[2],
+                      height: 160.h, // <-- set your desired height
                       onTap: () => onTapStoryItem(context, 2),
                     ),
                   ),
@@ -365,6 +367,7 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               SizedBox(height: 12.h),
               StoryGridItem(
                 model: state.userProfileModel?.storyItems?[3],
+                height: 160.h, // <-- set your desired height
                 onTap: () => onTapStoryItem(context, 3),
                 width: 116.h,
               ),

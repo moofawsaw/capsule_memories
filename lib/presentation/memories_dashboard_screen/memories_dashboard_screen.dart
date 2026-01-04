@@ -4,8 +4,10 @@ import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../widgets/custom_memory_skeleton.dart';
 import '../../widgets/custom_public_memories.dart' as unified_widget;
 import '../../widgets/custom_story_list.dart';
+import '../../widgets/custom_story_skeleton.dart';
 import '../create_memory_screen/create_memory_screen.dart';
 import '../friends_management_screen/widgets/qr_scanner_overlay.dart';
 import './models/memory_item_model.dart';
@@ -127,6 +129,7 @@ class _MemoriesDashboardScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoriesDashboardNotifier);
         final storyItems = state.memoriesDashboardModel?.storyItems ?? [];
+        final isLoading = state.isLoading ?? false;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -140,19 +143,35 @@ class _MemoriesDashboardScreenState
               ),
             ),
             SizedBox(height: 18.h),
-            storyItems.isEmpty
-                ? _buildStoriesEmptyState(context)
-                : CustomStoryList(
-                    storyItems: storyItems
-                        .map((item) => CustomStoryItem(
-                              backgroundImage: item.backgroundImage ?? '',
-                              profileImage: item.profileImage ?? '',
-                              timestamp: item.timestamp ?? '2 mins ago',
-                              navigateTo: item.navigateTo,
-                            ))
-                        .toList(),
-                    onStoryTap: (index) => _onStoryTap(context, index),
-                  ),
+            isLoading
+                ? SizedBox(
+                    height: 160.h,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.only(left: 20.h),
+                      itemCount: 3,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          width: 140.h,
+                          margin: EdgeInsets.only(right: 12.h),
+                          child: CustomStorySkeleton(isCompact: true),
+                        );
+                      },
+                    ),
+                  )
+                : storyItems.isEmpty
+                    ? _buildStoriesEmptyState(context)
+                    : CustomStoryList(
+                        storyItems: storyItems
+                            .map((item) => CustomStoryItem(
+                                  backgroundImage: item.backgroundImage ?? '',
+                                  profileImage: item.profileImage ?? '',
+                                  timestamp: item.timestamp ?? '2 mins ago',
+                                  navigateTo: item.navigateTo,
+                                ))
+                            .toList(),
+                        onStoryTap: (index) => _onStoryTap(context, index),
+                      ),
           ],
         );
       },
@@ -167,7 +186,6 @@ class _MemoriesDashboardScreenState
       padding: EdgeInsets.all(20.h),
       decoration: BoxDecoration(
         color: appTheme.gray_900_02.withAlpha(128),
-        borderRadius: BorderRadius.circular(16.h),
         border: Border.all(
           color: appTheme.blue_gray_300.withAlpha(51),
           width: 1.0,
@@ -209,7 +227,7 @@ class _MemoriesDashboardScreenState
         final selectedState = state.selectedState ?? 'all';
 
         return Container(
-          margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
+          margin: EdgeInsets.fromLTRB(16.h, 8.h, 16.h, 0),
           child: Row(
             children: [
               // Ownership Toggle (left side)
@@ -356,9 +374,14 @@ class _MemoriesDashboardScreenState
 
         if (state.isLoading ?? false) {
           return Container(
-            child: Center(
-              child: CircularProgressIndicator(
-                color: appTheme.deep_purple_A100,
+            margin: EdgeInsets.fromLTRB(16.h, 20.h, 16.h, 24.h),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: NeverScrollableScrollPhysics(),
+              child: Row(
+                children: List.generate(3, (index) {
+                  return CustomMemorySkeleton();
+                }),
               ),
             ),
           );
