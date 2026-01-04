@@ -25,8 +25,8 @@ class TimelineStoryWidget extends StatelessWidget {
 
             // Vertical connector line
             Container(
-              width: 2.w,
-              height: 15.h,
+              width: 4.w,
+              height: 19.h,
               color: const Color(0xFF3A3A4A),
             ),
 
@@ -55,7 +55,7 @@ class TimelineStoryWidget extends StatelessWidget {
       width: 40.w,
       height: 60.h,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12.0),
+        borderRadius: BorderRadius.circular(6.0),
         border: Border.all(
           color: const Color(0xFF8B5CF6), // Purple border
           width: 2,

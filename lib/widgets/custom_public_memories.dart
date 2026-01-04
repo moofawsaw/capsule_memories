@@ -656,6 +656,10 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     }
 
     return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 0,
+        vertical: 26,
+      ),
       margin: EdgeInsets.symmetric(horizontal: 4.h),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -753,7 +757,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
                   decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border:
-                          Border.all(color: appTheme.whiteCustom, width: 1.h)),
+                          Border.all(color: appTheme.whiteCustom, width: 0)),
                   child: ClipOval(
                       child: CustomImageView(
                           imagePath: profileImages[index],
@@ -767,7 +771,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     return Container(
         padding: EdgeInsets.all(12.h),
         decoration: BoxDecoration(
-          color: appTheme.gray_900_01,
           borderRadius: BorderRadius.only(
             bottomLeft: Radius.circular(20.h),
             bottomRight: Radius.circular(20.h),
