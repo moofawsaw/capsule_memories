@@ -6,86 +6,76 @@ import '../services/supabase_service.dart';
 import './custom_image_view.dart';
 import './custom_memory_skeleton.dart';
 
-/**
- * CustomPublicMemories - A horizontal scrolling component that displays public memory cards
- * with rich visual content including profile images, media previews, and timeline information.
- * 
- * Features:
- * - Section header with icon and title
- * - Horizontally scrollable memory cards
- * - Profile image stacks with overlapping circular images
- * - Media timeline with preview images and play buttons
- * - Timestamp and location information
- * - Responsive design with SizeUtils extensions
- */
+/// CustomPublicMemories - A horizontal scrolling component that displays public memory cards.
+/// Loading behavior:
+/// - When [isLoading] is true: shows the SAME skeleton loader used in MemoriesDashboardScreen
+///   (3x CustomMemorySkeleton).
+/// - When loaded: shows real cards. Each card fetches its own timeline stories; while those load,
+///   we keep a fixed-height placeholder (no additional skeleton shimmer per card).
 class CustomPublicMemories extends StatelessWidget {
-  CustomPublicMemories({
+  const CustomPublicMemories({
     Key? key,
     this.sectionTitle,
     this.sectionIcon,
     this.memories,
     this.onMemoryTap,
     this.margin,
-    this.isLoading = false, // ADD THIS PARAMETER
+    this.isLoading = false,
   }) : super(key: key);
 
-  /// Title text for the section header
   final String? sectionTitle;
-
-  /// Icon path for the section header
   final String? sectionIcon;
-
-  /// List of memory data to display
   final List<CustomMemoryItem>? memories;
-
-  /// Callback when a memory card is tapped
   final Function(CustomMemoryItem)? onMemoryTap;
-
-  /// Margin around the entire component
   final EdgeInsetsGeometry? margin;
-
-  /// Loading state indicator
-  final bool isLoading; // ADD THIS PROPERTY
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-        margin: margin ?? EdgeInsets.only(top: 30.h, left: 24.h),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Only show section header if sectionTitle or sectionIcon is provided
-          if (sectionTitle != null || sectionIcon != null)
-            _buildSectionHeader(context),
-          if (sectionTitle != null || sectionIcon != null)
-            SizedBox(height: 24.h),
+      margin: margin ?? EdgeInsets.only(top: 30.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (sectionTitle != null || sectionIcon != null) _buildSectionHeader(),
+          if (sectionTitle != null || sectionIcon != null) SizedBox(height: 24.h),
           _buildMemoriesScroll(context),
-        ]));
+        ],
+      ),
+    );
   }
 
-  Widget _buildSectionHeader(BuildContext context) {
-    return Row(children: [
-      CustomImageView(
+  Widget _buildSectionHeader() {
+    return Row(
+      children: [
+        CustomImageView(
           imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
           height: 22.h,
           width: 22.h,
-          color: appTheme.deep_purple_A100),
-      SizedBox(width: 8.h),
-      Text(sectionTitle ?? 'Public Memories',
+          color: appTheme.deep_purple_A100,
+        ),
+        SizedBox(width: 8.h),
+        Text(
+          sectionTitle ?? 'Public Memories',
           style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-              .copyWith(color: appTheme.gray_50)),
-    ]);
+              .copyWith(color: appTheme.gray_50),
+        ),
+      ],
+    );
   }
 
   Widget _buildMemoriesScroll(BuildContext context) {
-    // SHOW SKELETON LOADERS DURING INITIAL LOAD
+    // SAME SKELETON PATTERN AS MemoriesDashboardScreen
     if (isLoading) {
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
         child: Row(
           children: List.generate(3, (index) {
             return Container(
               width: 300.h,
               margin: EdgeInsets.only(right: index == 2 ? 0 : 12.h),
-              child: _buildSkeletonCard(context),
+              child: CustomMemorySkeleton(),
             );
           }),
         ),
@@ -93,314 +83,25 @@ class CustomPublicMemories extends StatelessWidget {
     }
 
     final memoryList = memories ?? [];
-
-    if (memoryList.isEmpty) {
-      return SizedBox.shrink();
-    }
+    if (memoryList.isEmpty) return const SizedBox.shrink();
 
     return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-            children: List.generate(memoryList.length, (index) {
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: List.generate(memoryList.length, (index) {
           final memory = memoryList[index];
           return Container(
-              margin: EdgeInsets.only(
-                  right: index == memoryList.length - 1 ? 0 : 12.h),
-              child: _buildMemoryCard(context, memory));
-        })));
-  }
-
-  // ADD NEW METHOD: Build skeleton card for loading state
-  Widget _buildSkeletonCard(BuildContext context) {
-    return Container(
-      width: 300.h,
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_01,
-        borderRadius: BorderRadius.circular(20.h),
-      ),
-      child: Column(
-        children: [
-          // Skeleton header
-          Container(
-            padding: EdgeInsets.all(18.h),
-            decoration: BoxDecoration(
-              color: appTheme.background_transparent,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20.h),
-                topRight: Radius.circular(20.h),
-              ),
+            margin: EdgeInsets.only(
+              right: index == memoryList.length - 1 ? 0 : 12.h,
             ),
-            child: Row(
-              children: [
-                // Skeleton icon
-                Container(
-                  height: 36.h,
-                  width: 36.h,
-                  decoration: BoxDecoration(
-                    color: appTheme.blue_gray_300.withAlpha(51),
-                    borderRadius: BorderRadius.circular(18.h),
-                  ),
-                ),
-                SizedBox(width: 12.h),
-                // Skeleton text
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 16.h,
-                        width: 140.h,
-                        decoration: BoxDecoration(
-                          color: appTheme.blue_gray_300.withAlpha(51),
-                          borderRadius: BorderRadius.circular(4.h),
-                        ),
-                      ),
-                      SizedBox(height: 6.h),
-                      Container(
-                        height: 12.h,
-                        width: 80.h,
-                        decoration: BoxDecoration(
-                          color: appTheme.blue_gray_300.withAlpha(51),
-                          borderRadius: BorderRadius.circular(4.h),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Skeleton profile images
-                SizedBox(
-                  width: 84.h,
-                  height: 36.h,
-                  child: Stack(
-                    children: List.generate(3, (index) {
-                      return Positioned(
-                        left: (index * 24).h,
-                        child: Container(
-                          height: 36.h,
-                          width: 36.h,
-                          decoration: BoxDecoration(
-                            color: appTheme.blue_gray_300.withAlpha(51),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ],
+            child: _PublicMemoryCard(
+              memory: memory,
+              onTap: () => onMemoryTap?.call(memory),
             ),
-          ),
-          // Skeleton timeline
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
-            height: 112.h,
-            child: CustomMemorySkeleton(),
-          ),
-          // Skeleton footer
-          Container(
-            padding: EdgeInsets.all(12.h),
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_01,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(20.h),
-                bottomRight: Radius.circular(20.h),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildSkeletonFooterColumn(),
-                _buildSkeletonFooterColumn(),
-                _buildSkeletonFooterColumn(),
-              ],
-            ),
-          ),
-        ],
+          );
+        }),
       ),
     );
-  }
-
-  // Helper method for skeleton footer columns
-  Widget _buildSkeletonFooterColumn() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          height: 14.h,
-          width: 50.h,
-          decoration: BoxDecoration(
-            color: appTheme.blue_gray_300.withAlpha(51),
-            borderRadius: BorderRadius.circular(4.h),
-          ),
-        ),
-        SizedBox(height: 6.h),
-        Container(
-          height: 12.h,
-          width: 40.h,
-          decoration: BoxDecoration(
-            color: appTheme.blue_gray_300.withAlpha(51),
-            borderRadius: BorderRadius.circular(4.h),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMemoryCard(BuildContext context, CustomMemoryItem memory) {
-    return _PublicMemoryCard(
-      memory: memory,
-      onTap: () => onMemoryTap?.call(memory),
-    );
-  }
-
-  Widget _buildMemoryHeader(BuildContext context, CustomMemoryItem memory) {
-    return Container(
-        padding: EdgeInsets.all(18.h),
-        decoration: BoxDecoration(
-          color: appTheme.background_transparent,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20.h),
-            topRight: Radius.circular(20.h),
-          ),
-        ),
-        child: Row(children: [
-          Container(
-              height: 36.h,
-              width: 36.h,
-              decoration: BoxDecoration(
-                  color: Color(0xFFC1242F).withAlpha(64),
-                  borderRadius: BorderRadius.circular(18.h)),
-              padding: EdgeInsets.all(6.h),
-              child: CustomImageView(
-                  imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
-                  height: 24.h,
-                  width: 24.h)),
-          SizedBox(width: 12.h),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(memory.title ?? 'Nixon Wedding 2025',
-                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50)),
-                SizedBox(height: 2.h),
-                Text(memory.date ?? 'Dec 4, 2025',
-                    style:
-                        TextStyleHelper.instance.body12MediumPlusJakartaSans),
-              ])),
-          _buildProfileStack(context, memory.profileImages ?? []),
-        ]));
-  }
-
-  Widget _buildProfileStack(BuildContext context, List<String> profileImages) {
-    if (profileImages.isEmpty) {
-      return SizedBox.shrink();
-    }
-
-    return SizedBox(
-        width: 84.h,
-        height: 36.h,
-        child: Stack(
-            children: List.generate(
-                profileImages.length > 3 ? 3 : profileImages.length, (index) {
-          return Positioned(
-              left: (index * 24).h,
-              child: Container(
-                  height: 36.h,
-                  width: 36.h,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: appTheme.whiteCustom, width: 1.h)),
-                  child: ClipOval(
-                      child: CustomImageView(
-                          imagePath: profileImages[index],
-                          height: 36.h,
-                          width: 36.h,
-                          fit: BoxFit.cover))));
-        })));
-  }
-
-  Widget _buildMediaPreview(BuildContext context, CustomMediaItem item) {
-    return Container(
-        margin: EdgeInsets.only(left: 6.h),
-        child: Stack(children: [
-          Container(
-              height: 56.h,
-              width: 40.h,
-              decoration: BoxDecoration(
-                  color: appTheme.gray_900_01,
-                  borderRadius: BorderRadius.circular(6.h),
-                  border:
-                      Border.all(color: appTheme.deep_purple_A200, width: 1.h)),
-              child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6.h),
-                  child: CustomImageView(
-                      imagePath: item.imagePath ?? '',
-                      height: 56.h,
-                      width: 40.h,
-                      fit: BoxFit.cover))),
-          if (item.hasPlayButton == true)
-            Positioned(
-                top: 4.h,
-                left: 4.h,
-                child: Container(
-                    height: 16.h,
-                    width: 16.h,
-                    decoration: BoxDecoration(
-                        color: Color(0xFFD81E29).withAlpha(59),
-                        borderRadius: BorderRadius.circular(8.h)),
-                    child: Center(
-                        child: CustomImageView(
-                            imagePath: ImageConstant.imgPlayCircle,
-                            height: 12.h,
-                            width: 12.h)))),
-        ]));
-  }
-
-  Widget _buildMemoryFooter(BuildContext context, CustomMemoryItem memory) {
-    return Container(
-        padding: EdgeInsets.all(12.h),
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_01,
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(20.h),
-            bottomRight: Radius.circular(20.h),
-          ),
-        ),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(memory.startDate ?? 'Dec 4',
-                style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50)),
-            SizedBox(height: 6.h),
-            Text(memory.startTime ?? '3:18pm',
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300)),
-          ]),
-          if (memory.location != null)
-            Column(children: [
-              Text(memory.location!,
-                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300)),
-              if (memory.distance != null) ...[
-                SizedBox(height: 4.h),
-                Text(memory.distance!,
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300)),
-              ],
-            ]),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(memory.endDate ?? 'Dec 4',
-                style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50)),
-            SizedBox(height: 6.h),
-            Text(memory.endTime ?? '3:18am',
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300)),
-          ]),
-        ]));
   }
 }
 
@@ -437,7 +138,7 @@ class CustomMemoryItem {
   final bool? isLiked;
 }
 
-/// Data model for media items in the timeline
+/// Data model for media items in the timeline (kept for compatibility)
 class CustomMediaItem {
   CustomMediaItem({
     this.imagePath,
@@ -465,6 +166,7 @@ class _PublicMemoryCard extends StatefulWidget {
 
 class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   final _storyService = StoryService();
+
   List<TimelineStoryItem> _timelineStories = [];
   DateTime? _memoryStartTime;
   DateTime? _memoryEndTime;
@@ -489,7 +191,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     try {
       final memoryId = widget.memory.id!;
 
-      // Fetch memory's start_time and end_time from database (same as timeline detail screen)
       final memoryResponse = await SupabaseService.instance.client
           ?.from('memories')
           .select('start_time, end_time')
@@ -502,16 +203,13 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       if (memoryResponse != null &&
           memoryResponse['start_time'] != null &&
           memoryResponse['end_time'] != null) {
-        // Use actual event window from database (same as timeline detail screen)
         memoryStart = DateTime.parse(memoryResponse['start_time'] as String);
         memoryEnd = DateTime.parse(memoryResponse['end_time'] as String);
       } else {
-        // Fallback: parse from string dates if database columns not available
         memoryStart = _parseMemoryStartTime();
         memoryEnd = _parseMemoryEndTime();
       }
 
-      // Fetch stories from database using memory ID
       final storiesData = await _storyService.fetchMemoryStories(memoryId);
 
       if (!mounted) return;
@@ -526,7 +224,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         return;
       }
 
-      // Convert stories to TimelineStoryItem format
       final timelineStories = storiesData.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
         final createdAt = DateTime.parse(storyData['created_at'] as String);
@@ -555,6 +252,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         _isLoadingTimeline = false;
       });
     } catch (e) {
+      // ignore: avoid_print
       print('❌ PUBLIC MEMORY CARD: Error loading timeline: $e');
       if (!mounted) return;
       setState(() {
@@ -572,20 +270,23 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       final now = DateTime.now();
       final parts = dateStr.split(' ');
       final month = _monthToNumber(parts[0]);
-      final day = int.tryParse(parts[1]) ?? now.day;
+      final day = int.tryParse(parts.length > 1 ? parts[1] : '') ?? now.day;
 
-      final timeParts =
-          timeStr.toLowerCase().replaceAll(RegExp(r'[ap]m'), '').split(':');
+      final timeParts = timeStr
+          .toLowerCase()
+          .replaceAll(RegExp(r'[ap]m'), '')
+          .trim()
+          .split(':');
+
       var hour = int.tryParse(timeParts[0]) ?? 0;
-      final minute =
-          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
 
       return DateTime(now.year, month, day, hour, minute);
-    } catch (e) {
-      return DateTime.now().subtract(Duration(hours: 2));
+    } catch (_) {
+      return DateTime.now().subtract(const Duration(hours: 2));
     }
   }
 
@@ -597,19 +298,22 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       final now = DateTime.now();
       final parts = dateStr.split(' ');
       final month = _monthToNumber(parts[0]);
-      final day = int.tryParse(parts[1]) ?? now.day;
+      final day = int.tryParse(parts.length > 1 ? parts[1] : '') ?? now.day;
 
-      final timeParts =
-          timeStr.toLowerCase().replaceAll(RegExp(r'[ap]m'), '').split(':');
+      final timeParts = timeStr
+          .toLowerCase()
+          .replaceAll(RegExp(r'[ap]m'), '')
+          .trim()
+          .split(':');
+
       var hour = int.tryParse(timeParts[0]) ?? 0;
-      final minute =
-          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
 
       return DateTime(now.year, month, day, hour, minute);
-    } catch (e) {
+    } catch (_) {
       return DateTime.now();
     }
   }
@@ -629,15 +333,16 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       'nov': 11,
       'dec': 12,
     };
-    return months[month.toLowerCase().substring(0, 3)] ?? DateTime.now().month;
+    final key = month.toLowerCase().substring(0, month.length >= 3 ? 3 : month.length);
+    return months[key] ?? DateTime.now().month;
   }
 
   Widget _buildMemoryTimeline() {
+    // IMPORTANT: no per-card skeleton shimmer (performance). Keep height stable.
     if (_isLoadingTimeline) {
-      return Container(
-        margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
+      return SizedBox(
         height: 112.h,
-        child: CustomMemorySkeleton(),
+        child: const SizedBox.shrink(),
       );
     }
 
@@ -656,10 +361,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     }
 
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 0,
-        vertical: 26,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 26),
       margin: EdgeInsets.symmetric(horizontal: 4.h),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -670,10 +372,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
               child: TimelineStoryWidget(
                 item: story,
                 onTap: () {
-                  // Navigate to full memory when timeline card is tapped
-                  if (widget.onTap != null) {
-                    widget.onTap!();
-                  }
+                  if (widget.onTap != null) widget.onTap!();
                 },
               ),
             );
@@ -690,124 +389,169 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       child: Container(
         width: 300.h,
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(20.h)),
-        child: Column(children: [
-          _buildMemoryHeader(context, widget.memory),
-          _buildMemoryTimeline(),
-          _buildMemoryFooter(context, widget.memory),
-        ]),
+        child: Column(
+          children: [
+            _buildMemoryHeader(context),
+            _buildMemoryTimeline(),
+            _buildMemoryFooter(context),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildMemoryHeader(BuildContext context, CustomMemoryItem memory) {
+  Widget _buildMemoryHeader(BuildContext context) {
+    final memory = widget.memory;
+
     return Container(
-        padding: EdgeInsets.all(18.h),
-        decoration: BoxDecoration(
-          color: appTheme.background_transparent,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20.h),
-            topRight: Radius.circular(20.h),
-          ),
+      padding: EdgeInsets.all(18.h),
+      decoration: BoxDecoration(
+        color: appTheme.background_transparent,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
         ),
-        child: Row(children: [
+      ),
+      child: Row(
+        children: [
           Container(
-              height: 36.h,
-              width: 36.h,
-              decoration: BoxDecoration(
-                  color: Color(0xFFC1242F).withAlpha(64),
-                  borderRadius: BorderRadius.circular(18.h)),
-              padding: EdgeInsets.all(6.h),
-              child: CustomImageView(
-                  imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
-                  height: 24.h,
-                  width: 24.h)),
+            height: 36.h,
+            width: 36.h,
+            decoration: BoxDecoration(
+              color: const Color(0xFFC1242F).withAlpha(64),
+              borderRadius: BorderRadius.circular(18.h),
+            ),
+            padding: EdgeInsets.all(6.h),
+            child: CustomImageView(
+              imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
+              height: 24.h,
+              width: 24.h,
+            ),
+          ),
           SizedBox(width: 12.h),
           Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(memory.title ?? 'Nixon Wedding 2025',
-                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  memory.title ?? 'Nixon Wedding 2025',
+                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                ),
                 SizedBox(height: 2.h),
-                Text(memory.date ?? 'Dec 4, 2025',
-                    style:
-                        TextStyleHelper.instance.body12MediumPlusJakartaSans),
-              ])),
+                Text(
+                  memory.date ?? 'Dec 4, 2025',
+                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans,
+                ),
+              ],
+            ),
+          ),
           _buildProfileStack(context, memory.profileImages ?? []),
-        ]));
+        ],
+      ),
+    );
   }
 
   Widget _buildProfileStack(BuildContext context, List<String> profileImages) {
-    if (profileImages.isEmpty) {
-      return SizedBox.shrink();
-    }
+    if (profileImages.isEmpty) return const SizedBox.shrink();
+
+    final count = profileImages.length > 3 ? 3 : profileImages.length;
 
     return SizedBox(
-        width: 84.h,
-        height: 36.h,
-        child: Stack(
-            children: List.generate(
-                profileImages.length > 3 ? 3 : profileImages.length, (index) {
+      width: 84.h,
+      height: 36.h,
+      child: Stack(
+        children: List.generate(count, (index) {
           return Positioned(
-              left: (index * 24).h,
-              child: Container(
+            left: (index * 24).h,
+            child: Container(
+              height: 36.h,
+              width: 36.h,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: appTheme.whiteCustom, width: 1.h),
+              ),
+              child: ClipOval(
+                child: CustomImageView(
+                  imagePath: profileImages[index],
                   height: 36.h,
                   width: 36.h,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: appTheme.whiteCustom, width: 0)),
-                  child: ClipOval(
-                      child: CustomImageView(
-                          imagePath: profileImages[index],
-                          height: 36.h,
-                          width: 36.h,
-                          fit: BoxFit.cover))));
-        })));
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
   }
 
-  Widget _buildMemoryFooter(BuildContext context, CustomMemoryItem memory) {
+  Widget _buildMemoryFooter(BuildContext context) {
+    final memory = widget.memory;
+
     return Container(
-        padding: EdgeInsets.all(12.h),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(20.h),
-            bottomRight: Radius.circular(20.h),
-          ),
+      padding: EdgeInsets.all(12.h),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(20.h),
+          bottomRight: Radius.circular(20.h),
         ),
-        child:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(memory.startDate ?? 'Dec 4',
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                memory.startDate ?? 'Dec 4',
                 style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50)),
-            SizedBox(height: 6.h),
-            Text(memory.startTime ?? '3:18pm',
+                    .copyWith(color: appTheme.gray_50),
+              ),
+              SizedBox(height: 6.h),
+              Text(
+                memory.startTime ?? '3:18pm',
                 style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300)),
-          ]),
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+          ),
           if (memory.location != null)
-            Column(children: [
-              Text(memory.location!,
+            Column(
+              children: [
+                Text(
+                  memory.location!,
                   style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300)),
-              if (memory.distance != null) ...[
-                SizedBox(height: 4.h),
-                Text(memory.distance!,
+                      .copyWith(color: appTheme.blue_gray_300),
+                ),
+                if (memory.distance != null) ...[
+                  SizedBox(height: 4.h),
+                  Text(
+                    memory.distance!,
                     style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300)),
+                        .copyWith(color: appTheme.blue_gray_300),
+                  ),
+                ],
               ],
-            ]),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(memory.endDate ?? 'Dec 4',
+            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                memory.endDate ?? 'Dec 4',
                 style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50)),
-            SizedBox(height: 6.h),
-            Text(memory.endTime ?? '3:18am',
+                    .copyWith(color: appTheme.gray_50),
+              ),
+              SizedBox(height: 6.h),
+              Text(
+                memory.endTime ?? '3:18am',
                 style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300)),
-          ]),
-        ]));
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

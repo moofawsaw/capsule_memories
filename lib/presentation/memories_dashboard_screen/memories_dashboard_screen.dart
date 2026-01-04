@@ -407,7 +407,12 @@ class _MemoriesDashboardScreenState
         final filteredMemories = notifier.getFilteredMemories(currentUser.id);
 
         return Container(
-          margin: EdgeInsets.fromLTRB(16.h, 20.h, 16.h, 24.h),
+          margin: EdgeInsets.fromLTRB(
+            0,
+            20,
+            0,
+            24,
+          ),
           child: _buildMemoryList(context, filteredMemories),
         );
       },
@@ -452,9 +457,12 @@ class _MemoriesDashboardScreenState
           final memory = convertedMemories[index];
           final memoryItem = memoryItems[index];
           return Container(
-            margin: EdgeInsets.only(
-              right: index == convertedMemories.length - 1 ? 0 : 12.h,
+            padding: EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 0,
             ),
+            margin: EdgeInsets.only(
+                right: index == convertedMemories.length - 1 ? 0 : 12.h),
             child: unified_widget.CustomPublicMemories(
               sectionTitle: null,
               sectionIcon: null,

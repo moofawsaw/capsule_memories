@@ -1,14 +1,36 @@
 import '../../../core/app_export.dart';
 
-/// Timeline Story Widget - Individual story card with vertical layout
+/// Data model for timeline story items
+class TimelineStoryItem {
+  const TimelineStoryItem({
+    required this.backgroundImage,
+    required this.userAvatar,
+    required this.postedAt,
+    this.timeLabel,
+    this.storyId,
+    this.isVideo = true,
+  });
+
+  final String backgroundImage;
+  final String userAvatar;
+  final DateTime postedAt;
+  final String? timeLabel;
+  final String? storyId;
+  final bool isVideo;
+}
+
+/// Individual timeline story widget with vertical layout
+/// Card at top, connector, avatar at bottom
 class TimelineStoryWidget extends StatelessWidget {
   final TimelineStoryItem item;
   final VoidCallback? onTap;
+  final double barPosition; // Y position of the horizontal bar
 
   const TimelineStoryWidget({
     Key? key,
     required this.item,
     this.onTap,
+    this.barPosition = 85.0,
   }) : super(key: key);
 
   @override
@@ -20,30 +42,34 @@ class TimelineStoryWidget extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Story Card (phone-shaped)
+            // Story Card (phone-shaped) - ABOVE THE BAR
             _buildStoryCard(),
 
-            // Vertical connector line
+            // Vertical connector from card to bar
             Container(
-              width: 4.w,
-              height: 19.h,
-              color: const Color(0xFF3A3A4A),
+              width: 3.w,
+              height: 12.h,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3A3A4A),
+                borderRadius: BorderRadius.circular(1.5.w),
+              ),
             ),
 
-            // User Avatar with gradient ring
-            _buildAvatarWithRing(),
-
+            // Space for the horizontal bar (handled by parent Stack)
             SizedBox(height: 4.h),
 
-            // Time/Location label
-            Text(
-              item.timeLabel ?? _formatTime(item.postedAt),
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 10.sp,
+            // Vertical connector from bar to avatar
+            Container(
+              width: 3.w,
+              height: 12.h,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3A3A4A),
+                borderRadius: BorderRadius.circular(1.5.w),
               ),
-              textAlign: TextAlign.center,
             ),
+
+            // User Avatar with gradient ring - BELOW THE BAR
+            _buildAvatarWithRing(),
           ],
         ),
       ),
@@ -52,32 +78,58 @@ class TimelineStoryWidget extends StatelessWidget {
 
   Widget _buildStoryCard() {
     return Container(
-      width: 40.w,
-      height: 60.h,
+      width: 48.w,
+      height: 68.h,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6.0),
+        borderRadius: BorderRadius.circular(10.h),
         border: Border.all(
           color: const Color(0xFF8B5CF6), // Purple border
-          width: 2,
+          width: 2.5,
         ),
-        image: DecorationImage(
-          image: NetworkImage(item.backgroundImage),
-          fit: BoxFit.cover,
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Center(
-        // Play icon overlay for videos
-        child: Container(
-          padding: EdgeInsets.all(6.h),
-          decoration: const BoxDecoration(
-            color: Colors.black38,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.play_arrow,
-            color: Colors.white,
-            size: 16.h,
-          ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8.h),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image
+            Image.network(
+              item.backgroundImage,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: const Color(0xFF2A2A3A),
+                child: Icon(
+                  Icons.image_not_supported,
+                  color: Colors.white38,
+                  size: 20.h,
+                ),
+              ),
+            ),
+            
+            // Play icon overlay (for videos)
+            if (item.isVideo)
+              Center(
+                child: Container(
+                  padding: EdgeInsets.all(8.h),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 18.h,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -85,44 +137,48 @@ class TimelineStoryWidget extends StatelessWidget {
 
   Widget _buildAvatarWithRing() {
     return Container(
-      width: 32.h,
-      height: 32.h,
-      padding: EdgeInsets.all(2.h), // Ring thickness
+      width: 40.h,
+      height: 40.h,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF8B5CF6), // Purple
+            Color(0xFFEC4899), // Pink
+            Color(0xFFF97316), // Orange
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(2.5.h), // Ring thickness
       child: Container(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          image: DecorationImage(
-            image: NetworkImage(item.userAvatar),
+          color: const Color(0xFF1A1A2E), // Dark background fallback
+        ),
+        child: ClipOval(
+          child: Image.network(
+            item.userAvatar,
             fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: const Color(0xFF2A2A3A),
+              child: Icon(
+                Icons.person,
+                color: Colors.white38,
+                size: 20.h,
+              ),
+            ),
           ),
         ),
       ),
     );
   }
-
-  String _formatTime(DateTime time) {
-    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
-    final period = time.hour >= 12 ? 'PM' : 'AM';
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute $period';
-  }
-}
-
-class TimelineStoryItem {
-  const TimelineStoryItem({
-    required this.backgroundImage,
-    required this.userAvatar,
-    required this.postedAt,
-    this.timeLabel,
-    this.storyId,
-    @Deprecated('Use storyId with onStoryTap callback instead') this.onTap,
-  });
-
-  final String backgroundImage;
-  final String userAvatar;
-  final DateTime postedAt;
-  final String? timeLabel;
-  final String? storyId;
-  @Deprecated('Use storyId with onStoryTap callback instead')
-  final VoidCallback? onTap;
 }
