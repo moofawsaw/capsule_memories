@@ -227,7 +227,12 @@ class _MemoriesDashboardScreenState
         final selectedState = state.selectedState ?? 'all';
 
         return Container(
-          margin: EdgeInsets.fromLTRB(16.h, 8.h, 16.h, 0),
+          margin: EdgeInsets.fromLTRB(
+            16,
+            24,
+            16,
+            0,
+          ),
           child: Row(
             children: [
               // Ownership Toggle (left side)

@@ -15,10 +15,13 @@ class CustomStoryViewer extends StatelessWidget {
     this.onStoryTap,
     this.onPlayButtonTap,
     this.onProfileTap,
+    this.onDeleteTap,
     this.showTimestamp = true,
     this.timestampText,
     this.margin,
     this.spacing,
+    this.showDeleteButton = false,
+    this.currentUserId,
   }) : super(key: key);
 
   /// List of story items to display
@@ -36,6 +39,9 @@ class CustomStoryViewer extends StatelessWidget {
   /// Callback when profile image is tapped
   final Function(int index)? onProfileTap;
 
+  /// Callback when delete button is tapped
+  final Function(int index)? onDeleteTap;
+
   /// Whether to show timestamp
   final bool showTimestamp;
 
@@ -47,6 +53,12 @@ class CustomStoryViewer extends StatelessWidget {
 
   /// Spacing between story items
   final double? spacing;
+
+  /// Whether to show delete button
+  final bool showDeleteButton;
+
+  /// Current user ID for ownership check
+  final String? currentUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +104,11 @@ class CustomStoryViewer extends StatelessWidget {
 
   Widget _buildStoryItem(
       BuildContext context, CustomStoryItem item, int index) {
+    // Check if current user owns this story
+    final isOwnStory = currentUserId != null &&
+        item.contributorId != null &&
+        currentUserId == item.contributorId;
+
     return GestureDetector(
       onTap: () => onStoryTap?.call(index),
       child: Container(
@@ -131,6 +148,29 @@ class CustomStoryViewer extends StatelessWidget {
                   borderRadius: 6.h,
                   padding: EdgeInsets.all(4.h),
                   onTap: () => onPlayButtonTap?.call(index),
+                ),
+              ),
+
+            // Delete button overlay - top right (only for current user's stories)
+            if (showDeleteButton && isOwnStory && onDeleteTap != null)
+              Positioned(
+                top: 4.h,
+                right: 4.h,
+                child: GestureDetector(
+                  onTap: () => onDeleteTap?.call(index),
+                  child: Container(
+                    width: 20.h,
+                    height: 20.h,
+                    decoration: BoxDecoration(
+                      color: appTheme.red_500.withAlpha(230),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.delete,
+                      color: appTheme.white_A700,
+                      size: 12.h,
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -208,6 +248,7 @@ class CustomStoryItem {
     required this.imagePath,
     this.showPlayButton = true,
     this.playIconPath,
+    this.contributorId,
   });
 
   /// Path to the story image
@@ -218,4 +259,7 @@ class CustomStoryItem {
 
   /// Custom play icon path (optional)
   final String? playIconPath;
+
+  /// Story contributor ID for ownership check
+  final String? contributorId;
 }

@@ -506,6 +506,36 @@ class StoryService {
     return memory['state'] == 'sealed';
   }
 
+  /// Delete a story from the database
+  /// Returns true if deletion was successful, false otherwise
+  /// CRITICAL: RLS policy ensures only story contributor can delete
+  Future<bool> deleteStory(String storyId) async {
+    if (_supabase == null) {
+      print('❌ STORY SERVICE: Supabase client not initialized');
+      return false;
+    }
+
+    return await _retryOperation(
+      () => _deleteStoryInternal(storyId),
+      'delete story',
+    );
+  }
+
+  /// Internal implementation of deleteStory with retry support
+  Future<bool> _deleteStoryInternal(String storyId) async {
+    try {
+      print('🗑️ STORY SERVICE: Deleting story: $storyId');
+
+      await _supabase?.from('stories').delete().eq('id', storyId);
+
+      print('✅ STORY SERVICE: Successfully deleted story $storyId');
+      return true;
+    } catch (e) {
+      print('❌ STORY SERVICE: Error deleting story: $e');
+      return false;
+    }
+  }
+
   /// Fetch individual story details for story viewer
   /// Returns actual media URLs (video_url or image_url) based on media_type
   Future<Map<String, dynamic>?> fetchStoryDetails(String storyId) async {

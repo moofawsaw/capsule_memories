@@ -170,6 +170,13 @@ class FeedService {
       // Get current user ID for read status check
       final currentUserId = _client!.auth.currentUser?.id;
 
+      // 🎯 DEBUG: Log database query start
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔍 DATABASE QUERY: fetchHappeningNowStories()');
+      print('   Current User ID: "$currentUserId"');
+      print('   Offset: $offset, Limit: $limit');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       // CRITICAL: Use user_profiles_public for anonymous/public access
       final response = await _client!
           .from('stories')
@@ -203,6 +210,10 @@ class FeedService {
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
+      // 📊 DEBUG: Log raw database response
+      print(
+          '📊 DATABASE RESPONSE: Received ${(response as List).length} stories from database');
+
       // 🛡️ VALIDATION: Filter out stories with incomplete data
       final validatedStories = <Map<String, dynamic>>[];
 
@@ -222,10 +233,16 @@ class FeedService {
           continue;
         }
 
-        // NEW: Check if current user has viewed this story
+        // FIXED: Check if current user has viewed this story by querying story_views table
         bool isRead = false;
         if (currentUserId != null) {
           try {
+            // 🔍 DEBUG: Log story_views query for each story
+            print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            print('🔍 CHECKING STORY VIEW STATUS');
+            print('   Story ID: "${item['id']}"');
+            print('   User ID: "$currentUserId"');
+
             final viewResponse = await _client!
                 .from('story_views')
                 .select('id')
@@ -234,14 +251,31 @@ class FeedService {
                 .maybeSingle();
 
             isRead = viewResponse != null;
-          } catch (e) {
+
+            // 📋 DEBUG: Log query result with detailed status
             print(
-                '⚠️ WARNING: Failed to check view status for story "${item['id']}": $e');
+                '   Query Result: ${viewResponse != null ? 'FOUND (viewed)' : 'NOT FOUND (unviewed)'}');
+            print('   isRead Status: $isRead');
+            print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          } catch (e) {
+            print('❌ ERROR checking view status for story "${item['id']}": $e');
           }
+        } else {
+          print('⚠️ WARNING: No authenticated user - setting isRead to false');
         }
 
         // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
         final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+
+        // 📦 DEBUG: Log final story data being added to validated list
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('📦 ADDING STORY TO VALIDATED LIST');
+        print('   Story ID: "${item['id']}"');
+        print('   Category Name: "${category?['name']}"');
+        print('   Category Icon: "${category?['icon_url']}"');
+        print('   isRead: $isRead');
+        print('   Thumbnail URL: "$resolvedThumbnailUrl"');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         validatedStories.add({
           'id': item['id'] ?? '',
@@ -255,12 +289,21 @@ class FeedService {
           'memory_title': memory?['title'] ?? 'Untitled Memory',
           'category_name': category?['name'] ?? 'Custom',
           'category_icon': category?['icon_url'] ?? '',
-          'is_read': isRead, // NEW: Include read status
+          'is_read': isRead, // FIXED: Include actual read status from database
         });
       }
 
+      // 📊 DEBUG: Final validation summary
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('✅ VALIDATION COMPLETE');
+      print('   Total Stories Fetched: ${(response as List).length}');
+      print('   Stories Passed Validation: ${validatedStories.length}');
       print(
-          '✅ VALIDATION: ${validatedStories.length} stories passed validation');
+          '   Stories with isRead=true: ${validatedStories.where((s) => s['is_read'] == true).length}');
+      print(
+          '   Stories with isRead=false: ${validatedStories.where((s) => s['is_read'] == false).length}');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       return validatedStories;
     } catch (e) {
       print('❌ ERROR fetching happening now stories: $e');

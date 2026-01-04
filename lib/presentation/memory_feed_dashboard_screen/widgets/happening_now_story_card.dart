@@ -22,6 +22,16 @@ class HappeningNowStoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 🎨 DEBUG: Log widget build with isRead status
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('🎨 WIDGET BUILD: HappeningNowStoryCard');
+    print('   Story ID: "${story.storyId}"');
+    print('   User Name: "${story.userName}"');
+    print('   isRead Status: ${story.isRead}');
+    print(
+        '   Ring Display: ${story.isRead ? 'GRAY (read)' : 'GRADIENT (unread)'}');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
     return GestureDetector(
       onTap: onTap,
       child: Container(

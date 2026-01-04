@@ -335,6 +335,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _currentIndex = index;
         _isLoading = false;
         _isPaused = false;
+        _initialStoryId = storyId; // Update current story ID
 
         // Transfer prefetched video controller if available
         if (videoController != null && isVideoInitialized) {
@@ -342,6 +343,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           _isVideoInitialized = true;
         }
       });
+
+      // NEW: Mark this story as viewed when it loads
+      await _markStoryAsViewed();
 
       // Initialize video player if media type is video and not already prefetched
       final mediaType = storyData['media_type'] as String? ?? 'image';
@@ -771,8 +775,13 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         return;
       }
 
-      // Use _initialStoryId from state instead of widget.initialStoryId
+      // Use _initialStoryId which is updated in _loadStoryAtIndex
       final currentStoryId = _initialStoryId;
+
+      if (currentStoryId == null) {
+        print('⚠️ WARNING: No current story ID available');
+        return;
+      }
 
       // Upsert into story_views (will insert if not exists, do nothing if exists due to unique constraint)
       await client.from('story_views').upsert({

@@ -44,6 +44,11 @@ class MemoryFeedDashboardNotifier
       // Fetch active memories for the current user
       final activeMemoriesData = await _feedService.fetchUserActiveMemories();
 
+      // 📊 DEBUG: Log fetch start
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔧 NOTIFIER: Starting data fetch from FeedService');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
       // Fetch initial page (offset 0) for all feeds
       final happeningNowData = await _feedService.fetchHappeningNowStories();
       final latestStoriesData = await _feedService.fetchLatestStories();
@@ -52,18 +57,25 @@ class MemoryFeedDashboardNotifier
       final longestStreakData = await _feedService.fetchLongestStreakStories();
       final popularUserData = await _feedService.fetchPopularUserStories();
 
-      // Debug: Log what we received from service
-      print(
-          '🔍 DEBUG: Notifier received ${happeningNowData.length} happening now stories');
-      print(
-          '🔍 DEBUG: Notifier received ${latestStoriesData.length} latest stories');
+      // 📊 DEBUG: Log service response
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('📊 SERVICE RESPONSE RECEIVED');
+      print('   Happening Now Stories: ${happeningNowData.length}');
+      print('   Latest Stories: ${latestStoriesData.length}');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // CRITICAL FIX: Use isRead from service response instead of hardcoding false
       final happeningNowStories = happeningNowData.map((item) {
         final categoryIcon = item['category_icon'] as String? ?? '';
         final isRead = item['is_read'] as bool? ?? false; // Use from service
-        print(
-            '🔍 DEBUG: Creating HappeningNowStoryData with categoryIcon: "$categoryIcon", isRead: $isRead');
+
+        // 🔍 DEBUG: Log transformation for each story
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('🔄 TRANSFORMING STORY TO MODEL');
+        print('   Story ID: "${item['id']}"');
+        print('   Service Response is_read: $isRead');
+        print('   Category Icon: "$categoryIcon"');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         return HappeningNowStoryData(
           storyId: item['id'] as String,
@@ -78,26 +90,39 @@ class MemoryFeedDashboardNotifier
         );
       }).toList();
 
-      // Debug: Verify transformed stories have icons
-      print('🔍 DEBUG: Transformed ${happeningNowStories.length} stories');
+      // 📊 DEBUG: Verify transformed stories
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('✅ STORIES TRANSFORMED TO MODEL OBJECTS');
+      print('   Total Stories: ${happeningNowStories.length}');
+      print(
+          '   Stories with isRead=true: ${happeningNowStories.where((s) => s.isRead).length}');
+      print(
+          '   Stories with isRead=false: ${happeningNowStories.where((s) => !s.isRead).length}');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      // 🔍 DEBUG: Log each story's isRead status
       for (final story in happeningNowStories) {
-        print('🔍 DEBUG: Story model categoryIcon: "${story.categoryIcon}"');
+        print(
+            '   Story "${story.storyId}": isRead=${story.isRead}, categoryIcon="${story.categoryIcon}"');
       }
 
       // Transform latest stories
-      final latestStories = latestStoriesData
-          .map((item) => HappeningNowStoryData(
-                storyId: item['id'] as String,
-                backgroundImage: item['thumbnail_url'] as String,
-                profileImage: item['contributor_avatar'] as String,
-                userName: item['contributor_name'] as String,
-                categoryName: item['category_name'] as String,
-                categoryIcon: item['category_icon'] as String? ?? '',
-                timestamp: _getRelativeTime(
-                    DateTime.parse(item['created_at'] as String)),
-                isRead: false,
-              ))
-          .toList();
+      final latestStories = latestStoriesData.map((item) {
+        final isRead =
+            item['is_read'] as bool? ?? false; // FIXED: Read from service
+
+        return HappeningNowStoryData(
+          storyId: item['id'] as String,
+          backgroundImage: item['thumbnail_url'] as String,
+          profileImage: item['contributor_avatar'] as String,
+          userName: item['contributor_name'] as String,
+          categoryName: item['category_name'] as String,
+          categoryIcon: item['category_icon'] as String? ?? '',
+          timestamp:
+              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          isRead: isRead, // FIXED: Use actual read status from database
+        );
+      }).toList();
 
       final publicMemories = publicMemoriesData
           .map((item) => CustomMemoryItem(
@@ -126,49 +151,58 @@ class MemoryFeedDashboardNotifier
           .toList();
 
       // Transform trending stories - NOW INCLUDING categoryIcon
-      final trendingStories = trendingData
-          .map((item) => HappeningNowStoryData(
-                storyId: item['id'] as String,
-                backgroundImage: item['thumbnail_url'] as String,
-                profileImage: item['contributor_avatar'] as String,
-                userName: item['contributor_name'] as String,
-                categoryName: item['category_name'] as String,
-                categoryIcon: item['category_icon'] as String? ?? '',
-                timestamp: _getRelativeTime(
-                    DateTime.parse(item['created_at'] as String)),
-                isRead: false,
-              ))
-          .toList();
+      final trendingStories = trendingData.map((item) {
+        final isRead =
+            item['is_read'] as bool? ?? false; // FIXED: Read from service
+
+        return HappeningNowStoryData(
+          storyId: item['id'] as String,
+          backgroundImage: item['thumbnail_url'] as String,
+          profileImage: item['contributor_avatar'] as String,
+          userName: item['contributor_name'] as String,
+          categoryName: item['category_name'] as String,
+          categoryIcon: item['category_icon'] as String? ?? '',
+          timestamp:
+              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          isRead: isRead, // FIXED: Use actual read status from database
+        );
+      }).toList();
 
       // Transform longest streak stories
-      final longestStreakStories = longestStreakData
-          .map((item) => HappeningNowStoryData(
-                storyId: item['id'] as String,
-                backgroundImage: item['thumbnail_url'] as String,
-                profileImage: item['contributor_avatar'] as String,
-                userName: item['contributor_name'] as String,
-                categoryName: item['category_name'] as String,
-                categoryIcon: item['category_icon'] as String? ?? '',
-                timestamp: _getRelativeTime(
-                    DateTime.parse(item['created_at'] as String)),
-                isRead: false,
-              ))
-          .toList();
+      final longestStreakStories = longestStreakData.map((item) {
+        final isRead =
+            item['is_read'] as bool? ?? false; // FIXED: Read from service
+
+        return HappeningNowStoryData(
+          storyId: item['id'] as String,
+          backgroundImage: item['thumbnail_url'] as String,
+          profileImage: item['contributor_avatar'] as String,
+          userName: item['contributor_name'] as String,
+          categoryName: item['category_name'] as String,
+          categoryIcon: item['category_icon'] as String? ?? '',
+          timestamp:
+              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          isRead: isRead, // FIXED: Use actual read status from database
+        );
+      }).toList();
 
       // Transform popular user stories
-      final popularUserStories = popularUserData
-          .map((item) => HappeningNowStoryData(
-                storyId: item['id'] as String,
-                backgroundImage: item['thumbnail_url'] as String,
-                profileImage: item['contributor_avatar'] as String,
-                userName: item['contributor_name'] as String,
-                categoryName: item['category_name'] as String,
-                categoryIcon: item['category_icon'] as String? ?? '',
-                timestamp: _getRelativeTime(
-                    DateTime.parse(item['created_at'] as String)),
-                isRead: false,
-              ))
-          .toList();
+      final popularUserStories = popularUserData.map((item) {
+        final isRead =
+            item['is_read'] as bool? ?? false; // FIXED: Read from service
+
+        return HappeningNowStoryData(
+          storyId: item['id'] as String,
+          backgroundImage: item['thumbnail_url'] as String,
+          profileImage: item['contributor_avatar'] as String,
+          userName: item['contributor_name'] as String,
+          categoryName: item['category_name'] as String,
+          categoryIcon: item['category_icon'] as String? ?? '',
+          timestamp:
+              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          isRead: isRead, // FIXED: Use actual read status from database
+        );
+      }).toList();
 
       if (_isDisposed) return;
 
@@ -220,45 +254,153 @@ class MemoryFeedDashboardNotifier
         return;
       }
 
+      print(
+          '🔧 DEBUG: Setting up real-time subscription for user: $currentUserId');
+
       _storyViewsSubscription = _feedService.subscribeToStoryViews(
         onStoryViewed: (storyId, userId) {
-          print('🔄 REALTIME UPDATE: Story "$storyId" viewed by "$userId"');
+          // 📋 DEBUG: Log FULL payload details
+          print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          print('🔄 REALTIME CALLBACK TRIGGERED');
+          print('📦 Full Payload Data:');
+          print('   Story ID: "$storyId" (Type: ${storyId.runtimeType})');
+          print('   User ID: "$userId" (Type: ${userId.runtimeType})');
+          print(
+              '   Current User ID: "$currentUserId" (Type: ${currentUserId.runtimeType})');
+          print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-          // Only refresh if current user viewed the story (on another device)
+          // 🔍 DEBUG: Check if this is the current user (same device or different device)
           if (userId == currentUserId) {
-            print('✅ REALTIME: Refreshing UI for current user');
+            print('✅ MATCH: View is for current user - updating UI');
             _updateStoryReadStatus(storyId);
+          } else {
+            print('⏭️ SKIP: View is for different user ($userId) - ignoring');
           }
         },
       );
 
+      // ✅ DEBUG: Log subscription status AFTER .subscribe()
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('📡 SUBSCRIPTION STATUS CHECK');
+      print('   Channel created: ${_storyViewsSubscription != null}');
+      print('   Subscription object: $_storyViewsSubscription');
+
+      // Wait a moment for subscription to establish, then check status
+      Future.delayed(Duration(milliseconds: 500), () {
+        final isJoined = _storyViewsSubscription?.isJoined ?? false;
+        print('   Status after 500ms: ${isJoined ? 'joined' : 'not joined'}');
+        if (isJoined) {
+          print('✅ SUCCESS: Subscription is ACTIVE and listening');
+        } else {
+          print('⚠️ WARNING: Subscription status is NOT subscribed');
+        }
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      });
+
       print('✅ SUCCESS: Subscribed to real-time story views in feed');
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ ERROR subscribing to real-time story views: $e');
+      print('Stack trace: $stackTrace');
     }
   }
 
-  /// NEW METHOD: Update read status for a specific story in the happening now list
+  /// NEW METHOD: Update read status for a specific story in ALL lists (not just happening now)
   void _updateStoryReadStatus(String storyId) {
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('🔍 _updateStoryReadStatus() CALLED');
+    print('   Looking for story ID: "$storyId" (Type: ${storyId.runtimeType})');
+
     final currentModel = state.memoryFeedDashboardModel;
-    if (currentModel?.happeningNowStories != null) {
-      final updatedHappeningNow =
-          currentModel!.happeningNowStories!.map((story) {
+
+    if (currentModel == null) {
+      print('⚠️ WARNING: No memoryFeedDashboardModel available in state');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      return;
+    }
+
+    bool anyUpdated = false;
+
+    // CRITICAL FIX: Update story in ALL lists where it appears
+    // Helper function to update story in a list
+    List<HappeningNowStoryData>? updateListIfPresent(
+      List<HappeningNowStoryData>? stories,
+      String listName,
+    ) {
+      if (stories == null || stories.isEmpty) return null;
+
+      bool foundInList = false;
+      final updated = stories.map((story) {
         if (story.storyId == storyId) {
+          foundInList = true;
+          print('✅ MATCH FOUND in $listName: "${story.storyId}"');
+          print('   Updating isRead: ${story.isRead} → true');
           return story.copyWith(isRead: true);
         }
         return story;
       }).toList();
 
-      // Emit updated state with refreshed happening now list
-      final updatedModel = currentModel.copyWith(
-        happeningNowStories: updatedHappeningNow,
-      );
-
-      _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
-
-      print('✅ SUCCESS: Updated read status for story "$storyId"');
+      if (foundInList) {
+        anyUpdated = true;
+        return updated;
+      }
+      return null;
     }
+
+    // Update Happening Now stories
+    final updatedHappeningNow = updateListIfPresent(
+      currentModel.happeningNowStories,
+      'Happening Now',
+    );
+
+    // Update Latest Stories
+    final updatedLatest = updateListIfPresent(
+      currentModel.latestStories,
+      'Latest Stories',
+    );
+
+    // Update Trending stories
+    final updatedTrending = updateListIfPresent(
+      currentModel.trendingStories,
+      'Trending',
+    );
+
+    // Update Longest Streak stories
+    final updatedLongestStreak = updateListIfPresent(
+      currentModel.longestStreakStories,
+      'Longest Streak',
+    );
+
+    // Update Popular User stories
+    final updatedPopularUsers = updateListIfPresent(
+      currentModel.popularUserStories,
+      'Popular Users',
+    );
+
+    if (!anyUpdated) {
+      print('❌ NO MATCH: Story ID "$storyId" not found in any story list');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      return;
+    }
+
+    // Emit updated state with refreshed story lists
+    final updatedModel = currentModel.copyWith(
+      happeningNowStories: updatedHappeningNow?.cast<HappeningNowStoryData>() ??
+          currentModel.happeningNowStories,
+      latestStories: updatedLatest?.cast<HappeningNowStoryData>() ??
+          currentModel.latestStories,
+      trendingStories: updatedTrending?.cast<HappeningNowStoryData>() ??
+          currentModel.trendingStories,
+      longestStreakStories:
+          updatedLongestStreak?.cast<HappeningNowStoryData>() ??
+              currentModel.longestStreakStories,
+      popularUserStories: updatedPopularUsers?.cast<HappeningNowStoryData>() ??
+          currentModel.popularUserStories,
+    );
+
+    _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
+
+    print('✅ SUCCESS: State updated with new isRead status across all feeds');
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   @override

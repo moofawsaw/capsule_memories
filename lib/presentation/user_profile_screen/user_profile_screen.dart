@@ -1,4 +1,5 @@
 import '../../core/app_export.dart';
+import '../../services/supabase_service.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_profile_display.dart';
 import '../../widgets/custom_stat_card.dart';
@@ -333,6 +334,20 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(userProfileNotifier);
+        final notifier = ref.read(userProfileNotifier.notifier);
+
+        // Get current user ID from Supabase auth
+        final currentUserId =
+            SupabaseService.instance.client?.auth.currentUser?.id;
+
+        // Get target user ID from route arguments
+        final args = ModalRoute.of(context)?.settings.arguments;
+        final targetUserId = args is Map ? args['userId'] as String? : null;
+
+        // Show delete button only if viewing own profile
+        final showDeleteButton = currentUserId != null &&
+            targetUserId != null &&
+            currentUserId == targetUserId;
 
         return Container(
           child: Column(
@@ -344,22 +359,46 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     child: StoryGridItem(
                       model: state.userProfileModel?.storyItems?[0],
                       onTap: () => onTapStoryItem(context, 0),
+                      showDeleteButton: showDeleteButton,
+                      currentUserId: currentUserId,
+                      onDelete: state
+                                  .userProfileModel?.storyItems?[0].storyId !=
+                              null
+                          ? () => notifier.confirmAndDeleteStory(context,
+                              state.userProfileModel!.storyItems![0].storyId!)
+                          : null,
                     ),
                   ),
                   SizedBox(width: 1.h),
                   Expanded(
                     child: StoryGridItem(
                       model: state.userProfileModel?.storyItems?[1],
-                      height: 160.h, // <-- set your desired height
+                      height: 160.h,
                       onTap: () => onTapStoryItem(context, 1),
+                      showDeleteButton: showDeleteButton,
+                      currentUserId: currentUserId,
+                      onDelete: state
+                                  .userProfileModel?.storyItems?[1].storyId !=
+                              null
+                          ? () => notifier.confirmAndDeleteStory(context,
+                              state.userProfileModel!.storyItems![1].storyId!)
+                          : null,
                     ),
                   ),
                   SizedBox(width: 1.h),
                   Expanded(
                     child: StoryGridItem(
                       model: state.userProfileModel?.storyItems?[2],
-                      height: 160.h, // <-- set your desired height
+                      height: 160.h,
                       onTap: () => onTapStoryItem(context, 2),
+                      showDeleteButton: showDeleteButton,
+                      currentUserId: currentUserId,
+                      onDelete: state
+                                  .userProfileModel?.storyItems?[2].storyId !=
+                              null
+                          ? () => notifier.confirmAndDeleteStory(context,
+                              state.userProfileModel!.storyItems![2].storyId!)
+                          : null,
                     ),
                   ),
                 ],
@@ -367,9 +406,16 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               SizedBox(height: 12.h),
               StoryGridItem(
                 model: state.userProfileModel?.storyItems?[3],
-                height: 160.h, // <-- set your desired height
+                height: 160.h,
                 onTap: () => onTapStoryItem(context, 3),
                 width: 116.h,
+                showDeleteButton: showDeleteButton,
+                currentUserId: currentUserId,
+                onDelete:
+                    state.userProfileModel?.storyItems?[3].storyId != null
+                        ? () => notifier.confirmAndDeleteStory(context,
+                            state.userProfileModel!.storyItems![3].storyId!)
+                        : null,
               ),
             ],
           ),

@@ -5,19 +5,30 @@ import '../models/story_item_model.dart';
 class StoryGridItem extends StatelessWidget {
   final StoryItemModel? model;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
   final double? width;
   final double? height;
+  final bool showDeleteButton;
+  final String? currentUserId;
 
   StoryGridItem({
     Key? key,
     this.model,
     this.onTap,
+    this.onDelete,
     this.width,
     this.height,
+    this.showDeleteButton = false,
+    this.currentUserId,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Check if current user owns this story
+    final isOwnStory = currentUserId != null &&
+        model?.contributorId != null &&
+        currentUserId == model?.contributorId;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -36,6 +47,30 @@ class StoryGridItem extends StatelessWidget {
               height: double.infinity,
               fit: BoxFit.cover,
             ),
+
+            // Delete button - top right corner (only for current user's stories)
+            if (showDeleteButton && isOwnStory && onDelete != null)
+              Positioned(
+                top: 8.h,
+                right: 8.h,
+                child: GestureDetector(
+                  onTap: onDelete,
+                  child: Container(
+                    width: 28.h,
+                    height: 28.h,
+                    decoration: BoxDecoration(
+                      color: appTheme.red_500.withAlpha(230),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.delete,
+                      color: appTheme.white_A700,
+                      size: 16.h,
+                    ),
+                  ),
+                ),
+              ),
+
             Container(
               padding: EdgeInsets.symmetric(horizontal: 6.h),
               child: Column(

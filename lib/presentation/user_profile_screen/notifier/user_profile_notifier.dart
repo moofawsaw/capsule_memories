@@ -26,6 +26,103 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
     initialize();
   }
 
+  /// Delete a story and refresh the profile
+  Future<bool> deleteStory(String storyId) async {
+    try {
+      print('🗑️ USER PROFILE NOTIFIER: Deleting story $storyId');
+
+      // Call story service to delete from database
+      final storyService = StoryService();
+      final success = await storyService.deleteStory(storyId);
+
+      if (success) {
+        print('✅ USER PROFILE NOTIFIER: Story deleted successfully');
+
+        // Refresh profile to update story list
+        await initialize();
+
+        return true;
+      } else {
+        print('❌ USER PROFILE NOTIFIER: Failed to delete story');
+        return false;
+      }
+    } catch (e) {
+      print('❌ USER PROFILE NOTIFIER: Error deleting story: $e');
+      return false;
+    }
+  }
+
+  /// Confirm and delete story with user dialog
+  Future<void> confirmAndDeleteStory(
+      BuildContext context, String storyId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: appTheme.gray_900_02,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12.h),
+        ),
+        title: Text(
+          'Delete Story',
+          style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+              .copyWith(color: appTheme.white_A700),
+        ),
+        content: Text(
+          'Are you sure you want to delete this story? This action cannot be undone.',
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              'Cancel',
+              style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              'Delete',
+              style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                  .copyWith(color: appTheme.red_500),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      // Show loading indicator
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Deleting story...'),
+          backgroundColor: appTheme.deep_purple_A100,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Delete story
+      final success = await deleteStory(storyId);
+
+      if (context.mounted) {
+        messenger.clearSnackBars();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(success
+                ? 'Story deleted successfully'
+                : 'Failed to delete story'),
+            backgroundColor:
+                success ? appTheme.deep_purple_A100 : appTheme.red_500,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Initialize profile with optional user ID for viewing other profiles
   Future<void> initialize({String? userId}) async {
     // Set loading state
     state = state.copyWith(isLoading: true);
