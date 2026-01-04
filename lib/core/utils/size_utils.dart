@@ -13,6 +13,9 @@ extension ResponsiveExtension on num {
   double get w => ((this * _width) / FIGMA_DESIGN_WIDTH);
 
   double get fSize => ((this * _width) / FIGMA_DESIGN_WIDTH);
+
+  // Add .sp extension for font sizes (same as fSize for consistency)
+  double get sp => ((this * _width) / FIGMA_DESIGN_WIDTH);
 }
 
 extension FormatExtension on double {

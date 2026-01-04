@@ -586,6 +586,7 @@ class _MemoryFeedDashboardScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
         final memories = state.memoryFeedDashboardModel?.publicMemories ?? [];
+        final isLoading = state.isLoading ?? false;
 
         // Convert memory_feed_dashboard_model.CustomMemoryItem to custom_public_memories.CustomMemoryItem
         final convertedMemories = memories.map((memory) {
@@ -615,6 +616,7 @@ class _MemoryFeedDashboardScreenState
           sectionTitle: 'Public Memories',
           sectionIcon: ImageConstant.imgIcon22x22,
           memories: convertedMemories,
+          isLoading: isLoading,
           onMemoryTap: (memory) {
             // CRITICAL FIX: Use validated navigation wrapper
             MemoryNavigationWrapper.navigateToTimeline(
@@ -639,6 +641,7 @@ class _MemoryFeedDashboardScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
         final memories = state.memoryFeedDashboardModel?.publicMemories ?? [];
+        final isLoading = state.isLoading ?? false;
 
         // Convert memory_feed_dashboard_model.CustomMemoryItem to custom_public_memories.CustomMemoryItem
         final convertedMemories = memories.map((memory) {
@@ -668,6 +671,7 @@ class _MemoryFeedDashboardScreenState
           sectionTitle: 'Popular Memories',
           sectionIcon: ImageConstant.imgIconRed500,
           memories: convertedMemories,
+          isLoading: isLoading,
           onMemoryTap: (memory) {
             // CRITICAL FIX: Use validated navigation wrapper
             MemoryNavigationWrapper.navigateToTimeline(

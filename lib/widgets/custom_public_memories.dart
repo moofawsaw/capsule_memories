@@ -4,6 +4,7 @@ import '../services/avatar_helper_service.dart';
 import '../services/story_service.dart';
 import '../services/supabase_service.dart';
 import './custom_image_view.dart';
+import './custom_memory_skeleton.dart';
 
 /**
  * CustomPublicMemories - A horizontal scrolling component that displays public memory cards
@@ -25,6 +26,7 @@ class CustomPublicMemories extends StatelessWidget {
     this.memories,
     this.onMemoryTap,
     this.margin,
+    this.isLoading = false, // ADD THIS PARAMETER
   }) : super(key: key);
 
   /// Title text for the section header
@@ -41,6 +43,9 @@ class CustomPublicMemories extends StatelessWidget {
 
   /// Margin around the entire component
   final EdgeInsetsGeometry? margin;
+
+  /// Loading state indicator
+  final bool isLoading; // ADD THIS PROPERTY
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +76,22 @@ class CustomPublicMemories extends StatelessWidget {
   }
 
   Widget _buildMemoriesScroll(BuildContext context) {
+    // SHOW SKELETON LOADERS DURING INITIAL LOAD
+    if (isLoading) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(3, (index) {
+            return Container(
+              width: 300.h,
+              margin: EdgeInsets.only(right: index == 2 ? 0 : 12.h),
+              child: _buildSkeletonCard(context),
+            );
+          }),
+        ),
+      );
+    }
+
     final memoryList = memories ?? [];
 
     if (memoryList.isEmpty) {
@@ -87,6 +108,142 @@ class CustomPublicMemories extends StatelessWidget {
                   right: index == memoryList.length - 1 ? 0 : 12.h),
               child: _buildMemoryCard(context, memory));
         })));
+  }
+
+  // ADD NEW METHOD: Build skeleton card for loading state
+  Widget _buildSkeletonCard(BuildContext context) {
+    return Container(
+      width: 300.h,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_01,
+        borderRadius: BorderRadius.circular(20.h),
+      ),
+      child: Column(
+        children: [
+          // Skeleton header
+          Container(
+            padding: EdgeInsets.all(18.h),
+            decoration: BoxDecoration(
+              color: appTheme.background_transparent,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20.h),
+                topRight: Radius.circular(20.h),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Skeleton icon
+                Container(
+                  height: 36.h,
+                  width: 36.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.blue_gray_300.withAlpha(51),
+                    borderRadius: BorderRadius.circular(18.h),
+                  ),
+                ),
+                SizedBox(width: 12.h),
+                // Skeleton text
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 16.h,
+                        width: 140.h,
+                        decoration: BoxDecoration(
+                          color: appTheme.blue_gray_300.withAlpha(51),
+                          borderRadius: BorderRadius.circular(4.h),
+                        ),
+                      ),
+                      SizedBox(height: 6.h),
+                      Container(
+                        height: 12.h,
+                        width: 80.h,
+                        decoration: BoxDecoration(
+                          color: appTheme.blue_gray_300.withAlpha(51),
+                          borderRadius: BorderRadius.circular(4.h),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Skeleton profile images
+                SizedBox(
+                  width: 84.h,
+                  height: 36.h,
+                  child: Stack(
+                    children: List.generate(3, (index) {
+                      return Positioned(
+                        left: (index * 24).h,
+                        child: Container(
+                          height: 36.h,
+                          width: 36.h,
+                          decoration: BoxDecoration(
+                            color: appTheme.blue_gray_300.withAlpha(51),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Skeleton timeline
+          Container(
+            margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
+            height: 112.h,
+            child: CustomMemorySkeleton(),
+          ),
+          // Skeleton footer
+          Container(
+            padding: EdgeInsets.all(12.h),
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_01,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(20.h),
+                bottomRight: Radius.circular(20.h),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildSkeletonFooterColumn(),
+                _buildSkeletonFooterColumn(),
+                _buildSkeletonFooterColumn(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper method for skeleton footer columns
+  Widget _buildSkeletonFooterColumn() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 14.h,
+          width: 50.h,
+          decoration: BoxDecoration(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            borderRadius: BorderRadius.circular(4.h),
+          ),
+        ),
+        SizedBox(height: 6.h),
+        Container(
+          height: 12.h,
+          width: 40.h,
+          decoration: BoxDecoration(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            borderRadius: BorderRadius.circular(4.h),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildMemoryCard(BuildContext context, CustomMemoryItem memory) {
@@ -480,17 +637,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       return Container(
         margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
         height: 112.h,
-        child: Center(
-          child: SizedBox(
-            width: 24.h,
-            height: 24.h,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.0,
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(appTheme.deep_purple_A100),
-            ),
-          ),
-        ),
+        child: CustomMemorySkeleton(),
       );
     }
 
@@ -510,18 +657,24 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 4.h),
-      child: TimelineStoryWidget(
-        stories: _timelineStories,
-        memoryStartTime:
-            _memoryStartTime ?? DateTime.now().subtract(Duration(hours: 2)),
-        memoryEndTime: _memoryEndTime ?? DateTime.now(),
-        timelineHeight: 112,
-        onStoryTap: (storyId) {
-          // Navigate to full memory when timeline card is tapped
-          if (widget.onTap != null) {
-            widget.onTap!();
-          }
-        },
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _timelineStories.map((story) {
+            return Padding(
+              padding: EdgeInsets.only(right: 8.h),
+              child: TimelineStoryWidget(
+                item: story,
+                onTap: () {
+                  // Navigate to full memory when timeline card is tapped
+                  if (widget.onTap != null) {
+                    widget.onTap!();
+                  }
+                },
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

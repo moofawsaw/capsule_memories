@@ -12,56 +12,88 @@ class TimelineDetailWidget extends StatelessWidget {
     this.onStoryTap,
   }) : super(key: key);
 
+  double _calculateTimelineWidth() {
+    // Calculate based on number of stories + spacing
+    final storyCount = model?.timelineStories?.length ?? 1;
+    return (storyCount * 80.w) + 100.w; // Card width + padding
+  }
+
   @override
   Widget build(BuildContext context) {
-    // CRITICAL DEBUG: Log what data widget receives for rendering
-    print('🚨 TIMELINE WIDGET DEBUG: TimelineDetailWidget.build() called');
-    print('   - model is null: ${model == null}');
-    if (model != null) {
-      print('   - centerLocation: "${model?.centerLocation}"');
-      print('   - centerDistance: "${model?.centerDistance}"');
-      print(
-          '   - timelineStories count: ${model?.timelineStories?.length ?? 0}');
-      print(
-          '   - Using fallback location: ${model?.centerLocation == "Tillsonburg, ON"}');
-      print('   - Using fallback distance: ${model?.centerDistance == "21km"}');
+    if (model == null) {
+      return Container(
+        height: 180.h,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: appTheme.deep_purple_A100,
+          ),
+        ),
+      );
     }
 
+    // Debug logging
+    debugPrint('Timeline stories count: ${model!.timelineStories?.length}');
+    model!.timelineStories?.forEach(
+        (s) => debugPrint('Story ${s.storyId}: posted ${s.postedAt}'));
+
     return Container(
-      child: Column(
-        children: [
-          // Only show location if real data exists
-          if (model?.centerLocation != null)
-            Text(
-              model!.centerLocation!,
-              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
-            ),
-          if (model?.centerLocation != null) SizedBox(height: 4.h),
+      margin: EdgeInsets.only(bottom: 12.h),
+      height: 180.h, // Enough for cards + line + avatars + labels
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: _calculateTimelineWidth(),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Horizontal timeline line (positioned in middle)
+              Positioned(
+                left: 40.w,
+                right: 40.w,
+                top: 85.h, // Below story cards
+                child: Container(
+                  height: 2.h,
+                  color: Color(0xFF3A3A4A), // Dark gray line
+                ),
+              ),
 
-          // Only show distance if real data exists
-          if (model?.centerDistance != null)
-            Text(
-              model!.centerDistance!,
-              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
-            ),
-
-          SizedBox(height: 24.h),
-
-          // Timeline with positioned story cards - dynamic widget using database data
-          if (model?.timelineStories != null &&
-              model!.timelineStories!.isNotEmpty)
-            TimelineStoryWidget(
-              stories: model!.timelineStories!,
-              memoryStartTime: model?.memoryStartTime ??
-                  DateTime.now().subtract(Duration(hours: 2)),
-              memoryEndTime: model?.memoryEndTime ?? DateTime.now(),
-              timelineHeight: 200,
-              onStoryTap: onStoryTap,
-            ),
-        ],
+              // Story items positioned along timeline
+              if (model!.timelineStories != null)
+                ...model!.timelineStories!.map((story) {
+                  final leftPos = _calculatePosition(story.postedAt);
+                  return Positioned(
+                    left: leftPos,
+                    top: 0,
+                    child: TimelineStoryWidget(
+                      item: story,
+                      onTap: () => onStoryTap?.call(story.storyId ?? ''),
+                    ),
+                  );
+                }),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  double _calculatePosition(DateTime postedAt) {
+    if (model?.timelineStories == null || model!.timelineStories!.isEmpty) {
+      return 40.w;
+    }
+
+    final memoryStartTime =
+        model?.memoryStartTime ?? DateTime.now().subtract(Duration(hours: 2));
+    final memoryEndTime = model?.memoryEndTime ?? DateTime.now();
+
+    final totalDuration =
+        memoryEndTime.difference(memoryStartTime).inMilliseconds.toDouble();
+    final elapsed =
+        postedAt.difference(memoryStartTime).inMilliseconds.toDouble();
+
+    final percentage = (elapsed / totalDuration).clamp(0.0, 1.0);
+    final totalWidth = _calculateTimelineWidth();
+
+    return (40.w + (totalWidth - 80.w) * percentage);
   }
 }

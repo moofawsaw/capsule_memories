@@ -371,12 +371,14 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 4.h),
       child: TimelineStoryWidget(
-        stories: _timelineStories,
-        memoryStartTime:
-            _memoryStartTime ?? DateTime.now().subtract(Duration(hours: 2)),
-        memoryEndTime: _memoryEndTime ?? DateTime.now(),
-        timelineHeight: 112,
-        onStoryTap: (storyId) {
+        item: _timelineStories.isNotEmpty ? _timelineStories.first : TimelineStoryItem(
+          backgroundImage: '',
+          userAvatar: '',
+          postedAt: DateTime.now(),
+          timeLabel: '',
+          storyId: '',
+        ),
+        onTap: () {
           // CRITICAL FIX: Navigate directly to timeline instead of opening bottom sheet
           print(
               '🔍 TIMELINE CARD TAPPED: Navigating to /timeline for memory ${widget.memoryItem.id}');
