@@ -66,7 +66,7 @@ class MemoryFeedDashboardModel extends Equatable {
         categoryName: 'Hangout',
         categoryIcon: ImageConstant.imgEmojiMemorycategory,
         timestamp: '2 mins ago',
-        isViewed: false,
+        isRead: false,
       ),
       HappeningNowStoryData(
         id: 'story_2',
@@ -76,7 +76,7 @@ class MemoryFeedDashboardModel extends Equatable {
         categoryName: 'Vacation',
         categoryIcon: ImageConstant.imgVector,
         timestamp: '2 mins ago',
-        isViewed: false,
+        isRead: false,
       ),
       HappeningNowStoryData(
         id: 'story_3',
@@ -86,7 +86,7 @@ class MemoryFeedDashboardModel extends Equatable {
         categoryName: 'Hangout',
         categoryIcon: ImageConstant.imgEmojiMemorycategory,
         timestamp: '2 mins ago',
-        isViewed: false,
+        isRead: false,
       ),
     ];
   }
@@ -166,7 +166,7 @@ class MemoryFeedDashboardModel extends Equatable {
         categoryName: 'Birthday Party',
         categoryIcon: ImageConstant.imgFrame13,
         timestamp: '15 mins ago',
-        isViewed: false,
+        isRead: false,
       ),
       HappeningNowStoryData(
         id: 'trending_2',
@@ -176,7 +176,7 @@ class MemoryFeedDashboardModel extends Equatable {
         categoryName: 'Adventure',
         categoryIcon: ImageConstant.imgVector,
         timestamp: '1 hour ago',
-        isViewed: false,
+        isRead: false,
       ),
       HappeningNowStoryData(
         id: 'trending_3',
@@ -186,7 +186,7 @@ class MemoryFeedDashboardModel extends Equatable {
         categoryName: 'Celebration',
         categoryIcon: ImageConstant.imgEmojiMemorycategory,
         timestamp: '2 hours ago',
-        isViewed: false,
+        isRead: false,
       ),
       HappeningNowStoryData(
         id: 'trending_4',
@@ -196,7 +196,7 @@ class MemoryFeedDashboardModel extends Equatable {
         categoryName: 'Concert',
         categoryIcon: ImageConstant.imgFrame13,
         timestamp: '3 hours ago',
-        isViewed: false,
+        isRead: false,
       ),
     ];
   }
@@ -210,7 +210,7 @@ class HappeningNowStoryData {
   final String? categoryName;
   final String? categoryIcon;
   final String? timestamp;
-  final bool? isViewed;
+  final bool? isRead;
   final String? memoryId;
 
   HappeningNowStoryData({
@@ -221,7 +221,7 @@ class HappeningNowStoryData {
     this.categoryName,
     this.categoryIcon,
     this.timestamp,
-    this.isViewed = false,
+    this.isRead = false,
     this.memoryId,
   });
 
@@ -233,7 +233,7 @@ class HappeningNowStoryData {
     String? categoryName,
     String? categoryIcon,
     String? timestamp,
-    bool? isViewed,
+    bool? isRead,
     String? memoryId,
   }) {
     return HappeningNowStoryData(
@@ -244,7 +244,7 @@ class HappeningNowStoryData {
       categoryName: categoryName ?? this.categoryName,
       categoryIcon: categoryIcon ?? this.categoryIcon,
       timestamp: timestamp ?? this.timestamp,
-      isViewed: isViewed ?? this.isViewed,
+      isRead: isRead ?? this.isRead,
       memoryId: memoryId ?? this.memoryId,
     );
   }

@@ -633,6 +633,9 @@ class MemoryFeedDashboardNotifier
       }
 
       final newStories = newData.map((item) {
+        // CRITICAL FIX: Read is_read from service response instead of hardcoding false
+        final isRead = item['is_read'] as bool? ?? false;
+
         return HappeningNowStoryData(
           storyId: item['id'] as String,
           backgroundImage: item['thumbnail_url'] as String,
@@ -642,7 +645,7 @@ class MemoryFeedDashboardNotifier
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
               _getRelativeTime(DateTime.parse(item['created_at'] as String)),
-          isRead: false,
+          isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
 
@@ -688,6 +691,9 @@ class MemoryFeedDashboardNotifier
       }
 
       final newStories = newData.map((item) {
+        // CRITICAL FIX: Read is_read from service response instead of hardcoding false
+        final isRead = item['is_read'] as bool? ?? false;
+
         return HappeningNowStoryData(
           storyId: item['id'] as String,
           backgroundImage: item['thumbnail_url'] as String,
@@ -697,7 +703,7 @@ class MemoryFeedDashboardNotifier
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
               _getRelativeTime(DateTime.parse(item['created_at'] as String)),
-          isRead: false,
+          isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
 
@@ -799,6 +805,9 @@ class MemoryFeedDashboardNotifier
       }
 
       final newStories = newData.map((item) {
+        // CRITICAL FIX: Read is_read from service response instead of hardcoding false
+        final isRead = item['is_read'] as bool? ?? false;
+
         return HappeningNowStoryData(
           storyId: item['id'] as String,
           backgroundImage: item['thumbnail_url'] as String,
@@ -808,7 +817,7 @@ class MemoryFeedDashboardNotifier
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
               _getRelativeTime(DateTime.parse(item['created_at'] as String)),
-          isRead: false,
+          isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
 
@@ -850,6 +859,9 @@ class MemoryFeedDashboardNotifier
       }
 
       final newStories = newData.map((item) {
+        // CRITICAL FIX: Read is_read from service response instead of hardcoding false
+        final isRead = item['is_read'] as bool? ?? false;
+
         return HappeningNowStoryData(
           storyId: item['id'] as String,
           backgroundImage: item['thumbnail_url'] as String,
@@ -859,7 +871,7 @@ class MemoryFeedDashboardNotifier
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
               _getRelativeTime(DateTime.parse(item['created_at'] as String)),
-          isRead: false,
+          isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
 
@@ -901,6 +913,9 @@ class MemoryFeedDashboardNotifier
       }
 
       final newStories = newData.map((item) {
+        // CRITICAL FIX: Read is_read from service response instead of hardcoding false
+        final isRead = item['is_read'] as bool? ?? false;
+
         return HappeningNowStoryData(
           storyId: item['id'] as String,
           backgroundImage: item['thumbnail_url'] as String,
@@ -910,7 +925,7 @@ class MemoryFeedDashboardNotifier
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
               _getRelativeTime(DateTime.parse(item['created_at'] as String)),
-          isRead: false,
+          isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
 
@@ -1092,6 +1107,9 @@ class MemoryFeedDashboardNotifier
       if (_isDisposed) return;
 
       final transformedStories = stories.map((story) {
+        // CRITICAL FIX: Read is_read from service response instead of hardcoding false
+        final isRead = story['is_read'] as bool? ?? false;
+
         return HappeningNowStoryData(
           storyId: story['id'] as String? ?? '',
           backgroundImage: story['thumbnail_url'] as String? ?? '',
@@ -1101,7 +1119,7 @@ class MemoryFeedDashboardNotifier
           categoryIcon: story['category_icon'] as String? ?? '',
           timestamp: _getRelativeTime(
               DateTime.parse(story['created_at'] as String? ?? '')),
-          isRead: false,
+          isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
 

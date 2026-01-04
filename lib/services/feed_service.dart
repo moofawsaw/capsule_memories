@@ -394,6 +394,9 @@ class FeedService {
     if (_client == null) return [];
 
     try {
+      // Get current user ID for read status check
+      final currentUserId = _client!.auth.currentUser?.id;
+
       // CRITICAL: Use user_profiles_public for anonymous/public access
       final response = await _client!
           .from('stories')
@@ -446,6 +449,24 @@ class FeedService {
           continue;
         }
 
+        // NEW: Check if current user has viewed this story
+        bool isRead = false;
+        if (currentUserId != null) {
+          try {
+            final viewResponse = await _client!
+                .from('story_views')
+                .select('id')
+                .eq('story_id', item['id'])
+                .eq('user_id', currentUserId)
+                .maybeSingle();
+
+            isRead = viewResponse != null;
+          } catch (e) {
+            print(
+                '⚠️ WARNING: Failed to check view status for trending story "${item['id']}": $e');
+          }
+        }
+
         // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
         final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
 
@@ -461,6 +482,7 @@ class FeedService {
           'memory_title': memory?['title'] ?? 'Untitled Memory',
           'category_name': category?['name'] ?? 'Custom',
           'category_icon': category?['icon_url'] ?? '',
+          'is_read': isRead, // FIXED: Include read status
         });
       }
 
@@ -481,6 +503,9 @@ class FeedService {
     if (_client == null) return [];
 
     try {
+      // Get current user ID for read status check
+      final currentUserId = _client!.auth.currentUser?.id;
+
       // CRITICAL: Use user_profiles_public for anonymous/public access
       final response = await _client!
           .from('stories')
@@ -534,6 +559,24 @@ class FeedService {
           continue;
         }
 
+        // NEW: Check if current user has viewed this story
+        bool isRead = false;
+        if (currentUserId != null) {
+          try {
+            final viewResponse = await _client!
+                .from('story_views')
+                .select('id')
+                .eq('story_id', item['id'])
+                .eq('user_id', currentUserId)
+                .maybeSingle();
+
+            isRead = viewResponse != null;
+          } catch (e) {
+            print(
+                '⚠️ WARNING: Failed to check view status for streak story "${item['id']}": $e');
+          }
+        }
+
         // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
         final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
 
@@ -550,6 +593,7 @@ class FeedService {
           'memory_title': memory?['title'] ?? 'Untitled Memory',
           'category_name': category?['name'] ?? 'Custom',
           'category_icon': category?['icon_url'] ?? '',
+          'is_read': isRead, // FIXED: Include read status
         });
       }
 
@@ -570,6 +614,9 @@ class FeedService {
     if (_client == null) return [];
 
     try {
+      // Get current user ID for read status check
+      final currentUserId = _client!.auth.currentUser?.id;
+
       // CRITICAL: Use user_profiles_public for anonymous/public access
       final response = await _client!
           .from('stories')
@@ -623,6 +670,24 @@ class FeedService {
           continue;
         }
 
+        // NEW: Check if current user has viewed this story
+        bool isRead = false;
+        if (currentUserId != null) {
+          try {
+            final viewResponse = await _client!
+                .from('story_views')
+                .select('id')
+                .eq('story_id', item['id'])
+                .eq('user_id', currentUserId)
+                .maybeSingle();
+
+            isRead = viewResponse != null;
+          } catch (e) {
+            print(
+                '⚠️ WARNING: Failed to check view status for popular user story "${item['id']}": $e');
+          }
+        }
+
         // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
         final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
 
@@ -639,6 +704,7 @@ class FeedService {
           'memory_title': memory?['title'] ?? 'Untitled Memory',
           'category_name': category?['name'] ?? 'Custom',
           'category_icon': category?['icon_url'] ?? '',
+          'is_read': isRead, // FIXED: Include read status
         });
       }
 
@@ -842,6 +908,22 @@ class FeedService {
           final category =
               memory?['memory_categories'] as Map<String, dynamic>?;
 
+          // NEW: Check if current user has viewed this story
+          bool isRead = false;
+          try {
+            final viewResponse = await _client!
+                .from('story_views')
+                .select('id')
+                .eq('story_id', item['id'])
+                .eq('user_id', currentUserId)
+                .maybeSingle();
+
+            isRead = viewResponse != null;
+          } catch (e) {
+            print(
+                '⚠️ WARNING: Failed to check view status for latest story "${item['id']}": $e');
+          }
+
           // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
           final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
 
@@ -857,6 +939,7 @@ class FeedService {
             'memory_title': memory?['title'] ?? 'Untitled Memory',
             'category_name': category?['name'] ?? 'Custom',
             'category_icon': category?['icon_url'] ?? '',
+            'is_read': isRead, // FIXED: Include read status
           });
         }
       }
