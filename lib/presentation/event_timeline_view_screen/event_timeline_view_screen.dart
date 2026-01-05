@@ -4,7 +4,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_story_list.dart';
-import '../../widgets/timeline_widget.dart' as timeline_widget;
+import '../../widgets/timeline_widget.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_details_screen/memory_details_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
@@ -198,8 +198,8 @@ class EventTimelineViewScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
-        final isCurrentUserMember = state.isCurrentUserMember;
-        final isCurrentUserCreator = state.isCurrentUserCreator;
+        final isCurrentUserMember = state.isCurrentUserMember ?? false;
+        final isCurrentUserCreator = state.isCurrentUserCreator ?? false;
 
         print('🔍 TIMELINE BUTTONS: Visibility check');
         print('   - isCurrentUserMember = $isCurrentUserMember');
@@ -276,52 +276,98 @@ class EventTimelineViewScreenState
 
   /// Section Widget - Timeline widget displaying memory stories
   Widget _buildTimelineWidget(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(eventTimelineViewNotifier);
-        final timelineDetail = state.eventTimelineViewModel?.timelineDetail;
-        final stories = timelineDetail?.timelineStories ?? [];
-        final memoryStartTime = timelineDetail?.memoryStartTime;
-        final memoryEndTime = timelineDetail?.memoryEndTime;
+    final state = ref.watch(eventTimelineViewNotifier);
 
-        // Show empty state if no stories or missing time data
-        if (stories.isEmpty ||
-            memoryStartTime == null ||
-            memoryEndTime == null) {
-          return Container(
-            padding: EdgeInsets.all(16.h),
-            child: Text(
-              'Timeline View',
-              style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
+    if (state.isLoading ?? false) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // Extract timeline stories from state
+    final timelineStories =
+        state.eventTimelineViewModel?.timelineDetail?.timelineStories ?? [];
+
+    // CRITICAL FIX: Get memory window times from state, with proper fallback
+    final memoryStartTime =
+        state.eventTimelineViewModel?.timelineDetail?.memoryStartTime;
+    final memoryEndTime =
+        state.eventTimelineViewModel?.timelineDetail?.memoryEndTime;
+
+    // CRITICAL: If memory times are null, don't render timeline
+    if (memoryStartTime == null || memoryEndTime == null) {
+      debugPrint(
+          '⚠️ TIMELINE: Memory time window not available, showing loading state');
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 20.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: appTheme.deep_purple_A100),
+              SizedBox(height: 12.h),
+              Text(
+                'Loading timeline...',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14.sp,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (timelineStories.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 20.h),
+          child: Text(
+            'No stories in this memory timeline yet',
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 16.sp,
             ),
-          );
-        }
+          ),
+        ),
+      );
+    }
 
-        print('🔍 TIMELINE WIDGET: Rendering with ${stories.length} stories');
-        print('   - Memory window: $memoryStartTime to $memoryEndTime');
+    // Debug logging for timeline window
+    debugPrint(
+        '🔍 TIMELINE WIDGET: Rendering ${timelineStories.length} stories');
+    debugPrint('   - Memory window: $memoryStartTime to $memoryEndTime');
+    debugPrint(
+        '   - Duration: ${memoryEndTime.difference(memoryStartTime).inMinutes} minutes');
 
-        // Convert stories to the correct TimelineStoryItem type from timeline_widget
-        final convertedStories = stories.map((story) {
-          return timeline_widget.TimelineStoryItem(
-            backgroundImage: story.backgroundImage,
-            userAvatar: story.userAvatar,
-            postedAt: story.postedAt,
-            timeLabel: story.timeLabel,
-            storyId: story.storyId,
-            isVideo: story.isVideo,
-          );
-        }).toList();
+    // Use the unified TimelineWidget - Convert stories to match widget's expected type
+    return TimelineWidget(
+      stories: timelineStories
+          .map((story) => TimelineStoryItem(
+                backgroundImage: story.backgroundImage,
+                userAvatar: story.userAvatar,
+                postedAt: story.postedAt,
+                timeLabel: story.timeLabel,
+                storyId: story.storyId,
+                isVideo: story.isVideo,
+              ))
+          .toList(),
+      memoryStartTime: memoryStartTime,
+      memoryEndTime: memoryEndTime,
+      onStoryTap: (storyId) {
+        // Navigate to story viewer
+        final notifier = ref.read(eventTimelineViewNotifier.notifier);
 
-        return timeline_widget.TimelineWidget(
-          stories: convertedStories,
-          memoryStartTime: memoryStartTime,
-          memoryEndTime: memoryEndTime,
-          variant: timeline_widget.TimelineVariant.active,
-          onStoryTap: (storyId) {
-            print('🔍 TIMELINE: Story tapped: $storyId');
-            _handleTimelineStoryTap(context, storyId);
-          },
+        // Get memory-specific story array for proper cycling
+        final feedContext = FeedStoryContext(
+          feedType: 'memory_timeline',
+          storyIds: notifier.currentMemoryStoryIds,
+          initialStoryId: storyId,
+        );
+
+        Navigator.pushNamed(
+          context,
+          AppRoutes.appStoryView,
+          arguments: feedContext,
         );
       },
     );
@@ -499,22 +545,18 @@ class EventTimelineViewScreenState
       final storyItem = storyItems[index];
 
       // CRITICAL FIX: Pass FeedStoryContext with memory-specific story array
-      // This ensures story viewer cycles through ONLY this memory's 3 stories
+      // This ensures story viewer cycles through ONLY this memory's stories
       final feedContext = FeedStoryContext(
         feedType: 'memory_timeline',
-        storyIds: notifier.currentMemoryStoryIds, // Use memory-specific IDs
-        initialStoryId:
-            storyItem.storyId ?? '', // Use storyId instead of navigateTo
+        storyIds: notifier.currentMemoryStoryIds,
+        initialStoryId: index < notifier.currentMemoryStoryIds.length
+            ? notifier.currentMemoryStoryIds[index]
+            : '',
       );
-
-      print('🔍 TIMELINE DEBUG: Opening story viewer with context:');
-      print('   - Story IDs: ${feedContext.storyIds}');
-      print('   - Initial story: ${feedContext.initialStoryId}');
-      print('   - Total stories: ${feedContext.storyIds.length}');
 
       NavigatorService.pushNamed(
         AppRoutes.appStoryView,
-        arguments: feedContext, // Pass context instead of just ID
+        arguments: feedContext,
       );
     }
   }

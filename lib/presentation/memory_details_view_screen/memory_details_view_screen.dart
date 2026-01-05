@@ -8,7 +8,6 @@ import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import 'notifier/memory_details_view_notifier.dart';
-import '../../widgets/timeline_widget.dart' as timeline_widget;
 
 class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
   MemoryDetailsViewScreen({Key? key}) : super(key: key);
@@ -197,16 +196,17 @@ class MemoryDetailsViewScreenState
           return SizedBox.shrink();
         }
 
-        // Convert TimelineStoryItem types
-        final convertedStories = timelineDetail.timelineStories!
-            .map((story) => timeline_widget.TimelineStoryItem(
-                  backgroundImage: story.backgroundImage,
-                  userAvatar: story.userAvatar,
-                  postedAt: story.postedAt,
-                  timeLabel: story.timeLabel,
-                  storyId: story.storyId,
-                ))
-            .toList();
+        // Convert TimelineStoryItem types with proper typing
+        final List<TimelineStoryItem> convertedStories =
+            timelineDetail.timelineStories!
+                .map((story) => TimelineStoryItem(
+                      backgroundImage: story.backgroundImage,
+                      userAvatar: story.userAvatar,
+                      postedAt: story.postedAt,
+                      timeLabel: story.timeLabel,
+                      storyId: story.storyId,
+                    ))
+                .toList();
 
         return Container(
           child: Stack(
@@ -233,24 +233,6 @@ class MemoryDetailsViewScreenState
                       variant: TimelineVariant.sealed,
                       onStoryTap: (storyId) =>
                           _handleTimelineStoryTap(context, storyId),
-                      onReplayAll: () {
-                        ref
-                            .read(memoryDetailsViewNotifier.notifier)
-                            .onReplayAllTap();
-                      },
-                      onAddMedia: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => Padding(
-                            padding: EdgeInsets.only(
-                              bottom: MediaQuery.of(context).viewInsets.bottom,
-                            ),
-                            child: AddMemoryUploadScreen(),
-                          ),
-                        );
-                      },
                     ),
                     SizedBox(height: 20.h),
                   ],

@@ -139,6 +139,7 @@ class CustomStoryItem {
     required this.profileImage,
     this.timestamp,
     this.navigateTo,
+    this.storyId,
   });
 
   /// Background image path for the story
@@ -152,4 +153,7 @@ class CustomStoryItem {
 
   /// Navigation destination identifier
   final String? navigateTo;
+
+  /// Story ID for navigation and tracking
+  final String? storyId;
 }

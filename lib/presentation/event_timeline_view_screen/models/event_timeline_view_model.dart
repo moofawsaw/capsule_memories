@@ -1,5 +1,5 @@
 import '../../../core/app_export.dart';
-import '../../../widgets/timeline_widget.dart';
+import '../../../widgets/custom_story_list.dart';
 import 'timeline_detail_model.dart';
 
 /// This class is used in the [event_timeline_view_screen] screen.
@@ -30,7 +30,7 @@ class EventTimelineViewModel extends Equatable {
   bool? isPrivate;
   String? categoryIcon;
   List<String>? participantImages;
-  List<TimelineStoryItem>? customStoryItems;
+  List<CustomStoryItem>? customStoryItems;
   TimelineDetailModel? timelineDetail;
   String? memoryId;
 
@@ -40,7 +40,7 @@ class EventTimelineViewModel extends Equatable {
     bool? isPrivate,
     String? categoryIcon,
     List<String>? participantImages,
-    List<TimelineStoryItem>? customStoryItems,
+    List<CustomStoryItem>? customStoryItems,
     TimelineDetailModel? timelineDetail,
     String? memoryId,
   }) {

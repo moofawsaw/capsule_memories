@@ -5,8 +5,14 @@ class EventTimelineViewState extends Equatable {
   final bool? isLoading;
   final bool? isSuccess;
   final String? errorMessage;
-  final bool isCurrentUserMember;
-  final bool isCurrentUserCreator;
+  final bool? isCurrentUserMember;
+  final bool? isCurrentUserCreator;
+
+  // CRITICAL FIX: Add state properties for timeline widget
+  final List<TimelineStoryItem> timelineStories;
+  final DateTime? memoryStartTime;
+  final DateTime? memoryEndTime;
+  final String? memoryId;
 
   EventTimelineViewState({
     this.eventTimelineViewModel,
@@ -15,6 +21,10 @@ class EventTimelineViewState extends Equatable {
     this.errorMessage,
     this.isCurrentUserMember = false,
     this.isCurrentUserCreator = false,
+    this.timelineStories = const [],
+    this.memoryStartTime,
+    this.memoryEndTime,
+    this.memoryId,
   });
 
   @override
@@ -25,6 +35,10 @@ class EventTimelineViewState extends Equatable {
         errorMessage,
         isCurrentUserMember,
         isCurrentUserCreator,
+        timelineStories,
+        memoryStartTime,
+        memoryEndTime,
+        memoryId,
       ];
 
   EventTimelineViewState copyWith({
@@ -34,6 +48,10 @@ class EventTimelineViewState extends Equatable {
     String? errorMessage,
     bool? isCurrentUserMember,
     bool? isCurrentUserCreator,
+    List<TimelineStoryItem>? timelineStories,
+    DateTime? memoryStartTime,
+    DateTime? memoryEndTime,
+    String? memoryId,
   }) {
     return EventTimelineViewState(
       eventTimelineViewModel:
@@ -43,6 +61,10 @@ class EventTimelineViewState extends Equatable {
       errorMessage: errorMessage,
       isCurrentUserMember: isCurrentUserMember ?? this.isCurrentUserMember,
       isCurrentUserCreator: isCurrentUserCreator ?? this.isCurrentUserCreator,
+      timelineStories: timelineStories ?? this.timelineStories,
+      memoryStartTime: memoryStartTime ?? this.memoryStartTime,
+      memoryEndTime: memoryEndTime ?? this.memoryEndTime,
+      memoryId: memoryId ?? this.memoryId,
     );
   }
 }

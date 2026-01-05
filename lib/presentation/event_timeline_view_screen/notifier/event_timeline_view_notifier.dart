@@ -307,6 +307,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       // Update state with validated database data
       state = state.copyWith(
+        memoryId: memoryId,
         eventTimelineViewModel: EventTimelineViewModel(
           memoryId: memoryId,
           eventTitle: title ?? 'Unknown Memory',
@@ -344,6 +345,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       // IMMEDIATE: Store memory ID in state before any async operations
       state = state.copyWith(
+        memoryId: navArgs.memoryId,
         eventTimelineViewModel:
             EventTimelineViewModel(memoryId: navArgs.memoryId),
       );
@@ -416,6 +418,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       // Update state with fetched data including creator status
       state = state.copyWith(
+        memoryId: navArgs.memoryId,
         eventTimelineViewModel: EventTimelineViewModel(
           memoryId: navArgs.memoryId,
           eventTitle: memoryResponse['title'] ?? 'Memory',
@@ -471,6 +474,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       // CRITICAL FIX: Store memory ID in state immediately for debugging
       state = state.copyWith(
+        memoryId: memoryId,
         eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
           memoryId: memoryId,
         ),
@@ -625,9 +629,13 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         );
       }).toList();
 
-      // Update state with memory window timeline
+      // Update state with memory window timeline including customStoryItems for the stories feed
       state = state.copyWith(
+        timelineStories: timelineStories,
+        memoryStartTime: memoryStartTime,
+        memoryEndTime: memoryEndTime,
         eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
+          customStoryItems: storyItems, // Horizontal story items for CustomStoryList
           timelineDetail: TimelineDetailModel(
             centerLocation:
                 state.eventTimelineViewModel?.timelineDetail?.centerLocation ??
@@ -637,7 +645,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
                     '0km',
             memoryStartTime: memoryStartTime,
             memoryEndTime: memoryEndTime,
-            timelineStories: timelineStories,
+            timelineStories: timelineStories, // TimelineStoryItem list for TimelineWidget
           ),
         ),
         errorMessage: null,
@@ -652,7 +660,6 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('❌ TIMELINE DEBUG: Error loading memory stories: $e');
       print('❌ TIMELINE DEBUG: Stack trace: $stackTrace');
 
-      // CRITICAL FIX: Set error state instead of silently failing
       state = state.copyWith(
         errorMessage: 'Failed to load memory data. Please try refreshing.',
         isLoading: false,
