@@ -296,7 +296,7 @@ class FeedService {
       // 📊 DEBUG: Final validation summary
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       print('✅ VALIDATION COMPLETE');
-      print('   Total Stories Fetched: ${(response as List).length}');
+      print('   Total Stories Fetched: ${(response).length}');
       print('   Stories Passed Validation: ${validatedStories.length}');
       print(
           '   Stories with isRead=true: ${validatedStories.where((s) => s['is_read'] == true).length}');

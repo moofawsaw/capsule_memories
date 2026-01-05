@@ -4,12 +4,12 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_story_list.dart';
+import '../../widgets/timeline_widget.dart' as timeline_widget;
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_details_screen/memory_details_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import '../qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import './notifier/event_timeline_view_notifier.dart';
-import './widgets/timeline_detail_widget.dart';
 
 class EventTimelineViewScreen extends ConsumerStatefulWidget {
   EventTimelineViewScreen({Key? key}) : super(key: key);
@@ -223,7 +223,7 @@ class EventTimelineViewScreenState
                 child: Column(
                   children: [
                     SizedBox(height: 44.h),
-                    _buildTimelineDetails(context),
+                    _buildTimelineWidget(context),
                     SizedBox(height: 20.h),
                   ],
                 ),
@@ -274,15 +274,54 @@ class EventTimelineViewScreenState
     );
   }
 
-  /// Section Widget
-  Widget _buildTimelineDetails(BuildContext context) {
+  /// Section Widget - Timeline widget displaying memory stories
+  Widget _buildTimelineWidget(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
+        final timelineDetail = state.eventTimelineViewModel?.timelineDetail;
+        final stories = timelineDetail?.timelineStories ?? [];
+        final memoryStartTime = timelineDetail?.memoryStartTime;
+        final memoryEndTime = timelineDetail?.memoryEndTime;
 
-        return TimelineDetailWidget(
-          model: state.eventTimelineViewModel?.timelineDetail,
-          onStoryTap: (storyId) => _handleTimelineStoryTap(context, storyId),
+        // Show empty state if no stories or missing time data
+        if (stories.isEmpty ||
+            memoryStartTime == null ||
+            memoryEndTime == null) {
+          return Container(
+            padding: EdgeInsets.all(16.h),
+            child: Text(
+              'Timeline View',
+              style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+          );
+        }
+
+        print('🔍 TIMELINE WIDGET: Rendering with ${stories.length} stories');
+        print('   - Memory window: $memoryStartTime to $memoryEndTime');
+
+        // Convert stories to the correct TimelineStoryItem type from timeline_widget
+        final convertedStories = stories.map((story) {
+          return timeline_widget.TimelineStoryItem(
+            backgroundImage: story.backgroundImage,
+            userAvatar: story.userAvatar,
+            postedAt: story.postedAt,
+            timeLabel: story.timeLabel,
+            storyId: story.storyId,
+            isVideo: story.isVideo,
+          );
+        }).toList();
+
+        return timeline_widget.TimelineWidget(
+          stories: convertedStories,
+          memoryStartTime: memoryStartTime,
+          memoryEndTime: memoryEndTime,
+          variant: timeline_widget.TimelineVariant.active,
+          onStoryTap: (storyId) {
+            print('🔍 TIMELINE: Story tapped: $storyId');
+            _handleTimelineStoryTap(context, storyId);
+          },
         );
       },
     );
@@ -344,7 +383,7 @@ class EventTimelineViewScreenState
         }
 
         return CustomStoryList(
-          storyItems: storyItems,
+          storyItems: (storyItems as List).cast<CustomStoryItem>(),
           onStoryTap: (index) {
             onTapStoryItem(context, index);
           },
@@ -464,8 +503,8 @@ class EventTimelineViewScreenState
       final feedContext = FeedStoryContext(
         feedType: 'memory_timeline',
         storyIds: notifier.currentMemoryStoryIds, // Use memory-specific IDs
-        initialStoryId: storyItem.navigateTo ??
-            '', // Add null check with default empty string
+        initialStoryId:
+            storyItem.storyId ?? '', // Use storyId instead of navigateTo
       );
 
       print('🔍 TIMELINE DEBUG: Opening story viewer with context:');

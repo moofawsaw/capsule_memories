@@ -8,6 +8,7 @@ import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import 'notifier/memory_details_view_notifier.dart';
+import '../../widgets/timeline_widget.dart' as timeline_widget;
 
 class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
   MemoryDetailsViewScreen({Key? key}) : super(key: key);
@@ -196,6 +197,17 @@ class MemoryDetailsViewScreenState
           return SizedBox.shrink();
         }
 
+        // Convert TimelineStoryItem types
+        final convertedStories = timelineDetail.timelineStories!
+            .map((story) => timeline_widget.TimelineStoryItem(
+                  backgroundImage: story.backgroundImage,
+                  userAvatar: story.userAvatar,
+                  postedAt: story.postedAt,
+                  timeLabel: story.timeLabel,
+                  storyId: story.storyId,
+                ))
+            .toList();
+
         return Container(
           child: Stack(
             children: [
@@ -215,16 +227,7 @@ class MemoryDetailsViewScreenState
                     _buildStoryProgress(context),
                     SizedBox(height: 44.h),
                     TimelineWidget(
-                      stories: timelineDetail.timelineStories!
-                          .map((s) => TimelineStoryItem(
-                                backgroundImage: s.backgroundImage,
-                                userAvatar: s.userAvatar,
-                                postedAt: s.postedAt,
-                                timeLabel: s.timeLabel,
-                                storyId: s.storyId,
-                              ))
-                          .toList(),
-                      // Now safe to use ! operator after null checks above
+                      stories: convertedStories,
                       memoryStartTime: timelineDetail.memoryStartTime!,
                       memoryEndTime: timelineDetail.memoryEndTime!,
                       variant: TimelineVariant.sealed,
@@ -305,7 +308,10 @@ class MemoryDetailsViewScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsViewNotifier);
-        final storyItems = state.memoryDetailsViewModel?.customStoryItems ?? [];
+        // Add cast to List<CustomStoryItem>
+        final storyItems =
+            (state.memoryDetailsViewModel?.customStoryItems ?? [])
+                .cast<CustomStoryItem>();
 
         if (storyItems.isEmpty) {
           return Container(
@@ -420,7 +426,7 @@ class MemoryDetailsViewScreenState
       final feedContext = FeedStoryContext(
         feedType: 'memory_timeline',
         storyIds: notifier.currentMemoryStoryIds,
-        initialStoryId: storyItem.navigateTo ?? '',
+        initialStoryId: storyItem.storyId ?? '',
       );
 
       NavigatorService.pushNamed(

@@ -1,5 +1,5 @@
 import '../../../core/app_export.dart';
-import '../../../widgets/custom_story_list.dart';
+import '../../../widgets/timeline_widget.dart';
 import './timeline_detail_model.dart';
 
 class MemoryDetailsViewModel extends Equatable {
@@ -9,7 +9,7 @@ class MemoryDetailsViewModel extends Equatable {
   final bool? isPrivate;
   final String? categoryIcon;
   final List<String>? participantImages;
-  final List<CustomStoryItem>? customStoryItems;
+  final List<TimelineStoryItem>? customStoryItems;
   final TimelineDetailModel? timelineDetail;
   final bool? isMemorySealed;
   final String? sealedDate;
@@ -36,7 +36,7 @@ class MemoryDetailsViewModel extends Equatable {
     bool? isPrivate,
     String? categoryIcon,
     List<String>? participantImages,
-    List<CustomStoryItem>? customStoryItems,
+    List<TimelineStoryItem>? customStoryItems,
     TimelineDetailModel? timelineDetail,
     bool? isMemorySealed,
     String? sealedDate,

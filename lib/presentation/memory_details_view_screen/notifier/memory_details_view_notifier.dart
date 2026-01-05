@@ -168,7 +168,6 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
 
       state = state.copyWith(
         memoryDetailsViewModel: state.memoryDetailsViewModel?.copyWith(
-          customStoryItems: storyItems,
           timelineDetail: TimelineDetailModel(
             centerLocation:
                 state.memoryDetailsViewModel?.timelineDetail?.centerLocation ??

@@ -628,7 +628,6 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       // Update state with memory window timeline
       state = state.copyWith(
         eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
-          customStoryItems: storyItems,
           timelineDetail: TimelineDetailModel(
             centerLocation:
                 state.eventTimelineViewModel?.timelineDetail?.centerLocation ??
@@ -857,7 +856,6 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       // Update state with memory window timeline
       state = state.copyWith(
         eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
-          customStoryItems: storyItems,
           timelineDetail: TimelineDetailModel(
             centerLocation:
                 state.eventTimelineViewModel?.timelineDetail?.centerLocation ??

@@ -1,10 +1,10 @@
 import '../core/app_export.dart';
-import '../presentation/event_timeline_view_screen/widgets/timeline_story_widget.dart';
 import '../services/avatar_helper_service.dart';
 import '../services/story_service.dart';
 import '../services/supabase_service.dart';
 import './custom_image_view.dart';
 import './custom_memory_skeleton.dart';
+import './timeline_widget.dart';
 
 /// CustomPublicMemories - A horizontal scrolling component that displays public memory cards.
 /// Loading behavior:
@@ -37,8 +37,10 @@ class CustomPublicMemories extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (sectionTitle != null || sectionIcon != null) _buildSectionHeader(),
-          if (sectionTitle != null || sectionIcon != null) SizedBox(height: 24.h),
+          if (sectionTitle != null || sectionIcon != null)
+            _buildSectionHeader(),
+          if (sectionTitle != null || sectionIcon != null)
+            SizedBox(height: 24.h),
           _buildMemoriesScroll(context),
         ],
       ),
@@ -279,7 +281,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .split(':');
 
       var hour = int.tryParse(timeParts[0]) ?? 0;
-      final minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final minute =
+          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
@@ -307,7 +310,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .split(':');
 
       var hour = int.tryParse(timeParts[0]) ?? 0;
-      final minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final minute =
+          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
@@ -333,7 +337,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       'nov': 11,
       'dec': 12,
     };
-    final key = month.toLowerCase().substring(0, month.length >= 3 ? 3 : month.length);
+    final key =
+        month.toLowerCase().substring(0, month.length >= 3 ? 3 : month.length);
     return months[key] ?? DateTime.now().month;
   }
 
@@ -341,7 +346,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     // IMPORTANT: no per-card skeleton shimmer (performance). Keep height stable.
     if (_isLoadingTimeline) {
       return SizedBox(
-        height: 112.h,
+        height: 200.h,
         child: const SizedBox.shrink(),
       );
     }
@@ -360,24 +365,16 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       );
     }
 
+    // USE ONLY THE UNIFIED TIMELINE WIDGET
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 26),
-      margin: EdgeInsets.symmetric(horizontal: 4.h),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: _timelineStories.map((story) {
-            return Padding(
-              padding: EdgeInsets.only(right: 8.h),
-              child: TimelineStoryWidget(
-                item: story,
-                onTap: () {
-                  if (widget.onTap != null) widget.onTap!();
-                },
-              ),
-            );
-          }).toList(),
-        ),
+      margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
+      child: TimelineWidget(
+        stories: _timelineStories,
+        memoryStartTime: _memoryStartTime!,
+        memoryEndTime: _memoryEndTime!,
+        onStoryTap: (storyId) {
+          if (widget.onTap != null) widget.onTap!();
+        },
       ),
     );
   }
