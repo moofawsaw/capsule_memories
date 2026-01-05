@@ -585,6 +585,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   notification['type'] as String? ?? ''),
               title: notification['title'] as String? ?? 'Notification',
               description: notification['message'] as String? ?? '',
+              timestamp: notification['created_at'] != null
+                  ? DateTime.parse(notification['created_at'] as String)
+                  : null,
               isRead: isRead,
               backgroundColor: _getNotificationBackgroundColor(isRead),
               titleColor: _getNotificationTextColor(isRead),

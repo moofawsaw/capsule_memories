@@ -8,7 +8,7 @@ import './custom_image_view.dart';
  * Features:
  * - Horizontal scrolling with customizable gap between items
  * - Story items with background images and overlay content
- * - Profile avatars with purple border styling
+ * - Profile avatars with read/unread ring styling (gradient for unread, gray for read)
  * - Timestamp display with consistent styling
  * - Navigation callback support for story tapping
  * - Responsive design using SizeUtils extensions
@@ -18,8 +18,17 @@ import './custom_image_view.dart';
  * @param itemGap Gap between story items
  * @param margin Margin around the entire list
  */
+
+// IMPORTANT: This widget CANNOT be const because it uses runtime values:
+// - .h/.w extensions from Sizer package (runtime calculations)
+// - appTheme theme values (runtime theme access)
+// - TextStyleHelper.instance (runtime singleton access)
+// Flutter hot reload may fail when switching between const/non-const.
+// Solution: Perform Hot Restart (not Hot Reload) when you see const-related errors.
+
 class CustomStoryList extends StatelessWidget {
-  const CustomStoryList({
+  // Explicitly non-const constructor (required due to runtime values in build method)
+  CustomStoryList({
     Key? key,
     required this.storyItems,
     this.onStoryTap,
@@ -93,24 +102,47 @@ class CustomStoryList extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Profile avatar with border
+                  // Profile avatar with read/unread ring
                   Container(
                     width: 32.h,
                     height: 32.h,
-                    padding: EdgeInsets.all(3.h),
+                    padding: EdgeInsets.all(2.h), // Gap between ring and avatar
                     decoration: BoxDecoration(
-                      border: Border.all(
-                        color: appTheme.deep_purple_A100,
-                        width: 2.h,
-                      ),
-                      borderRadius: BorderRadius.circular(16.h),
+                      shape: BoxShape.circle,
+                      gradient: item.isRead
+                          ? null // No gradient for read stories
+                          : LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: const [
+                                Color(0xFF8B5CF6), // Purple
+                                Color(0xFFF97316), // Orange
+                              ],
+                            ),
+                      color: item.isRead
+                          ? Color(0xFF9CA3AF)
+                          : null, // Gray for read
+                      border: item.isRead
+                          ? Border.all(color: Color(0xFF9CA3AF), width: 2.h)
+                          : null,
                     ),
-                    child: CustomImageView(
-                      imagePath: item.profileImage,
-                      width: 26.h,
-                      height: 26.h,
-                      fit: BoxFit.cover,
-                      radius: BorderRadius.circular(13.h),
+                    child: Container(
+                      width: 28.h,
+                      height: 28.h,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color:
+                            appTheme.gray_900, // Background color for padding
+                      ),
+                      padding: EdgeInsets.all(1.h),
+                      child: ClipOval(
+                        child: CustomImageView(
+                          imagePath: item.profileImage,
+                          width: 26.h,
+                          height: 26.h,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                   ),
 
@@ -140,6 +172,7 @@ class CustomStoryItem {
     this.timestamp,
     this.navigateTo,
     this.storyId,
+    this.isRead = false, // Default to unread (shows gradient ring)
   });
 
   /// Background image path for the story
@@ -156,4 +189,7 @@ class CustomStoryItem {
 
   /// Story ID for navigation and tracking
   final String? storyId;
+
+  /// Read/unread state - true shows gray ring, false shows gradient ring
+  final bool isRead;
 }

@@ -736,33 +736,64 @@ class _MemoryFeedDashboardScreenState
                         );
                       },
                     )
-                  : ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.only(left: 24.h),
-                      itemCount: stories.length,
-                      itemBuilder: (context, index) {
-                        final story = stories[index];
-                        return HappeningNowStoryCard(
-                          story: story,
-                          onTap: () {
-                            // Create feed context with all story IDs from trending feed
-                            final feedContext = FeedStoryContext(
-                              feedType: 'trending',
-                              storyIds: stories
-                                  .map((s) => s.storyId)
-                                  .where((id) => id.isNotEmpty)
-                                  .toList(),
-                              initialStoryId: story.storyId,
-                            );
+                  : stories.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24.h),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CustomImageView(
+                                  imagePath: ImageConstant.imgIconBlueA700,
+                                  height: 48.h,
+                                  width: 48.h,
+                                  color: appTheme.blue_gray_300,
+                                ),
+                                SizedBox(height: 12.h),
+                                Text(
+                                  'No trending stories yet',
+                                  style: TextStyleHelper
+                                      .instance.title16MediumPlusJakartaSans
+                                      .copyWith(color: appTheme.blue_gray_300),
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  'Check back later for trending content',
+                                  style: TextStyleHelper
+                                      .instance.body12MediumPlusJakartaSans
+                                      .copyWith(color: appTheme.blue_gray_300),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.only(left: 24.h),
+                          itemCount: stories.length,
+                          itemBuilder: (context, index) {
+                            final story = stories[index];
+                            return HappeningNowStoryCard(
+                              story: story,
+                              onTap: () {
+                                // Create feed context with all story IDs from trending feed
+                                final feedContext = FeedStoryContext(
+                                  feedType: 'trending',
+                                  storyIds: stories
+                                      .map((s) => s.storyId)
+                                      .where((id) => id.isNotEmpty)
+                                      .toList(),
+                                  initialStoryId: story.storyId,
+                                );
 
-                            NavigatorService.pushNamed(
-                              AppRoutes.appStoryView,
-                              arguments: feedContext,
+                                NavigatorService.pushNamed(
+                                  AppRoutes.appStoryView,
+                                  arguments: feedContext,
+                                );
+                              },
                             );
                           },
-                        );
-                      },
-                    ),
+                        ),
             ),
           ],
         );

@@ -1,6 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../core/app_export.dart';
 import './custom_image_view.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 /** 
  * CustomEventCard - A reusable event card component that displays event information
@@ -18,6 +19,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 class CustomEventCard extends StatelessWidget {
   final String? eventTitle;
   final String? eventDate;
+  final String? eventLocation;
   final bool? isPrivate;
   final String? iconButtonImagePath;
   final List<String>? participantImages;
@@ -29,6 +31,7 @@ class CustomEventCard extends StatelessWidget {
     Key? key,
     this.eventTitle,
     this.eventDate,
+    this.eventLocation,
     this.isPrivate,
     this.iconButtonImagePath,
     this.participantImages,
@@ -158,7 +161,7 @@ class CustomEventCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  eventDate ?? 'Event Date',
+                  eventLocation ?? 'Event Location',
                   style: TextStyleHelper.instance.body12MediumPlusJakartaSans
                       .copyWith(height: 1.33),
                 ),

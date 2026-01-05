@@ -1,5 +1,7 @@
 import '../../core/app_export.dart';
+import '../../services/supabase_service.dart';
 import '../../widgets/custom_user_status_row.dart';
+import './models/memory_members_model.dart';
 import 'notifier/memory_members_notifier.dart';
 
 class MemoryMembersScreen extends ConsumerStatefulWidget {
@@ -208,6 +210,10 @@ class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
         final state = ref.watch(memoryMembersNotifier);
         final members = state.memoryMembersModel?.members ?? [];
 
+        // Get current user ID from Supabase
+        final currentUserId =
+            SupabaseService.instance.client?.auth.currentUser?.id;
+
         if (members.isEmpty) {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: 40.h),
@@ -219,19 +225,54 @@ class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
           );
         }
 
+        // Sort members: Creator first, then current user (if not creator), then others
+        final sortedMembers = List<MemberModel>.from(members);
+        sortedMembers.sort((a, b) {
+          final aIsCreator = a.isCreator ?? false;
+          final bIsCreator = b.isCreator ?? false;
+          final aIsCurrentUser = a.userId == currentUserId;
+          final bIsCurrentUser = b.userId == currentUserId;
+
+          // Creator always first
+          if (aIsCreator && !bIsCreator) return -1;
+          if (!aIsCreator && bIsCreator) return 1;
+
+          // If neither is creator, current user comes first
+          if (!aIsCreator && !bIsCreator) {
+            if (aIsCurrentUser && !bIsCurrentUser) return -1;
+            if (!aIsCurrentUser && bIsCurrentUser) return 1;
+          }
+
+          return 0;
+        });
+
         return Column(
           spacing: 10.h,
-          children: members.map((member) {
+          children: sortedMembers.map((member) {
             final isCreator = member.isCreator ?? false;
+            final isCurrentUser = member.userId == currentUserId;
+
+            // Build status text with multiple badges
+            String? statusText;
+            if (isCreator && isCurrentUser) {
+              statusText = 'Creator • You';
+            } else if (isCreator) {
+              statusText = 'Creator';
+            } else if (isCurrentUser) {
+              statusText = 'You';
+            }
 
             return CustomUserStatusRow(
               profileImagePath:
                   member.avatarUrl ?? ImageConstant.imgEllipse826x26,
               userName: member.displayName ?? member.username ?? 'Unknown',
-              statusText: isCreator ? 'Creator' : null,
-              statusBackgroundColor:
-                  isCreator ? appTheme.deep_purple_A100.withAlpha(51) : null,
-              statusTextColor: isCreator ? appTheme.deep_purple_A100 : null,
+              statusText: statusText,
+              statusBackgroundColor: (isCreator || isCurrentUser)
+                  ? appTheme.deep_purple_A100.withAlpha(51)
+                  : null,
+              statusTextColor: (isCreator || isCurrentUser)
+                  ? appTheme.deep_purple_A100
+                  : null,
               onTap: () => _onTapMember(context, member.userId ?? ''),
             );
           }).toList(),

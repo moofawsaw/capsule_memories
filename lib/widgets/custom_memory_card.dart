@@ -48,7 +48,7 @@ class CustomMemoryCard extends StatelessWidget {
   /// Callback for action button tap
   final VoidCallback? onActionTap;
 
-  /// Callback for category button tap
+  /// Callback for category button tap (navigates to timeline)
   final VoidCallback? onCategoryTap;
 
   /// Callback for main image tap

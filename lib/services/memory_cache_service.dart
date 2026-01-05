@@ -296,9 +296,29 @@ class MemoryCacheService {
     try {
       final storiesData = await _storyService.fetchUserStories(userId);
 
+      // Fetch all story views for the current user in one query
+      final storyIds = storiesData.map((s) => s['id'] as String).toList();
+
+      Set<String> viewedStoryIds = {};
+      if (storyIds.isNotEmpty) {
+        final viewsResponse = await SupabaseService.instance.client
+            ?.from('story_views')
+            .select('story_id')
+            .eq('user_id', userId)
+            .inFilter('story_id', storyIds);
+
+        if (viewsResponse != null) {
+          viewedStoryIds =
+              viewsResponse.map((view) => view['story_id'] as String).toSet();
+          print(
+              '🔍 CACHE: Found ${viewedStoryIds.length} viewed stories for user');
+        }
+      }
+
       return storiesData.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
         final createdAt = DateTime.parse(storyData['created_at'] as String);
+        final storyId = storyData['id'] as String;
 
         final backgroundImage = _storyService.getStoryMediaUrl(storyData);
         final profileImage = AvatarHelperService.getAvatarUrl(
@@ -309,8 +329,11 @@ class MemoryCacheService {
             contributor?['username'] as String? ??
             'Unknown';
 
+        // Determine if story has been viewed by current user
+        final isRead = viewedStoryIds.contains(storyId);
+
         return StoryItemModel(
-          id: storyData['id'] as String,
+          id: storyId,
           backgroundImage: backgroundImage,
           profileImage: profileImage,
           timestamp: _storyService.getTimeAgo(createdAt),
@@ -321,6 +344,7 @@ class MemoryCacheService {
           videoUrl: storyData['video_url'] as String? ?? '',
           imageUrl: storyData['image_url'] as String? ?? '',
           contributorName: contributorName,
+          isRead: isRead,
         );
       }).toList();
     } catch (e) {

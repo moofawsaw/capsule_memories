@@ -84,14 +84,14 @@ class CustomPublicMemories extends StatelessWidget {
       );
     }
 
-    final memoryList = memories ?? [];
+    final List<CustomMemoryItem> memoryList = memories ?? <CustomMemoryItem>[];
     if (memoryList.isEmpty) return const SizedBox.shrink();
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: List.generate(memoryList.length, (index) {
-          final memory = memoryList[index];
+          final CustomMemoryItem memory = memoryList[index];
           return Container(
             margin: EdgeInsets.only(
               right: index == memoryList.length - 1 ? 0 : 12.h,
@@ -167,12 +167,16 @@ class _PublicMemoryCard extends StatefulWidget {
 }
 
 class _PublicMemoryCardState extends State<_PublicMemoryCard> {
-  final _storyService = StoryService();
+  final StoryService _storyService = StoryService();
 
-  List<TimelineStoryItem> _timelineStories = [];
+  List<TimelineStoryItem> _timelineStories = <TimelineStoryItem>[];
   DateTime? _memoryStartTime;
   DateTime? _memoryEndTime;
   bool _isLoadingTimeline = true;
+
+  // Parent-card horizontal padding applied around the timeline area
+  // (this is what keeps markers away from card edges).
+  static const double _timelineSidePadding = 14.0;
 
   @override
   void initState() {
@@ -185,15 +189,15 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       if (!mounted) return;
       setState(() {
         _isLoadingTimeline = false;
-        _timelineStories = [];
+        _timelineStories = <TimelineStoryItem>[];
       });
       return;
     }
 
     try {
-      final memoryId = widget.memory.id!;
+      final String memoryId = widget.memory.id!;
 
-      final memoryResponse = await SupabaseService.instance.client
+      final dynamic memoryResponse = await SupabaseService.instance.client
           ?.from('memories')
           .select('start_time, end_time')
           .eq('id', memoryId)
@@ -212,29 +216,37 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         memoryEnd = _parseMemoryEndTime();
       }
 
-      final storiesData = await _storyService.fetchMemoryStories(memoryId);
+      final List<dynamic> storiesData =
+          await _storyService.fetchMemoryStories(memoryId);
 
       if (!mounted) return;
 
       if (storiesData.isEmpty) {
         setState(() {
           _isLoadingTimeline = false;
-          _timelineStories = [];
+          _timelineStories = <TimelineStoryItem>[];
           _memoryStartTime = memoryStart;
           _memoryEndTime = memoryEnd;
         });
         return;
       }
 
-      final timelineStories = storiesData.map((storyData) {
-        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
-        final createdAt = DateTime.parse(storyData['created_at'] as String);
-        final storyId = storyData['id'] as String;
+      final List<TimelineStoryItem> timelineStories =
+          storiesData.map<TimelineStoryItem>((dynamic storyData) {
+        final Map<String, dynamic>? contributor =
+            storyData['user_profiles'] as Map<String, dynamic>?;
 
-        final backgroundImage = _storyService.getStoryMediaUrl(storyData);
-        final profileImage = AvatarHelperService.getAvatarUrl(
-          contributor?['avatar_url'] as String?,
-        );
+        final DateTime createdAt =
+            DateTime.parse(storyData['created_at'] as String);
+        final String storyId = storyData['id'] as String;
+
+        final String backgroundImage =
+            _storyService.getStoryMediaUrl(storyData);
+
+        final String? avatarUrl =
+            contributor != null ? contributor['avatar_url'] as String? : null;
+
+        final String profileImage = AvatarHelperService.getAvatarUrl(avatarUrl);
 
         return TimelineStoryItem(
           backgroundImage: backgroundImage,
@@ -259,29 +271,29 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       if (!mounted) return;
       setState(() {
         _isLoadingTimeline = false;
-        _timelineStories = [];
+        _timelineStories = <TimelineStoryItem>[];
       });
     }
   }
 
   DateTime _parseMemoryStartTime() {
     try {
-      final dateStr = widget.memory.startDate ?? 'Dec 4';
-      final timeStr = widget.memory.startTime ?? '3:18pm';
+      final String dateStr = widget.memory.startDate ?? 'Dec 4';
+      final String timeStr = widget.memory.startTime ?? '3:18pm';
 
-      final now = DateTime.now();
-      final parts = dateStr.split(' ');
-      final month = _monthToNumber(parts[0]);
-      final day = int.tryParse(parts.length > 1 ? parts[1] : '') ?? now.day;
+      final DateTime now = DateTime.now();
+      final List<String> parts = dateStr.split(' ');
+      final int month = _monthToNumber(parts[0]);
+      final int day = int.tryParse(parts.length > 1 ? parts[1] : '') ?? now.day;
 
-      final timeParts = timeStr
+      final List<String> timeParts = timeStr
           .toLowerCase()
           .replaceAll(RegExp(r'[ap]m'), '')
           .trim()
           .split(':');
 
-      var hour = int.tryParse(timeParts[0]) ?? 0;
-      final minute =
+      int hour = int.tryParse(timeParts[0]) ?? 0;
+      final int minute =
           timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
@@ -295,22 +307,22 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   DateTime _parseMemoryEndTime() {
     try {
-      final dateStr = widget.memory.endDate ?? 'Dec 4';
-      final timeStr = widget.memory.endTime ?? '3:18am';
+      final String dateStr = widget.memory.endDate ?? 'Dec 4';
+      final String timeStr = widget.memory.endTime ?? '3:18am';
 
-      final now = DateTime.now();
-      final parts = dateStr.split(' ');
-      final month = _monthToNumber(parts[0]);
-      final day = int.tryParse(parts.length > 1 ? parts[1] : '') ?? now.day;
+      final DateTime now = DateTime.now();
+      final List<String> parts = dateStr.split(' ');
+      final int month = _monthToNumber(parts[0]);
+      final int day = int.tryParse(parts.length > 1 ? parts[1] : '') ?? now.day;
 
-      final timeParts = timeStr
+      final List<String> timeParts = timeStr
           .toLowerCase()
           .replaceAll(RegExp(r'[ap]m'), '')
           .trim()
           .split(':');
 
-      var hour = int.tryParse(timeParts[0]) ?? 0;
-      final minute =
+      int hour = int.tryParse(timeParts[0]) ?? 0;
+      final int minute =
           timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
@@ -323,7 +335,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   }
 
   int _monthToNumber(String month) {
-    const months = {
+    const Map<String, int> months = <String, int>{
       'jan': 1,
       'feb': 2,
       'mar': 3,
@@ -337,7 +349,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       'nov': 11,
       'dec': 12,
     };
-    final key =
+
+    final String key =
         month.toLowerCase().substring(0, month.length >= 3 ? 3 : month.length);
     return months[key] ?? DateTime.now().month;
   }
@@ -351,30 +364,38 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       );
     }
 
+    // Empty state keeps the SAME left/right padding as the real timeline
     if (_timelineStories.isEmpty) {
-      return Container(
-        margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
-        height: 112.h,
-        child: Center(
-          child: Text(
-            'No stories yet',
-            style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
+        child: Container(
+          margin: EdgeInsets.symmetric(vertical: 8.h),
+          height: 112.h,
+          child: Center(
+            child: Text(
+              'No stories yet',
+              style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+            ),
           ),
         ),
       );
     }
 
-    // USE ONLY THE UNIFIED TIMELINE WIDGET
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
-      child: TimelineWidget(
-        stories: _timelineStories,
-        memoryStartTime: _memoryStartTime!,
-        memoryEndTime: _memoryEndTime!,
-        onStoryTap: (storyId) {
-          if (widget.onTap != null) widget.onTap!();
-        },
+    // ✅ KEY CHANGE: add horizontal padding on the PARENT card area (not inside TimelineWidget)
+    // This keeps the markers away from the card edges.
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 8.h),
+        child: TimelineWidget(
+          stories: _timelineStories,
+          memoryStartTime: _memoryStartTime!,
+          memoryEndTime: _memoryEndTime!,
+          onStoryTap: (String storyId) {
+            if (widget.onTap != null) widget.onTap!();
+          },
+        ),
       ),
     );
   }
@@ -385,7 +406,9 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       onTap: widget.onTap,
       child: Container(
         width: 300.h,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(20.h)),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20.h),
+        ),
         child: Column(
           children: [
             _buildMemoryHeader(context),
@@ -398,7 +421,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   }
 
   Widget _buildMemoryHeader(BuildContext context) {
-    final memory = widget.memory;
+    final CustomMemoryItem memory = widget.memory;
 
     return Container(
       padding: EdgeInsets.all(18.h),
@@ -412,17 +435,17 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       child: Row(
         children: [
           Container(
-            height: 36.h,
-            width: 36.h,
+            padding: EdgeInsets.all(6.h),
             decoration: BoxDecoration(
-              color: const Color(0xFFC1242F).withAlpha(64),
+              color: Color(0xFF222D3E),
               borderRadius: BorderRadius.circular(18.h),
             ),
-            padding: EdgeInsets.all(6.h),
+            width: 42.h,
+            height: 42.h,
             child: CustomImageView(
               imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
-              height: 24.h,
-              width: 24.h,
+              height: 29.h,
+              width: 29.h,
             ),
           ),
           SizedBox(width: 12.h),
@@ -437,13 +460,13 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
                 ),
                 SizedBox(height: 2.h),
                 Text(
-                  memory.date ?? 'Dec 4, 2025',
+                  memory.location ?? 'Dec 4, 2025',
                   style: TextStyleHelper.instance.body12MediumPlusJakartaSans,
                 ),
               ],
             ),
           ),
-          _buildProfileStack(context, memory.profileImages ?? []),
+          _buildProfileStack(context, memory.profileImages ?? <String>[]),
         ],
       ),
     );
@@ -452,7 +475,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   Widget _buildProfileStack(BuildContext context, List<String> profileImages) {
     if (profileImages.isEmpty) return const SizedBox.shrink();
 
-    final count = profileImages.length > 3 ? 3 : profileImages.length;
+    final int count = profileImages.length > 3 ? 3 : profileImages.length;
 
     return SizedBox(
       width: 84.h,
@@ -484,71 +507,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   }
 
   Widget _buildMemoryFooter(BuildContext context) {
-    final memory = widget.memory;
+    final CustomMemoryItem memory = widget.memory;
 
-    return Container(
-      padding: EdgeInsets.all(12.h),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(20.h),
-          bottomRight: Radius.circular(20.h),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                memory.startDate ?? 'Dec 4',
-                style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
-              ),
-              SizedBox(height: 6.h),
-              Text(
-                memory.startTime ?? '3:18pm',
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-            ],
-          ),
-          if (memory.location != null)
-            Column(
-              children: [
-                Text(
-                  memory.location!,
-                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300),
-                ),
-                if (memory.distance != null) ...[
-                  SizedBox(height: 4.h),
-                  Text(
-                    memory.distance!,
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
-                  ),
-                ],
-              ],
-            ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                memory.endDate ?? 'Dec 4',
-                style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
-              ),
-              SizedBox(height: 6.h),
-              Text(
-                memory.endTime ?? '3:18am',
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    return SizedBox();
   }
 }

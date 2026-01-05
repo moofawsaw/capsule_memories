@@ -1,4 +1,5 @@
 import '../core/app_export.dart';
+import 'package:intl/intl.dart';
 
 /**
  * CustomNotificationCard - A reusable card component for displaying notifications
@@ -10,6 +11,7 @@ import '../core/app_export.dart';
  * - Envelope icons (open/closed) for read/unread state
  * - Customizable colors for title, description, and background
  * - Responsive design with proper spacing
+ * - Timestamp display showing when notification was received
  */
 class CustomNotificationCard extends StatelessWidget {
   const CustomNotificationCard({
@@ -19,6 +21,7 @@ class CustomNotificationCard extends StatelessWidget {
     required this.description,
     required this.isRead,
     required this.onToggleRead,
+    this.timestamp,
     this.titleFontSize,
     this.descriptionAlignment,
     this.margin,
@@ -33,6 +36,7 @@ class CustomNotificationCard extends StatelessWidget {
   final String description;
   final bool isRead;
   final VoidCallback onToggleRead;
+  final DateTime? timestamp;
   final double? titleFontSize;
   final TextAlign? descriptionAlignment;
   final EdgeInsetsGeometry? margin;
@@ -40,6 +44,32 @@ class CustomNotificationCard extends StatelessWidget {
   final Color? backgroundColor;
   final Color? titleColor;
   final Color? descriptionColor;
+
+  String _formatTimestamp(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      final minutes = difference.inMinutes;
+      return '$minutes ${minutes == 1 ? 'minute' : 'minutes'} ago';
+    } else if (difference.inHours < 24) {
+      final hours = difference.inHours;
+      return '$hours ${hours == 1 ? 'hour' : 'hours'} ago';
+    } else if (difference.inDays < 7) {
+      final days = difference.inDays;
+      return '$days ${days == 1 ? 'day' : 'days'} ago';
+    } else if (difference.inDays < 30) {
+      final weeks = (difference.inDays / 7).floor();
+      return '$weeks ${weeks == 1 ? 'week' : 'weeks'} ago';
+    } else if (difference.inDays < 365) {
+      final months = (difference.inDays / 30).floor();
+      return '$months ${months == 1 ? 'month' : 'months'} ago';
+    } else {
+      return DateFormat('MMM d, yyyy').format(dateTime);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +115,18 @@ class CustomNotificationCard extends StatelessWidget {
                           height: 1.29,
                         ),
                       ),
+                      if (timestamp != null) ...[
+                        SizedBox(height: 6.h),
+                        Text(
+                          _formatTimestamp(timestamp!),
+                          style: TextStyleHelper
+                              .instance.body12RegularPlusJakartaSans
+                              .copyWith(
+                            color: appTheme.blue_gray_300.withAlpha(153),
+                            height: 1.33,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

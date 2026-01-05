@@ -123,29 +123,7 @@ class CustomButton extends StatelessWidget {
 
   Widget _buildOutlinedButton(
       CustomButtonStyle style, CustomButtonTextStyle textStyle, bool disabled) {
-    return OutlinedButton(
-      onPressed: disabled ? null : onPressed,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: style.backgroundColor ?? appTheme.transparentCustom,
-        foregroundColor: textStyle.color ?? appTheme.blue_gray_300,
-        side: style.borderSide ??
-            BorderSide(
-              color: appTheme.blue_gray_900,
-              width: 2.h,
-            ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(style.borderRadius ?? 6.h),
-        ),
-        padding: padding ??
-            EdgeInsets.symmetric(
-              horizontal: 16.h,
-              vertical: 12.h,
-            ),
-        minimumSize: Size(0, 0),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: _buildButtonContent(textStyle),
-    );
+    return SizedBox();
   }
 
   Widget _buildTextButton(

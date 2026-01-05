@@ -18,6 +18,7 @@ class StoryItemModel extends Equatable {
     this.imageUrl,
     this.contributorName,
     this.thumbnailUrl,
+    this.isRead,
   }) {
     id = id ?? "";
     backgroundImage = backgroundImage ?? "";
@@ -31,6 +32,7 @@ class StoryItemModel extends Equatable {
     imageUrl = imageUrl ?? "";
     contributorName = contributorName ?? "";
     thumbnailUrl = thumbnailUrl ?? "";
+    isRead = isRead ?? false;
   }
 
   String? id;
@@ -45,6 +47,7 @@ class StoryItemModel extends Equatable {
   String? imageUrl;
   String? contributorName;
   String? thumbnailUrl;
+  bool? isRead;
 
   /// Computed getter for resolved thumbnail URL
   /// Returns full Supabase Storage URL for thumbnails
@@ -109,6 +112,7 @@ class StoryItemModel extends Equatable {
     String? imageUrl,
     String? contributorName,
     String? thumbnailUrl,
+    bool? isRead,
   }) {
     return StoryItemModel(
       id: id ?? this.id,
@@ -123,6 +127,7 @@ class StoryItemModel extends Equatable {
       imageUrl: imageUrl ?? this.imageUrl,
       contributorName: contributorName ?? this.contributorName,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      isRead: isRead ?? this.isRead,
     );
   }
 
@@ -140,5 +145,6 @@ class StoryItemModel extends Equatable {
         imageUrl,
         contributorName,
         thumbnailUrl,
+        isRead,
       ];
 }

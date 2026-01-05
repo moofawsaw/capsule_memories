@@ -168,6 +168,8 @@ class _MemoriesDashboardScreenState
                                   profileImage: item.profileImage ?? '',
                                   timestamp: item.timestamp ?? '2 mins ago',
                                   navigateTo: item.navigateTo,
+                                  storyId: item.id,
+                                  isRead: item.isRead ?? false,
                                 ))
                             .toList(),
                         onStoryTap: (index) => _onStoryTap(context, index),

@@ -210,15 +210,19 @@ class EventTimelineViewScreenState
           child: Stack(
             children: [
               Container(
-                width: double.maxFinite,
                 padding: EdgeInsets.symmetric(horizontal: 16.h),
                 decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: appTheme.blue_gray_900,
-                      width: 1,
-                    ),
-                  ),
+                    border: Border(
+                        bottom: BorderSide(
+                  color: appTheme.blue_gray_900,
+                  width: 1,
+                ))),
+                width: double.maxFinite,
+                margin: EdgeInsets.fromLTRB(
+                  0,
+                  0,
+                  0,
+                  16,
                 ),
                 child: Column(
                   children: [
