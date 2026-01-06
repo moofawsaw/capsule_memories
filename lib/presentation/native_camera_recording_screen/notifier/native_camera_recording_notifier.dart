@@ -12,51 +12,31 @@ class NativeCameraRecordingNotifier
   NativeCameraRecordingNotifier() : super(NativeCameraRecordingState.initial());
 
   void setRecording(bool isRecording) {
-    state = NativeCameraRecordingState(
+    state = state.copyWith(
       isRecording: isRecording,
-      isInitializing: state.isInitializing,
-      recordedVideoPath: state.recordedVideoPath,
-      errorMessage: state.errorMessage,
-      recordingDuration: state.recordingDuration,
     );
   }
 
   void setInitializing(bool isInitializing) {
-    state = NativeCameraRecordingState(
-      isRecording: state.isRecording,
+    state = state.copyWith(
       isInitializing: isInitializing,
-      recordedVideoPath: state.recordedVideoPath,
-      errorMessage: state.errorMessage,
-      recordingDuration: state.recordingDuration,
     );
   }
 
   void setRecordedVideoPath(String? path) {
-    state = NativeCameraRecordingState(
-      isRecording: state.isRecording,
-      isInitializing: state.isInitializing,
+    state = state.copyWith(
       recordedVideoPath: path,
-      errorMessage: state.errorMessage,
-      recordingDuration: state.recordingDuration,
     );
   }
 
   void setError(String error) {
-    state = NativeCameraRecordingState(
-      isRecording: state.isRecording,
-      isInitializing: state.isInitializing,
-      recordedVideoPath: state.recordedVideoPath,
+    state = state.copyWith(
       errorMessage: error,
-      recordingDuration: state.recordingDuration,
     );
   }
 
   void updateRecordingDuration(int seconds) {
-    state = NativeCameraRecordingState(
-      isRecording: state.isRecording,
-      isInitializing: state.isInitializing,
-      recordedVideoPath: state.recordedVideoPath,
-      errorMessage: state.errorMessage,
+    state = state.copyWith(
       recordingDuration: seconds,
     );
   }
