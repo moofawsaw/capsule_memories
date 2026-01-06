@@ -276,14 +276,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       width: double.maxFinite,
       child: Column(
         children: [
-          SizedBox(height: 26.h),
+          SizedBox(height: 24.h),
           Expanded(
             child: Container(
-              margin: EdgeInsets.fromLTRB(8.h, 0, 8.h, 62.h),
+              margin: EdgeInsets.symmetric(horizontal: 16.h),
               child: Column(
-                spacing: 32.h,
                 children: [
                   _buildNotificationsHeader(context),
+                  SizedBox(height: 16.h),
                   Expanded(child: _buildNotificationsList())
                 ],
               ),

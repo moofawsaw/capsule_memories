@@ -1,5 +1,6 @@
 import './supabase_service.dart';
 import './avatar_helper_service.dart';
+import './location_service.dart';
 
 class StoryService {
   final _supabase = SupabaseService.instance.client;
@@ -641,7 +642,20 @@ class StoryService {
     List<String>? invitedUserIds,
   }) async {
     try {
-      // Create memory
+      // ADDED: Fetch user's current location
+      print(
+          '📍 FETCHING LOCATION: Getting user location for memory creation...');
+      final locationData = await LocationService.getLocationData();
+
+      if (locationData != null) {
+        print(
+            '✅ LOCATION FETCHED: ${locationData['location_name']} (${locationData['latitude']}, ${locationData['longitude']})');
+      } else {
+        print(
+            '⚠️ LOCATION UNAVAILABLE: Memory will be created without location');
+      }
+
+      // Create memory with location data
       final response = await _supabase?.from('memories').insert({
         'title': title,
         'creator_id': creatorId,
@@ -649,6 +663,12 @@ class StoryService {
         'duration': duration,
         if (categoryId != null) 'category_id': categoryId,
         'expires_at': _calculateExpirationTime(duration).toIso8601String(),
+        // ADDED: Include location fields if location was successfully fetched
+        if (locationData != null) ...{
+          'location_name': locationData['location_name'],
+          'location_lat': locationData['latitude'],
+          'location_lng': locationData['longitude'],
+        },
       }).select();
 
       if (response == null || response.isEmpty) {
@@ -656,6 +676,8 @@ class StoryService {
       }
 
       final memoryId = response.first['id'] as String;
+      print(
+          '✅ MEMORY CREATED: $memoryId with location: ${locationData?['location_name'] ?? 'No location'}');
 
       // Add contributors if provided
       if (invitedUserIds != null && invitedUserIds.isNotEmpty) {
@@ -682,7 +704,7 @@ class StoryService {
 
       return memoryId;
     } catch (e) {
-      print('Error creating memory: $e');
+      print('❌ ERROR CREATING MEMORY: $e');
       return null;
     }
   }

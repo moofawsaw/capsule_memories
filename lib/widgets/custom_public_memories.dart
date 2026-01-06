@@ -602,8 +602,9 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Show timeline skeleton if memory isn't built out yet
-            if (hasNoStories && !hasNoMembers) ...[
+            // ✅ FIX: ALWAYS show timeline skeleton in empty state (regardless of member count)
+            // This guides users on what the memory card will look like when built out
+            if (hasNoStories) ...[
               _buildTimelineSkeleton(),
               SizedBox(height: 12.h),
             ],

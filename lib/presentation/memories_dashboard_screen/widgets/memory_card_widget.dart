@@ -6,6 +6,7 @@ import '../../../services/supabase_service.dart';
 import '../../../widgets/custom_confirmation_dialog.dart';
 import '../../../widgets/custom_icon_button.dart';
 import '../../../widgets/custom_image_view.dart';
+import '../../create_memory_screen/create_memory_screen.dart';
 import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart';
 import '../../memory_details_screen/memory_details_screen.dart';
 import '../../memory_invitation_screen/memory_invitation_screen.dart';
@@ -152,6 +153,12 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
   }
 
   Widget _buildEventHeader() {
+    // Get current user ID for creator comparison
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    final currentUserId = currentUser?.id ?? '';
+    final isCreator = currentUserId.isNotEmpty &&
+        currentUserId == widget.memoryItem.creatorId;
+
     return Container(
       height: 88
           .h, // FIXED HEIGHT: Accommodates text wrapping without expanding card
@@ -205,6 +212,23 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
           SizedBox(width: 8.h),
           // Participant avatars section - using exact feed pattern
           _buildParticipantAvatarsStack(),
+          // EDIT ICON - only show for memories created by current user
+          if (isCreator) ...[
+            SizedBox(width: 8.h),
+            Builder(
+              builder: (context) => GestureDetector(
+                onTap: () => _handleEditTap(context),
+                child: Container(
+                  padding: EdgeInsets.all(8.h),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: 20.h,
+                    color: appTheme.gray_50,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (widget.onDelete != null) ...[
             SizedBox(width: 8.h),
             Builder(
@@ -244,6 +268,31 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => MemoryDetailsScreen(memoryId: memoryId),
+    );
+  }
+
+  /// Handle edit icon tap - open edit memory bottom sheet
+  void _handleEditTap(BuildContext context) {
+    final memoryId = widget.memoryItem.id;
+    if (memoryId == null || memoryId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Invalid memory ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Open CreateMemoryScreen as edit bottom sheet
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => CreateMemoryScreen(
+          // TODO: Add memoryId parameter to CreateMemoryScreen for edit mode
+          // For now, it will open as create mode - edit functionality needs to be added to CreateMemoryScreen
+          ),
     );
   }
 
@@ -362,14 +411,49 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
     }
 
     if (_timelineStories.isEmpty) {
-      return Container(
-        margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
-        height: 112.h,
-        child: Center(
-          child: Text(
-            'No stories yet',
-            style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
+      // FIXED: Show empty state with view details button instead of text
+      return GestureDetector(
+        onTap: () {
+          print(
+              '🔍 TIMELINE EMPTY STATE TAPPED: Navigating to /timeline for memory ${widget.memoryItem.id}');
+          MemoryNavigationWrapper.navigateFromMemoryItem(
+            context: context,
+            memoryItem: widget.memoryItem,
+          );
+        },
+        child: Container(
+          margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
+          height: 112.h,
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02.withAlpha(77),
+            borderRadius: BorderRadius.circular(12.h),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.timeline_outlined,
+                size: 32.h,
+                color: appTheme.blue_gray_300,
+              ),
+              SizedBox(height: 8.h),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+                decoration: BoxDecoration(
+                  color: appTheme.deep_purple_A100.withAlpha(26),
+                  borderRadius: BorderRadius.circular(20.h),
+                  border: Border.all(
+                    color: appTheme.deep_purple_A100.withAlpha(77),
+                    width: 1.0,
+                  ),
+                ),
+                child: Text(
+                  'View Details',
+                  style: TextStyleHelper.instance.body12BoldPlusJakartaSans
+                      .copyWith(color: appTheme.deep_purple_A100),
+                ),
+              ),
+            ],
           ),
         ),
       );

@@ -59,22 +59,21 @@ class _MemoriesDashboardScreenState
           },
           color: appTheme.deep_purple_A100,
           backgroundColor: appTheme.gray_900_01,
-          child: SingleChildScrollView(
-            physics: AlwaysScrollableScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height -
-                    MediaQuery.of(context).padding.top,
+          child: Column(
+            children: [
+              _buildMemoriesHeader(context),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildLatestStoriesSection(context),
+                    _buildTabSection(context),
+                    Expanded(
+                      child: _buildMemoriesContent(context),
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                children: [
-                  _buildMemoriesHeader(context),
-                  _buildLatestStoriesSection(context),
-                  _buildTabSection(context),
-                  _buildMemoriesContent(context),
-                ],
-              ),
-            ),
+            ],
           ),
         ),
       ),
@@ -84,7 +83,7 @@ class _MemoriesDashboardScreenState
   /// Section Widget - Memories Header
   Widget _buildMemoriesHeader(BuildContext context) {
     return Container(
-      margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
+      margin: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,8 +92,8 @@ class _MemoriesDashboardScreenState
             children: [
               CustomImageView(
                 imagePath: ImageConstant.imgIcon10,
-                height: 26.h,
-                width: 26.h,
+                height: 24.h,
+                width: 24.h,
               ),
               SizedBox(width: 6.h),
               Text(
@@ -108,12 +107,12 @@ class _MemoriesDashboardScreenState
               return Row(
                 children: [
                   CustomIconButton(
-                    height: 44.h,
-                    width: 44.h,
+                    height: 40.h,
+                    width: 40.h,
                     icon: Icons.camera_alt,
                     backgroundColor: appTheme.gray_900_01.withAlpha(179),
-                    borderRadius: 22.h,
-                    iconSize: 24.h,
+                    borderRadius: 20.h,
+                    iconSize: 22.h,
                     iconColor: Theme.of(context).colorScheme.onSurface,
                     onTap: () => _onCameraButtonTap(context),
                   ),
@@ -124,9 +123,9 @@ class _MemoriesDashboardScreenState
                     onPressed: () => _onCreateMemoryTap(context),
                     buttonStyle: CustomButtonStyle.fillPrimary,
                     buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                    height: 42.h,
+                    height: 38.h,
                     padding:
-                        EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+                        EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
                   ),
                 ],
               );
@@ -147,46 +146,64 @@ class _MemoriesDashboardScreenState
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              margin: EdgeInsets.fromLTRB(20.h, 22.h, 20.h, 0),
+              margin: EdgeInsets.fromLTRB(20.h, 14.h, 20.h, 0),
               child: Text(
                 'Latest Stories (${storyItems.length})',
                 style: TextStyleHelper.instance.body14BoldPlusJakartaSans
                     .copyWith(color: appTheme.gray_50),
               ),
             ),
-            SizedBox(height: 18.h),
+            SizedBox(height: 12.h),
             isLoading
                 ? SizedBox(
-                    height: 160.h,
+                    height: 140.h,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.only(left: 20.h),
                       itemCount: 3,
                       itemBuilder: (context, index) {
                         return Container(
-                          width: 140.h,
-                          margin: EdgeInsets.only(right: 12.h),
+                          width: 120.h,
+                          margin: EdgeInsets.only(right: 10.h),
                           child: CustomStorySkeleton(isCompact: true),
                         );
                       },
                     ),
                   )
                 : storyItems.isEmpty
-                    ? _buildStoriesEmptyState(context)
-                    : CustomStoryList(
-                        storyItems: storyItems
-                            .map((item) => CustomStoryItem(
-                                  backgroundImage: item.backgroundImage ?? '',
-                                  profileImage: item.profileImage ?? '',
-                                  timestamp: item.timestamp ?? '2 mins ago',
-                                  navigateTo: item.navigateTo,
-                                  storyId: item.id,
-                                  isRead: item.isRead ?? false,
-                                ))
-                            .toList(),
-                        onStoryTap: (index) => _onStoryTap(context, index),
+                    ? SizedBox(
+                        height: 140.h,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: EdgeInsets.only(left: 20.h),
+                          itemCount: 3,
+                          itemBuilder: (context, index) {
+                            return Container(
+                              width: 120.h,
+                              margin: EdgeInsets.only(right: 10.h),
+                              child: CustomStorySkeleton(isCompact: true),
+                            );
+                          },
+                        ),
+                      )
+                    : SizedBox(
+                        height: 140.h,
+                        child: CustomStoryList(
+                          storyItems: storyItems
+                              .map((item) => CustomStoryItem(
+                                    backgroundImage: item.backgroundImage ?? '',
+                                    profileImage: item.profileImage ?? '',
+                                    timestamp: item.timestamp ?? '2 mins ago',
+                                    navigateTo: item.navigateTo,
+                                    storyId: item.id,
+                                    isRead: item.isRead ?? false,
+                                  ))
+                              .toList(),
+                          onStoryTap: (index) => _onStoryTap(context, index),
+                        ),
                       ),
           ],
         );
@@ -195,44 +212,7 @@ class _MemoriesDashboardScreenState
   }
 
   /// Empty State - Stories Feed
-  Widget _buildStoriesEmptyState(BuildContext context) {
-    return Container(
-      height: 120.h,
-      margin: EdgeInsets.symmetric(horizontal: 20.h),
-      padding: EdgeInsets.all(20.h),
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_02.withAlpha(128),
-        border: Border.all(
-          color: appTheme.blue_gray_300.withAlpha(51),
-          width: 1.0,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CustomImageView(
-            imagePath: ImageConstant.imgPlayCircle,
-            height: 32.h,
-            width: 32.h,
-            color: appTheme.blue_gray_300,
-          ),
-          SizedBox(height: 12.h),
-          Text(
-            'No stories yet',
-            style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            'Be the first to share a story',
-            style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
+  // REMOVED: Empty state widget no longer used - replaced with skeleton loaders
 
   /// Section Widget - Tab Section
   Widget _buildTabSection(BuildContext context) {
@@ -256,17 +236,17 @@ class _MemoriesDashboardScreenState
 
         return Container(
           width: MediaQuery.of(context).size.width,
-          margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
+          margin: EdgeInsets.fromLTRB(16.h, 14.h, 16.h, 0),
           child: Row(
             children: [
               // Ownership Toggle (left side) - wrapped in Flexible instead of Expanded
               Flexible(
                 flex: 7,
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
+                  padding: EdgeInsets.symmetric(horizontal: 3.h, vertical: 3.h),
                   decoration: BoxDecoration(
                     color: appTheme.gray_900_02.withAlpha(128),
-                    borderRadius: BorderRadius.circular(24.h),
+                    borderRadius: BorderRadius.circular(22.h),
                     border: Border.all(
                       color: appTheme.blue_gray_300.withAlpha(51),
                       width: 1.0,
@@ -279,14 +259,14 @@ class _MemoriesDashboardScreenState
                           onTap: () => _onOwnershipTap(context, 'created'),
                           child: Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: 12.h,
-                              vertical: 10.h,
+                              horizontal: 10.h,
+                              vertical: 8.h,
                             ),
                             decoration: BoxDecoration(
                               color: selectedOwnership == 'created'
                                   ? appTheme.deep_purple_A100
                                   : appTheme.transparentCustom,
-                              borderRadius: BorderRadius.circular(20.h),
+                              borderRadius: BorderRadius.circular(19.h),
                             ),
                             child: Text(
                               'Created by Me ($createdCount)',
@@ -311,14 +291,14 @@ class _MemoriesDashboardScreenState
                           onTap: () => _onOwnershipTap(context, 'joined'),
                           child: Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: 12.h,
-                              vertical: 10.h,
+                              horizontal: 10.h,
+                              vertical: 8.h,
                             ),
                             decoration: BoxDecoration(
                               color: selectedOwnership == 'joined'
                                   ? appTheme.deep_purple_A100
                                   : appTheme.transparentCustom,
-                              borderRadius: BorderRadius.circular(20.h),
+                              borderRadius: BorderRadius.circular(19.h),
                             ),
                             child: Text(
                               'Joined ($joinedCount)',
@@ -343,17 +323,17 @@ class _MemoriesDashboardScreenState
                 ),
               ),
 
-              SizedBox(width: 12.h),
+              SizedBox(width: 10.h),
 
               // State Dropdown (right side)
               GestureDetector(
                 onTap: () => _showStateDropdown(context),
                 child: Container(
                   padding:
-                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+                      EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
                   decoration: BoxDecoration(
                     color: appTheme.gray_900_02.withAlpha(128),
-                    borderRadius: BorderRadius.circular(24.h),
+                    borderRadius: BorderRadius.circular(22.h),
                     border: Border.all(
                       color: appTheme.blue_gray_300.withAlpha(51),
                       width: 1.0,
@@ -371,7 +351,7 @@ class _MemoriesDashboardScreenState
                       SizedBox(width: 6.h),
                       Icon(
                         Icons.keyboard_arrow_down,
-                        size: 18.h,
+                        size: 16.h,
                         color: appTheme.gray_50,
                       ),
                     ],
@@ -409,7 +389,7 @@ class _MemoriesDashboardScreenState
 
         if (state.isLoading ?? false) {
           return Container(
-            margin: EdgeInsets.fromLTRB(16.h, 20.h, 16.h, 24.h),
+            margin: EdgeInsets.fromLTRB(16.h, 14.h, 16.h, 16.h),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: NeverScrollableScrollPhysics(),
@@ -437,12 +417,7 @@ class _MemoriesDashboardScreenState
         final filteredMemories = notifier.getFilteredMemories(currentUser.id);
 
         return Container(
-          margin: EdgeInsets.fromLTRB(
-            0,
-            20,
-            0,
-            24,
-          ),
+          margin: EdgeInsets.fromLTRB(0, 14.h, 0, 16.h),
           child: _buildMemoryList(context, filteredMemories),
         );
       },
@@ -480,7 +455,7 @@ class _MemoriesDashboardScreenState
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.only(bottom: 20.h),
+      padding: EdgeInsets.only(bottom: 14.h),
       physics: BouncingScrollPhysics(),
       child: Row(
         children: List.generate(convertedMemories.length, (index) {
@@ -488,8 +463,8 @@ class _MemoriesDashboardScreenState
           final memoryItem = memoryItems[index];
           return Container(
             margin: EdgeInsets.only(
-              left: index == 0 ? 24.h : 0,
-              right: 12.h,
+              left: index == 0 ? 20.h : 0,
+              right: 10.h,
             ),
             child: unified_widget.CustomPublicMemories(
               sectionTitle: null,
@@ -539,39 +514,39 @@ class _MemoriesDashboardScreenState
 
     return Center(
       child: Container(
-        padding: EdgeInsets.all(32.h),
+        padding: EdgeInsets.all(24.h),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CustomImageView(
               imagePath: iconPath,
-              height: 64.h,
-              width: 64.h,
+              height: 56.h,
+              width: 56.h,
               color: appTheme.blue_gray_300,
             ),
-            SizedBox(height: 24.h),
+            SizedBox(height: 18.h),
             Text(
               title,
               style: TextStyleHelper.instance.title18BoldPlusJakartaSans
                   .copyWith(color: appTheme.gray_50),
             ),
-            SizedBox(height: 8.h),
+            SizedBox(height: 6.h),
             Text(
               subtitle,
               style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                   .copyWith(color: appTheme.blue_gray_300),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 24.h),
+            SizedBox(height: 18.h),
             CustomButton(
               text: 'Create Memory',
               leftIcon: ImageConstant.imgIcon20x20,
               onPressed: () => _onCreateMemoryTap(context),
               buttonStyle: CustomButtonStyle.fillPrimary,
               buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-              height: 44.h,
-              width: 200.h,
-              padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 12.h),
+              height: 40.h,
+              width: 180.h,
+              padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 10.h),
             ),
           ],
         ),
