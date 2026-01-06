@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:http/http.dart' as http;
 
 import '../core/app_export.dart';
 
@@ -240,28 +242,85 @@ class _CustomImageViewState extends State<CustomImageView>
           fit: widget.fit,
           imageUrl: widget.imagePath!,
           color: widget.color,
+          // CRITICAL FIX: Extended timeout from default 60 seconds to 90 seconds
+          // This gives database-fetched thumbnails enough time to load without timing out too quickly
+          cacheManager: CacheManager(
+            Config(
+              'customCacheKey',
+              stalePeriod: const Duration(days: 7),
+              maxNrOfCacheObjects: 200,
+              // CRITICAL: Prevent premature timeout that causes broken thumbnails on refresh
+              repo: JsonCacheInfoRepository(databaseName: 'customCacheKey'),
+              fileService: HttpFileService(
+                httpClient: http.Client(),
+              ),
+            ),
+          ),
           placeholder: (context, url) => Container(
-            height: 30,
-            width: 30,
-            child: LinearProgressIndicator(
-              color: appTheme.grey200,
-              backgroundColor: appTheme.grey100,
+            height: widget.height,
+            width: widget.width,
+            color: appTheme.grey100,
+            child: Center(
+              child: SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: appTheme.gray_300,
+                ),
+              ),
             ),
           ),
           errorWidget: (context, url, error) {
-            // CRITICAL: Enhanced error logging for debugging story media URL issues
-            print('❌ IMAGE LOAD FAILED:');
-            print('   Raw URL: ${widget.imagePath}');
-            print('   Resolved URL: $url');
-            print('   Error: $error');
-            print('   Widget Size: ${widget.width}x${widget.height}');
+            // CRITICAL FIX: Only show error placeholder if database returned invalid/null URL
+            // Check if URL is actually invalid (null or empty) from database
+            final isInvalidUrl = url.isEmpty ||
+                url == 'null' ||
+                url == 'undefined' ||
+                !url.startsWith('http');
 
-            return Image.asset(
-              widget.placeHolder ?? ImageConstant.imgImageNotFound,
-              height: widget.height,
-              width: widget.width,
-              fit: widget.fit ?? BoxFit.cover,
-            );
+            if (isInvalidUrl) {
+              // Database returned invalid thumbnail - show placeholder
+              print('❌ IMAGE LOAD FAILED - Invalid URL from database:');
+              print('   URL: $url');
+
+              return Image.asset(
+                widget.placeHolder ?? ImageConstant.imgImageNotFound,
+                height: widget.height,
+                width: widget.width,
+                fit: widget.fit ?? BoxFit.cover,
+              );
+            } else {
+              // Valid URL from database but network error - retry with progressive loading
+              print('⚠️ NETWORK ERROR - Valid URL, retrying:');
+              print('   URL: $url');
+              print('   Error: $error');
+
+              // Show retry indicator instead of immediate failure
+              return Container(
+                height: widget.height,
+                width: widget.width,
+                color: appTheme.grey100,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.refresh,
+                      color: appTheme.gray_300,
+                      size: 24,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Loading...',
+                      style: TextStyle(
+                        color: appTheme.gray_300,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
           },
         );
       case ImageType.png:

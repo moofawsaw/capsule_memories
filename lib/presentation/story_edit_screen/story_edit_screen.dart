@@ -173,41 +173,8 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
               ],
             ),
 
-            // Next/Share button
-            Consumer(
-              builder: (context, ref, _) {
-                final state = ref.watch(storyEditProvider);
-                return GestureDetector(
-                  onTap:
-                      state.isUploading ? null : () => _onShareStory(context),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 16.h,
-                      vertical: 8.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: appTheme.deep_purple_A100,
-                      borderRadius: BorderRadius.circular(20.h),
-                    ),
-                    child: state.isUploading
-                        ? SizedBox(
-                            height: 16.h,
-                            width: 16.h,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  appTheme.gray_50),
-                            ),
-                          )
-                        : Text(
-                            'Next',
-                            style: TextStyleHelper.instance.body14Bold
-                                .copyWith(color: appTheme.gray_50),
-                          ),
-                  ),
-                );
-              },
-            ),
+            // Empty spacer to maintain layout balance (REMOVED duplicate Next button)
+            SizedBox(width: 72.h),
           ],
         ),
       ),

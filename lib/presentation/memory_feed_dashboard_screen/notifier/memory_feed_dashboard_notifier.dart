@@ -33,12 +33,15 @@ class MemoryFeedDashboardNotifier
     loadInitialData();
     // NEW: Subscribe to real-time story view updates
     _subscribeToStoryViews();
+    // CRITICAL FIX: Enable real-time subscriptions for new stories
+    _setupRealtimeSubscriptions();
   }
 
   /// Load initial data from the database
   Future<void> loadInitialData() async {
     if (_isDisposed) return;
-    _safeSetState(state.copyWith(isLoading: true));
+    _safeSetState(
+        state.copyWith(isLoading: true, isLoadingActiveMemories: true));
 
     try {
       // Fetch active memories for the current user
@@ -225,6 +228,7 @@ class MemoryFeedDashboardNotifier
       _safeSetState(state.copyWith(
         memoryFeedDashboardModel: model,
         isLoading: false,
+        isLoadingActiveMemories: false,
         activeMemories: activeMemoriesData,
         hasMoreHappeningNow: happeningNowData.length == _pageSize,
         hasMoreLatestStories: latestStoriesData.length == _pageSize,
@@ -237,7 +241,8 @@ class MemoryFeedDashboardNotifier
     } catch (e) {
       print('Error loading feed data: $e');
       if (!_isDisposed) {
-        _safeSetState(state.copyWith(isLoading: false));
+        _safeSetState(
+            state.copyWith(isLoading: false, isLoadingActiveMemories: false));
       }
     }
   }
@@ -408,7 +413,10 @@ class MemoryFeedDashboardNotifier
     // NEW: Unsubscribe from real-time updates when notifier is disposed
     _feedService.unsubscribeFromStoryViews();
     _storyViewsSubscription?.unsubscribe();
+    // CRITICAL FIX: Cleanup story and memory subscriptions
+    _cleanupSubscriptions();
     print('✅ SUCCESS: Cleaned up real-time subscriptions in feed notifier');
+    _isDisposed = true;
     super.dispose();
   }
 

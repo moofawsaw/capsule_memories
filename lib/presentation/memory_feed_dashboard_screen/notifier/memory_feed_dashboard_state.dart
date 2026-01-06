@@ -15,6 +15,7 @@ class MemoryFeedDashboardState extends Equatable {
   final List<Map<String, dynamic>> activeMemories;
   final List<Map<String, dynamic>>? categories;
   final bool isLoadingCategories;
+  final bool isLoadingActiveMemories;
 
   MemoryFeedDashboardState({
     this.memoryFeedDashboardModel,
@@ -30,6 +31,7 @@ class MemoryFeedDashboardState extends Equatable {
     this.activeMemories = const [],
     this.categories,
     this.isLoadingCategories = false,
+    this.isLoadingActiveMemories = true,
   });
 
   MemoryFeedDashboardState copyWith({
@@ -46,6 +48,7 @@ class MemoryFeedDashboardState extends Equatable {
     List<Map<String, dynamic>>? activeMemories,
     List<Map<String, dynamic>>? categories,
     bool? isLoadingCategories,
+    bool? isLoadingActiveMemories,
   }) {
     return MemoryFeedDashboardState(
       memoryFeedDashboardModel:
@@ -64,6 +67,8 @@ class MemoryFeedDashboardState extends Equatable {
       activeMemories: activeMemories ?? this.activeMemories,
       categories: categories ?? this.categories,
       isLoadingCategories: isLoadingCategories ?? this.isLoadingCategories,
+      isLoadingActiveMemories:
+          isLoadingActiveMemories ?? this.isLoadingActiveMemories,
     );
   }
 
@@ -82,5 +87,6 @@ class MemoryFeedDashboardState extends Equatable {
         activeMemories,
         categories,
         isLoadingCategories,
+        isLoadingActiveMemories,
       ];
 }

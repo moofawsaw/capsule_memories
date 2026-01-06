@@ -52,21 +52,39 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     _fetchAvailableCategories();
   }
 
-  /// NEW: Initialize with pre-selected category
-  void initializeWithCategory(String categoryId) {
-    // Wait for categories to be loaded before setting selection
-    Future.delayed(Duration(milliseconds: 100), () {
-      final categories = state.createMemoryModel?.availableCategories ?? [];
-      final categoryExists = categories.any((cat) => cat['id'] == categoryId);
+  /// FIXED: Initialize with pre-selected category - now properly waits for categories to load
+  Future<void> initializeWithCategory(String categoryId) async {
+    // Wait for categories to be loaded with timeout
+    int attempts = 0;
+    const maxAttempts = 50; // 50 attempts * 100ms = 5 seconds max wait
 
-      if (categoryExists) {
-        state = state.copyWith(
-          createMemoryModel: state.createMemoryModel?.copyWith(
-            selectedCategory: categoryId,
-          ),
-        );
+    while (attempts < maxAttempts) {
+      final categories = state.createMemoryModel?.availableCategories ?? [];
+
+      if (categories.isNotEmpty) {
+        // Categories loaded - check if the requested category exists
+        final categoryExists = categories.any((cat) => cat['id'] == categoryId);
+
+        if (categoryExists) {
+          state = state.copyWith(
+            createMemoryModel: state.createMemoryModel?.copyWith(
+              selectedCategory: categoryId,
+            ),
+          );
+          print('✅ Category pre-selected: $categoryId');
+          return;
+        } else {
+          print('⚠️ Category $categoryId not found in available categories');
+          return;
+        }
       }
-    });
+
+      // Categories not loaded yet - wait and retry
+      await Future.delayed(Duration(milliseconds: 100));
+      attempts++;
+    }
+
+    print('⚠️ Timeout waiting for categories to load');
   }
 
   /// Fetch available groups from Supabase

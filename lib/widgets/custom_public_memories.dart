@@ -228,6 +228,21 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     _loadTimelineData();
   }
 
+  // ✅ CRITICAL FIX: Reload timeline when memory ID changes
+  @override
+  void didUpdateWidget(covariant _PublicMemoryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Only reload if the memory ID actually changed
+    if (oldWidget.memory.id != widget.memory.id) {
+      setState(() {
+        _isLoadingTimeline = true;
+        _timelineStories = [];
+      });
+      _loadTimelineData();
+    }
+  }
+
   Future<void> _loadTimelineData() async {
     if (widget.memory.id == null || widget.memory.id!.isEmpty) {
       if (!mounted) return;

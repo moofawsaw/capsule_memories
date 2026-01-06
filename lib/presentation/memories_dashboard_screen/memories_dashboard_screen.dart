@@ -46,21 +46,27 @@ class _MemoriesDashboardScreenState
         backgroundColor: appTheme.gray_900_02,
         body: RefreshIndicator(
           onRefresh: () async {
-            ref.read(memoriesDashboardNotifier.notifier).refreshMemories();
+            await ref
+                .read(memoriesDashboardNotifier.notifier)
+                .refreshMemories();
           },
           color: appTheme.deep_purple_A100,
           backgroundColor: appTheme.gray_900_01,
-          child: Container(
-            width: double.maxFinite,
-            child: Column(
-              children: [
-                _buildMemoriesHeader(context),
-                _buildLatestStoriesSection(context),
-                _buildTabSection(context),
-                Expanded(
-                  child: _buildMemoriesContent(context),
-                ),
-              ],
+          child: SingleChildScrollView(
+            physics: AlwaysScrollableScrollPhysics(),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height -
+                    MediaQuery.of(context).padding.top,
+              ),
+              child: Column(
+                children: [
+                  _buildMemoriesHeader(context),
+                  _buildLatestStoriesSection(context),
+                  _buildTabSection(context),
+                  _buildMemoriesContent(context),
+                ],
+              ),
             ),
           ),
         ),
@@ -229,134 +235,127 @@ class _MemoriesDashboardScreenState
         final selectedOwnership = state.selectedOwnership ?? 'created';
         final selectedState = state.selectedState ?? 'all';
 
-        return SizedBox(
+        return Container(
           width: MediaQuery.of(context).size.width,
-          child: Container(
-            margin: EdgeInsets.fromLTRB(
-              16,
-              24,
-              16,
-              0,
-            ),
-            child: Row(
-              children: [
-                // Ownership Toggle (left side)
-                Expanded(
-                  child: Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
-                    decoration: BoxDecoration(
-                      color: appTheme.gray_900_02.withAlpha(128),
-                      borderRadius: BorderRadius.circular(24.h),
-                      border: Border.all(
-                        color: appTheme.blue_gray_300.withAlpha(51),
-                        width: 1.0,
-                      ),
+          margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
+          child: Row(
+            children: [
+              // Ownership Toggle (left side) - wrapped in Flexible instead of Expanded
+              Flexible(
+                flex: 7,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_02.withAlpha(128),
+                    borderRadius: BorderRadius.circular(24.h),
+                    border: Border.all(
+                      color: appTheme.blue_gray_300.withAlpha(51),
+                      width: 1.0,
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => _onOwnershipTap(context, 'created'),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12.h,
-                                vertical: 10.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: selectedOwnership == 'created'
-                                    ? appTheme.deep_purple_A100
-                                    : appTheme.transparentCustom,
-                                borderRadius: BorderRadius.circular(20.h),
-                              ),
-                              child: Text(
-                                'Created by Me',
-                                textAlign: TextAlign.center,
-                                style: selectedOwnership == 'created'
-                                    ? TextStyleHelper
-                                        .instance.body14BoldPlusJakartaSans
-                                        .copyWith(color: appTheme.gray_900_02)
-                                    : TextStyleHelper
-                                        .instance.body14RegularPlusJakartaSans
-                                        .copyWith(
-                                            color: appTheme.gray_50
-                                                .withAlpha(179)),
-                              ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _onOwnershipTap(context, 'created'),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12.h,
+                              vertical: 10.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selectedOwnership == 'created'
+                                  ? appTheme.deep_purple_A100
+                                  : appTheme.transparentCustom,
+                              borderRadius: BorderRadius.circular(20.h),
+                            ),
+                            child: Text(
+                              'Created by Me',
+                              textAlign: TextAlign.center,
+                              style: selectedOwnership == 'created'
+                                  ? TextStyleHelper
+                                      .instance.body14BoldPlusJakartaSans
+                                      .copyWith(color: appTheme.gray_900_02)
+                                  : TextStyleHelper
+                                      .instance.body14RegularPlusJakartaSans
+                                      .copyWith(
+                                          color:
+                                              appTheme.gray_50.withAlpha(179)),
                             ),
                           ),
                         ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => _onOwnershipTap(context, 'joined'),
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 12.h,
-                                vertical: 10.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: selectedOwnership == 'joined'
-                                    ? appTheme.deep_purple_A100
-                                    : appTheme.transparentCustom,
-                                borderRadius: BorderRadius.circular(20.h),
-                              ),
-                              child: Text(
-                                'Joined',
-                                textAlign: TextAlign.center,
-                                style: selectedOwnership == 'joined'
-                                    ? TextStyleHelper
-                                        .instance.body14BoldPlusJakartaSans
-                                        .copyWith(color: appTheme.gray_900_02)
-                                    : TextStyleHelper
-                                        .instance.body14RegularPlusJakartaSans
-                                        .copyWith(
-                                            color: appTheme.gray_50
-                                                .withAlpha(179)),
-                              ),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _onOwnershipTap(context, 'joined'),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 12.h,
+                              vertical: 10.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selectedOwnership == 'joined'
+                                  ? appTheme.deep_purple_A100
+                                  : appTheme.transparentCustom,
+                              borderRadius: BorderRadius.circular(20.h),
+                            ),
+                            child: Text(
+                              'Joined',
+                              textAlign: TextAlign.center,
+                              style: selectedOwnership == 'joined'
+                                  ? TextStyleHelper
+                                      .instance.body14BoldPlusJakartaSans
+                                      .copyWith(color: appTheme.gray_900_02)
+                                  : TextStyleHelper
+                                      .instance.body14RegularPlusJakartaSans
+                                      .copyWith(
+                                          color:
+                                              appTheme.gray_50.withAlpha(179)),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                SizedBox(width: 12.h),
-
-                // State Dropdown (right side)
-                GestureDetector(
-                  onTap: () => _showStateDropdown(context),
-                  child: Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
-                    decoration: BoxDecoration(
-                      color: appTheme.gray_900_02.withAlpha(128),
-                      borderRadius: BorderRadius.circular(24.h),
-                      border: Border.all(
-                        color: appTheme.blue_gray_300.withAlpha(51),
-                        width: 1.0,
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _getStateLabel(selectedState),
-                          style: TextStyleHelper
-                              .instance.body14RegularPlusJakartaSans
-                              .copyWith(color: appTheme.gray_50),
-                        ),
-                        SizedBox(width: 6.h),
-                        Icon(
-                          Icons.keyboard_arrow_down,
-                          size: 18.h,
-                          color: appTheme.gray_50,
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+
+              SizedBox(width: 12.h),
+
+              // State Dropdown (right side)
+              GestureDetector(
+                onTap: () => _showStateDropdown(context),
+                child: Container(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_02.withAlpha(128),
+                    borderRadius: BorderRadius.circular(24.h),
+                    border: Border.all(
+                      color: appTheme.blue_gray_300.withAlpha(51),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _getStateLabel(selectedState),
+                        style: TextStyleHelper
+                            .instance.body14RegularPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                      ),
+                      SizedBox(width: 6.h),
+                      Icon(
+                        Icons.keyboard_arrow_down,
+                        size: 18.h,
+                        color: appTheme.gray_50,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -376,8 +375,9 @@ class _MemoriesDashboardScreenState
             if (current.isLoading == false && current.isSuccess == true) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Memories loaded successfully'),
+                  content: Text('Memories refreshed'),
                   backgroundColor: appTheme.colorFF52D1,
+                  duration: Duration(seconds: 1),
                 ),
               );
             }
@@ -464,12 +464,10 @@ class _MemoriesDashboardScreenState
           final memory = convertedMemories[index];
           final memoryItem = memoryItems[index];
           return Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 0,
-            ),
             margin: EdgeInsets.only(
-                right: index == convertedMemories.length - 1 ? 0 : 12.h),
+              left: index == 0 ? 24.h : 0,
+              right: 12.h,
+            ),
             child: unified_widget.CustomPublicMemories(
               sectionTitle: null,
               sectionIcon: null,

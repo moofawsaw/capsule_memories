@@ -20,18 +20,25 @@ class CreateMemoryScreen extends ConsumerStatefulWidget {
 
 class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    // Initialize with pre-selected category if provided
+    // FIXED: Initialize with pre-selected category if provided - now async
     if (widget.preSelectedCategoryId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await ref
             .read(createMemoryNotifier.notifier)
             .initializeWithCategory(widget.preSelectedCategoryId!);
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -40,56 +47,63 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
       builder: (context, ref, _) {
         final state = ref.watch(createMemoryNotifier);
         final currentStep = state.currentStep ?? 1;
+        final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
         return Material(
           color: Colors.transparent,
-          child: Container(
-            width: double.maxFinite,
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_02,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20.h),
-                topRight: Radius.circular(20.h),
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: 12.h),
-                // Drag handle indicator
-                Container(
-                  width: 48.h,
-                  height: 5.h,
-                  decoration: BoxDecoration(
-                    color: appTheme.colorFF3A3A,
-                    borderRadius: BorderRadius.circular(2.5),
-                  ),
+          child: AnimatedPadding(
+            padding: EdgeInsets.only(bottom: keyboardHeight),
+            duration: Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            child: Container(
+              width: double.maxFinite,
+              decoration: BoxDecoration(
+                color: appTheme.gray_900_02,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20.h),
+                  topRight: Radius.circular(20.h),
                 ),
-                SizedBox(height: 20.h),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: 20.h),
-                    child: Form(
-                      key: _formKey,
-                      child: AnimatedSwitcher(
-                        duration: Duration(milliseconds: 300),
-                        switchInCurve: Curves.easeInOut,
-                        switchOutCurve: Curves.easeInOut,
-                        transitionBuilder:
-                            (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: child,
-                          );
-                        },
-                        child: currentStep == 1
-                            ? _buildStep1Content(context)
-                            : _buildStep2Content(context),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 12.h),
+                  // Drag handle indicator
+                  Container(
+                    width: 48.h,
+                    height: 5.h,
+                    decoration: BoxDecoration(
+                      color: appTheme.colorFF3A3A,
+                      borderRadius: BorderRadius.circular(2.5),
+                    ),
+                  ),
+                  SizedBox(height: 20.h),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      padding: EdgeInsets.symmetric(horizontal: 20.h),
+                      child: Form(
+                        key: _formKey,
+                        child: AnimatedSwitcher(
+                          duration: Duration(milliseconds: 300),
+                          switchInCurve: Curves.easeInOut,
+                          switchOutCurve: Curves.easeInOut,
+                          transitionBuilder:
+                              (Widget child, Animation<double> animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                          child: currentStep == 1
+                              ? _buildStep1Content(context)
+                              : _buildStep2Content(context),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -252,7 +266,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  /// NEW: Category Selection Section
+  /// FIXED: Category Selection Section - removed preview badge, dropdown shows selection
   Widget _buildCategorySection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -311,12 +325,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                       rightIcon: ImageConstant.imgIconBlueGray30022x18,
                       margin: EdgeInsets.zero,
                     ),
-              if (selectedCategory != null)
-                Padding(
-                  padding: EdgeInsets.only(top: 8.h),
-                  child: _buildCategoryPreview(
-                      context, availableCategories, selectedCategory),
-                ),
             ],
           ),
         );
@@ -353,68 +361,19 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     }).toList();
   }
 
-  /// NEW: Build category preview
-  Widget _buildCategoryPreview(BuildContext context,
-      List<Map<String, dynamic>> categories, String selectedCategoryId) {
-    final category = categories.firstWhere(
-      (cat) => cat['id'] == selectedCategoryId,
-      orElse: () => <String, dynamic>{},
-    );
-
-    if (category.isEmpty) return SizedBox.shrink();
-
-    return Container(
-      padding: EdgeInsets.all(12.h),
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_01,
-        borderRadius: BorderRadius.circular(8.h),
-        border: Border.all(color: appTheme.deep_purple_A100.withAlpha(77)),
-      ),
-      child: Row(
-        children: [
-          if (category['icon_url'] != null)
-            Container(
-              margin: EdgeInsets.only(right: 12.h),
-              child: CustomImageView(
-                imagePath: category['icon_url'] as String,
-                height: 32.h,
-                width: 32.h,
-              ),
-            ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  category['name'] as String,
-                  style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                      .copyWith(
-                    color: appTheme.gray_50,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (category['tagline'] != null)
-                  Padding(
-                    padding: EdgeInsets.only(top: 4.h),
-                    child: Text(
-                      category['tagline'] as String,
-                      style: TextStyleHelper
-                          .instance.body12MediumPlusJakartaSans
-                          .copyWith(
-                        color: appTheme.blue_gray_300,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Step 2: Invite People
   Widget _buildStep2Content(BuildContext context) {
+    // Scroll to bottom when search field is focused
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
     return Column(
       key: ValueKey('step2'),
       mainAxisSize: MainAxisSize.min,
@@ -711,6 +670,18 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             controller: state.searchController,
             onChanged: (value) {
               ref.read(createMemoryNotifier.notifier).updateSearchQuery(value);
+            },
+            onTap: () {
+              // Scroll to show the search field when tapped
+              Future.delayed(Duration(milliseconds: 400), () {
+                if (_scrollController.hasClients) {
+                  _scrollController.animateTo(
+                    _scrollController.position.maxScrollExtent,
+                    duration: Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                }
+              });
             },
             style:
                 TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(

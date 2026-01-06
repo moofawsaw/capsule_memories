@@ -411,6 +411,7 @@ class _FloatingReactionAnimationState extends State<FloatingReactionAnimation>
                   widget.emoji,
                   style: TextStyle(
                     fontSize: 40.fSize,
+                    decoration: TextDecoration.none,
                   ),
                 ),
               ),
