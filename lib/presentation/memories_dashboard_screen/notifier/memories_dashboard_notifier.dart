@@ -32,7 +32,20 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   }
 
   void initialize() async {
-    state = state.copyWith(isLoading: true);
+    // FIXED: Simplified initialization - always load if empty, don't block on existing data
+    final hasData = state.memoriesDashboardModel?.memoryItems != null &&
+        (state.memoriesDashboardModel?.memoryItems?.isNotEmpty ?? false);
+
+    if (hasData && !(state.isLoading ?? false)) {
+      print(
+          '🔍 MEMORIES DEBUG: Dashboard already has data and not loading, skipping initialization');
+      return;
+    }
+
+    // FIXED: Only set loading if we don't have data yet
+    if (!hasData) {
+      state = state.copyWith(isLoading: true);
+    }
 
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
@@ -155,6 +168,17 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     return finalFiltered;
   }
 
+  /// NEW METHOD: Get count of memories for specific ownership filter
+  int getOwnershipCount(String userId, String ownership) {
+    final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
+
+    if (ownership == 'created') {
+      return allMemories.where((m) => m.creatorId == userId).length;
+    } else {
+      return allMemories.where((m) => m.creatorId != userId).length;
+    }
+  }
+
   void loadAllStories() async {
     state = state.copyWith(isLoading: true);
 
@@ -180,7 +204,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   }
 
   Future<void> refreshMemories() async {
-    state = state.copyWith(isLoading: true);
+    // FIXED: Don't set loading state during refresh - just update data silently
+    print('🔄 MEMORIES DEBUG: Refreshing memories...');
 
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
@@ -188,15 +213,21 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         // Force refresh cache
         await _cacheService.refreshMemoryCache(currentUser.id);
         await _loadFromCache(currentUser.id);
-      }
 
-      state = state.copyWith(
-        isLoading: false,
-        isSuccess: true,
-      );
+        print('✅ MEMORIES DEBUG: Memories refreshed successfully');
+
+        // Show success feedback
+        state = state.copyWith(isSuccess: true);
+
+        // Reset success flag after short delay
+        Future.delayed(Duration(milliseconds: 500), () {
+          if (!_isDisposed) {
+            state = state.copyWith(isSuccess: false);
+          }
+        });
+      }
     } catch (e) {
-      print('Error refreshing memories: $e');
-      state = state.copyWith(isLoading: false);
+      print('❌ MEMORIES DEBUG: Error refreshing memories: $e');
     }
   }
 

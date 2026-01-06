@@ -488,6 +488,15 @@ class MemoryCacheService {
         );
       }));
 
+      // FIXED: Sort memories by creation date descending (newest first)
+      allMemories.sort((a, b) {
+        final dateA = a.createdAt ?? DateTime.now();
+        final dateB = b.createdAt ?? DateTime.now();
+        return dateB.compareTo(dateA); // Descending order - newest first
+      });
+
+      print('✅ CACHE: Sorted ${allMemories.length} memories by newest first');
+
       return allMemories;
     } catch (e) {
       print('❌ CACHE: Error loading user memories: $e');

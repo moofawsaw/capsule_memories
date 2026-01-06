@@ -25,7 +25,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   @override
   void initState() {
     super.initState();
-    // FIXED: Initialize with pre-selected category if provided - now async
+    // Initialize with pre-selected category if provided
     if (widget.preSelectedCategoryId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await ref
@@ -46,64 +46,58 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(createMemoryNotifier);
-        final currentStep = state.currentStep ?? 1;
-        final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
         return Material(
           color: Colors.transparent,
-          child: AnimatedPadding(
-            padding: EdgeInsets.only(bottom: keyboardHeight),
-            duration: Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-            child: Container(
-              width: double.maxFinite,
-              decoration: BoxDecoration(
-                color: appTheme.gray_900_02,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20.h),
-                  topRight: Radius.circular(20.h),
-                ),
+          child: Container(
+            width: double.maxFinite,
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_02,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20.h),
+                topRight: Radius.circular(20.h),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(height: 12.h),
-                  // Drag handle indicator
-                  Container(
-                    width: 48.h,
-                    height: 5.h,
-                    decoration: BoxDecoration(
-                      color: appTheme.colorFF3A3A,
-                      borderRadius: BorderRadius.circular(2.5),
-                    ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(height: 12.h),
+                // Drag handle indicator
+                Container(
+                  width: 48.h,
+                  height: 5.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.colorFF3A3A,
+                    borderRadius: BorderRadius.circular(2.5),
                   ),
-                  SizedBox(height: 20.h),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      controller: _scrollController,
-                      padding: EdgeInsets.symmetric(horizontal: 20.h),
-                      child: Form(
-                        key: _formKey,
-                        child: AnimatedSwitcher(
-                          duration: Duration(milliseconds: 300),
-                          switchInCurve: Curves.easeInOut,
-                          switchOutCurve: Curves.easeInOut,
-                          transitionBuilder:
-                              (Widget child, Animation<double> animation) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: child,
-                            );
-                          },
-                          child: currentStep == 1
-                              ? _buildStep1Content(context)
-                              : _buildStep2Content(context),
-                        ),
+                ),
+                SizedBox(height: 20.h),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(horizontal: 20.h),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CustomHeaderSection(
+                            title: 'Create Memory',
+                            description:
+                                'Invite-only. Every perspective. One timeline. Replay forever',
+                            margin: EdgeInsets.only(left: 10.h, right: 10.h),
+                          ),
+                          _buildNameSection(context),
+                          _buildDurationSelector(context),
+                          _buildCategorySection(context),
+                          _buildPrivacySettings(context),
+                          _buildActionButtons(context),
+                          SizedBox(height: 20.h),
+                        ],
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -939,5 +933,90 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         child: Text(group['name'] as String),
       );
     }).toList();
+  }
+
+  /// Action Buttons - Create memory directly
+  Widget _buildActionButtons(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(createMemoryNotifier);
+
+        // Listen for navigation to confirmation screen
+        ref.listen(
+          createMemoryNotifier,
+          (previous, current) {
+            // FIXED: Close bottom sheet first, then navigate to confirmation
+            if (current.shouldNavigateToConfirmation ?? false) {
+              // Close the create memory bottom sheet
+              Navigator.of(context).pop();
+
+              // Navigate to confirmation screen with memory details
+              Future.delayed(Duration(milliseconds: 200), () {
+                NavigatorService.pushNamed(
+                  '/memory-confirmation-screen',
+                  arguments: {
+                    'memory_id': current.createdMemoryId,
+                    'memory_name': current.memoryNameController?.text.trim(),
+                  },
+                );
+              });
+            }
+
+            // Show error messages
+            if (current.errorMessage != null &&
+                previous?.errorMessage != current.errorMessage) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(current.errorMessage!),
+                  backgroundColor: appTheme.colorFFD81E,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            }
+          },
+        );
+
+        return Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(top: 20.h),
+          child: Row(
+            spacing: 12.h,
+            children: [
+              Expanded(
+                child: CustomButton(
+                  text: 'Cancel',
+                  onPressed: () {
+                    ref.read(createMemoryNotifier.notifier).onCancelPressed();
+                  },
+                  buttonStyle: CustomButtonStyle.fillDark,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                ),
+              ),
+              Expanded(
+                child: CustomButton(
+                  text: state.isLoading ? 'Creating...' : 'Create Memory',
+                  onPressed: state.isLoading
+                      ? null
+                      : () {
+                          if (_formKey.currentState?.validate() ?? false) {
+                            ref
+                                .read(createMemoryNotifier.notifier)
+                                .createMemory();
+                          }
+                        },
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  isDisabled: state.isLoading,
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

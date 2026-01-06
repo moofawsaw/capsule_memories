@@ -4,10 +4,12 @@ class CreateMemoryState {
   final CreateMemoryModel? createMemoryModel;
   final TextEditingController? memoryNameController;
   final TextEditingController? searchController;
-  final bool? isLoading;
+  final bool isLoading;
   final int? currentStep;
   final bool? shouldNavigateToInvite;
   final bool? shouldNavigateBack;
+  final bool? shouldNavigateToConfirmation;
+  final String? createdMemoryId;
   final String? errorMessage;
 
   CreateMemoryState({
@@ -15,9 +17,11 @@ class CreateMemoryState {
     this.memoryNameController,
     this.searchController,
     this.isLoading = false,
-    this.currentStep = 1,
-    this.shouldNavigateToInvite = false,
-    this.shouldNavigateBack = false,
+    this.currentStep,
+    this.shouldNavigateToInvite,
+    this.shouldNavigateBack,
+    this.shouldNavigateToConfirmation,
+    this.createdMemoryId,
     this.errorMessage,
   });
 
@@ -29,6 +33,8 @@ class CreateMemoryState {
     int? currentStep,
     bool? shouldNavigateToInvite,
     bool? shouldNavigateBack,
+    bool? shouldNavigateToConfirmation,
+    String? createdMemoryId,
     String? errorMessage,
   }) {
     return CreateMemoryState(
@@ -40,6 +46,9 @@ class CreateMemoryState {
       shouldNavigateToInvite:
           shouldNavigateToInvite ?? this.shouldNavigateToInvite,
       shouldNavigateBack: shouldNavigateBack ?? this.shouldNavigateBack,
+      shouldNavigateToConfirmation:
+          shouldNavigateToConfirmation ?? this.shouldNavigateToConfirmation,
+      createdMemoryId: createdMemoryId ?? this.createdMemoryId,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }

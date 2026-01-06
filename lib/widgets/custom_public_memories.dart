@@ -1,7 +1,9 @@
 import '../core/app_export.dart';
 import '../services/avatar_helper_service.dart';
+import '../services/memory_members_service.dart';
 import '../services/story_service.dart';
 import '../services/supabase_service.dart';
+import './custom_button.dart';
 import './custom_image_view.dart';
 import './custom_memory_skeleton.dart';
 import './timeline_widget.dart';
@@ -212,11 +214,14 @@ class _PublicMemoryCard extends StatefulWidget {
 
 class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   final StoryService _storyService = StoryService();
+  final MemoryMembersService _membersService = MemoryMembersService();
 
   List<TimelineStoryItem> _timelineStories = <TimelineStoryItem>[];
   DateTime? _memoryStartTime;
   DateTime? _memoryEndTime;
   bool _isLoadingTimeline = true;
+  bool _isUserCreatedMemory = false;
+  int _memberCount = 0;
 
   // Parent-card horizontal padding applied around the timeline area
   // (this is what keeps markers away from card edges).
@@ -225,7 +230,56 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   @override
   void initState() {
     super.initState();
+    _checkMemoryOwnership();
     _loadTimelineData();
+    _fetchMemberCount();
+  }
+
+  // Check if current user is the creator of this memory
+  Future<void> _checkMemoryOwnership() async {
+    try {
+      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+      if (currentUser == null || widget.memory.id == null) {
+        setState(() => _isUserCreatedMemory = false);
+        return;
+      }
+
+      final dynamic memoryResponse = await SupabaseService.instance.client
+          ?.from('memories')
+          .select('user_id')
+          .eq('id', widget.memory.id!)
+          .single();
+
+      if (memoryResponse != null && mounted) {
+        setState(() {
+          _isUserCreatedMemory = memoryResponse['user_id'] == currentUser.id;
+        });
+      }
+    } catch (e) {
+      print('❌ Error checking memory ownership: $e');
+      if (mounted) {
+        setState(() => _isUserCreatedMemory = false);
+      }
+    }
+  }
+
+  // Fetch count of members (excluding creator)
+  Future<void> _fetchMemberCount() async {
+    if (widget.memory.id == null || widget.memory.id!.isEmpty) {
+      if (mounted) setState(() => _memberCount = 0);
+      return;
+    }
+
+    try {
+      final members =
+          await _membersService.fetchMemoryMembers(widget.memory.id!);
+      if (mounted) {
+        setState(() => _memberCount = members.length);
+      }
+    } catch (e) {
+      print('❌ Error fetching member count: $e');
+      if (mounted) setState(() => _memberCount = 0);
+    }
   }
 
   // ✅ CRITICAL FIX: Reload timeline when memory ID changes
@@ -415,16 +469,18 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   }
 
   Widget _buildMemoryTimeline() {
-    // IMPORTANT: no per-card skeleton shimmer (performance). Keep height stable.
+    // Show skeleton content while loading to guide users on what's missing
     if (_isLoadingTimeline) {
-      return SizedBox(
-        height: 200.h,
-        child: const SizedBox.shrink(),
-      );
+      return _buildTimelineSkeleton();
     }
 
-    // Empty state keeps the SAME left/right padding as the real timeline
+    // Empty state with conditional buttons based on member/story status
     if (_timelineStories.isEmpty) {
+      if (_isUserCreatedMemory) {
+        return _buildUserCreatedEmptyState();
+      }
+
+      // Default empty state for joined memories
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
         child: Container(
@@ -457,6 +513,182 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         ),
       ),
     );
+  }
+
+  /// Build timeline skeleton to show what's missing
+  Widget _buildTimelineSkeleton() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 8.h),
+        padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 16.h),
+        height: 180.h,
+        child: Column(
+          children: [
+            // Timeline progress bar skeleton
+            Container(
+              height: 4.h,
+              decoration: BoxDecoration(
+                color: appTheme.blue_gray_300.withAlpha(51),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            SizedBox(height: 24.h),
+            // Date markers skeleton (start, middle, end)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildDateMarkerSkeleton(),
+                _buildDateMarkerSkeleton(),
+                _buildDateMarkerSkeleton(),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build individual date marker skeleton
+  Widget _buildDateMarkerSkeleton() {
+    return Column(
+      children: [
+        Container(
+          width: 2,
+          height: 8.h,
+          color: appTheme.blue_gray_300.withAlpha(51),
+        ),
+        SizedBox(height: 6.h),
+        Container(
+          width: 60.h,
+          height: 14.h,
+          decoration: BoxDecoration(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(height: 6.h),
+        Container(
+          width: 50.h,
+          height: 12.h,
+          decoration: BoxDecoration(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build empty state for user-created memories with conditional buttons
+  Widget _buildUserCreatedEmptyState() {
+    // Determine which button to show based on member and story count
+    final bool hasNoMembers = _memberCount == 0;
+    final bool hasNoStories = _timelineStories.isEmpty;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 8.h),
+        padding: EdgeInsets.all(20.h),
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_02.withAlpha(128),
+          borderRadius: BorderRadius.circular(16.h),
+          border: Border.all(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            width: 1.0,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Show timeline skeleton if memory isn't built out yet
+            if (hasNoStories && !hasNoMembers) ...[
+              _buildTimelineSkeleton(),
+              SizedBox(height: 12.h),
+            ],
+
+            CustomImageView(
+              imagePath: ImageConstant.imgPlayCircle,
+              height: 48.h,
+              width: 48.h,
+              color: appTheme.blue_gray_300,
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              hasNoMembers ? 'No members yet' : 'No stories yet',
+              style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+            SizedBox(height: 6.h),
+            Text(
+              hasNoMembers
+                  ? 'Invite people to join this memory'
+                  : 'Create your first story',
+              style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 20.h),
+
+            // Conditional button rendering
+            if (hasNoMembers)
+              // Show only invite button if no members
+              CustomButton(
+                text: 'Invite',
+                leftIcon: ImageConstant.imgIconWhiteA700,
+                onPressed: () => _onInviteTap(),
+                buttonStyle: CustomButtonStyle.fillPrimary,
+                buttonTextStyle: CustomButtonTextStyle.bodySmall,
+                height: 40.h,
+                padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
+              )
+            else
+              // Show create story button if members exist but no stories
+              CustomButton(
+                text: 'Create Story',
+                leftIcon: ImageConstant.imgPlayCircle,
+                onPressed: () => _onCreateStoryTap(),
+                buttonStyle: CustomButtonStyle.fillPrimary,
+                buttonTextStyle: CustomButtonTextStyle.bodySmall,
+                height: 40.h,
+                padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Handle invite button tap
+  void _onInviteTap() {
+    if (widget.memory.id != null) {
+      NavigatorService.pushNamed(
+        AppRoutes.appBsMembers,
+        arguments: widget.memory.id,
+      );
+    }
+  }
+
+  /// Handle create story button tap
+  void _onCreateStoryTap() {
+    if (widget.memory.id != null) {
+      // Navigate to story creation screen with memory context
+      NavigatorService.pushNamed(
+        AppRoutes.appBsUpload,
+        arguments: widget.memory.id,
+      );
+    }
+  }
+
+  /// Handle edit button tap
+  void _onEditTap() {
+    if (widget.memory.id != null) {
+      NavigatorService.pushNamed(
+        AppRoutes.appBsDetails,
+        arguments: widget.memory.id,
+      );
+    }
   }
 
   @override

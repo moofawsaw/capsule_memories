@@ -24,6 +24,7 @@ import '../presentation/hangout_call_screen/hangout_call_screen.dart';
 import '../presentation/invite_people_screen/invite_people_screen.dart';
 import '../presentation/login_screen/login_screen.dart';
 import '../presentation/memories_dashboard_screen/memories_dashboard_screen.dart';
+import '../presentation/memory_confirmation_screen/memory_confirmation_screen.dart';
 import '../presentation/memory_details_screen/memory_details_screen.dart';
 import '../presentation/memory_details_view_screen/memory_details_view_screen.dart';
 import '../presentation/memory_feed_dashboard_screen/memory_feed_dashboard_screen.dart';
@@ -114,6 +115,7 @@ class AppRoutes {
   static const String qrCodeShareScreenTwo = '/qr-code-share-screen-two';
   static const String qrTimelineShare = '/qr-timeline-share';
   static const String memoryShareOptionsScreen = '/memory-share-options-screen';
+  static const String memoryConfirmationScreen = '/memory-confirmation-screen';
   static const String qrScannerScreen = '/qr-scanner-screen';
   static const String friendRequestConfirmationDialog =
       '/friend-request-confirmation-dialog';
@@ -366,6 +368,7 @@ class AppRoutes {
           );
         },
         memoryShareOptionsScreen: (context) => const MemoryShareOptionsScreen(),
+        memoryConfirmationScreen: (context) => const MemoryConfirmationScreen(),
         qrScannerScreen: (context) => const QRScannerScreen(),
         friendRequestConfirmationDialog: (context) =>
             const FriendRequestConfirmationDialog(),
@@ -388,6 +391,8 @@ class AppRouter {
     },
     AppRoutes.memoryShareOptionsScreen: (context) =>
         const MemoryShareOptionsScreen(),
+    AppRoutes.memoryConfirmationScreen: (context) =>
+        const MemoryConfirmationScreen(),
     AppRoutes.qrScannerScreen: (context) => const QRScannerScreen(),
     AppRoutes.friendRequestConfirmationDialog: (context) =>
         const FriendRequestConfirmationDialog(),

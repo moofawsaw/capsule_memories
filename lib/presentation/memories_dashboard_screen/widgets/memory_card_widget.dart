@@ -134,6 +134,8 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
       onTap: widget.onTap,
       child: Container(
         width: 300.h,
+        height: 280
+            .h, // FIXED HEIGHT: Ensures all cards are same height regardless of text wrapping
         decoration: BoxDecoration(
           color: appTheme.gray_900_01,
           borderRadius: BorderRadius.circular(20.h),
@@ -151,6 +153,8 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
 
   Widget _buildEventHeader() {
     return Container(
+      height: 88
+          .h, // FIXED HEIGHT: Accommodates text wrapping without expanding card
       padding: EdgeInsets.all(18.h),
       decoration: BoxDecoration(
         color: appTheme.color3BD81E,
@@ -180,11 +184,14 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
               onTap: () => _handleTitleTap(context),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     widget.memoryItem.title ?? 'Nixon Wedding 2025',
                     style: TextStyleHelper.instance.title16BoldPlusJakartaSans
                         .copyWith(color: appTheme.gray_50),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   SizedBox(height: 4.h),
                   Text(
@@ -371,13 +378,15 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 4.h),
       child: TimelineStoryWidget(
-        item: _timelineStories.isNotEmpty ? _timelineStories.first : TimelineStoryItem(
-          backgroundImage: '',
-          userAvatar: '',
-          postedAt: DateTime.now(),
-          timeLabel: '',
-          storyId: '',
-        ),
+        item: _timelineStories.isNotEmpty
+            ? _timelineStories.first
+            : TimelineStoryItem(
+                backgroundImage: '',
+                userAvatar: '',
+                postedAt: DateTime.now(),
+                timeLabel: '',
+                storyId: '',
+              ),
         onTap: () {
           // CRITICAL FIX: Navigate directly to timeline instead of opening bottom sheet
           print(

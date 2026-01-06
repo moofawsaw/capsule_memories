@@ -33,6 +33,8 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       currentStep: 1,
       shouldNavigateToInvite: false,
       shouldNavigateBack: false,
+      shouldNavigateToConfirmation: false,
+      createdMemoryId: null,
       createMemoryModel: CreateMemoryModel(
         isPublic: true,
         memoryName: null,
@@ -349,7 +351,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     final duration = state.createMemoryModel?.selectedDuration ?? '12_hours';
 
     // Set loading state
-    state = state.copyWith(isLoading: true);
+    state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
       // Get current user
@@ -358,53 +360,18 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         throw Exception('User not authenticated');
       }
 
-      // Get invited user IDs (from selected group members + manually invited users)
-      final Set<String> invitedUserIds = {};
-
-      // Helper function to validate UUID format
-      bool isValidUUID(String? value) {
-        if (value == null || value.isEmpty) return false;
-        final uuidRegex = RegExp(
-          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-          caseSensitive: false,
-        );
-        return uuidRegex.hasMatch(value);
-      }
-
-      // Add group members if a group is selected
-      if (state.createMemoryModel?.selectedGroup != null) {
-        final groupMembers = state.createMemoryModel?.groupMembers ?? [];
-        for (final member in groupMembers) {
-          final userId = member['id'] as String?;
-          // Only add valid UUIDs and exclude current user
-          if (userId != null &&
-              userId != currentUser.id &&
-              isValidUUID(userId)) {
-            invitedUserIds.add(userId);
-          }
-        }
-      }
-
-      // Add manually invited users (filter out invalid UUIDs like mock user IDs)
-      final manuallyInvited = state.createMemoryModel?.invitedUserIds ?? {};
-      for (final userId in manuallyInvited) {
-        if (isValidUUID(userId) && userId != currentUser.id) {
-          invitedUserIds.add(userId);
-        }
-      }
-
       // Determine visibility
       final visibility =
           state.createMemoryModel?.isPublic == true ? 'public' : 'private';
 
-      // Create memory in database with category_id and selected duration
+      // Create memory in database (without any invites initially)
       final memoryId = await _storyService.createMemory(
         title: memoryName,
         creatorId: currentUser.id,
         visibility: visibility,
         duration: duration,
         categoryId: categoryId,
-        invitedUserIds: invitedUserIds.toList(),
+        invitedUserIds: [], // Empty - invites will be sent from confirmation screen
       );
 
       if (memoryId == null) {
@@ -416,31 +383,41 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       // Refresh cache to include new memory
       await _cacheService.refreshMemoryCache(currentUser.id);
 
-      // Reset state and close bottom sheet
-      state.memoryNameController?.clear();
-
+      // FIXED: Don't clear form until navigation is set up properly
+      // Set navigation flag with memory details
       state = state.copyWith(
         isLoading: false,
-        shouldNavigateBack: true,
-        currentStep: 1,
-        createMemoryModel: CreateMemoryModel(
-          isPublic: true,
-          memoryName: null,
-          selectedGroup: null,
-          selectedCategory: null,
-          selectedDuration: '12_hours',
-        ),
+        shouldNavigateToConfirmation: true,
+        createdMemoryId: memoryId,
+        errorMessage: null,
       );
 
-      // Reset navigation flag
-      Future.delayed(Duration.zero, () {
-        state = state.copyWith(shouldNavigateBack: false);
+      // Clear form and reset after navigation flag is set
+      Future.delayed(Duration(milliseconds: 100), () {
+        if (!mounted) return;
+
+        // Clear form data
+        state.memoryNameController?.clear();
+
+        // Reset state to initial values
+        state = state.copyWith(
+          shouldNavigateToConfirmation: false,
+          createdMemoryId: null,
+          currentStep: 1,
+          createMemoryModel: CreateMemoryModel(
+            isPublic: true,
+            memoryName: null,
+            selectedGroup: null,
+            selectedCategory: null,
+            selectedDuration: '12_hours',
+          ),
+        );
       });
     } catch (e) {
       print('❌ CREATE MEMORY: Error creating memory: $e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Failed to create memory: ${e.toString()}',
+        errorMessage: 'Failed to create memory. Please try again.',
       );
     }
   }

@@ -33,6 +33,13 @@ class _MemoriesDashboardScreenState
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // REMOVED: Automatic refresh was causing loading state to persist
+    // Users can manually refresh using RefreshIndicator
+  }
+
+  @override
   void dispose() {
     super.dispose();
   }
@@ -232,8 +239,20 @@ class _MemoriesDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoriesDashboardNotifier);
+        final notifier = ref.read(memoriesDashboardNotifier.notifier);
         final selectedOwnership = state.selectedOwnership ?? 'created';
         final selectedState = state.selectedState ?? 'all';
+
+        // FIXED: Calculate counts for ownership tabs
+        final currentUser = SupabaseService.instance.client?.auth.currentUser;
+        final userId = currentUser?.id ?? '';
+
+        final createdCount = userId.isNotEmpty
+            ? notifier.getOwnershipCount(userId, 'created')
+            : 0;
+        final joinedCount = userId.isNotEmpty
+            ? notifier.getOwnershipCount(userId, 'joined')
+            : 0;
 
         return Container(
           width: MediaQuery.of(context).size.width,
@@ -270,7 +289,7 @@ class _MemoriesDashboardScreenState
                               borderRadius: BorderRadius.circular(20.h),
                             ),
                             child: Text(
-                              'Created by Me',
+                              'Created by Me ($createdCount)',
                               textAlign: TextAlign.center,
                               style: selectedOwnership == 'created'
                                   ? TextStyleHelper
@@ -281,6 +300,8 @@ class _MemoriesDashboardScreenState
                                       .copyWith(
                                           color:
                                               appTheme.gray_50.withAlpha(179)),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ),
                         ),
@@ -300,7 +321,7 @@ class _MemoriesDashboardScreenState
                               borderRadius: BorderRadius.circular(20.h),
                             ),
                             child: Text(
-                              'Joined',
+                              'Joined ($joinedCount)',
                               textAlign: TextAlign.center,
                               style: selectedOwnership == 'joined'
                                   ? TextStyleHelper
@@ -311,6 +332,8 @@ class _MemoriesDashboardScreenState
                                       .copyWith(
                                           color:
                                               appTheme.gray_50.withAlpha(179)),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ),
                         ),

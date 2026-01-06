@@ -1,5 +1,5 @@
-name: capsule_memories
-description: A new Flutter project.
+name: Capsule
+description: One memory, every angle.
 version: 1.0.0+3
 environment: 
   sdk: ^3.6.0
