@@ -67,49 +67,52 @@ class GroupsManagementScreenState
         final state = ref.watch(groupsManagementNotifier);
         final groupCount = state.groups?.length ?? 0;
 
-        return Container(
-          margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CustomImageView(
-                imagePath: ImageConstant.imgIcon7,
-                height: 26.h,
-                width: 26.h,
-              ),
-              Container(
-                margin: EdgeInsets.only(left: 6.h, top: 1.h),
-                child: Text(
-                  'Groups ($groupCount)',
-                  style: TextStyleHelper
-                      .instance.title20ExtraBoldPlusJakartaSans
-                      .copyWith(height: 1.30),
+        return SizedBox(
+          width: MediaQuery.of(context).size.width,
+          child: Container(
+            margin: EdgeInsets.fromLTRB(16.h, 24.h, 16.h, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CustomImageView(
+                  imagePath: ImageConstant.imgIcon7,
+                  height: 26.h,
+                  width: 26.h,
                 ),
-              ),
-              Spacer(),
-              CustomIconButton(
-                height: 44.h,
-                width: 44.h,
-                icon: Icons.camera_alt,
-                backgroundColor: appTheme.gray_900_01.withAlpha(179),
-                borderRadius: 22.h,
-                iconSize: 24.h,
-                iconColor: Theme.of(context).colorScheme.onSurface,
-                onTap: () => onTapCameraButton(context),
-              ),
-              SizedBox(width: 8.h),
-              CustomButton(
-                text: 'New Group',
-                width: null,
-                leftIcon: ImageConstant.imgIcon20x20,
-                onPressed: () => onTapNewGroup(context),
-                buttonStyle: CustomButtonStyle.fillPrimary,
-                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                padding: EdgeInsets.fromLTRB(16.h, 12.h, 16.h, 12.h),
-                margin: EdgeInsets.zero,
-              ),
-            ],
+                Container(
+                  margin: EdgeInsets.only(left: 6.h, top: 1.h),
+                  child: Text(
+                    'Groups ($groupCount)',
+                    style: TextStyleHelper
+                        .instance.title20ExtraBoldPlusJakartaSans
+                        .copyWith(height: 1.30),
+                  ),
+                ),
+                Spacer(),
+                CustomIconButton(
+                  height: 44.h,
+                  width: 44.h,
+                  icon: Icons.camera_alt,
+                  backgroundColor: appTheme.gray_900_01.withAlpha(179),
+                  borderRadius: 22.h,
+                  iconSize: 24.h,
+                  iconColor: Theme.of(context).colorScheme.onSurface,
+                  onTap: () => onTapCameraButton(context),
+                ),
+                SizedBox(width: 8.h),
+                CustomButton(
+                  text: 'New Group',
+                  width: null,
+                  leftIcon: ImageConstant.imgIcon20x20,
+                  onPressed: () => onTapNewGroup(context),
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  padding: EdgeInsets.fromLTRB(16.h, 12.h, 16.h, 12.h),
+                  margin: EdgeInsets.zero,
+                ),
+              ],
+            ),
           ),
         );
       },

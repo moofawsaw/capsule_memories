@@ -1,10 +1,7 @@
 import '../core/app_export.dart';
-import '../core/utils/image_constant.dart';
-import '../presentation/memories_dashboard_screen/memories_dashboard_screen.dart';
 import '../services/avatar_helper_service.dart';
 import '../services/story_service.dart';
 import '../services/supabase_service.dart';
-import '../theme/text_style_helper.dart';
 import './custom_image_view.dart';
 import './custom_memory_skeleton.dart';
 import './timeline_widget.dart';
