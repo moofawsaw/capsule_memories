@@ -18,9 +18,7 @@ final memoriesDashboardNotifier = StateNotifierProvider.autoDispose<
 class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   final _cacheService = MemoryCacheService();
 
-  MemoriesDashboardNotifier(MemoriesDashboardState state) : super(state) {
-    initialize();
-  }
+  MemoriesDashboardNotifier(MemoriesDashboardState state) : super(state);
 
   void initialize() async {
     state = state.copyWith(isLoading: true);

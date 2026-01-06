@@ -3,7 +3,7 @@ import './custom_image_view.dart';
 
 /**
  * CustomButton - A versatile button component that supports multiple styles and configurations
- * 
+ *
  * @param text - The text content displayed on the button
  * @param onPressed - Callback function when button is pressed
  * @param width - Button width, can be specific value or null for auto-sizing
@@ -97,7 +97,10 @@ class CustomButton extends StatelessWidget {
   }
 
   Widget _buildElevatedButton(
-      CustomButtonStyle style, CustomButtonTextStyle textStyle, bool disabled) {
+      CustomButtonStyle style,
+      CustomButtonTextStyle textStyle,
+      bool disabled,
+      ) {
     return ElevatedButton(
       onPressed: disabled ? null : onPressed,
       style: ElevatedButton.styleFrom(
@@ -114,20 +117,49 @@ class CustomButton extends StatelessWidget {
               horizontal: 16.h,
               vertical: 12.h,
             ),
-        minimumSize: Size(0, 0),
+        minimumSize: const Size(0, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       child: _buildButtonContent(textStyle),
     );
   }
 
+  /// ✅ FIX: outline buttons must render an OutlinedButton (you previously returned SizedBox())
   Widget _buildOutlinedButton(
-      CustomButtonStyle style, CustomButtonTextStyle textStyle, bool disabled) {
-    return SizedBox();
+      CustomButtonStyle style,
+      CustomButtonTextStyle textStyle,
+      bool disabled,
+      ) {
+    return OutlinedButton(
+      onPressed: disabled ? null : onPressed,
+      style: OutlinedButton.styleFrom(
+        backgroundColor: style.backgroundColor ?? appTheme.transparentCustom,
+        foregroundColor: textStyle.color ?? appTheme.blue_gray_300,
+        side: style.borderSide ??
+            BorderSide(
+              color: appTheme.blue_gray_900,
+              width: 1,
+            ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(style.borderRadius ?? 6.h),
+        ),
+        padding: padding ??
+            EdgeInsets.symmetric(
+              horizontal: 16.h,
+              vertical: 12.h,
+            ),
+        minimumSize: const Size(0, 0),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: _buildButtonContent(textStyle),
+    );
   }
 
   Widget _buildTextButton(
-      CustomButtonStyle style, CustomButtonTextStyle textStyle, bool disabled) {
+      CustomButtonStyle style,
+      CustomButtonTextStyle textStyle,
+      bool disabled,
+      ) {
     return TextButton(
       onPressed: disabled ? null : onPressed,
       style: TextButton.styleFrom(
@@ -141,7 +173,7 @@ class CustomButton extends StatelessWidget {
               horizontal: 16.h,
               vertical: 12.h,
             ),
-        minimumSize: Size(0, 0),
+        minimumSize: const Size(0, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       child: _buildButtonContent(textStyle),
@@ -165,7 +197,9 @@ class CustomButton extends StatelessWidget {
     }
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      // Use max so full-width buttons center nicely
+      mainAxisSize: MainAxisSize.max,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (hasLeftIcon) ...[
           CustomImageView(
@@ -215,64 +249,64 @@ class CustomButtonStyle {
 
   // Predefined styles based on JSON analysis
   static CustomButtonStyle get fillPrimary => CustomButtonStyle(
-        backgroundColor: appTheme.deep_purple_A100,
-        variant: CustomButtonVariant.fill,
-      );
+    backgroundColor: appTheme.deep_purple_A100,
+    variant: CustomButtonVariant.fill,
+  );
 
   static CustomButtonStyle get fillSuccess => CustomButtonStyle(
-        backgroundColor: appTheme.green_500,
-        variant: CustomButtonVariant.fill,
-      );
+    backgroundColor: appTheme.green_500,
+    variant: CustomButtonVariant.fill,
+  );
 
   static CustomButtonStyle get fillError => CustomButtonStyle(
-        backgroundColor: appTheme.red_500,
-        variant: CustomButtonVariant.fill,
-      );
+    backgroundColor: appTheme.red_500,
+    variant: CustomButtonVariant.fill,
+  );
 
   static CustomButtonStyle get fillDark => CustomButtonStyle(
-        backgroundColor: appTheme.gray_900_02,
-        variant: CustomButtonVariant.fill,
-      );
+    backgroundColor: appTheme.gray_900_02,
+    variant: CustomButtonVariant.fill,
+  );
 
   static CustomButtonStyle get fillTransparentRed => CustomButtonStyle(
-        backgroundColor: appTheme.color41C124,
-        variant: CustomButtonVariant.fill,
-      );
+    backgroundColor: appTheme.color41C124,
+    variant: CustomButtonVariant.fill,
+  );
 
   static CustomButtonStyle get fillGray => CustomButtonStyle(
-        backgroundColor: appTheme.gray_400,
-        variant: CustomButtonVariant.fill,
-      );
+    backgroundColor: appTheme.gray_400,
+    variant: CustomButtonVariant.fill,
+  );
 
   static CustomButtonStyle get fillDeepPurpleA => CustomButtonStyle(
-        backgroundColor: appTheme.deep_purple_A200,
-        variant: CustomButtonVariant.fill,
-      );
+    backgroundColor: appTheme.deep_purple_A200,
+    variant: CustomButtonVariant.fill,
+  );
 
   static CustomButtonStyle get fillRed => CustomButtonStyle(
-        backgroundColor: appTheme.red_500,
-        variant: CustomButtonVariant.fill,
-      );
+    backgroundColor: appTheme.red_500,
+    variant: CustomButtonVariant.fill,
+  );
 
   static CustomButtonStyle get outlineDark => CustomButtonStyle(
-        borderSide: BorderSide(
-          color: appTheme.blue_gray_900,
-          width: 2,
-        ),
-        variant: CustomButtonVariant.outline,
-      );
+    borderSide: BorderSide(
+      color: appTheme.blue_gray_900,
+      width: 2,
+    ),
+    variant: CustomButtonVariant.outline,
+  );
 
   static CustomButtonStyle get outlinePrimary => CustomButtonStyle(
-        borderSide: BorderSide(
-          color: appTheme.deep_purple_A100,
-          width: 1,
-        ),
-        variant: CustomButtonVariant.outline,
-      );
+    borderSide: BorderSide(
+      color: appTheme.deep_purple_A100,
+      width: 1,
+    ),
+    variant: CustomButtonVariant.outline,
+  );
 
   static CustomButtonStyle get textOnly => CustomButtonStyle(
-        variant: CustomButtonVariant.text,
-      );
+    variant: CustomButtonVariant.text,
+  );
 }
 
 /// Button text style configuration
@@ -290,34 +324,34 @@ class CustomButtonTextStyle {
   final double? iconSize;
 
   static CustomButtonTextStyle get bodyMedium => CustomButtonTextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: appTheme.whiteCustom,
-      );
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: appTheme.whiteCustom,
+  );
 
   static CustomButtonTextStyle get bodySmall => CustomButtonTextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        color: appTheme.whiteCustom,
-      );
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+    color: appTheme.whiteCustom,
+  );
 
   static CustomButtonTextStyle get bodyMediumGray => CustomButtonTextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w400,
-        color: appTheme.blue_gray_300,
-      );
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    color: appTheme.blue_gray_300,
+  );
 
   static CustomButtonTextStyle get bodySmallPrimary => CustomButtonTextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        color: appTheme.deep_purple_A100,
-      );
+    fontSize: 12,
+    fontWeight: FontWeight.w700,
+    color: appTheme.deep_purple_A100,
+  );
 
   static CustomButtonTextStyle get bodyMediumPrimary => CustomButtonTextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: appTheme.deep_purple_A100,
-      );
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: appTheme.deep_purple_A100,
+  );
 }
 
 /// Button variant enumeration

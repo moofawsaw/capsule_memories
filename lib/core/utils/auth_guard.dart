@@ -17,6 +17,8 @@ class AuthGuard {
     AppRoutes.appTimelineSealed,
     AppRoutes.appVideoCall,
     AppRoutes.appProfile,
+    AppRoutes
+        .appStoryView, // ✅ CRITICAL FIX: Allow story viewing without authentication
   ];
 
   /// Check if the route is public (doesn't require authentication)

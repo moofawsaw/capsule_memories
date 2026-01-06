@@ -62,6 +62,10 @@ class MemoryFeedDashboardNotifier
       print('📊 SERVICE RESPONSE RECEIVED');
       print('   Happening Now Stories: ${happeningNowData.length}');
       print('   Latest Stories: ${latestStoriesData.length}');
+      print('   Public Memories: ${publicMemoriesData.length}');
+      print('   Trending Stories: ${trendingData.length}');
+      print('   Longest Streak Stories: ${longestStreakData.length}');
+      print('   Popular User Stories: ${popularUserData.length}');
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // CRITICAL FIX: Use isRead from service response instead of hardcoding false
@@ -206,23 +210,16 @@ class MemoryFeedDashboardNotifier
 
       if (_isDisposed) return;
 
+      // CRITICAL FIX: Always store lists (even if empty) instead of null
+      // This allows UI to properly show loading states vs empty states
       final model = MemoryFeedDashboardModel(
-        happeningNowStories: happeningNowStories.isNotEmpty
-            ? happeningNowStories.cast<HappeningNowStoryData>()
-            : null,
-        latestStories: latestStories.isNotEmpty
-            ? latestStories.cast<HappeningNowStoryData>()
-            : null,
+        happeningNowStories: happeningNowStories.cast<HappeningNowStoryData>(),
+        latestStories: latestStories.cast<HappeningNowStoryData>(),
         publicMemories: publicMemories.isNotEmpty ? publicMemories : null,
-        trendingStories: trendingStories.isNotEmpty
-            ? trendingStories.cast<HappeningNowStoryData>()
-            : null,
-        longestStreakStories: longestStreakStories.isNotEmpty
-            ? longestStreakStories.cast<HappeningNowStoryData>()
-            : null,
-        popularUserStories: popularUserStories.isNotEmpty
-            ? popularUserStories.cast<HappeningNowStoryData>()
-            : null,
+        trendingStories: trendingStories.cast<HappeningNowStoryData>(),
+        longestStreakStories:
+            longestStreakStories.cast<HappeningNowStoryData>(),
+        popularUserStories: popularUserStories.cast<HappeningNowStoryData>(),
       );
 
       _safeSetState(state.copyWith(
@@ -250,7 +247,10 @@ class MemoryFeedDashboardNotifier
     try {
       final currentUserId = Supabase.instance.client.auth.currentUser?.id;
       if (currentUserId == null) {
-        print('⚠️ WARNING: No authenticated user for real-time subscription');
+        // ✅ SILENT SKIP: Real-time subscriptions are optional - feed works without them
+        // Latest Stories feed is fully public and doesn't require authentication
+        print(
+            'ℹ️ INFO: Real-time subscription skipped (optional feature - requires authentication)');
         return;
       }
 

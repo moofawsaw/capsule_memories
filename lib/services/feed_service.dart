@@ -25,7 +25,9 @@ class FeedService {
   /// Returns true if all critical data is present, false if validation fails
   bool _validateStoryData(Map<String, dynamic> item, String context) {
     final memory = item['memories'] as Map<String, dynamic>?;
-    final contributor = item['user_profiles'] as Map<String, dynamic>?;
+    // UPDATED: Support both user_profiles (authenticated) and user_profiles_public (public)
+    final contributor = (item['user_profiles'] ?? item['user_profiles_public'])
+        as Map<String, dynamic>?;
     final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
     final categoryId = memory?['category_id'] as String?;
@@ -881,7 +883,8 @@ class FeedService {
   }
 
   /// NEW METHOD: Fetch latest stories (all stories ordered by date)
-  /// Returns stories from all memories the user is a contributor to, ordered by creation date
+  /// UPDATED: Now shows latest stories from ALL public memories - no contributor requirement, no time constraint
+  /// PUBLIC ACCESS: Works for both authenticated and anonymous users
   Future<List<Map<String, dynamic>>> fetchLatestStories({
     int offset = 0,
     int limit = _pageSize,
@@ -889,28 +892,21 @@ class FeedService {
     if (_client == null) return [];
 
     try {
+      // ✅ NO AUTHENTICATION REQUIRED - Works for all users (authenticated + anonymous)
       final currentUserId = _client!.auth.currentUser?.id;
-      if (currentUserId == null) {
-        print('❌ ERROR: No authenticated user for latest stories');
-        return [];
-      }
 
-      // Get memory IDs where user is a contributor
-      final contributorResponse = await _client!
-          .from('memory_contributors')
-          .select('memory_id')
-          .eq('user_id', currentUserId);
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('🔍 DEBUG: fetchLatestStories() - START');
+      print(
+          '   Current User ID: $currentUserId (optional - for read status only)');
+      print('   Offset: $offset, Limit: $limit');
+      print(
+          '   Auth Status: ${currentUserId != null ? "AUTHENTICATED" : "ANONYMOUS"}');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      if (contributorResponse.isEmpty) {
-        print('⚠️ WARNING: User is not a contributor to any memories');
-        return [];
-      }
-
-      final memoryIds = (contributorResponse as List)
-          .map((c) => c['memory_id'] as String)
-          .toList();
-
-      // Fetch stories from these memories ordered by date
+      // CRITICAL: Use user_profiles_public for anonymous/public access
+      // ✅ NO CONTRIBUTOR FILTER - Shows ALL public stories
+      // ✅ NO TIME CONSTRAINT - Shows stories from all time periods
       final response = await _client!
           .from('stories')
           .select('''
@@ -923,6 +919,7 @@ class FeedService {
             memories!inner(
               title,
               state,
+              visibility,
               category_id,
               memory_categories:category_id(
                 id,
@@ -930,29 +927,92 @@ class FeedService {
                 icon_url
               )
             ),
-            user_profiles!stories_contributor_id_fkey(
+            user_profiles_public!stories_contributor_id_fkey(
               id,
               display_name,
               avatar_url
             )
           ''')
-          .inFilter('memory_id', memoryIds)
-          .order('created_at', ascending: false)
+          .eq('memories.visibility',
+              'public') // ✅ Only public memories - accessible to everyone
+          .order('created_at',
+              ascending: false) // Latest first, no time constraint
           .range(offset, offset + limit - 1);
+
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('📊 DATABASE RESPONSE RECEIVED');
+      print('   Total rows returned: ${(response as List).length}');
+
+      // CRITICAL: Log EVERY row to see what's being returned
+      if (response.isEmpty) {
+        print('   ⚠️ WARNING: Database returned ZERO stories');
+        print('   Possible causes:');
+        print('      1. No public stories exist in database');
+        print('      2. All stories filtered out by visibility check');
+        print('      3. Database join failed on user_profiles_public');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        return [];
+      }
+
+      print(
+          '   ✅ Database returned ${response.length} stories - analyzing each...');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // 🛡️ VALIDATION: Filter out stories with incomplete data
       final validatedStories = <Map<String, dynamic>>[];
 
-      for (final item in response) {
-        if (_validateStoryData(item, 'LatestStories')) {
-          final memory = item['memories'] as Map<String, dynamic>?;
-          final contributor =
-              item['user_profiles'] as Map<String, dynamic>? ?? {};
-          final category =
-              memory?['memory_categories'] as Map<String, dynamic>?;
+      for (var i = 0; i < response.length; i++) {
+        final item = response[i];
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('🔍 VALIDATING STORY ${i + 1}/${response.length}');
+        print('   Story ID: "${item['id']}"');
 
-          // NEW: Check if current user has viewed this story
-          bool isRead = false;
+        // CRITICAL FIX: Update to use user_profiles_public
+        final memory = item['memories'] as Map<String, dynamic>?;
+        final contributor =
+            item['user_profiles_public'] as Map<String, dynamic>? ?? {};
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
+
+        print('   Memory Data:');
+        print('      - memory object: ${memory != null ? "EXISTS" : "NULL"}');
+        print('      - title: "${memory?['title']}"');
+        print('      - visibility: "${memory?['visibility']}"');
+
+        print('   Contributor Data:');
+        print(
+            '      - contributor object: ${contributor.isNotEmpty ? "EXISTS" : "EMPTY"}');
+        print('      - display_name: "${contributor['display_name']}"');
+        print('      - avatar_url: "${contributor['avatar_url']}"');
+
+        print('   Category Data:');
+        print(
+            '      - category object: ${category != null ? "EXISTS" : "NULL"}');
+        print('      - name: "${category?['name']}"');
+        print('      - icon_url: "${category?['icon_url']}"');
+
+        print('   Thumbnail:');
+        print('      - thumbnail_url: "${item['thumbnail_url']}"');
+
+        // Validate required fields
+        if (memory?['title'] == null ||
+            contributor['display_name'] == null ||
+            item['thumbnail_url'] == null) {
+          print('   ❌ VALIDATION FAILED - Missing required data:');
+          if (memory?['title'] == null) print('      - memory.title is NULL');
+          if (contributor['display_name'] == null)
+            print('      - contributor.display_name is NULL');
+          if (item['thumbnail_url'] == null)
+            print('      - thumbnail_url is NULL');
+          print('   RESULT: Story REJECTED - skipping');
+          continue;
+        }
+
+        print('   ✅ VALIDATION PASSED - All required fields present');
+
+        // ✅ OPTIONAL: Check read status ONLY if user is authenticated
+        // Anonymous users will see all stories as unread (isRead = false)
+        bool isRead = false;
+        if (currentUserId != null) {
           try {
             final viewResponse = await _client!
                 .from('story_views')
@@ -962,42 +1022,66 @@ class FeedService {
                 .maybeSingle();
 
             isRead = viewResponse != null;
+            print('   Read Status: ${isRead ? "READ" : "UNREAD"}');
           } catch (e) {
-            print(
-                '⚠️ WARNING: Failed to check view status for latest story "${item['id']}": $e');
+            print('   ⚠️ WARNING: Failed to check view status: $e');
+            print('   Defaulting to UNREAD');
           }
-
-          // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
-          final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
-
-          validatedStories.add({
-            'id': item['id'] ?? '',
-            'thumbnail_url': resolvedThumbnailUrl ?? '',
-            'created_at': item['created_at'] ?? '',
-            'memory_id': item['memory_id'] ?? '',
-            'contributor_name': contributor['display_name'] ?? 'Unknown User',
-            'contributor_avatar': AvatarHelperService.getAvatarUrl(
-              contributor['avatar_url'],
-            ),
-            'memory_title': memory?['title'] ?? 'Untitled Memory',
-            'category_name': category?['name'] ?? 'Custom',
-            'category_icon': category?['icon_url'] ?? '',
-            'is_read': isRead, // FIXED: Include read status
-          });
+        } else {
+          print('   Read Status: UNREAD (anonymous user)');
         }
+
+        // CRITICAL FIX: Resolve thumbnail URL using StoryService helper
+        final resolvedThumbnailUrl = _storyService.getStoryMediaUrl(item);
+        print('   Resolved thumbnail URL: "$resolvedThumbnailUrl"');
+
+        validatedStories.add({
+          'id': item['id'] ?? '',
+          'thumbnail_url': resolvedThumbnailUrl ?? '',
+          'created_at': item['created_at'] ?? '',
+          'memory_id': item['memory_id'] ?? '',
+          'contributor_name': contributor['display_name'] ?? 'Unknown User',
+          'contributor_avatar': AvatarHelperService.getAvatarUrl(
+            contributor['avatar_url'],
+          ),
+          'memory_title': memory?['title'] ?? 'Untitled Memory',
+          'category_name': category?['name'] ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+          'is_read': isRead,
+        });
+
+        print('   RESULT: Story ACCEPTED - added to validated list');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       }
 
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('✅ VALIDATION COMPLETE - FINAL RESULTS');
+      print('   Total stories from database: ${response.length}');
+      print('   Stories passed validation: ${validatedStories.length}');
       print(
-          '✅ VALIDATION: ${validatedStories.length} latest stories passed validation');
+          '   Stories rejected: ${response.length - validatedStories.length}');
+      print(
+          '   Auth status: ${currentUserId != null ? "AUTHENTICATED" : "ANONYMOUS"}');
+
+      if (validatedStories.isEmpty && response.isNotEmpty) {
+        print('   ⚠️ CRITICAL: All stories were REJECTED by validation');
+        print('   This indicates data quality issues in the database');
+      }
+
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return validatedStories;
-    } catch (e) {
-      print('❌ ERROR fetching latest stories: $e');
+    } catch (e, stackTrace) {
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      print('❌ ERROR in fetchLatestStories(): $e');
+      print('Stack trace: $stackTrace');
+      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return [];
     }
   }
 
   /// NEW METHOD: Fetch all latest story IDs in chronological order (not grouped by memory)
-  /// Filters stories to only include those from memories where current user is a contributor
+  /// UPDATED: Now shows story IDs from ALL public memories - no authentication required
+  /// PUBLIC ACCESS: Works for both authenticated and anonymous users
   Future<List<String>> fetchLatestStoryIds() async {
     try {
       final client = SupabaseService.instance.client;
@@ -1006,50 +1090,36 @@ class FeedService {
         return [];
       }
 
-      // Get current user ID
-      final currentUserId = client.auth.currentUser?.id;
-      if (currentUserId == null) {
-        print('❌ ERROR: No authenticated user');
-        return [];
-      }
-
-      // First, get all memory IDs where current user is a contributor
-      final contributorResponse = await client
-          .from('memory_contributors')
-          .select('memory_id')
-          .eq('user_id', currentUserId);
-
-      if (contributorResponse.isEmpty) {
-        print('⚠️ WARNING: User is not a contributor to any memories');
-        return [];
-      }
-
-      final memoryIds = (contributorResponse as List)
-          .map((c) => c['memory_id'] as String)
-          .toList();
-
       print(
-          '🔍 DEBUG: User is contributor to ${memoryIds.length} memories: $memoryIds');
+          '🔍 DEBUG: Fetching latest public story IDs (no authentication required)');
 
-      // Fetch all stories from these memories in chronological order
+      // ✅ NO AUTHENTICATION REQUIRED - Fetches ALL public stories
+      // ✅ NO CONTRIBUTOR FILTER - Shows stories from all contributors
       final response = await client
           .from('stories')
-          .select('id, created_at, memory_id')
-          .inFilter('memory_id', memoryIds)
-          .order('created_at', ascending: false);
+          .select('''
+            id,
+            created_at,
+            memory_id,
+            memories!inner(visibility)
+          ''')
+          .eq('memories.visibility',
+              'public') // ✅ Only public memories - accessible to everyone
+          .order('created_at',
+              ascending: false); // Latest first, no time constraint
 
       if (response.isEmpty) {
-        print('⚠️ WARNING: No stories found in user\'s memories');
+        print('⚠️ INFO: No public stories found');
         return [];
       }
 
       final storyIds =
           (response as List).map((story) => story['id'] as String).toList();
 
-      print('✅ SUCCESS: Fetched ${storyIds.length} story IDs from latest feed');
       print(
-          '🔍 DEBUG: Stories belong to these memories: ${(response).map((s) => s['memory_id']).toSet().toList()}');
-
+          '✅ SUCCESS: Fetched ${storyIds.length} public story IDs from latest feed');
+      print(
+          '   ✅ PUBLIC ACCESS: Feed accessible to authenticated + anonymous users');
       return storyIds;
     } catch (e) {
       print('❌ ERROR fetching latest story IDs: $e');

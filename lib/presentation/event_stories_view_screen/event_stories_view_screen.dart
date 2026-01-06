@@ -34,18 +34,27 @@ class EventStoriesViewScreen extends ConsumerStatefulWidget {
 }
 
 class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   String? _initialStoryId;
   String? _feedType;
   List<String> _storyIds = [];
   int _currentIndex = 0;
   int _startingIndex = 0;
-  Map<String, dynamic>? _storyData;
+
+  // DUAL MEDIA SLOTS for seamless transitions
+  Map<String, dynamic>? _currentStoryData;
+  Map<String, dynamic>? _nextStoryData;
+
   bool _isLoading = true;
   String? _errorMessage;
   final FeedService _feedService = FeedService();
-  VideoPlayerController? _videoController;
-  bool _isVideoInitialized = false;
+
+  // DUAL VIDEO CONTROLLERS
+  VideoPlayerController? _currentVideoController;
+  VideoPlayerController? _nextVideoController;
+  bool _isCurrentVideoInitialized = false;
+  bool _isNextVideoInitialized = false;
+
   PageController? _pageController;
 
   // Timer animation controllers
@@ -53,6 +62,11 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   bool _isPaused = false;
   bool _isMuted = false;
   static const Duration _imageDuration = Duration(seconds: 5);
+
+  // CROSSFADE ANIMATION CONTROLLER
+  AnimationController? _crossfadeController;
+  Animation<double>? _crossfadeAnimation;
+  bool _isTransitioning = false;
 
   // Swipe gesture tracking
   double _dragStartY = 0.0;
@@ -64,23 +78,33 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   String? _memoryCategoryIcon;
   String? _memoryId;
 
-  // NEW: Prefetching state management
-  Map<String, dynamic>? _prefetchedStoryData;
-  VideoPlayerController? _prefetchedVideoController;
-  bool _isPrefetchedVideoInitialized = false;
+  // Prefetching state
   bool _isPrefetching = false;
 
   @override
   void initState() {
     super.initState();
+
+    // Initialize timer controller
     _timerController = AnimationController(
       vsync: this,
       duration: _imageDuration,
     );
 
+    // Initialize crossfade controller (100-150ms as per requirements)
+    _crossfadeController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 120), // 120ms for smooth crossfade
+    );
+
+    _crossfadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _crossfadeController!, curve: Curves.easeInOut),
+    );
+
     _timerController?.addStatusListener((status) {
-      if (status == AnimationStatus.completed && !_isPaused) {
-        // Trigger vibration on progress bar completion
+      if (status == AnimationStatus.completed &&
+          !_isPaused &&
+          !_isTransitioning) {
         _triggerHapticFeedback(HapticFeedbackType.light);
         _goToNextStory();
       }
@@ -89,42 +113,25 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments;
 
-      // For memories feed, accept String ID but load ALL feed stories (not memory-specific)
       if (args is String) {
         print('🔍 DEBUG: Received story ID from memories feed: $args');
         _initialStoryId = args;
-        _feedType =
-            'latest_stories'; // Mark as latest stories feed (not memory-grouped)
-        _loadAllLatestStories(); // Load entire feed array instead of memory-specific
-      }
-      // Check if feed context was passed (for happening now and other feeds)
-      else if (args is FeedStoryContext) {
+        _feedType = 'latest_stories';
+        _loadAllLatestStories();
+      } else if (args is FeedStoryContext) {
         print('🔍 DEBUG: Received FeedStoryContext');
-        print('   Feed type: ${args.feedType}');
-        print('   Story count: ${args.storyIds.length}');
-        print('   Initial story: ${args.initialStoryId}');
-
         _feedType = args.feedType;
         _initialStoryId = args.initialStoryId;
         _storyIds = args.storyIds;
-
-        // Find the index of the initial story
         _currentIndex = _storyIds.indexOf(args.initialStoryId);
+
         if (_currentIndex == -1) {
-          print('⚠️ WARNING: Initial story not found in feed, defaulting to 0');
           _currentIndex = 0;
         }
 
         _startingIndex = _currentIndex;
-
-        // Initialize PageController with the current index
         _pageController = PageController(initialPage: _currentIndex);
-
-        // Load the initial story
         _loadStoryAtIndex(_currentIndex);
-
-        print(
-            '✅ DEBUG: Feed-based story viewer initialized at index $_currentIndex');
       } else {
         setState(() {
           _isLoading = false;
@@ -133,7 +140,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       }
     });
 
-    // Mark story as viewed when screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _markStoryAsViewed();
     });
@@ -282,38 +288,30 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       print(
           '🔄 DEBUG: Loading story at index $index (ID: ${_storyIds[index]})');
 
-      // Reset and stop timer
+      // Reset timer
       _timerController?.stop();
       _timerController?.reset();
 
-      // CRITICAL: Check if we have prefetched data for this story
       final storyId = _storyIds[index];
+
+      // Check if we have prefetched next story data
       Map<String, dynamic>? storyData;
       VideoPlayerController? videoController;
       bool isVideoInitialized = false;
 
-      if (_prefetchedStoryData != null &&
-          _prefetchedStoryData!['id'] == storyId) {
+      if (_nextStoryData != null && _nextStoryData!['id'] == storyId) {
         print('✅ DEBUG: Using prefetched data for story $storyId');
-        storyData = _prefetchedStoryData;
-        videoController = _prefetchedVideoController;
-        isVideoInitialized = _isPrefetchedVideoInitialized;
+        storyData = _nextStoryData;
+        videoController = _nextVideoController;
+        isVideoInitialized = _isNextVideoInitialized;
 
-        // Clear prefetch state
-        _prefetchedStoryData = null;
-        _prefetchedVideoController = null;
-        _isPrefetchedVideoInitialized = false;
+        // Clear next slot
+        _nextStoryData = null;
+        _nextVideoController = null;
+        _isNextVideoInitialized = false;
       } else {
         print('🔄 DEBUG: Fetching story data from service');
         storyData = await _feedService.fetchStoryDetails(storyId);
-      }
-
-      // Dispose previous video controller if exists
-      if (_videoController != null) {
-        await _videoController!.pause();
-        await _videoController!.dispose();
-        _videoController = null;
-        _isVideoInitialized = false;
       }
 
       if (storyData == null) {
@@ -330,53 +328,71 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         await _fetchMemoryCategory(memoryId);
       }
 
-      setState(() {
-        _storyData = storyData;
-        _currentIndex = index;
-        _isLoading = false;
-        _isPaused = false;
-        _initialStoryId = storyId; // Update current story ID
+      // CRITICAL: If this is first load, set as current directly
+      if (_currentStoryData == null) {
+        _currentStoryData = storyData;
+        _currentVideoController = videoController;
+        _isCurrentVideoInitialized = isVideoInitialized;
 
-        // Transfer prefetched video controller if available
-        if (videoController != null && isVideoInitialized) {
-          _videoController = videoController;
-          _isVideoInitialized = true;
+        setState(() {
+          _currentIndex = index;
+          _isLoading = false;
+          _isPaused = false;
+          _initialStoryId = storyId;
+        });
+
+        await _markStoryAsViewed();
+
+        // Initialize video if needed
+        final mediaType = storyData['media_type'] as String? ?? 'image';
+        final mediaUrl = storyData['media_url'] as String?;
+
+        if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
+          if (_currentVideoController == null || !_isCurrentVideoInitialized) {
+            await _initializeVideoPlayer(mediaUrl, isCurrentSlot: true);
+          } else {
+            _currentVideoController!.setVolume(_isMuted ? 0.0 : 1.0);
+            _currentVideoController!.play();
+
+            final videoDuration = _currentVideoController!.value.duration;
+            _timerController?.duration = videoDuration;
+            _timerController?.forward();
+          }
+        } else {
+          _timerController?.duration = _imageDuration;
+          _timerController?.forward();
         }
-      });
 
-      // NEW: Mark this story as viewed when it loads
-      await _markStoryAsViewed();
+        // Prefetch next story
+        _prefetchNextStory(index);
+        return;
+      }
 
-      // Initialize video player if media type is video and not already prefetched
+      // DUAL-SLOT CROSSFADE TRANSITION
+      // Move prefetched data to next slot if not already there
+      _nextStoryData = storyData;
+      _nextVideoController = videoController;
+      _isNextVideoInitialized = isVideoInitialized;
+
+      // Initialize video in next slot if needed and not prefetched
       final mediaType = storyData['media_type'] as String? ?? 'image';
       final mediaUrl = storyData['media_url'] as String?;
 
-      print('📹 DEBUG: Media type: $mediaType, URL: $mediaUrl');
-
       if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
-        if (_videoController == null || !_isVideoInitialized) {
-          await _initializeVideoPlayer(mediaUrl);
-        } else {
-          // Start prefetched video
-          print('▶️ DEBUG: Starting prefetched video');
-          _videoController!.setVolume(_isMuted ? 0.0 : 1.0);
-          _videoController!.play();
-
-          final videoDuration = _videoController!.value.duration;
-          _timerController?.duration = videoDuration;
-          _timerController?.forward();
+        if (_nextVideoController == null || !_isNextVideoInitialized) {
+          await _initializeVideoPlayer(mediaUrl, isCurrentSlot: false);
         }
-      } else {
-        // Start timer for images
-        print('⏱️ DEBUG: Starting timer for image at index $index');
-        _timerController?.duration = _imageDuration;
-        _timerController?.forward();
+      } else if (mediaType == 'image' &&
+          mediaUrl != null &&
+          mediaUrl.isNotEmpty) {
+        // Ensure image is precached before transition
+        await precacheImage(CachedNetworkImageProvider(mediaUrl), context);
       }
 
-      // NEW: Prefetch next story in background
-      _prefetchNextStory(index);
+      // Perform crossfade transition
+      await _performCrossfadeTransition(index, storyId);
 
-      print('✅ DEBUG: Successfully loaded story at index $index');
+      print('✅ DEBUG: Successfully transitioned to story at index $index');
     } catch (e) {
       print('❌ ERROR loading story at index $index: $e');
       setState(() {
@@ -385,9 +401,87 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
-  /// NEW METHOD: Prefetch next story media in background
+  /// CRITICAL: Performs Instagram Reels-style crossfade transition
+  Future<void> _performCrossfadeTransition(int newIndex, String storyId) async {
+    if (_isTransitioning) {
+      print('⚠️ WARNING: Already transitioning, skipping');
+      return;
+    }
+
+    try {
+      _isTransitioning = true;
+
+      // Reset crossfade controller
+      _crossfadeController?.reset();
+
+      setState(() {
+        _currentIndex = newIndex;
+        _initialStoryId = storyId;
+      });
+
+      // Start crossfade animation (120ms)
+      await _crossfadeController?.forward();
+
+      // After fade completes, swap slots and dispose old media
+      await _swapMediaSlots();
+
+      _isTransitioning = false;
+
+      // Mark as viewed
+      await _markStoryAsViewed();
+
+      // Start playback on new current story
+      final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+
+      if (mediaType == 'video' &&
+          _currentVideoController != null &&
+          _isCurrentVideoInitialized) {
+        _currentVideoController!.setVolume(_isMuted ? 0.0 : 1.0);
+        _currentVideoController!.play();
+
+        final videoDuration = _currentVideoController!.value.duration;
+        _timerController?.duration = videoDuration;
+        _timerController?.forward();
+      } else {
+        _timerController?.duration = _imageDuration;
+        _timerController?.forward();
+      }
+
+      // Prefetch next story
+      _prefetchNextStory(newIndex);
+
+      print('✅ DEBUG: Crossfade transition completed');
+    } catch (e) {
+      print('❌ ERROR during crossfade transition: $e');
+      _isTransitioning = false;
+    }
+  }
+
+  /// Swaps next media slot to current and disposes old current
+  Future<void> _swapMediaSlots() async {
+    // Dispose old current video controller
+    if (_currentVideoController != null) {
+      await _currentVideoController!.pause();
+      await _currentVideoController!.dispose();
+    }
+
+    // Move next to current
+    _currentStoryData = _nextStoryData;
+    _currentVideoController = _nextVideoController;
+    _isCurrentVideoInitialized = _isNextVideoInitialized;
+
+    // Clear next slot
+    _nextStoryData = null;
+    _nextVideoController = null;
+    _isNextVideoInitialized = false;
+
+    setState(() {});
+
+    print('✅ DEBUG: Media slots swapped, old media disposed');
+  }
+
+  /// Prefetch next story media in background
   Future<void> _prefetchNextStory(int currentIndex) async {
-    // Skip if already prefetching or no next story
     if (_isPrefetching || currentIndex >= _storyIds.length - 1) {
       return;
     }
@@ -412,37 +506,32 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       final mediaType = nextStoryData['media_type'] as String? ?? 'image';
       final mediaUrl = nextStoryData['media_url'] as String?;
 
-      print('📹 DEBUG: Prefetch media type: $mediaType, URL: $mediaUrl');
-
       if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
-        // Prefetch video - initialize but don't play
         print('📹 DEBUG: Prefetching video controller');
         final prefetchController =
             VideoPlayerController.networkUrl(Uri.parse(mediaUrl));
         await prefetchController.initialize();
         prefetchController.setLooping(false);
 
-        _prefetchedVideoController = prefetchController;
-        _isPrefetchedVideoInitialized = true;
+        _nextVideoController = prefetchController;
+        _isNextVideoInitialized = true;
 
         print('✅ DEBUG: Video prefetched successfully');
       } else if (mediaType == 'image' &&
           mediaUrl != null &&
           mediaUrl.isNotEmpty) {
-        // Prefetch image using CachedNetworkImage's precaching
         print('🖼️ DEBUG: Prefetching image');
         await precacheImage(CachedNetworkImageProvider(mediaUrl), context);
         print('✅ DEBUG: Image prefetched successfully');
       }
 
-      _prefetchedStoryData = nextStoryData;
+      _nextStoryData = nextStoryData;
       _isPrefetching = false;
 
       print('✅ DEBUG: Story $nextStoryId prefetched successfully');
     } catch (e) {
       print('⚠️ WARNING: Error prefetching next story: $e');
       _isPrefetching = false;
-      // Don't block current story if prefetch fails
     }
   }
 
@@ -476,11 +565,12 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       });
 
       // CRITICAL: Store memory data in _storyData for category badge navigation
-      if (_storyData != null) {
-        _storyData!['memory_title'] = response['name'] as String?;
-        _storyData!['memory_date'] = response['created_at'] as String?;
-        _storyData!['memory_location'] = response['location'] as String?;
-        _storyData!['memory_visibility'] = response['visibility'] as String?;
+      if (_currentStoryData != null) {
+        _currentStoryData!['memory_title'] = response['name'] as String?;
+        _currentStoryData!['memory_date'] = response['created_at'] as String?;
+        _currentStoryData!['memory_location'] = response['location'] as String?;
+        _currentStoryData!['memory_visibility'] =
+            response['visibility'] as String?;
       }
 
       print('✅ DEBUG: Fetched memory category - Name: $_memoryCategoryName');
@@ -493,35 +583,44 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
-  Future<void> _initializeVideoPlayer(String videoUrl) async {
+  Future<void> _initializeVideoPlayer(String videoUrl,
+      {required bool isCurrentSlot}) async {
     try {
-      _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
-      await _videoController!.initialize();
+      final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+      await controller.initialize();
 
-      // Set timer duration to video duration
-      final videoDuration = _videoController!.value.duration;
-      _timerController?.duration = videoDuration;
+      controller.setVolume(_isMuted ? 0.0 : 1.0);
+      controller.setLooping(false);
 
-      // Apply mute state to video controller
-      _videoController!.setVolume(_isMuted ? 0.0 : 1.0);
+      if (isCurrentSlot) {
+        _currentVideoController = controller;
+        _isCurrentVideoInitialized = true;
 
-      _videoController!.setLooping(false);
-      _videoController!.play();
-      _timerController?.forward();
+        // Set timer duration
+        final videoDuration = controller.value.duration;
+        _timerController?.duration = videoDuration;
 
-      // Listen for video completion
-      _videoController!.addListener(() {
-        if (_videoController!.value.position >=
-            _videoController!.value.duration) {
-          if (!_isPaused) {
-            _goToNextStory();
+        // Start playback
+        controller.play();
+        _timerController?.forward();
+
+        // Listen for completion
+        controller.addListener(() {
+          if (controller.value.position >= controller.value.duration) {
+            if (!_isPaused && !_isTransitioning) {
+              _goToNextStory();
+            }
           }
-        }
-      });
+        });
+      } else {
+        _nextVideoController = controller;
+        _isNextVideoInitialized = true;
+      }
 
-      setState(() {
-        _isVideoInitialized = true;
-      });
+      setState(() {});
+
+      print(
+          '✅ DEBUG: Video initialized in ${isCurrentSlot ? 'current' : 'next'} slot');
     } catch (e) {
       print('❌ ERROR initializing video player: $e');
       setState(() {
@@ -543,7 +642,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       // Last story reached - stop timer and keep viewer open
       // User must manually close via back button
       _timerController?.stop();
-      _videoController?.pause();
+      _currentVideoController?.pause();
       setState(() {
         _isPaused = true;
       });
@@ -568,10 +667,10 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
       if (_isPaused) {
         _timerController?.stop();
-        _videoController?.pause();
+        _currentVideoController?.pause();
       } else {
         _timerController?.forward();
-        _videoController?.play();
+        _currentVideoController?.play();
       }
     });
   }
@@ -582,7 +681,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
     setState(() {
       _isMuted = !_isMuted;
-      _videoController?.setVolume(_isMuted ? 0.0 : 1.0);
+      _currentVideoController?.setVolume(_isMuted ? 0.0 : 1.0);
     });
   }
 
@@ -614,16 +713,17 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
   /// Shares the current story with native share sheet
   Future<void> _shareStory() async {
-    if (_storyData == null) {
+    if (_currentStoryData == null) {
       print('⚠️ WARNING: No story data available to share');
       return;
     }
 
     try {
-      final userName = _storyData?['user_name'] as String? ?? 'Unknown User';
-      final mediaUrl = _storyData?['media_url'] as String?;
-      final memoryId = _storyData?['memory_id'] as String?;
-      final caption = _storyData?['caption'] as String? ?? '';
+      final userName =
+          _currentStoryData?['user_name'] as String? ?? 'Unknown User';
+      final mediaUrl = _currentStoryData?['media_url'] as String?;
+      final memoryId = _currentStoryData?['memory_id'] as String?;
+      final caption = _currentStoryData?['caption'] as String? ?? '';
 
       // Fetch memory name
       String memoryName = 'Memory';
@@ -707,52 +807,50 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
   @override
   void dispose() {
-    // CRITICAL FIX: Dispose prefetched video controller as well
     _performHardMediaReset();
-
     _timerController?.dispose();
+    _crossfadeController?.dispose();
     _pageController?.dispose();
     super.dispose();
   }
 
-  /// CRITICAL METHOD: Hard reset all media playback (ensures zero leakage)
   void _performHardMediaReset() {
     try {
-      // 1. Stop timer animation immediately
       _timerController?.stop();
       _timerController?.reset();
+      _crossfadeController?.stop();
+      _crossfadeController?.reset();
 
-      // 2. Hard stop video controller (synchronous operations)
-      if (_videoController != null) {
-        _videoController!.pause();
-        _videoController!.setVolume(0.0);
-        _videoController!.seekTo(Duration.zero);
-        _videoController!.removeListener(() {});
-        _videoController!.dispose();
-        _videoController = null;
-        _isVideoInitialized = false;
+      // Dispose current video controller
+      if (_currentVideoController != null) {
+        _currentVideoController!.pause();
+        _currentVideoController!.setVolume(0.0);
+        _currentVideoController!.seekTo(Duration.zero);
+        _currentVideoController!.removeListener(() {});
+        _currentVideoController!.dispose();
+        _currentVideoController = null;
+        _isCurrentVideoInitialized = false;
       }
 
-      // 3. NEW: Dispose prefetched video controller
-      if (_prefetchedVideoController != null) {
-        _prefetchedVideoController!.pause();
-        _prefetchedVideoController!.setVolume(0.0);
-        _prefetchedVideoController!.seekTo(Duration.zero);
-        _prefetchedVideoController!.removeListener(() {});
-        _prefetchedVideoController!.dispose();
-        _prefetchedVideoController = null;
-        _isPrefetchedVideoInitialized = false;
+      // Dispose next video controller
+      if (_nextVideoController != null) {
+        _nextVideoController!.pause();
+        _nextVideoController!.setVolume(0.0);
+        _nextVideoController!.seekTo(Duration.zero);
+        _nextVideoController!.removeListener(() {});
+        _nextVideoController!.dispose();
+        _nextVideoController = null;
+        _isNextVideoInitialized = false;
       }
 
-      // 4. Clear prefetched data
-      _prefetchedStoryData = null;
+      _currentStoryData = null;
+      _nextStoryData = null;
       _isPrefetching = false;
 
       print(
-          '✅ HARD RESET: All media players (including prefetched) stopped and disposed');
+          '✅ HARD RESET: All media players (dual slots) stopped and disposed');
     } catch (e) {
       print('⚠️ WARNING: Error during hard media reset: $e');
-      // Continue with disposal even if error occurs
     }
   }
 
@@ -808,7 +906,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       );
     }
 
-    if (_errorMessage != null || _storyData == null) {
+    if (_errorMessage != null || _currentStoryData == null) {
       return Scaffold(
         backgroundColor: appTheme.gray_900_02,
         body: Center(
@@ -862,10 +960,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
           if (dragDistance > 100 || velocity > 500) {
             _triggerHapticFeedback(HapticFeedbackType.medium);
-
-            // CRITICAL FIX: Hard reset before navigation
             _performHardMediaReset();
-
             Navigator.of(context).pop();
           }
 
@@ -895,7 +990,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  _buildStoryBackground(),
+                  // DUAL MEDIA LAYER RENDERING
+                  _buildDualMediaLayers(),
                   _buildGradientOverlays(),
                   _buildTapZones(),
                   SafeArea(
@@ -918,6 +1014,95 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     );
   }
 
+  /// CRITICAL: Renders dual media layers with crossfade
+  Widget _buildDualMediaLayers() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Current story (bottom layer)
+        if (_currentStoryData != null)
+          _buildMediaLayer(_currentStoryData!, _currentVideoController,
+              _isCurrentVideoInitialized),
+
+        // Next story (top layer with crossfade)
+        if (_isTransitioning && _nextStoryData != null)
+          FadeTransition(
+            opacity: _crossfadeAnimation!,
+            child: _buildMediaLayer(
+                _nextStoryData!, _nextVideoController, _isNextVideoInitialized),
+          ),
+      ],
+    );
+  }
+
+  /// Builds a single media layer (image or video)
+  Widget _buildMediaLayer(Map<String, dynamic> storyData,
+      VideoPlayerController? controller, bool isInitialized) {
+    final mediaUrl = storyData['media_url'] as String?;
+    final mediaType = storyData['media_type'] as String? ?? 'image';
+
+    if (mediaUrl == null || mediaUrl.isEmpty) {
+      return Container(
+        color: appTheme.gray_900_02,
+        child: Center(
+          child: Icon(Icons.image_not_supported,
+              size: 64.h, color: appTheme.blue_gray_300),
+        ),
+      );
+    }
+
+    if (mediaType == 'video') {
+      if (controller != null && isInitialized) {
+        return SizedBox.expand(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
+            ),
+          ),
+        );
+      } else {
+        return Container(
+          color: appTheme.gray_900_02,
+          child: Center(
+              child: CircularProgressIndicator(color: appTheme.colorFF3A3A)),
+        );
+      }
+    }
+
+    return CachedNetworkImage(
+      imageUrl: mediaUrl,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      placeholder: (context, url) => Container(
+        color: appTheme.gray_900_02,
+        child: Center(
+            child: CircularProgressIndicator(color: appTheme.colorFF3A3A)),
+      ),
+      errorWidget: (context, url, error) => Container(
+        color: appTheme.gray_900_02,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.broken_image_outlined,
+                  size: 64.h, color: appTheme.blue_gray_300),
+              SizedBox(height: 12.h),
+              Text(
+                'Failed to load image',
+                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Builds transparent tap zones for story navigation
   Widget _buildTapZones() {
     return SafeArea(
@@ -934,7 +1119,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 setState(() {
                   _isPaused = true;
                   _timerController?.stop();
-                  _videoController?.pause();
+                  _currentVideoController?.pause();
                 });
               },
               onLongPressEnd: (_) {
@@ -942,7 +1127,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 setState(() {
                   _isPaused = false;
                   _timerController?.forward();
-                  _videoController?.play();
+                  _currentVideoController?.play();
                 });
               },
               child: Row(
@@ -1049,8 +1234,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   }
 
   Widget _buildStoryBackground() {
-    final mediaUrl = _storyData?['media_url'] as String?;
-    final mediaType = _storyData?['media_type'] as String? ?? 'image';
+    final mediaUrl = _currentStoryData?['media_url'] as String?;
+    final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
 
     print('🔍 DEBUG Story Media - URL: $mediaUrl, Type: $mediaType');
 
@@ -1068,14 +1253,14 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     }
 
     if (mediaType == 'video') {
-      if (_videoController != null && _isVideoInitialized) {
+      if (_currentVideoController != null && _isCurrentVideoInitialized) {
         return SizedBox.expand(
           child: FittedBox(
             fit: BoxFit.cover,
             child: SizedBox(
-              width: _videoController!.value.size.width,
-              height: _videoController!.value.size.height,
-              child: VideoPlayer(_videoController!),
+              width: _currentVideoController!.value.size.width,
+              height: _currentVideoController!.value.size.height,
+              child: VideoPlayer(_currentVideoController!),
             ),
           ),
         );
@@ -1165,10 +1350,11 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
   /// Builds tappable user profile section positioned on top layer to ensure tap detection
   Widget _buildTappableUserProfile() {
-    final userName = _storyData?['user_name'] as String? ?? 'Unknown User';
-    final userAvatar = _storyData?['user_avatar'] as String?;
-    final userId = _storyData?['user_id'] as String?;
-    final memoryTitle = _storyData?['memory_title'] as String?;
+    final userName =
+        _currentStoryData?['user_name'] as String? ?? 'Unknown User';
+    final userAvatar = _currentStoryData?['user_avatar'] as String?;
+    final userId = _currentStoryData?['user_id'] as String?;
+    final memoryTitle = _currentStoryData?['memory_title'] as String?;
 
     return Positioned(
       top: MediaQuery.of(context).padding.top +
@@ -1230,7 +1416,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
-                        if (_memoryId != null && _storyData != null) {
+                        if (_memoryId != null && _currentStoryData != null) {
                           print('🔍 MEMORY TITLE: Navigating to timeline');
                           print('   - Memory ID: $_memoryId');
                           print('   - Memory Title: $memoryTitle');
@@ -1239,15 +1425,17 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                             memoryId: _memoryId!,
                             snapshot: MemorySnapshot(
                               title: memoryTitle,
-                              date: _storyData?['memory_date'] as String? ??
-                                  _formatDate(
-                                      _storyData?['created_at'] as String?),
-                              location:
-                                  _storyData?['memory_location'] as String?,
+                              date: _currentStoryData?['memory_date']
+                                      as String? ??
+                                  _formatDate(_currentStoryData?['created_at']
+                                      as String?),
+                              location: _currentStoryData?['memory_location']
+                                  as String?,
                               categoryIcon: _memoryCategoryIcon,
                               participantAvatars: null,
                               isPrivate:
-                                  _storyData?['memory_visibility'] == 'private',
+                                  _currentStoryData?['memory_visibility'] ==
+                                      'private',
                             ),
                           );
 
@@ -1274,7 +1462,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                     ),
                   // Time ago is NOT tappable (no GestureDetector)
                   Text(
-                    _formatTimeAgo(_storyData?['created_at'] as String? ?? ''),
+                    _formatTimeAgo(
+                        _currentStoryData?['created_at'] as String? ?? ''),
                     style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                         .copyWith(color: Colors.white70),
                   ),
@@ -1294,7 +1483,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         _memoryId != null;
 
     // Get location from story data
-    final location = _storyData?['location'] as String?;
+    final location = _currentStoryData?['location'] as String?;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
@@ -1338,7 +1527,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
             GestureDetector(
               onTap: () async {
                 // CRITICAL FIX: Pass proper MemoryNavArgs with current story data
-                if (_memoryId != null && _storyData != null) {
+                if (_memoryId != null && _currentStoryData != null) {
                   print('🔍 CATEGORY BADGE: Navigating to timeline');
                   print('   - Memory ID: $_memoryId');
 
@@ -1346,14 +1535,18 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                   final navArgs = MemoryNavArgs(
                     memoryId: _memoryId!,
                     snapshot: MemorySnapshot(
-                      title: _storyData?['memory_title'] as String? ?? 'Memory',
-                      date: _storyData?['memory_date'] as String? ??
-                          _formatDate(_storyData?['created_at'] as String?),
-                      location: _storyData?['memory_location'] as String?,
+                      title: _currentStoryData?['memory_title'] as String? ??
+                          'Memory',
+                      date: _currentStoryData?['memory_date'] as String? ??
+                          _formatDate(
+                              _currentStoryData?['created_at'] as String?),
+                      location:
+                          _currentStoryData?['memory_location'] as String?,
                       categoryIcon: _memoryCategoryIcon,
                       participantAvatars:
                           null, // Will be fetched by timeline notifier
-                      isPrivate: _storyData?['memory_visibility'] == 'private',
+                      isPrivate:
+                          _currentStoryData?['memory_visibility'] == 'private',
                     ),
                   );
 
@@ -1423,8 +1616,11 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   }
 
   Widget _buildBottomInfo() {
-    final caption = _storyData?['caption'] as String?;
+    final caption = _currentStoryData?['caption'] as String?;
     final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : null;
+
+    // Check if user is authenticated
+    final isAuthenticated = Supabase.instance.client.auth.currentUser != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1435,8 +1631,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
         SizedBox(height: 12.h),
 
-        // Full-width reaction widget container
-        if (storyId != null)
+        // Full-width reaction widget container - ONLY show if user is authenticated
+        if (storyId != null && isAuthenticated)
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
@@ -1518,9 +1714,10 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   /// NEW METHOD: Bottom right vertical control stack (TikTok-style)
   /// Contains lock icon button and volume button only (category badge moved to header)
   Widget _buildBottomRightControls() {
-    final mediaType = _storyData?['media_type'] as String? ?? 'image';
-    final showVolumeButton =
-        mediaType == 'video' && _videoController != null && _isVideoInitialized;
+    final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+    final showVolumeButton = mediaType == 'video' &&
+        _currentVideoController != null &&
+        _isCurrentVideoInitialized;
 
     return Align(
       alignment: Alignment.centerRight,

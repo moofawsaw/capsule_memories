@@ -120,7 +120,7 @@ class _MemoryFeedDashboardScreenState
                     _buildHappeningNowOrLatestSection(context),
                     _buildPublicMemoriesSection(context),
                     _buildTrendingStoriesSection(context),
-                    _buildCategoriesSection(context),
+                    if (_isAuthenticated) _buildCategoriesSection(context),
                     _buildLongestStreakSection(context),
                     _buildPopularMemoriesSection(context),
                     _buildPopularUsersSection(context),

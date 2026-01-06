@@ -5,7 +5,7 @@
 
 part of 'friends_management_state.dart';
 
-// Add this import ... //
+// Add this import at the top
 import 'package:json_annotation/json_annotation.dart';
 import 'package:collection/collection.dart';
 

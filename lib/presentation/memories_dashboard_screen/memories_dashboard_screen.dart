@@ -26,6 +26,7 @@ class _MemoriesDashboardScreenState
   @override
   void initState() {
     super.initState();
+    // CRITICAL: Call initialize() for authenticated screens to load data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(memoriesDashboardNotifier.notifier).initialize();
     });

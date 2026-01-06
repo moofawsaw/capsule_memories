@@ -446,31 +446,60 @@ class EventTimelineViewScreenState
 
   /// Section Widget
   Widget _buildActionButtons(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 24.h),
-      child: Column(
-        children: [
-          CustomButton(
-            text: 'View All',
-            width: double.infinity,
-            buttonStyle: CustomButtonStyle.outlineDark,
-            buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-            onPressed: () {
-              onTapViewAll(context);
-            },
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(eventTimelineViewNotifier);
+        final isCurrentUserMember = state.isCurrentUserMember ?? false;
+        final memoryId = state.eventTimelineViewModel?.memoryId;
+        final memoryName = state.eventTimelineViewModel?.eventTitle;
+
+        return Container(
+          margin: EdgeInsets.symmetric(horizontal: 24.h),
+          child: Column(
+            children: [
+              CustomButton(
+                text: 'View All',
+                width: double.infinity,
+                buttonStyle: CustomButtonStyle.outlineDark,
+                buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
+                onPressed: () {
+                  onTapViewAll(context);
+                },
+              ),
+              SizedBox(height: 12.h),
+              // CONDITIONAL BUTTON: Show Create Story if member, else Share Memory
+              if (isCurrentUserMember)
+                CustomButton(
+                  text: 'Create Story',
+                  width: double.infinity,
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  onPressed: () {
+                    onTapCreateStory(context);
+                  },
+                )
+              else
+                CustomButton(
+                  text: 'Share Memory',
+                  width: double.infinity,
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  onPressed: () {
+                    if (memoryId != null && memoryName != null) {
+                      NavigatorService.pushNamed(
+                        AppRoutes.memoryShareOptionsScreen,
+                        arguments: {
+                          'memory_id': memoryId,
+                          'memory_name': memoryName,
+                        },
+                      );
+                    }
+                  },
+                ),
+            ],
           ),
-          SizedBox(height: 12.h),
-          CustomButton(
-            text: 'Create Story',
-            width: double.infinity,
-            buttonStyle: CustomButtonStyle.fillPrimary,
-            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-            onPressed: () {
-              onTapCreateStory(context);
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

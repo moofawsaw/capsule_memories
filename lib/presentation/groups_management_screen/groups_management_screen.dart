@@ -23,6 +23,15 @@ class GroupsManagementScreen extends ConsumerStatefulWidget {
 class GroupsManagementScreenState
     extends ConsumerState<GroupsManagementScreen> {
   @override
+  void initState() {
+    super.initState();
+    // CRITICAL: Call initialize() for authenticated screens to load data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(groupsManagementNotifier.notifier).initialize();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(groupsManagementNotifier);
 

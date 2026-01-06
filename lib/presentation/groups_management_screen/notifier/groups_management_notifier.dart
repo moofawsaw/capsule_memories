@@ -20,7 +20,7 @@ class GroupsManagementNotifier extends StateNotifier<GroupsManagementState> {
   final Map<String, RealtimeChannel> _groupMembersChannels = {};
 
   GroupsManagementNotifier(GroupsManagementState state) : super(state) {
-    initialize();
+    // REMOVED: initialize() call from constructor - let screen control initialization
   }
 
   @override

@@ -85,7 +85,38 @@ class CustomPublicMemories extends StatelessWidget {
     }
 
     final List<CustomMemoryItem> memoryList = memories ?? <CustomMemoryItem>[];
-    if (memoryList.isEmpty) return const SizedBox.shrink();
+
+    // ✅ EMPTY STATE: Same UI pattern as story feeds
+    if (memoryList.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.h),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CustomImageView(
+                imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
+                height: 48.h,
+                width: 48.h,
+                color: appTheme.blue_gray_300,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                'No memories yet',
+                style: TextStyleHelper.instance.title16MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                'Create your first memory',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
