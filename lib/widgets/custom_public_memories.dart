@@ -1,7 +1,10 @@
 import '../core/app_export.dart';
+import '../core/utils/image_constant.dart';
+import '../presentation/memories_dashboard_screen/memories_dashboard_screen.dart';
 import '../services/avatar_helper_service.dart';
 import '../services/story_service.dart';
 import '../services/supabase_service.dart';
+import '../theme/text_style_helper.dart';
 import './custom_image_view.dart';
 import './custom_memory_skeleton.dart';
 import './timeline_widget.dart';
@@ -48,21 +51,25 @@ class CustomPublicMemories extends StatelessWidget {
   }
 
   Widget _buildSectionHeader() {
-    return Row(
-      children: [
-        CustomImageView(
-          imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
-          height: 22.h,
-          width: 22.h,
-          color: appTheme.deep_purple_A100,
-        ),
-        SizedBox(width: 8.h),
-        Text(
-          sectionTitle ?? 'Public Memories',
-          style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-              .copyWith(color: appTheme.gray_50),
-        ),
-      ],
+    // ✅ ADD horizontal padding to section header (like story feeds)
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24.h),
+      child: Row(
+        children: [
+          CustomImageView(
+            imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
+            height: 22.h,
+            width: 22.h,
+            color: appTheme.deep_purple_A100,
+          ),
+          SizedBox(width: 8.h),
+          Text(
+            sectionTitle ?? 'Public Memories',
+            style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
+          ),
+        ],
+      ),
     );
   }
 
@@ -76,7 +83,11 @@ class CustomPublicMemories extends StatelessWidget {
           children: List.generate(3, (index) {
             return Container(
               width: 300.h,
-              margin: EdgeInsets.only(right: index == 2 ? 0 : 12.h),
+              // ✅ ADD left padding to first card, right padding to all
+              margin: EdgeInsets.only(
+                left: index == 0 ? 24.h : 0,
+                right: 12.h,
+              ),
               child: CustomMemorySkeleton(),
             );
           }),
@@ -86,38 +97,42 @@ class CustomPublicMemories extends StatelessWidget {
 
     final List<CustomMemoryItem> memoryList = memories ?? <CustomMemoryItem>[];
 
-    // ✅ EMPTY STATE: Same UI pattern as story feeds
+    // ✅ EMPTY STATE: Add horizontal padding
     if (memoryList.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.all(24.h),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CustomImageView(
-                imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
-                height: 48.h,
-                width: 48.h,
-                color: appTheme.blue_gray_300,
-              ),
-              SizedBox(height: 12.h),
-              Text(
-                'No memories yet',
-                style: TextStyleHelper.instance.title16MediumPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-              SizedBox(height: 4.h),
-              Text(
-                'Create your first memory',
-                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-            ],
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24.h),
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24.h),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CustomImageView(
+                  imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
+                  height: 48.h,
+                  width: 48.h,
+                  color: appTheme.blue_gray_300,
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  'No memories yet',
+                  style: TextStyleHelper.instance.title16MediumPlusJakartaSans
+                      .copyWith(color: appTheme.blue_gray_300),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  'Create your first memory',
+                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                      .copyWith(color: appTheme.blue_gray_300),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
+    // ✅ FIX: Add padding to FIRST card only (like story feeds)
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -125,7 +140,8 @@ class CustomPublicMemories extends StatelessWidget {
           final CustomMemoryItem memory = memoryList[index];
           return Container(
             margin: EdgeInsets.only(
-              right: index == memoryList.length - 1 ? 0 : 12.h,
+              left: index == 0 ? 24.h : 0, // ✅ First card gets left padding
+              right: 12.h,
             ),
             child: _PublicMemoryCard(
               memory: memory,

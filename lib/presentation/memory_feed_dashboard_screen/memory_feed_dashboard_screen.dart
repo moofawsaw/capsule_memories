@@ -1,7 +1,11 @@
 import '../../core/app_export.dart';
+import '../../core/utils/image_constant.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
+import '../../core/utils/navigator_service.dart';
+import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
+import '../../theme/text_style_helper.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_category_badge.dart';
 import '../../widgets/custom_image_view.dart';
@@ -630,7 +634,7 @@ class _MemoryFeedDashboardScreenState
               isPrivate: false, // Public memories are never private
             );
           },
-          margin: EdgeInsets.only(top: 30.h, left: 24.h),
+          margin: EdgeInsets.only(top: 30.h),
         );
       },
     );
@@ -685,7 +689,7 @@ class _MemoryFeedDashboardScreenState
               isPrivate: false, // Popular memories are public
             );
           },
-          margin: EdgeInsets.only(top: 30.h, left: 24.h),
+          margin: EdgeInsets.only(top: 30.h),
         );
       },
     );
