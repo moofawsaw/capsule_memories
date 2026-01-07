@@ -1,6 +1,7 @@
 import '../../../core/app_export.dart';
 import '../../../services/groups_service.dart';
 import '../../../services/memory_cache_service.dart';
+import '../../../services/memory_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../friends_management_screen/widgets/qr_scanner_overlay.dart';
@@ -20,6 +21,7 @@ final createMemoryNotifier =
 class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   final _storyService = StoryService();
   final _cacheService = MemoryCacheService();
+  final _memoryService = MemoryService();
 
   CreateMemoryNotifier(CreateMemoryState state) : super(state) {
     initialize();
@@ -331,10 +333,12 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   }
 
   Future<void> createMemory() async {
+    print('🎯 Create Memory button pressed');
+
     // Validate memory name
     final memoryName = state.memoryNameController?.text.trim();
     if (memoryName == null || memoryName.isEmpty) {
-      print('❌ CREATE MEMORY: Memory name is required');
+      print('❌ Memory name is required');
       return;
     }
 
@@ -346,6 +350,8 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       );
       return;
     }
+
+    print('✅ Form validation passed');
 
     // Get selected duration
     final duration = state.createMemoryModel?.selectedDuration ?? '12_hours';
@@ -364,51 +370,33 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       final visibility =
           state.createMemoryModel?.isPublic == true ? 'public' : 'private';
 
-      // Calculate expiration time based on duration
-      final now = DateTime.now();
-      DateTime expiresAt;
-      switch (duration) {
-        case '24_hours':
-          expiresAt = now.add(Duration(hours: 24));
-          break;
-        case '12_hours':
-          expiresAt = now.add(Duration(hours: 12));
-          break;
-        default:
-          expiresAt = now.add(Duration(hours: 12));
-      }
+      // Get invited user IDs from state
+      final invitedUserIds =
+          state.createMemoryModel?.invitedUserIds.toList() ?? [];
 
-      // Create memory in database directly using Supabase client
-      final supabase = SupabaseService.instance.client;
-      if (supabase == null) {
-        throw Exception('Supabase client not initialized');
-      }
+      print('📋 Creating memory with:');
+      print('   - Title: $memoryName');
+      print('   - Category: $categoryId');
+      print('   - Duration: $duration');
+      print('   - Visibility: $visibility');
+      print('   - Invited users: ${invitedUserIds.length}');
 
-      final memoryResponse = await supabase.from('memories').insert({
-        'title': memoryName,
-        'creator_id': currentUser.id,
-        'visibility': visibility,
-        'duration': duration,
-        'category_id': categoryId,
-        'expires_at': expiresAt.toIso8601String(),
-        'state': 'open',
-        'contributor_count': 1,
-      }).select('id').single();
-
-      final memoryId = memoryResponse['id'] as String?;
+      // CRITICAL FIX: Use MemoryService.createMemory instead of direct database insertion
+      // This ensures proper location fetching, geocoding, and contributor management
+      final memoryId = await _memoryService.createMemory(
+        title: memoryName,
+        creatorId: currentUser.id,
+        visibility: visibility,
+        duration: duration,
+        categoryId: categoryId,
+        invitedUserIds: invitedUserIds,
+      );
 
       if (memoryId == null) {
-        throw Exception('Failed to create memory');
+        throw Exception('Failed to create memory - service returned null');
       }
 
-      // Add creator as first contributor
-      await supabase.from('memory_contributors').insert({
-        'memory_id': memoryId,
-        'user_id': currentUser.id,
-        'role': 'creator',
-      });
-
-      print('✅ CREATE MEMORY: Memory created successfully with ID: $memoryId');
+      print('✅ Memory created successfully with ID: $memoryId');
 
       // Force refresh cache BEFORE navigation to ensure /memories screen shows new data
       await _cacheService.refreshMemoryCache(currentUser.id);
@@ -421,7 +409,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         errorMessage: null,
       );
 
-      print('🚀 CREATE MEMORY: Set shouldNavigateToConfirmation flag');
+      print('🚀 Set shouldNavigateToConfirmation flag');
 
       // Clear form and reset after a short delay to allow navigation to complete
       Future.delayed(Duration(milliseconds: 500), () {
@@ -443,11 +431,12 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
             ),
           );
 
-          print('✅ CREATE MEMORY: Form cleared and state reset');
+          print('✅ Form cleared and state reset');
         }
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ CREATE MEMORY: Error creating memory: $e');
+      print('   Stack trace: $stackTrace');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Failed to create memory. Please try again.',

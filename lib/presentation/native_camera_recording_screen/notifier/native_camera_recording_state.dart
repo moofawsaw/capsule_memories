@@ -1,17 +1,19 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+class NativeCameraRecordingState {
+  final dynamic nativeCameraRecordingModel;
+  final bool isRecording;
+  final bool isInitializing;
+  final String? recordedVideoPath;
+  final String? errorMessage;
+  final int? recordingDuration;
 
-part 'native_camera_recording_state.freezed.dart';
-
-@freezed
-class NativeCameraRecordingState with _$NativeCameraRecordingState {
-  const factory NativeCameraRecordingState({
-    NativeCameraRecordingModel? nativeCameraRecordingModel,
-    @Default(false) bool isRecording,
-    @Default(false) bool isInitializing,
-    String? recordedVideoPath,
-    String? errorMessage,
-    int? recordingDuration,
-  }) = _NativeCameraRecordingState;
+  const NativeCameraRecordingState({
+    this.nativeCameraRecordingModel,
+    this.isRecording = false,
+    this.isInitializing = false,
+    this.recordedVideoPath,
+    this.errorMessage,
+    this.recordingDuration,
+  });
 
   factory NativeCameraRecordingState.initial() =>
       const NativeCameraRecordingState();

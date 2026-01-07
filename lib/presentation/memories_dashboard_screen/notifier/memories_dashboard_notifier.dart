@@ -50,8 +50,9 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         return;
       }
 
-      // FIXED: Always load data from cache - removes stale data check that caused loading state issues
-      await _loadFromCache(currentUser.id);
+      // CRITICAL FIX: Force cache refresh on initialization to prevent stale data
+      // This ensures newly created memories appear immediately when navigating to this screen
+      await _loadFromCache(currentUser.id, forceRefresh: true);
 
       state = state.copyWith(
         isLoading: false,
@@ -67,13 +68,18 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     }
   }
 
-  Future<void> _loadFromCache(String userId) async {
+  Future<void> _loadFromCache(String userId,
+      {bool forceRefresh = false}) async {
     try {
-      print('🔍 MEMORIES DEBUG: Loading data from cache service');
+      print(
+          '🔍 MEMORIES DEBUG: Loading data from cache service (forceRefresh: $forceRefresh)');
 
-      // Load stories and memories from cache
-      final stories = await _cacheService.getStories(userId);
-      final memories = await _cacheService.getMemories(userId);
+      // CRITICAL FIX: Pass forceRefresh flag to cache service
+      // This ensures fresh data is fetched when needed (e.g., after memory creation)
+      final stories =
+          await _cacheService.getStories(userId, forceRefresh: forceRefresh);
+      final memories =
+          await _cacheService.getMemories(userId, forceRefresh: forceRefresh);
 
       print(
           '✅ MEMORIES DEBUG: Loaded ${stories.length} stories and ${memories.length} memories from cache');

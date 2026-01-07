@@ -45,7 +45,8 @@ class LocationService {
       print('📍 Fetching current location...');
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit:
+            const Duration(seconds: 15), // OPTIMIZED: Increased from 10s to 15s
       );
       print('✅ Location obtained: ${position.latitude}, ${position.longitude}');
 
@@ -60,21 +61,21 @@ class LocationService {
   }
 
   /// Reverse geocode coordinates to human-readable location with retry and validation
-  /// CRITICAL FIX: Added timeout, retry logic, and coordinate validation
+  /// OPTIMIZED: Enhanced geocoding with better retry logic and NULL fallback
   static Future<String?> getLocationName(
       double latitude, double longitude) async {
-    // Try geocoding with retries (max 3 attempts)
-    for (int attempt = 1; attempt <= 3; attempt++) {
+    // OPTIMIZED: Increased retry attempts from 3 to 4 for better success rate
+    for (int attempt = 1; attempt <= 4; attempt++) {
       try {
         print(
-            '🗺️ GEOCODING ATTEMPT $attempt: Starting reverse geocoding for ($latitude, $longitude)');
+            '🗺️ GEOCODING ATTEMPT $attempt/4: Starting reverse geocoding for ($latitude, $longitude)');
 
-        // Add explicit timeout for geocoding operation
+        // OPTIMIZED: Increased timeout from 10s to 15s per attempt
         final placemarks =
             await placemarkFromCoordinates(latitude, longitude).timeout(
-          Duration(seconds: 10),
+          Duration(seconds: 15),
           onTimeout: () {
-            print('⏱️ GEOCODING ATTEMPT $attempt: Timeout after 10 seconds');
+            print('⏱️ GEOCODING ATTEMPT $attempt: Timeout after 15 seconds');
             return <Placemark>[];
           },
         );
@@ -82,15 +83,20 @@ class LocationService {
         if (placemarks.isEmpty) {
           print(
               '⚠️ GEOCODING ATTEMPT $attempt: No placemarks found, retrying...');
-          if (attempt < 3) {
-            await Future.delayed(Duration(seconds: 2)); // Wait before retry
+          if (attempt < 4) {
+            // OPTIMIZED: Progressive backoff - wait longer between retries
+            final waitTime = attempt * 2; // 2s, 4s, 6s
+            print('⏳ Waiting ${waitTime}s before retry...');
+            await Future.delayed(Duration(seconds: waitTime));
             continue;
           }
+          // CRITICAL FIX: Return NULL instead of coordinates when geocoding fails
           print(
-              '❌ GEOCODING: All attempts failed - no placemarks found, returning coordinates');
-          return '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}';
+              '❌ GEOCODING: All 4 attempts failed - returning NULL for location_name');
+          return null;
         }
 
+        // CRITICAL FIX: Safely access first placemark with null check
         final placemark = placemarks.first;
 
         print('📍 GEOCODING ATTEMPT $attempt: Placemark details:');
@@ -128,70 +134,93 @@ class LocationService {
             if (isCoordinates) {
               print(
                   '⚠️ GEOCODING ATTEMPT $attempt: Result looks like coordinates ($formattedLocation), retrying...');
-              if (attempt < 3) {
-                await Future.delayed(Duration(seconds: 2));
+              if (attempt < 4) {
+                final waitTime = attempt * 2;
+                print('⏳ Waiting ${waitTime}s before retry...');
+                await Future.delayed(Duration(seconds: waitTime));
                 continue;
               }
-              // Last attempt failed - return coordinates as fallback
+              // CRITICAL FIX: Return NULL instead of coordinates
               print(
-                  '❌ GEOCODING: All attempts returned coordinates, using fallback');
-              return '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}';
+                  '❌ GEOCODING: All attempts returned coordinates, returning NULL');
+              return null;
             }
           }
 
           // Success - we have a proper city/state format
-          print(
-              '✅ GEOCODING: Successfully formatted location: $formattedLocation');
+          print('✅ GEOCODING SUCCESS: Location name = "$formattedLocation"');
           return formattedLocation;
         }
 
         // No valid city found on this attempt
         print(
             '⚠️ GEOCODING ATTEMPT $attempt: No valid city/state found, retrying...');
-        if (attempt < 3) {
-          await Future.delayed(Duration(seconds: 2));
+        if (attempt < 4) {
+          final waitTime = attempt * 2;
+          print('⏳ Waiting ${waitTime}s before retry...');
+          await Future.delayed(Duration(seconds: waitTime));
           continue;
         }
 
-        // Fallback to coordinates after all retries
-        print('❌ GEOCODING: All attempts failed, returning coordinates');
-        return '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}';
+        // CRITICAL FIX: Return NULL instead of coordinates after all retries
+        print('❌ GEOCODING: All attempts failed, returning NULL');
+        return null;
       } catch (e) {
-        print('❌ GEOCODING ATTEMPT $attempt: Error: $e');
-        if (attempt < 3) {
-          await Future.delayed(Duration(seconds: 2));
+        print('❌ GEOCODING ATTEMPT $attempt ERROR: $e');
+        if (attempt < 4) {
+          final waitTime = attempt * 2;
+          print('⏳ Waiting ${waitTime}s before retry...');
+          await Future.delayed(Duration(seconds: waitTime));
           continue;
         }
-        // Return coordinates as final fallback
-        return '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}';
+        // CRITICAL FIX: Return NULL instead of coordinates on error
+        print('❌ GEOCODING: All attempts encountered errors, returning NULL');
+        return null;
       }
     }
 
-    // Should never reach here, but return coordinates as ultimate fallback
-    return '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}';
+    // CRITICAL FIX: Ultimate fallback is NULL, not coordinates
+    print('❌ GEOCODING: Final fallback - returning NULL');
+    return null;
   }
 
   /// Get location data with formatted name
+  /// OPTIMIZED: Better timeout handling and validation
   static Future<Map<String, dynamic>?> getLocationData() async {
     try {
       print('🌍 Starting location data fetch...');
       final position = await getCurrentLocation();
       if (position == null) {
-        print('❌ No position obtained');
+        print('❌ No position obtained - returning NULL');
         return null;
       }
 
       print('🗺️ Reverse geocoding location...');
+      // OPTIMIZED: Wrap geocoding in timeout to prevent hanging
       final locationName = await getLocationName(
         position.latitude,
         position.longitude,
+      ).timeout(
+        Duration(seconds: 60), // Total 60s timeout for all 4 retry attempts
+        onTimeout: () {
+          print('⏱️ Geocoding timed out after 60 seconds total');
+          return null;
+        },
       );
 
-      print('✅ Location data complete: $locationName');
+      // CRITICAL VALIDATION: Check if we got a real city name
+      if (locationName != null) {
+        print('✅ Location data complete: "$locationName"');
+        print('   Coordinates: ${position.latitude}, ${position.longitude}');
+      } else {
+        print('⚠️ Geocoding failed - location_name will be NULL');
+        print('   Coordinates: ${position.latitude}, ${position.longitude}');
+      }
+
       return {
         'latitude': position.latitude,
         'longitude': position.longitude,
-        'location_name': locationName,
+        'location_name': locationName, // Will be NULL if geocoding failed
       };
     } catch (e) {
       print('⚠️ Failed to get location data: $e');
