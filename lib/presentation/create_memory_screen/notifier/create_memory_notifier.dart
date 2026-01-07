@@ -364,19 +364,49 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       final visibility =
           state.createMemoryModel?.isPublic == true ? 'public' : 'private';
 
-      // Create memory in database (without any invites initially)
-      final memoryId = await _storyService.createMemory(
-        title: memoryName,
-        creatorId: currentUser.id,
-        visibility: visibility,
-        duration: duration,
-        categoryId: categoryId,
-        invitedUserIds: [], // Empty - invites will be sent from confirmation screen
-      );
+      // Calculate expiration time based on duration
+      final now = DateTime.now();
+      DateTime expiresAt;
+      switch (duration) {
+        case '24_hours':
+          expiresAt = now.add(Duration(hours: 24));
+          break;
+        case '12_hours':
+          expiresAt = now.add(Duration(hours: 12));
+          break;
+        default:
+          expiresAt = now.add(Duration(hours: 12));
+      }
+
+      // Create memory in database directly using Supabase client
+      final supabase = SupabaseService.instance.client;
+      if (supabase == null) {
+        throw Exception('Supabase client not initialized');
+      }
+
+      final memoryResponse = await supabase.from('memories').insert({
+        'title': memoryName,
+        'creator_id': currentUser.id,
+        'visibility': visibility,
+        'duration': duration,
+        'category_id': categoryId,
+        'expires_at': expiresAt.toIso8601String(),
+        'state': 'open',
+        'contributor_count': 1,
+      }).select('id').single();
+
+      final memoryId = memoryResponse['id'] as String?;
 
       if (memoryId == null) {
         throw Exception('Failed to create memory');
       }
+
+      // Add creator as first contributor
+      await supabase.from('memory_contributors').insert({
+        'memory_id': memoryId,
+        'user_id': currentUser.id,
+        'role': 'creator',
+      });
 
       print('✅ CREATE MEMORY: Memory created successfully with ID: $memoryId');
 

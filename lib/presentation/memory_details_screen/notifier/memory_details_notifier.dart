@@ -4,7 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/app_export.dart';
 import '../../../services/avatar_helper_service.dart';
 import '../../../services/friends_service.dart';
-import '../../../services/location_service.dart';
+import '../../../services/memory_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../../widgets/custom_button.dart';
 import '../models/memory_details_model.dart';
@@ -24,6 +24,7 @@ final memoryDetailsNotifier = StateNotifierProvider.autoDispose<
 class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
   final Ref ref;
   final FriendsService _friendsService = FriendsService();
+  final MemoryService _memoryService = MemoryService();
 
   MemoryDetailsNotifier(MemoryDetailsState state, {required this.ref})
       : super(state);
@@ -408,16 +409,18 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     );
   }
 
-  /// NEW: Fetch current location
+  /// NEW: Fetch current location using MemoryService
+  /// This ensures location handling is consistent with memory creation
   Future<void> fetchCurrentLocation() async {
     if (!state.isCreator) return;
 
     state = state.copyWith(isFetchingLocation: true);
 
     try {
-      // Add timeout wrapper to prevent infinite loading
+      // Use MemoryService to update location with proper geocoding
+      // This ensures location_name is formatted as "City, State" format
       final locationData = await Future.any([
-        LocationService.getLocationData(),
+        _memoryService.updateMemoryLocation(state.memoryId ?? ''),
         Future.delayed(
           const Duration(seconds: 15),
           () => null,
@@ -427,7 +430,7 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
       if (locationData != null) {
         // CRITICAL: LocationService.getLocationData() already returns properly formatted location_name
         // Format: "City, State" (e.g., "Toronto, ON" or "Dallas, TX")
-        // This matches the exact same process used during story creation
+        // This matches the exact same process used during memory and story creation
         final newLocationName = locationData['location_name'] as String?;
 
         // Update both state and controller

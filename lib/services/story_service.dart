@@ -1,6 +1,5 @@
 import './supabase_service.dart';
 import './avatar_helper_service.dart';
-import './location_service.dart';
 
 class StoryService {
   final _supabase = SupabaseService.instance.client;
@@ -630,94 +629,6 @@ class StoryService {
       print('❌ STORY SERVICE: Error fetching story details: $e');
       return null;
     }
-  }
-
-  /// Create a new memory in the database
-  Future<String?> createMemory({
-    required String title,
-    required String creatorId,
-    required String visibility,
-    required String duration,
-    String? categoryId,
-    List<String>? invitedUserIds,
-  }) async {
-    try {
-      // ADDED: Fetch user's current location
-      print(
-          '📍 FETCHING LOCATION: Getting user location for memory creation...');
-      final locationData = await LocationService.getLocationData();
-
-      if (locationData != null) {
-        print(
-            '✅ LOCATION FETCHED: ${locationData['location_name']} (${locationData['latitude']}, ${locationData['longitude']})');
-      } else {
-        print(
-            '⚠️ LOCATION UNAVAILABLE: Memory will be created without location');
-      }
-
-      // Create memory with location data
-      final response = await _supabase?.from('memories').insert({
-        'title': title,
-        'creator_id': creatorId,
-        'visibility': visibility,
-        'duration': duration,
-        if (categoryId != null) 'category_id': categoryId,
-        'expires_at': _calculateExpirationTime(duration).toIso8601String(),
-        // ADDED: Include location fields if location was successfully fetched
-        if (locationData != null) ...{
-          'location_name': locationData['location_name'],
-          'location_lat': locationData['latitude'],
-          'location_lng': locationData['longitude'],
-        },
-      }).select();
-
-      if (response == null || response.isEmpty) {
-        throw Exception('Failed to create memory');
-      }
-
-      final memoryId = response.first['id'] as String;
-      print(
-          '✅ MEMORY CREATED: $memoryId with location: ${locationData?['location_name'] ?? 'No location'}');
-
-      // Add contributors if provided
-      if (invitedUserIds != null && invitedUserIds.isNotEmpty) {
-        // Filter out invalid UUIDs (like mock user IDs: "user1", "user2", etc.)
-        final validUserIds =
-            invitedUserIds.where((userId) => _isValidUUID(userId)).toList();
-
-        if (validUserIds.isNotEmpty) {
-          final contributorInserts = validUserIds
-              .map<Map<String, dynamic>>((userId) => {
-                    'memory_id': memoryId,
-                    'user_id': userId,
-                  })
-              .toList();
-
-          await _supabase
-              ?.from('memory_contributors')
-              .insert(contributorInserts);
-        } else {
-          print(
-              '⚠️ CREATE MEMORY: No valid UUIDs found in invited user IDs, skipping contributor inserts');
-        }
-      }
-
-      return memoryId;
-    } catch (e) {
-      print('❌ ERROR CREATING MEMORY: $e');
-      return null;
-    }
-  }
-
-  /// Check if a string is a valid UUID format
-  bool _isValidUUID(String? value) {
-    if (value == null || value.isEmpty) return false;
-    // UUID format: 8-4-4-4-12 hexadecimal characters
-    final uuidRegex = RegExp(
-      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-      caseSensitive: false,
-    );
-    return uuidRegex.hasMatch(value);
   }
 
   /// Calculate expiration time based on duration

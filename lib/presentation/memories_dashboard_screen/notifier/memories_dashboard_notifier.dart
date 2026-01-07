@@ -21,6 +21,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   // NEW: Real-time subscription channels
   RealtimeChannel? _storiesChannel;
   RealtimeChannel? _memoriesChannel;
+  RealtimeChannel? _contributorsChannel; // NEW: Listen to contributor joins
   bool _isDisposed = false;
 
   MemoriesDashboardNotifier()
@@ -273,6 +274,17 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
           )
           .subscribe();
 
+      // NEW: Subscribe to memory_contributors to detect when user joins memories
+      _contributorsChannel = client
+          .channel('memories_dashboard:contributors')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'memory_contributors',
+            callback: _handleContributorJoin,
+          )
+          .subscribe();
+
       print('✅ REALTIME: Subscriptions setup complete for memories dashboard');
     } catch (e) {
       print('❌ REALTIME: Error setting up subscriptions: $e');
@@ -408,6 +420,139 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     }
   }
 
+  /// NEW METHOD: Handle when user joins a memory as contributor
+  void _handleContributorJoin(PostgresChangePayload payload) async {
+    if (_isDisposed) return;
+
+    print(
+        '🔔 REALTIME: New contributor detected: ${payload.newRecord['user_id']} joined memory ${payload.newRecord['memory_id']}');
+
+    try {
+      final contributorUserId = payload.newRecord['user_id'] as String;
+      final memoryId = payload.newRecord['memory_id'] as String;
+      final client = SupabaseService.instance.client;
+
+      if (client == null) return;
+
+      final currentUserId = client.auth.currentUser?.id;
+      if (currentUserId == null) return;
+
+      // Only process if this is the current user joining the memory
+      if (contributorUserId != currentUserId) return;
+
+      print(
+          '✅ REALTIME: Current user joined memory $memoryId - fetching details...');
+
+      // Fetch full memory details for the joined memory
+      final response = await client.from('memories').select('''
+            id,
+            title,
+            start_time,
+            end_time,
+            location_name,
+            state,
+            creator_id,
+            memory_categories(
+              id,
+              name,
+              icon_url
+            ),
+            memory_contributors(
+              user_profiles(
+                avatar_url
+              )
+            )
+          ''').eq('id', memoryId).single();
+
+      if (_isDisposed) return;
+
+      final contributors = response['memory_contributors'] as List? ?? [];
+      final category = response['memory_categories'] as Map<String, dynamic>?;
+      final creatorId = response['creator_id'] as String;
+
+      // CRITICAL FIX: Add null check and error handling for date parsing
+      String? startTimeStr = response['start_time'] as String?;
+      String? endTimeStr = response['end_time'] as String?;
+
+      // Validate date strings before parsing
+      if (startTimeStr == null || startTimeStr.isEmpty) {
+        print('❌ REALTIME: Invalid start_time in contributor join - skipping');
+        return;
+      }
+
+      if (endTimeStr == null || endTimeStr.isEmpty) {
+        print('❌ REALTIME: Invalid end_time in contributor join - skipping');
+        return;
+      }
+
+      // CRITICAL FIX: Add try-catch around date parsing to prevent FormatException
+      DateTime? startTime;
+
+      try {
+        startTime = DateTime.parse(startTimeStr);
+      } catch (e) {
+        print(
+            '❌ REALTIME: FormatException parsing start_time in contributor join: $startTimeStr - $e');
+        return;
+      }
+
+      final newMemoryItem = MemoryItemModel(
+        id: response['id'],
+        title: response['title'],
+        date: startTime.toString(),
+        eventDate: startTimeStr,
+        eventTime: startTimeStr,
+        endDate: endTimeStr,
+        endTime: endTimeStr,
+        location: response['location_name'] ?? '',
+        distance: '',
+        categoryIconUrl: category?['icon_url'] ?? '',
+        categoryName: category?['name'] ?? '',
+        participantAvatars: contributors
+            .map((c) => c['user_profiles']?['avatar_url'] as String? ?? '')
+            .where((url) => url.isNotEmpty)
+            .toList(),
+        state: response['state'] ?? 'open',
+        creatorId: creatorId,
+      );
+
+      // Check if memory already exists in the list (prevent duplicates)
+      final currentMemories = state.memoriesDashboardModel?.memoryItems ?? [];
+      final memoryExists = currentMemories.any((m) => m.id == memoryId);
+
+      if (memoryExists) {
+        print(
+            '⚠️ REALTIME: Memory $memoryId already exists in feed - skipping');
+        return;
+      }
+
+      // Add to beginning of memories list
+      final updatedMemories = [newMemoryItem, ...currentMemories];
+
+      // Recalculate counts
+      final liveMemories =
+          updatedMemories.where((m) => m.state == 'open').toList();
+      final sealedMemories =
+          updatedMemories.where((m) => m.state == 'sealed').toList();
+
+      final updatedModel = state.memoriesDashboardModel?.copyWith(
+        memoryItems: updatedMemories.cast<MemoryItemModel>(),
+        liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
+        sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
+        allCount: updatedMemories.length,
+        liveCount: liveMemories.length,
+        sealedCount: sealedMemories.length,
+      );
+
+      _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
+
+      print(
+          '✅ REALTIME: Joined memory added to dashboard - ${updatedMemories.length} total memories');
+    } catch (e) {
+      print('❌ REALTIME: Error handling contributor join: $e');
+    }
+  }
+
   /// NEW METHOD: Handle new memory inserted
   void _handleNewMemory(PostgresChangePayload payload) async {
     if (_isDisposed) return;
@@ -434,7 +579,10 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
             start_time,
             end_time,
             location_name,
+            location_lat,
+            location_lng,
             state,
+            creator_id,
             memory_categories(
               id,
               name,
@@ -452,15 +600,84 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final contributors = response['memory_contributors'] as List? ?? [];
       final category = response['memory_categories'] as Map<String, dynamic>?;
 
+      // CRITICAL FIX: Add comprehensive null/empty validation for ALL date fields
+      // This prevents FormatException when realtime receives invalid date data
+      String? startTimeStr = response['start_time'] as String?;
+      String? endTimeStr = response['end_time'] as String?;
+
+      // ENHANCED VALIDATION: Check for null, empty, and whitespace-only strings
+      if (startTimeStr == null || startTimeStr.trim().isEmpty) {
+        print('❌ REALTIME: Invalid or null start_time - skipping memory');
+        return;
+      }
+
+      if (endTimeStr == null || endTimeStr.trim().isEmpty) {
+        print('❌ REALTIME: Invalid or null end_time - skipping memory');
+        return;
+      }
+
+      // CRITICAL FIX: Add try-catch around date parsing to prevent FormatException
+      DateTime? startTime;
+      DateTime? endTime;
+
+      try {
+        startTime = DateTime.parse(startTimeStr.trim());
+      } catch (e) {
+        print(
+            '❌ REALTIME: FormatException parsing start_time: "$startTimeStr" - $e');
+        return;
+      }
+
+      try {
+        endTime = DateTime.parse(endTimeStr.trim());
+      } catch (e) {
+        print(
+            '❌ REALTIME: FormatException parsing end_time: "$endTimeStr" - $e');
+        return;
+      }
+
+      // CRITICAL FIX: Add location data validation and logging
+      final locationName = response['location_name'] as String?;
+      final locationLat = response['location_lat'];
+      final locationLng = response['location_lng'];
+
+      print('📍 REALTIME: Location data received:');
+      print('   - location_name: $locationName');
+      print('   - location_lat: $locationLat');
+      print('   - location_lng: $locationLng');
+
+      // Validate location data format
+      if (locationName == null || locationName.isEmpty) {
+        print(
+            '⚠️ REALTIME: location_name is NULL or EMPTY in realtime payload');
+      } else {
+        // Check if location_name is still in coordinate format
+        final parts = locationName.split(',');
+        if (parts.length == 2) {
+          final firstPart = parts[0].trim();
+          final secondPart = parts[1].trim();
+          final isCoordinates = double.tryParse(firstPart) != null &&
+              double.tryParse(secondPart) != null;
+
+          if (isCoordinates) {
+            print(
+                '❌ REALTIME: location_name contains COORDINATES instead of City, State: "$locationName"');
+          } else {
+            print(
+                '✅ REALTIME: location_name properly formatted: "$locationName"');
+          }
+        }
+      }
+
       final newMemoryItem = MemoryItemModel(
         id: response['id'],
         title: response['title'],
-        date: DateTime.parse(response['start_time']).toString(),
-        eventDate: response['start_time'],
-        eventTime: response['start_time'],
-        endDate: response['end_time'],
-        endTime: response['end_time'],
-        location: response['location_name'] ?? '',
+        date: startTime.toString(),
+        eventDate: startTimeStr,
+        eventTime: startTimeStr,
+        endDate: endTimeStr,
+        endTime: endTimeStr,
+        location: locationName ?? '',
         distance: '',
         categoryIconUrl: category?['icon_url'] ?? '',
         categoryName: category?['name'] ?? '',
@@ -476,8 +693,19 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final currentMemories = state.memoriesDashboardModel?.memoryItems ?? [];
       final updatedMemories = [newMemoryItem, ...currentMemories];
 
+      // Recalculate counts
+      final liveMemories =
+          updatedMemories.where((m) => m.state == 'open').toList();
+      final sealedMemories =
+          updatedMemories.where((m) => m.state == 'sealed').toList();
+
       final updatedModel = state.memoriesDashboardModel?.copyWith(
         memoryItems: updatedMemories.cast<MemoryItemModel>(),
+        liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
+        sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
+        allCount: updatedMemories.length,
+        liveCount: liveMemories.length,
+        sealedCount: sealedMemories.length,
       );
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
@@ -577,6 +805,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     try {
       _storiesChannel?.unsubscribe();
       _memoriesChannel?.unsubscribe();
+      _contributorsChannel?.unsubscribe(); // NEW: Clean up contributors channel
       print('✅ REALTIME: Subscriptions cleaned up');
     } catch (e) {
       print('⚠️ REALTIME: Error cleaning up subscriptions: $e');
