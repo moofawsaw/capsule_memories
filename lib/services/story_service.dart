@@ -1,5 +1,6 @@
-import './supabase_service.dart';
 import './avatar_helper_service.dart';
+import './location_service.dart';
+import './supabase_service.dart';
 
 class StoryService {
   final _supabase = SupabaseService.instance.client;
@@ -335,6 +336,121 @@ class StoryService {
     } catch (e) {
       print('❌ STORY SERVICE: Error fetching memory stories: $e');
       rethrow;
+    }
+  }
+
+  /// Create a new story with real location data matching memory creation pattern
+  /// Uses LocationService to fetch coordinates and geocode to "City, State" format
+  /// OPTIMIZED: Identical process to MemoryService.createMemory() for consistency
+  Future<Map<String, dynamic>?> createStory({
+    required String memoryId,
+    required String contributorId,
+    required String mediaUrl,
+    required String mediaType,
+    String? thumbnailUrl,
+    String? caption,
+    int? durationSeconds,
+  }) async {
+    try {
+      print('🚀 STORY CREATION START: Creating story for memory $memoryId');
+
+      // STEP 1: Fetch location data with proper geocoding using LocationService
+      // If geocoding fails after all retries, location_name will be NULL
+      print('📍 STORY CREATION: Fetching location data...');
+      final locationData = await LocationService.getLocationData();
+
+      double? latitude;
+      double? longitude;
+      String? locationName;
+
+      if (locationData != null) {
+        latitude = locationData['latitude'];
+        longitude = locationData['longitude'];
+        locationName = locationData['location_name'];
+
+        print('✅ STORY LOCATION DATA OBTAINED:');
+        print('   - Latitude: $latitude');
+        print('   - Longitude: $longitude');
+        print(
+            '   - Location Name: ${locationName ?? "NULL (geocoding failed)"}');
+      } else {
+        print('⚠️ STORY CREATION: LocationService returned NULL');
+        print('   Story will be created without location data');
+      }
+
+      // STEP 2: Create story with location data
+      print('💾 STORY CREATION: Inserting into database...');
+      final now = DateTime.now().toUtc();
+      final storyData = {
+        'memory_id': memoryId,
+        'contributor_id': contributorId,
+        'image_url': mediaType == 'image' ? mediaUrl : null,
+        'video_url': mediaType == 'video' ? mediaUrl : null,
+        'thumbnail_url': thumbnailUrl,
+        'media_type': mediaType,
+        'location_lat': latitude,
+        'location_lng': longitude,
+        'location_name': locationName,
+        'created_at': now.toIso8601String(),
+        'capture_timestamp': now.toIso8601String(),
+        'duration_seconds': durationSeconds,
+        'text_overlays': caption != null
+            ? [
+                {'text': caption}
+              ]
+            : [],
+      };
+
+      print('📝 STORY DATA TO INSERT:');
+      print('   - memory_id: $memoryId');
+      print('   - contributor_id: $contributorId');
+      print('   - media_type: $mediaType');
+      print('   - latitude: ${latitude ?? "NULL"}');
+      print('   - longitude: ${longitude ?? "NULL"}');
+      print('   - location_name: ${locationName ?? "NULL"}');
+
+      final response =
+          await _supabase?.from('stories').insert(storyData).select('''
+            id,
+            location_name,
+            location_lat,
+            location_lng,
+            user_profiles!stories_contributor_id_fkey (
+              id,
+              display_name,
+              avatar_url,
+              username
+            )
+          ''').single();
+
+      final storyId = response?['id'] as String?;
+      final dbLocationName = response?['location_name'] as String?;
+      final dbLocationLat = response?['location_lat'];
+      final dbLocationLng = response?['location_lng'];
+
+      if (storyId == null) {
+        print('❌ STORY CREATION: Story ID not returned from database');
+        return null;
+      }
+
+      print('✅ STORY CREATION: Story inserted with ID: $storyId');
+      print('🔍 STORY CREATION: Database validation:');
+      print(
+          '   - location_name: ${dbLocationName ?? 'NULL (location unavailable)'}');
+      print('   - location_lat: $dbLocationLat');
+      print('   - location_lng: $dbLocationLng');
+
+      print('🎉 STORY CREATION COMPLETE: Story created successfully');
+      print('   Final story ID: $storyId');
+      print(
+          '   Final location_name: ${dbLocationName ?? 'NULL (location unavailable)'}');
+
+      return response;
+    } catch (e, stackTrace) {
+      print('❌ STORY CREATION FAILED: Error creating story');
+      print('   Error: $e');
+      print('   Stack trace: $stackTrace');
+      return null;
     }
   }
 
