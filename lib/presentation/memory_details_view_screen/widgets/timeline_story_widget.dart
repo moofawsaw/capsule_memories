@@ -1,20 +1,5 @@
 import '../../../core/app_export.dart';
-
-class TimelineStoryItem {
-  final String backgroundImage;
-  final String userAvatar;
-  final DateTime postedAt;
-  final String timeLabel;
-  final String? storyId;
-
-  const TimelineStoryItem({
-    required this.backgroundImage,
-    required this.userAvatar,
-    required this.postedAt,
-    required this.timeLabel,
-    this.storyId,
-  });
-}
+import '../../../widgets/timeline_widget.dart';
 
 class TimelineStoryWidget extends StatelessWidget {
   final TimelineStoryItem item;
@@ -69,7 +54,7 @@ class TimelineStoryWidget extends StatelessWidget {
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  item.timeLabel,
+                  item.timeLabel ?? '',
                   style: TextStyleHelper.instance.body12MediumPlusJakartaSans
                       .copyWith(color: appTheme.blue_gray_300),
                 ),

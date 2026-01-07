@@ -1,5 +1,5 @@
 import '../../../core/app_export.dart';
-import '../widgets/timeline_story_widget.dart';
+import '../../../widgets/timeline_widget.dart';
 
 class TimelineDetailModel extends Equatable {
   final String centerLocation;

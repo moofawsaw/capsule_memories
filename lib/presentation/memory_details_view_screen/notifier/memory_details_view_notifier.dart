@@ -7,7 +7,7 @@ import '../../../services/supabase_service.dart';
 import '../../../widgets/custom_story_list.dart';
 import '../models/memory_details_view_model.dart';
 import '../models/timeline_detail_model.dart';
-import '../widgets/timeline_story_widget.dart';
+import '../../../widgets/timeline_widget.dart' as timeline_widget;
 
 part 'memory_details_view_state.dart';
 
@@ -25,6 +25,30 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
   MemoryDetailsViewNotifier() : super(MemoryDetailsViewState());
 
   List<String> get currentMemoryStoryIds => _currentMemoryStoryIds;
+
+  /// Parse any Supabase timestamp into a UTC DateTime consistently.
+  /// Handles:
+  /// - DateTime objects (keeps UTC)
+  /// - ISO strings with timezone (Z or +/-HH:MM)
+  /// - "naive" ISO strings (no timezone) -> treat as UTC by appending "Z"
+  DateTime _parseUtc(dynamic value) {
+    if (value == null) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+
+    if (value is DateTime) {
+      return value.isUtc ? value : value.toUtc();
+    }
+
+    final s = value.toString().trim();
+    if (s.isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+
+    final hasTz = s.endsWith('Z') || RegExp(r'[\+\-]\d\d:\d\d$').hasMatch(s);
+    final dt = DateTime.parse(hasTz ? s : '${s}Z');
+    return dt.toUtc();
+  }
 
   void initializeFromMemory(MemoryNavArgs navArgs) async {
     print('🚨 SEALED NOTIFIER: initializeFromMemory with MemoryNavArgs');
@@ -104,18 +128,19 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
       if (memoryResponse != null &&
           memoryResponse['start_time'] != null &&
           memoryResponse['end_time'] != null) {
-        memoryStartTime =
-            DateTime.parse(memoryResponse['start_time'] as String);
-        memoryEndTime = DateTime.parse(memoryResponse['end_time'] as String);
+        // CRITICAL FIX: Normalize to UTC consistently
+        memoryStartTime = _parseUtc(memoryResponse['start_time']);
+        memoryEndTime = _parseUtc(memoryResponse['end_time']);
 
-        print('✅ SEALED DEBUG: Using memory window timestamps:');
-        print('   - Event start: $memoryStartTime');
-        print('   - Event end: $memoryEndTime');
+        print(
+            '✅ SEALED DEBUG: Using memory window timestamps (UTC-normalized):');
+        print('   - Event start: ${memoryStartTime.toIso8601String()}');
+        print('   - Event end:   ${memoryEndTime.toIso8601String()}');
       } else {
         if (storiesData.isNotEmpty) {
-          final storyTimes = storiesData
-              .map((s) => DateTime.parse(s['created_at'] as String))
-              .toList();
+          // CRITICAL FIX: Normalize story timestamps to UTC consistently
+          final storyTimes =
+              storiesData.map((s) => _parseUtc(s['created_at'])).toList();
           storyTimes.sort();
 
           memoryStartTime = storyTimes.first;
@@ -124,15 +149,20 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
           final padding = memoryEndTime.difference(memoryStartTime) * 0.1;
           memoryStartTime = memoryStartTime.subtract(padding);
           memoryEndTime = memoryEndTime.add(padding);
+
+          print(
+              '⚠️ SEALED DEBUG: Memory window unavailable, using story range with padding (UTC-normalized)');
+          print('   - Derived start: ${memoryStartTime.toIso8601String()}');
+          print('   - Derived end:   ${memoryEndTime.toIso8601String()}');
         } else {
-          memoryEndTime = DateTime.now();
-          memoryStartTime = memoryEndTime.subtract(Duration(hours: 2));
+          memoryEndTime = DateTime.now().toUtc();
+          memoryStartTime = memoryEndTime.subtract(const Duration(hours: 2));
         }
       }
 
       final storyItems = storiesData.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
-        final createdAt = DateTime.parse(storyData['created_at'] as String);
+        final createdAt = _parseUtc(storyData['created_at']);
 
         final backgroundImage = _storyService.getStoryMediaUrl(storyData);
         final profileImage = AvatarHelperService.getAvatarUrl(
@@ -149,7 +179,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
 
       final timelineStories = storiesData.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
-        final createdAt = DateTime.parse(storyData['created_at'] as String);
+        final createdAt = _parseUtc(storyData['created_at']);
         final storyId = storyData['id'] as String;
 
         final backgroundImage = _storyService.getStoryMediaUrl(storyData);
@@ -157,10 +187,15 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
           contributor?['avatar_url'] as String?,
         );
 
-        return TimelineStoryItem(
+        // Optional debug: check spacing math
+        final diffMin = createdAt.difference(memoryStartTime).inMinutes;
+        print(
+            '🧭 SEALED TIMELINE DIFF: story=$storyId diffMin=$diffMin createdAt=${createdAt.toIso8601String()} start=${memoryStartTime.toIso8601String()}');
+
+        return timeline_widget.TimelineStoryItem(
           backgroundImage: backgroundImage,
           userAvatar: profileImage,
-          postedAt: createdAt,
+          postedAt: createdAt, // UTC-normalized
           timeLabel: _storyService.getTimeAgo(createdAt),
           storyId: storyId,
         );
@@ -168,6 +203,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
 
       state = state.copyWith(
         memoryDetailsViewModel: state.memoryDetailsViewModel?.copyWith(
+          customStoryItems: timelineStories,
           timelineDetail: TimelineDetailModel(
             centerLocation:
                 state.memoryDetailsViewModel?.timelineDetail?.centerLocation ??
