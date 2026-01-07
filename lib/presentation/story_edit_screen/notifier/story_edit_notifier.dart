@@ -62,16 +62,17 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
 
       // Get temporary directory for storing thumbnail
       final tempDir = await getTemporaryDirectory();
-      final thumbnailPath = '${tempDir.path}/thumb_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final thumbnailPath =
+          '${tempDir.path}/thumb_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
       // Generate thumbnail at 1 second mark (or first frame if video is shorter)
       final thumbnail = await VideoThumbnail.thumbnailFile(
         video: videoPath,
         thumbnailPath: thumbnailPath,
         imageFormat: ImageFormat.JPEG,
-        maxWidth: 400,  // Reasonable size for thumbnails
-        quality: 75,    // Good balance of quality vs size
-        timeMs: 1000,   // 1 second into video
+        maxWidth: 400, // Reasonable size for thumbnails
+        quality: 75, // Good balance of quality vs size
+        timeMs: 1000, // 1 second into video
       );
 
       if (thumbnail != null) {
@@ -181,15 +182,18 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       final storyId = _uuid.v4();
       print('🆔 Generated Story ID: $storyId');
 
-      // Capture location data (non-blocking)
-      print('📍 Attempting to capture location...');
+      // FIXED: Use geocoding service to get proper location name (city/state format)
+      print(
+          '📍 FETCHING LOCATION: Getting user location for story creation...');
       Map<String, dynamic>? locationData;
       try {
         locationData = await LocationService.getLocationData();
         if (locationData != null) {
-          print('✅ Location captured: ${locationData['location_name']}');
+          print(
+              '✅ LOCATION FETCHED: ${locationData['location_name']} (${locationData['latitude']}, ${locationData['longitude']})');
         } else {
-          print('⚠️ Location capture skipped (permission denied or unavailable)');
+          print(
+              '⚠️ LOCATION UNAVAILABLE: Story will be created without location');
         }
       } catch (e) {
         print('⚠️ Location capture failed: $e - continuing without location');

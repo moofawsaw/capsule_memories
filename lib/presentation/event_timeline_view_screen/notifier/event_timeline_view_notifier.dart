@@ -635,7 +635,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         memoryStartTime: memoryStartTime,
         memoryEndTime: memoryEndTime,
         eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
-          customStoryItems: storyItems, // Horizontal story items for CustomStoryList
+          customStoryItems:
+              storyItems, // Horizontal story items for CustomStoryList
           timelineDetail: TimelineDetailModel(
             centerLocation:
                 state.eventTimelineViewModel?.timelineDetail?.centerLocation ??
@@ -645,7 +646,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
                     '0km',
             memoryStartTime: memoryStartTime,
             memoryEndTime: memoryEndTime,
-            timelineStories: timelineStories, // TimelineStoryItem list for TimelineWidget
+            timelineStories:
+                timelineStories, // TimelineStoryItem list for TimelineWidget
           ),
         ),
         errorMessage: null,
@@ -924,5 +926,50 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   void refreshData() {
     state = state.copyWith(isLoading: true);
     initialize();
+  }
+
+  /// DELETE MEMORY: Remove memory and all associated data
+  Future<void> deleteMemory(String memoryId) async {
+    try {
+      print('🔍 DELETE MEMORY: Starting deletion process');
+      print('   - Memory ID: $memoryId');
+
+      final client = SupabaseService.instance.client;
+      if (client == null) {
+        throw Exception('Supabase client is not initialized');
+      }
+
+      final currentUser = client.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('No authenticated user');
+      }
+
+      // Verify user is the creator before deletion
+      final memoryResponse = await client
+          .from('memories')
+          .select('creator_id')
+          .eq('id', memoryId)
+          .single();
+
+      if (memoryResponse['creator_id'] != currentUser.id) {
+        throw Exception('Only the memory creator can delete this memory');
+      }
+
+      print('✅ DELETE MEMORY: User verified as creator');
+
+      // Delete memory (cascade will handle related records)
+      await client.from('memories').delete().eq('id', memoryId);
+
+      print('✅ DELETE MEMORY: Memory deleted successfully');
+
+      // Clear cache for this memory
+      await _cacheService.refreshMemoryCache(currentUser.id);
+
+      print('✅ DELETE MEMORY: Cache cleared');
+    } catch (e, stackTrace) {
+      print('❌ DELETE MEMORY ERROR: $e');
+      print('   Stack trace: $stackTrace');
+      rethrow; // Re-throw to handle in UI
+    }
   }
 }

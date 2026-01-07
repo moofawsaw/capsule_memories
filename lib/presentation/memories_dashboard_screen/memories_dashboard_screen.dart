@@ -35,8 +35,13 @@ class _MemoriesDashboardScreenState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // REMOVED: Automatic refresh was causing loading state to persist
-    // Users can manually refresh using RefreshIndicator
+    // CRITICAL FIX: Force refresh when screen becomes visible again
+    // This ensures deleted memories don't appear after deletion + redirect
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(memoriesDashboardNotifier.notifier).refreshMemories();
+      }
+    });
   }
 
   @override

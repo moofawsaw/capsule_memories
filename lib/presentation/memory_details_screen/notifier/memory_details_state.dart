@@ -1,61 +1,122 @@
 part of 'memory_details_notifier.dart';
 
+@immutable
 class MemoryDetailsState {
   final MemoryDetailsModel? memoryDetailsModel;
   final TextEditingController? titleController;
   final TextEditingController? inviteLinkController;
-  final bool isPublic;
+  final TextEditingController? searchController;
+  final TextEditingController? locationController;
+  final bool isLoading;
   final bool isSaving;
   final bool isSharing;
-  final bool showSuccessMessage;
-  final String? successMessage;
-  final bool isLoading;
-  final String? errorMessage;
   final bool isCreator;
+  final bool isPublic;
+  final bool isFetchingLocation;
+  final bool isLoadingFriends;
+  final bool isInviting;
+  final bool isLoadingCategories;
   final String? memoryId;
+  final String? errorMessage;
+  final bool? showSuccessMessage;
+  final String? successMessage;
+  final String? locationName;
+  final double? locationLat;
+  final double? locationLng;
+  final String? selectedCategoryId;
+  final String? selectedCategoryName;
+  final List<Map<String, dynamic>> categories;
+  final List<Map<String, dynamic>> friendsList;
+  final List<Map<String, dynamic>> filteredFriendsList;
+  final Set<String> memberUserIds;
 
   MemoryDetailsState({
     this.memoryDetailsModel,
     this.titleController,
     this.inviteLinkController,
-    this.isPublic = false,
+    this.searchController,
+    this.locationController,
+    this.isLoading = false,
     this.isSaving = false,
     this.isSharing = false,
-    this.showSuccessMessage = false,
-    this.successMessage,
-    this.isLoading = false,
-    this.errorMessage,
     this.isCreator = false,
+    this.isPublic = false,
+    this.isFetchingLocation = false,
+    this.isLoadingFriends = false,
+    this.isInviting = false,
+    this.isLoadingCategories = false,
     this.memoryId,
+    this.errorMessage,
+    this.showSuccessMessage,
+    this.successMessage,
+    this.locationName,
+    this.locationLat,
+    this.locationLng,
+    this.selectedCategoryId,
+    this.selectedCategoryName,
+    this.categories = const [],
+    this.friendsList = const [],
+    this.filteredFriendsList = const [],
+    this.memberUserIds = const {},
   });
 
   MemoryDetailsState copyWith({
     MemoryDetailsModel? memoryDetailsModel,
     TextEditingController? titleController,
     TextEditingController? inviteLinkController,
-    bool? isPublic,
+    TextEditingController? searchController,
+    TextEditingController? locationController,
+    bool? isLoading,
     bool? isSaving,
     bool? isSharing,
+    bool? isCreator,
+    bool? isPublic,
+    bool? isFetchingLocation,
+    bool? isLoadingFriends,
+    bool? isInviting,
+    bool? isLoadingCategories,
+    String? memoryId,
+    String? errorMessage,
     bool? showSuccessMessage,
     String? successMessage,
-    bool? isLoading,
-    String? errorMessage,
-    bool? isCreator,
-    String? memoryId,
+    String? locationName,
+    double? locationLat,
+    double? locationLng,
+    String? selectedCategoryId,
+    String? selectedCategoryName,
+    List<Map<String, dynamic>>? categories,
+    List<Map<String, dynamic>>? friendsList,
+    List<Map<String, dynamic>>? filteredFriendsList,
+    Set<String>? memberUserIds,
   }) {
     return MemoryDetailsState(
       memoryDetailsModel: memoryDetailsModel ?? this.memoryDetailsModel,
       titleController: titleController ?? this.titleController,
       inviteLinkController: inviteLinkController ?? this.inviteLinkController,
-      isPublic: isPublic ?? this.isPublic,
+      searchController: searchController ?? this.searchController,
+      locationController: locationController ?? this.locationController,
+      isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
       isSharing: isSharing ?? this.isSharing,
-      showSuccessMessage: showSuccessMessage ?? this.showSuccessMessage,
-      successMessage: successMessage ?? this.successMessage,
-      isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage ?? this.errorMessage,
       isCreator: isCreator ?? this.isCreator,
+      isPublic: isPublic ?? this.isPublic,
+      isFetchingLocation: isFetchingLocation ?? this.isFetchingLocation,
+      isLoadingFriends: isLoadingFriends ?? this.isLoadingFriends,
+      isInviting: isInviting ?? this.isInviting,
+      isLoadingCategories: isLoadingCategories ?? this.isLoadingCategories,
       memoryId: memoryId ?? this.memoryId,
+      errorMessage: errorMessage,
+      showSuccessMessage: showSuccessMessage,
+      successMessage: successMessage,
+      locationName: locationName ?? this.locationName,
+      locationLat: locationLat ?? this.locationLat,
+      locationLng: locationLng ?? this.locationLng,
+      selectedCategoryId: selectedCategoryId ?? this.selectedCategoryId,
+      selectedCategoryName: selectedCategoryName ?? this.selectedCategoryName,
+      categories: categories ?? this.categories,
+      friendsList: friendsList ?? this.friendsList,
+      filteredFriendsList: filteredFriendsList ?? this.filteredFriendsList,
+      memberUserIds: memberUserIds ?? this.memberUserIds,
     );
   }
 }

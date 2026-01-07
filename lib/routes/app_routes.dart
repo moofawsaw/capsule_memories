@@ -271,6 +271,14 @@ class AppRoutes {
       return _buildRoute(SplashScreen(), settings, shouldAnimate: false);
     }
 
+    // ✅ CRITICAL FIX: Explicit handling for memory confirmation screen
+    if (routeName == memoryConfirmationScreen) {
+      return MaterialPageRoute(
+        builder: (context) => const MemoryConfirmationScreen(),
+        settings: settings, // Ensure settings with arguments are passed through
+      );
+    }
+
     // ✅ NEW: Special handling for menu overlay - slides from left over current screen
     if (routeName == appMenu) {
       return _buildSlideOverlayRoute(UserMenuScreen(), settings);

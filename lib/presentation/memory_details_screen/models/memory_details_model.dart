@@ -47,32 +47,37 @@ class MemberModel extends Equatable {
     this.profileImagePath,
     this.role,
     this.isCreator,
+    this.userId,
   }) {
     name = name ?? "";
     profileImagePath = profileImagePath ?? "";
     role = role ?? "";
     isCreator = isCreator ?? false;
+    userId = userId ?? "";
   }
 
   String? name;
   String? profileImagePath;
   String? role;
   bool? isCreator;
+  String? userId;
 
   MemberModel copyWith({
     String? name,
     String? profileImagePath,
     String? role,
     bool? isCreator,
+    String? userId,
   }) {
     return MemberModel(
       name: name ?? this.name,
       profileImagePath: profileImagePath ?? this.profileImagePath,
       role: role ?? this.role,
       isCreator: isCreator ?? this.isCreator,
+      userId: userId ?? this.userId,
     );
   }
 
   @override
-  List<Object?> get props => [name, profileImagePath, role, isCreator];
+  List<Object?> get props => [name, profileImagePath, role, isCreator, userId];
 }

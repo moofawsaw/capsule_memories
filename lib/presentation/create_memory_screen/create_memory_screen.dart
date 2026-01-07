@@ -945,20 +945,35 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         ref.listen(
           createMemoryNotifier,
           (previous, current) {
-            // FIXED: Close bottom sheet first, then navigate to confirmation
-            if (current.shouldNavigateToConfirmation ?? false) {
-              // Close the create memory bottom sheet
-              Navigator.of(context).pop();
+            // CRITICAL FIX: Close bottom sheet FIRST, then navigate
+            if (current.shouldNavigateToConfirmation == true &&
+                (previous?.shouldNavigateToConfirmation != true)) {
+              print(
+                  '🔔 LISTENER TRIGGERED: shouldNavigateToConfirmation = true');
+              print('📍 Memory ID: ${current.createdMemoryId}');
+              print(
+                  '📝 Memory Name: ${current.memoryNameController?.text.trim()}');
 
-              // Navigate to confirmation screen with memory details
+              // Close bottom sheet FIRST
+              print('🚀 Closing bottom sheet first...');
+              if (Navigator.canPop(context)) {
+                Navigator.of(context).pop();
+                print('✅ Bottom sheet closed');
+              }
+
+              // THEN navigate after bottom sheet is dismissed
               Future.delayed(Duration(milliseconds: 200), () {
+                print('🚀 Navigating to confirmation screen...');
+
                 NavigatorService.pushNamed(
-                  '/memory-confirmation-screen',
+                  AppRoutes.memoryConfirmationScreen,
                   arguments: {
                     'memory_id': current.createdMemoryId,
                     'memory_name': current.memoryNameController?.text.trim(),
                   },
                 );
+
+                print('✅ Navigation initiated');
               });
             }
 
@@ -1000,10 +1015,15 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   onPressed: state.isLoading
                       ? null
                       : () {
+                          print('🎯 Create Memory button pressed');
+
                           if (_formKey.currentState?.validate() ?? false) {
+                            print('✅ Form validation passed');
                             ref
                                 .read(createMemoryNotifier.notifier)
                                 .createMemory();
+                          } else {
+                            print('❌ Form validation failed');
                           }
                         },
                   buttonStyle: CustomButtonStyle.fillPrimary,

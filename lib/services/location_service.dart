@@ -1,5 +1,6 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'dart:async';
 
 class LocationService {
   /// Check if location services are enabled and request permission if needed
@@ -37,13 +38,21 @@ class LocationService {
     try {
       final hasPermission = await checkAndRequestPermission();
       if (!hasPermission) {
+        print('⚠️ Location permission not granted');
         return null;
       }
 
-      return await Geolocator.getCurrentPosition(
+      print('📍 Fetching current location...');
+      final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
         timeLimit: const Duration(seconds: 10),
       );
+      print('✅ Location obtained: ${position.latitude}, ${position.longitude}');
+
+      return position;
+    } on TimeoutException catch (e) {
+      print('⏱️ Location fetch timeout: $e');
+      return null;
     } catch (e) {
       print('⚠️ Failed to get location: $e');
       return null;
@@ -88,16 +97,20 @@ class LocationService {
   /// Get location data with formatted name
   static Future<Map<String, dynamic>?> getLocationData() async {
     try {
+      print('🌍 Starting location data fetch...');
       final position = await getCurrentLocation();
       if (position == null) {
+        print('❌ No position obtained');
         return null;
       }
 
+      print('🗺️ Reverse geocoding location...');
       final locationName = await getLocationName(
         position.latitude,
         position.longitude,
       );
 
+      print('✅ Location data complete: $locationName');
       return {
         'latitude': position.latitude,
         'longitude': position.longitude,

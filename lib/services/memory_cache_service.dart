@@ -364,21 +364,66 @@ class MemoryCacheService {
         final category =
             memoryData['memory_categories'] as Map<String, dynamic>?;
         final stories = memoryData['stories'] as List?;
-        final createdAt = DateTime.parse(memoryData['created_at'] as String);
-        final expiresAt = memoryData['expires_at'] != null
-            ? DateTime.parse(memoryData['expires_at'] as String)
-            : null;
-        final sealedAt = memoryData['sealed_at'] != null
-            ? DateTime.parse(memoryData['sealed_at'] as String)
-            : null;
 
-        // Use start_time/end_time if available, otherwise fall back to created_at/expires_at
-        final startTime = memoryData['start_time'] != null
-            ? DateTime.parse(memoryData['start_time'] as String)
-            : createdAt;
-        final endTime = memoryData['end_time'] != null
-            ? DateTime.parse(memoryData['end_time'] as String)
-            : expiresAt ?? createdAt.add(Duration(hours: 12));
+        // CRITICAL FIX: Add robust date parsing with try-catch for all date fields
+        DateTime createdAt;
+        DateTime? expiresAt;
+        DateTime? sealedAt;
+        DateTime startTime;
+        DateTime endTime;
+
+        // Parse created_at with error handling
+        try {
+          createdAt = DateTime.parse(memoryData['created_at'] as String);
+        } catch (e) {
+          print(
+              '❌ CACHE: Invalid created_at format: ${memoryData['created_at']}');
+          createdAt = DateTime.now();
+        }
+
+        // Parse expires_at with error handling
+        try {
+          expiresAt = memoryData['expires_at'] != null
+              ? DateTime.parse(memoryData['expires_at'] as String)
+              : null;
+        } catch (e) {
+          print(
+              '❌ CACHE: Invalid expires_at format: ${memoryData['expires_at']}');
+          expiresAt = null;
+        }
+
+        // Parse sealed_at with error handling
+        try {
+          sealedAt = memoryData['sealed_at'] != null
+              ? DateTime.parse(memoryData['sealed_at'] as String)
+              : null;
+        } catch (e) {
+          print(
+              '❌ CACHE: Invalid sealed_at format: ${memoryData['sealed_at']}');
+          sealedAt = null;
+        }
+
+        // CRITICAL FIX: Use start_time/end_time if available with error handling
+        // Fallback to created_at/expires_at if parsing fails
+        try {
+          startTime = memoryData['start_time'] != null
+              ? DateTime.parse(memoryData['start_time'] as String)
+              : createdAt;
+        } catch (e) {
+          print(
+              '❌ CACHE: Invalid start_time format: ${memoryData['start_time']}, using created_at');
+          startTime = createdAt;
+        }
+
+        try {
+          endTime = memoryData['end_time'] != null
+              ? DateTime.parse(memoryData['end_time'] as String)
+              : (expiresAt ?? createdAt.add(Duration(hours: 12)));
+        } catch (e) {
+          print(
+              '❌ CACHE: Invalid end_time format: ${memoryData['end_time']}, using fallback');
+          endTime = expiresAt ?? createdAt.add(Duration(hours: 12));
+        }
 
         final memoryThumbnails = stories
                 ?.map((story) {

@@ -2,18 +2,23 @@ import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../models/memory_details_model.dart';
 
-class MemberItemWidget extends StatelessWidget {
+class MemberItemWidget extends ConsumerWidget {
   final MemberModel member;
-  final VoidCallback? onTap;
+  final bool isCreator;
+  final VoidCallback? onRemove;
 
-  MemberItemWidget({
+  const MemberItemWidget({
     Key? key,
     required this.member,
-    this.onTap,
+    this.isCreator = false,
+    this.onRemove,
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Show remove icon only if current user is creator AND this member is not the creator
+    final showRemoveIcon = isCreator && !(member.isCreator ?? false);
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: 8.h,
@@ -57,16 +62,20 @@ class MemberItemWidget extends StatelessWidget {
                     .copyWith(color: appTheme.deep_purple_A100, height: 1.33),
               ),
             ),
-          ] else ...[
-            Spacer(),
+          ] else if (showRemoveIcon) ...[
+            SizedBox(width: 8.h),
             GestureDetector(
-              onTap: onTap,
+              onTap: onRemove,
               child: Container(
-                margin: EdgeInsets.only(right: 10.h),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgIconBlueGray300,
-                  height: 28.h,
-                  width: 28.h,
+                padding: EdgeInsets.all(6.h),
+                decoration: BoxDecoration(
+                  color: appTheme.red_500.withAlpha(26),
+                  borderRadius: BorderRadius.circular(6.h),
+                ),
+                child: Icon(
+                  Icons.person_remove,
+                  color: appTheme.red_500,
+                  size: 18.h,
                 ),
               ),
             ),

@@ -12,8 +12,8 @@ import './timeline_widget.dart';
 /// Loading behavior:
 /// - When [isLoading] is true: shows the SAME skeleton loader used in MemoriesDashboardScreen
 ///   (3x CustomMemorySkeleton).
-/// - When loaded: shows real cards. Each card fetches its own timeline stories; while those load,
-///   we keep a fixed-height placeholder (no additional skeleton shimmer per card).
+/// - When loaded: shows real cards. Each card fetches its own timeline stories; when there are
+///   no stories yet, we STILL show a timeline skeleton preview (empty-state guidance), not just on load.
 class CustomPublicMemories extends StatelessWidget {
   const CustomPublicMemories({
     Key? key,
@@ -39,10 +39,8 @@ class CustomPublicMemories extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (sectionTitle != null || sectionIcon != null)
-            _buildSectionHeader(),
-          if (sectionTitle != null || sectionIcon != null)
-            SizedBox(height: 24.h),
+          if (sectionTitle != null || sectionIcon != null) _buildSectionHeader(),
+          if (sectionTitle != null || sectionIcon != null) SizedBox(height: 24.h),
           _buildMemoriesScroll(context),
         ],
       ),
@@ -50,7 +48,6 @@ class CustomPublicMemories extends StatelessWidget {
   }
 
   Widget _buildSectionHeader() {
-    // ✅ ADD horizontal padding to section header (like story feeds)
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 24.h),
       child: Row(
@@ -73,7 +70,6 @@ class CustomPublicMemories extends StatelessWidget {
   }
 
   Widget _buildMemoriesScroll(BuildContext context) {
-    // SAME SKELETON PATTERN AS MemoriesDashboardScreen
     if (isLoading) {
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -82,7 +78,6 @@ class CustomPublicMemories extends StatelessWidget {
           children: List.generate(3, (index) {
             return Container(
               width: 300.h,
-              // ✅ ADD left padding to first card, right padding to all
               margin: EdgeInsets.only(
                 left: index == 0 ? 24.h : 0,
                 right: 12.h,
@@ -96,7 +91,6 @@ class CustomPublicMemories extends StatelessWidget {
 
     final List<CustomMemoryItem> memoryList = memories ?? <CustomMemoryItem>[];
 
-    // ✅ EMPTY STATE: Add horizontal padding
     if (memoryList.isEmpty) {
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: 24.h),
@@ -131,7 +125,6 @@ class CustomPublicMemories extends StatelessWidget {
       );
     }
 
-    // ✅ FIX: Add padding to FIRST card only (like story feeds)
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -139,7 +132,7 @@ class CustomPublicMemories extends StatelessWidget {
           final CustomMemoryItem memory = memoryList[index];
           return Container(
             margin: EdgeInsets.only(
-              left: index == 0 ? 24.h : 0, // ✅ First card gets left padding
+              left: index == 0 ? 24.h : 0,
               right: 12.h,
             ),
             child: _PublicMemoryCard(
@@ -157,6 +150,7 @@ class CustomPublicMemories extends StatelessWidget {
 class CustomMemoryItem {
   CustomMemoryItem({
     this.id,
+    this.userId, // ✅ add owner id so we don't rely on a per-card RLS-blocked query
     this.title,
     this.date,
     this.iconPath,
@@ -172,6 +166,7 @@ class CustomMemoryItem {
   });
 
   final String? id;
+  final String? userId; // ✅ owner/creator id (from your memory list query)
   final String? title;
   final String? date;
   final String? iconPath;
@@ -223,24 +218,37 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   bool _isUserCreatedMemory = false;
   int _memberCount = 0;
 
-  // Parent-card horizontal padding applied around the timeline area
-  // (this is what keeps markers away from card edges).
   static const double _timelineSidePadding = 14.0;
 
   @override
   void initState() {
     super.initState();
-    _checkMemoryOwnership();
+    _deriveOwnershipFast();
     _loadTimelineData();
     _fetchMemberCount();
   }
 
-  // Check if current user is the creator of this memory
-  Future<void> _checkMemoryOwnership() async {
+  /// ✅ Prefer using userId passed into the model (no RLS risk).
+  /// Fallback to DB check only if userId not provided.
+  void _deriveOwnershipFast() {
+    final currentUser = SupabaseService.instance.client?.auth.currentUser;
+    final ownerId = widget.memory.userId;
+
+    if (currentUser == null || ownerId == null || ownerId.isEmpty) {
+      // We'll try DB fallback async (best effort) if needed.
+      _isUserCreatedMemory = false;
+      _checkMemoryOwnershipFallback();
+      return;
+    }
+
+    _isUserCreatedMemory = currentUser.id == ownerId;
+  }
+
+  Future<void> _checkMemoryOwnershipFallback() async {
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
       if (currentUser == null || widget.memory.id == null) {
-        setState(() => _isUserCreatedMemory = false);
+        if (mounted) setState(() => _isUserCreatedMemory = false);
         return;
       }
 
@@ -250,20 +258,23 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .eq('id', widget.memory.id!)
           .single();
 
-      if (memoryResponse != null && mounted) {
+      if (!mounted) return;
+
+      if (memoryResponse != null && memoryResponse['user_id'] != null) {
         setState(() {
           _isUserCreatedMemory = memoryResponse['user_id'] == currentUser.id;
         });
-      }
-    } catch (e) {
-      print('❌ Error checking memory ownership: $e');
-      if (mounted) {
+      } else {
         setState(() => _isUserCreatedMemory = false);
       }
+    } catch (e) {
+      // If RLS blocks it, we stay false (joined view)
+      // ignore: avoid_print
+      print('❌ Error checking memory ownership (fallback): $e');
+      if (mounted) setState(() => _isUserCreatedMemory = false);
     }
   }
 
-  // Fetch count of members (excluding creator)
   Future<void> _fetchMemberCount() async {
     if (widget.memory.id == null || widget.memory.id!.isEmpty) {
       if (mounted) setState(() => _memberCount = 0);
@@ -271,29 +282,37 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     }
 
     try {
-      final members =
-          await _membersService.fetchMemoryMembers(widget.memory.id!);
+      final members = await _membersService.fetchMemoryMembers(widget.memory.id!);
       if (mounted) {
         setState(() => _memberCount = members.length);
       }
     } catch (e) {
+      // ignore: avoid_print
       print('❌ Error fetching member count: $e');
       if (mounted) setState(() => _memberCount = 0);
     }
   }
 
-  // ✅ CRITICAL FIX: Reload timeline when memory ID changes
   @override
   void didUpdateWidget(covariant _PublicMemoryCard oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Only reload if the memory ID actually changed
     if (oldWidget.memory.id != widget.memory.id) {
       setState(() {
         _isLoadingTimeline = true;
-        _timelineStories = [];
+        _timelineStories = <TimelineStoryItem>[];
+        _memoryStartTime = null;
+        _memoryEndTime = null;
+        _memberCount = 0;
       });
+
+      _deriveOwnershipFast();
+      _fetchMemberCount();
       _loadTimelineData();
+    } else if (oldWidget.memory.userId != widget.memory.userId) {
+      // ownership info changed
+      _deriveOwnershipFast();
+      if (mounted) setState(() {});
     }
   }
 
@@ -303,6 +322,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       setState(() {
         _isLoadingTimeline = false;
         _timelineStories = <TimelineStoryItem>[];
+        _memoryStartTime = _parseMemoryStartTime();
+        _memoryEndTime = _parseMemoryEndTime();
       });
       return;
     }
@@ -329,8 +350,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         memoryEnd = _parseMemoryEndTime();
       }
 
-      final List<dynamic> storiesData =
-          await _storyService.fetchMemoryStories(memoryId);
+      final List<dynamic> storiesData = await _storyService.fetchMemoryStories(memoryId);
 
       if (!mounted) return;
 
@@ -349,16 +369,12 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         final Map<String, dynamic>? contributor =
             storyData['user_profiles'] as Map<String, dynamic>?;
 
-        final DateTime createdAt =
-            DateTime.parse(storyData['created_at'] as String);
+        final DateTime createdAt = DateTime.parse(storyData['created_at'] as String);
         final String storyId = storyData['id'] as String;
 
-        final String backgroundImage =
-            _storyService.getStoryMediaUrl(storyData);
+        final String backgroundImage = _storyService.getStoryMediaUrl(storyData);
 
-        final String? avatarUrl =
-            contributor != null ? contributor['avatar_url'] as String? : null;
-
+        final String? avatarUrl = contributor != null ? contributor['avatar_url'] as String? : null;
         final String profileImage = AvatarHelperService.getAvatarUrl(avatarUrl);
 
         return TimelineStoryItem(
@@ -382,9 +398,12 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       // ignore: avoid_print
       print('❌ PUBLIC MEMORY CARD: Error loading timeline: $e');
       if (!mounted) return;
+
       setState(() {
         _isLoadingTimeline = false;
         _timelineStories = <TimelineStoryItem>[];
+        _memoryStartTime ??= _parseMemoryStartTime();
+        _memoryEndTime ??= _parseMemoryEndTime();
       });
     }
   }
@@ -406,8 +425,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .split(':');
 
       int hour = int.tryParse(timeParts[0]) ?? 0;
-      final int minute =
-          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final int minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
@@ -435,8 +453,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .split(':');
 
       int hour = int.tryParse(timeParts[0]) ?? 0;
-      final int minute =
-          timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final int minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
@@ -469,44 +486,57 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   }
 
   Widget _buildMemoryTimeline() {
-    // Show skeleton content while loading to guide users on what's missing
+    // Loading: show skeleton
     if (_isLoadingTimeline) {
       return _buildTimelineSkeleton();
     }
 
-    // Empty state with conditional buttons based on member/story status
+    // Empty: ALWAYS show skeleton preview + then the correct empty messaging/CTAs
     if (_timelineStories.isEmpty) {
-      if (_isUserCreatedMemory) {
-        return _buildUserCreatedEmptyState();
-      }
+      final bool hasNoMembers = _memberCount == 0;
 
-      // Default empty state for joined memories
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
         child: Container(
           margin: EdgeInsets.symmetric(vertical: 8.h),
-          height: 112.h,
-          child: Center(
-            child: Text(
-              'No stories yet',
-              style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
+          padding: EdgeInsets.all(16.h),
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02.withAlpha(128),
+            borderRadius: BorderRadius.circular(16.h),
+            border: Border.all(
+              color: appTheme.blue_gray_300.withAlpha(51),
+              width: 1.0,
             ),
+          ),
+          child: Column(
+            children: [
+              _buildTimelineSkeleton(),
+              SizedBox(height: 12.h),
+
+              // Owner: show CTAs (Create Story always, Invite optional)
+              if (_isUserCreatedMemory) ...[
+                _buildOwnerEmptyContent(hasNoMembers: hasNoMembers),
+              ] else ...[
+                _buildJoinedEmptyContent(),
+              ],
+            ],
           ),
         ),
       );
     }
 
-    // ✅ KEY CHANGE: add horizontal padding on the PARENT card area (not inside TimelineWidget)
-    // This keeps the markers away from the card edges.
+    // Normal timeline
+    final DateTime start = _memoryStartTime ?? _parseMemoryStartTime();
+    final DateTime end = _memoryEndTime ?? _parseMemoryEndTime();
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
       child: Container(
         margin: EdgeInsets.symmetric(vertical: 8.h),
         child: TimelineWidget(
           stories: _timelineStories,
-          memoryStartTime: _memoryStartTime!,
-          memoryEndTime: _memoryEndTime!,
+          memoryStartTime: start,
+          memoryEndTime: end,
           onStoryTap: (String storyId) {
             if (widget.onTap != null) widget.onTap!();
           },
@@ -515,41 +545,105 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     );
   }
 
+  Widget _buildOwnerEmptyContent({required bool hasNoMembers}) {
+    return Column(
+      children: [
+        CustomImageView(
+          imagePath: ImageConstant.imgPlayCircle,
+          height: 48.h,
+          width: 48.h,
+          color: appTheme.blue_gray_300,
+        ),
+        SizedBox(height: 16.h),
+        Text(
+          'No stories yet',
+          style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+        SizedBox(height: 6.h),
+        Text(
+          'Create your first story',
+          style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 20.h),
+
+        // ✅ Create Story ALWAYS for owner when empty
+        CustomButton(
+          text: 'Create Story',
+          leftIcon: ImageConstant.imgPlayCircle,
+          onPressed: _onCreateStoryTap,
+          buttonStyle: CustomButtonStyle.fillPrimary,
+          buttonTextStyle: CustomButtonTextStyle.bodySmall,
+          height: 40.h,
+          padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
+        ),
+
+        // ✅ Invite as secondary if no members yet (excluding creator)
+        if (hasNoMembers) ...[
+          SizedBox(height: 10.h),
+          CustomButton(
+            text: 'Invite',
+            leftIcon: ImageConstant.imgIconWhiteA700,
+            onPressed: _onInviteTap,
+            buttonStyle: CustomButtonStyle.fillPrimary,
+            buttonTextStyle: CustomButtonTextStyle.bodySmall,
+            height: 40.h,
+            padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildJoinedEmptyContent() {
+    return Column(
+      children: [
+        Text(
+          'No stories yet',
+          style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+        SizedBox(height: 6.h),
+        Text(
+          'Check back soon',
+          style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
   /// Build timeline skeleton to show what's missing
   Widget _buildTimelineSkeleton() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: 8.h),
-        padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 16.h),
-        height: 180.h,
-        child: Column(
-          children: [
-            // Timeline progress bar skeleton
-            Container(
-              height: 4.h,
-              decoration: BoxDecoration(
-                color: appTheme.blue_gray_300.withAlpha(51),
-                borderRadius: BorderRadius.circular(999),
-              ),
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 16.h),
+      height: 180.h,
+      child: Column(
+        children: [
+          Container(
+            height: 4.h,
+            decoration: BoxDecoration(
+              color: appTheme.blue_gray_300.withAlpha(51),
+              borderRadius: BorderRadius.circular(999),
             ),
-            SizedBox(height: 24.h),
-            // Date markers skeleton (start, middle, end)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildDateMarkerSkeleton(),
-                _buildDateMarkerSkeleton(),
-                _buildDateMarkerSkeleton(),
-              ],
-            ),
-          ],
-        ),
+          ),
+          SizedBox(height: 24.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildDateMarkerSkeleton(),
+              _buildDateMarkerSkeleton(),
+              _buildDateMarkerSkeleton(),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  /// Build individual date marker skeleton
   Widget _buildDateMarkerSkeleton() {
     return Column(
       children: [
@@ -580,88 +674,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     );
   }
 
-  /// Build empty state for user-created memories with conditional buttons
-  Widget _buildUserCreatedEmptyState() {
-    // Determine which button to show based on member and story count
-    final bool hasNoMembers = _memberCount == 0;
-    final bool hasNoStories = _timelineStories.isEmpty;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: 8.h),
-        padding: EdgeInsets.all(20.h),
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_02.withAlpha(128),
-          borderRadius: BorderRadius.circular(16.h),
-          border: Border.all(
-            color: appTheme.blue_gray_300.withAlpha(51),
-            width: 1.0,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // ✅ FIX: ALWAYS show timeline skeleton in empty state (regardless of member count)
-            // This guides users on what the memory card will look like when built out
-            if (hasNoStories) ...[
-              _buildTimelineSkeleton(),
-              SizedBox(height: 12.h),
-            ],
-
-            CustomImageView(
-              imagePath: ImageConstant.imgPlayCircle,
-              height: 48.h,
-              width: 48.h,
-              color: appTheme.blue_gray_300,
-            ),
-            SizedBox(height: 16.h),
-            Text(
-              hasNoMembers ? 'No members yet' : 'No stories yet',
-              style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
-            ),
-            SizedBox(height: 6.h),
-            Text(
-              hasNoMembers
-                  ? 'Invite people to join this memory'
-                  : 'Create your first story',
-              style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 20.h),
-
-            // Conditional button rendering
-            if (hasNoMembers)
-              // Show only invite button if no members
-              CustomButton(
-                text: 'Invite',
-                leftIcon: ImageConstant.imgIconWhiteA700,
-                onPressed: () => _onInviteTap(),
-                buttonStyle: CustomButtonStyle.fillPrimary,
-                buttonTextStyle: CustomButtonTextStyle.bodySmall,
-                height: 40.h,
-                padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
-              )
-            else
-              // Show create story button if members exist but no stories
-              CustomButton(
-                text: 'Create Story',
-                leftIcon: ImageConstant.imgPlayCircle,
-                onPressed: () => _onCreateStoryTap(),
-                buttonStyle: CustomButtonStyle.fillPrimary,
-                buttonTextStyle: CustomButtonTextStyle.bodySmall,
-                height: 40.h,
-                padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Handle invite button tap
   void _onInviteTap() {
     if (widget.memory.id != null) {
       NavigatorService.pushNamed(
@@ -671,10 +683,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     }
   }
 
-  /// Handle create story button tap
   void _onCreateStoryTap() {
     if (widget.memory.id != null) {
-      // Navigate to story creation screen with memory context
       NavigatorService.pushNamed(
         AppRoutes.appBsUpload,
         arguments: widget.memory.id,
@@ -682,7 +692,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     }
   }
 
-  /// Handle edit button tap
   void _onEditTap() {
     if (widget.memory.id != null) {
       NavigatorService.pushNamed(
@@ -729,7 +738,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           Container(
             padding: EdgeInsets.all(6.h),
             decoration: BoxDecoration(
-              color: Color(0xFF222D3E),
+              color: const Color(0xFF222D3E),
               borderRadius: BorderRadius.circular(18.h),
             ),
             width: 42.h,
@@ -799,8 +808,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   }
 
   Widget _buildMemoryFooter(BuildContext context) {
-    final CustomMemoryItem memory = widget.memory;
-
-    return SizedBox();
+    // keep as-is
+    return const SizedBox();
   }
 }

@@ -32,25 +32,15 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   }
 
   void initialize() async {
-    // FIXED: Simplified initialization - always load if empty, don't block on existing data
-    final hasData = state.memoriesDashboardModel?.memoryItems != null &&
-        (state.memoriesDashboardModel?.memoryItems?.isNotEmpty ?? false);
+    // CRITICAL FIX: Always reload data from cache on initialization
+    // This ensures the screen shows latest data including newly created memories
+    print('🔍 MEMORIES DEBUG: Initializing memories dashboard');
 
-    if (hasData && !(state.isLoading ?? false)) {
-      print(
-          '🔍 MEMORIES DEBUG: Dashboard already has data and not loading, skipping initialization');
-      return;
-    }
-
-    // FIXED: Only set loading if we don't have data yet
-    if (!hasData) {
-      state = state.copyWith(isLoading: true);
-    }
+    // Set loading state
+    state = state.copyWith(isLoading: true);
 
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
-
-      print('🔍 MEMORIES DEBUG: Initializing memories dashboard');
       print('🔍 MEMORIES DEBUG: Current user ID: ${currentUser?.id}');
 
       if (currentUser == null) {
@@ -59,7 +49,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         return;
       }
 
-      // Use cache service for data loading
+      // FIXED: Always load data from cache - removes stale data check that caused loading state issues
       await _loadFromCache(currentUser.id);
 
       state = state.copyWith(
@@ -204,19 +194,22 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   }
 
   Future<void> refreshMemories() async {
-    // FIXED: Don't set loading state during refresh - just update data silently
+    // FIXED: Properly handle cache refresh and loading state
     print('🔄 MEMORIES DEBUG: Refreshing memories...');
 
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
       if (currentUser != null) {
-        // Force refresh cache
-        await _cacheService.refreshMemoryCache(currentUser.id);
+        // FIXED: Use immediate cache refresh instead of debounced
+        // This ensures data is loaded immediately after deletion
         await _loadFromCache(currentUser.id);
+
+        // Force immediate cache update in background
+        _cacheService.refreshMemoryCache(currentUser.id);
 
         print('✅ MEMORIES DEBUG: Memories refreshed successfully');
 
-        // Show success feedback
+        // Show success feedback briefly
         state = state.copyWith(isSuccess: true);
 
         // Reset success flag after short delay
@@ -257,7 +250,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
           )
           .subscribe();
 
-      // Subscribe to memory updates
+      // Subscribe to memory updates and deletions
       _memoriesChannel = client
           .channel('memories_dashboard:memories')
           .onPostgresChanges(
@@ -271,6 +264,12 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
             schema: 'public',
             table: 'memories',
             callback: _handleMemoryUpdate,
+          )
+          .onPostgresChanges(
+            event: PostgresChangeEvent.delete,
+            schema: 'public',
+            table: 'memories',
+            callback: _handleMemoryDelete,
           )
           .subscribe();
 
@@ -527,6 +526,49 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       print('✅ REALTIME: Memory updated in dashboard');
     } catch (e) {
       print('❌ REALTIME: Error handling memory update: $e');
+    }
+  }
+
+  /// NEW METHOD: Handle memory deletion
+  void _handleMemoryDelete(PostgresChangePayload payload) {
+    if (_isDisposed) return;
+
+    print('🔔 REALTIME: Memory deleted: ${payload.oldRecord['id']}');
+
+    try {
+      final memoryId = payload.oldRecord['id'] as String;
+      final currentModel = state.memoriesDashboardModel;
+
+      if (currentModel == null) return;
+
+      final memoryItems = currentModel.memoryItems;
+      if (memoryItems == null || memoryItems.isEmpty) return;
+
+      // Remove deleted memory from list
+      final updatedMemories =
+          memoryItems.where((memory) => memory.id != memoryId).toList();
+
+      // Recalculate counts
+      final liveMemories =
+          updatedMemories.where((m) => m.state == 'open').toList();
+      final sealedMemories =
+          updatedMemories.where((m) => m.state == 'sealed').toList();
+
+      final updatedModel = currentModel.copyWith(
+        memoryItems: updatedMemories.cast<MemoryItemModel>(),
+        liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
+        sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
+        allCount: updatedMemories.length,
+        liveCount: liveMemories.length,
+        sealedCount: sealedMemories.length,
+      );
+
+      _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
+
+      print(
+          '✅ REALTIME: Memory deleted from dashboard - ${updatedMemories.length} memories remaining');
+    } catch (e) {
+      print('❌ REALTIME: Error handling memory deletion: $e');
     }
   }
 

@@ -144,6 +144,7 @@ class _MemoryShareOptionsScreenState
                           label: 'Share Link',
                           subtitle: 'Copy invite link to clipboard',
                           onTap: () => notifier.copyLinkToClipboard(context),
+                          showCopiedAnimation: model.isLinkCopied,
                         ),
 
                         SizedBox(height: 2.h.fSize),
@@ -499,6 +500,7 @@ class _MemoryShareOptionsScreenState
     required String label,
     required String subtitle,
     required VoidCallback onTap,
+    bool showCopiedAnimation = false,
   }) {
     return InkWell(
       onTap: onTap,
@@ -512,13 +514,32 @@ class _MemoryShareOptionsScreenState
         ),
         child: Row(
           children: [
-            Container(
+            AnimatedContainer(
+              duration: Duration(milliseconds: 300),
               padding: EdgeInsets.all(2.w.fSize),
               decoration: BoxDecoration(
-                color: Color(0xFF9C27B0).withAlpha(51),
+                color: showCopiedAnimation
+                    ? Color(0xFF4CAF50).withAlpha(102)
+                    : Color(0xFF9C27B0).withAlpha(51),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(icon, color: Color(0xFF9C27B0), size: 24.fSize),
+              child: AnimatedSwitcher(
+                duration: Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) {
+                  return ScaleTransition(
+                    scale: animation,
+                    child: child,
+                  );
+                },
+                child: Icon(
+                  showCopiedAnimation ? Icons.check : icon,
+                  key: ValueKey(showCopiedAnimation),
+                  color: showCopiedAnimation
+                      ? Color(0xFF4CAF50)
+                      : Color(0xFF9C27B0),
+                  size: 24.fSize,
+                ),
+              ),
             ),
             SizedBox(width: 3.w.fSize),
             Expanded(
@@ -526,7 +547,7 @@ class _MemoryShareOptionsScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    label,
+                    showCopiedAnimation ? 'Link Copied!' : label,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 14.fSize,

@@ -380,11 +380,10 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
       print('✅ CREATE MEMORY: Memory created successfully with ID: $memoryId');
 
-      // Refresh cache to include new memory
+      // Force refresh cache BEFORE navigation to ensure /memories screen shows new data
       await _cacheService.refreshMemoryCache(currentUser.id);
 
-      // FIXED: Don't clear form until navigation is set up properly
-      // Set navigation flag with memory details
+      // CRITICAL FIX: Store memory data in state variables for navigation
       state = state.copyWith(
         isLoading: false,
         shouldNavigateToConfirmation: true,
@@ -392,26 +391,30 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         errorMessage: null,
       );
 
-      // Clear form and reset after navigation flag is set
-      Future.delayed(Duration(milliseconds: 100), () {
-        if (!mounted) return;
+      print('🚀 CREATE MEMORY: Set shouldNavigateToConfirmation flag');
 
-        // Clear form data
-        state.memoryNameController?.clear();
+      // Clear form and reset after a short delay to allow navigation to complete
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted) {
+          // Clear form data
+          state.memoryNameController?.clear();
 
-        // Reset state to initial values
-        state = state.copyWith(
-          shouldNavigateToConfirmation: false,
-          createdMemoryId: null,
-          currentStep: 1,
-          createMemoryModel: CreateMemoryModel(
-            isPublic: true,
-            memoryName: null,
-            selectedGroup: null,
-            selectedCategory: null,
-            selectedDuration: '12_hours',
-          ),
-        );
+          // Reset state to initial values
+          state = state.copyWith(
+            shouldNavigateToConfirmation: false,
+            createdMemoryId: null,
+            currentStep: 1,
+            createMemoryModel: CreateMemoryModel(
+              isPublic: true,
+              memoryName: null,
+              selectedGroup: null,
+              selectedCategory: null,
+              selectedDuration: '12_hours',
+            ),
+          );
+
+          print('✅ CREATE MEMORY: Form cleared and state reset');
+        }
       });
     } catch (e) {
       print('❌ CREATE MEMORY: Error creating memory: $e');

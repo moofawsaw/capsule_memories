@@ -1,9 +1,14 @@
 import '../../core/app_export.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_button_skeleton.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_icon_button.dart';
+import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart';
+import '../../widgets/custom_story_skeleton.dart';
+import '../../widgets/custom_timeline_header_skeleton.dart';
+import '../../widgets/custom_timeline_widget_skeleton.dart';
 import '../../widgets/timeline_widget.dart';
 import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_details_screen/memory_details_screen.dart';
@@ -132,6 +137,7 @@ class EventTimelineViewScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(eventTimelineViewNotifier);
+    final isLoading = state.isLoading ?? false;
 
     return SafeArea(
       child: Scaffold(
@@ -152,11 +158,35 @@ class EventTimelineViewScreenState
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
-                _buildEventHeader(context),
-                _buildTimelineSection(context),
+                // Header skeleton or actual content
+                isLoading
+                    ? CustomTimelineHeaderSkeleton()
+                    : _buildEventHeader(context),
+
+                // Timeline section skeleton or actual content
+                isLoading
+                    ? CustomTimelineWidgetSkeleton()
+                    : _buildTimelineSection(context),
+
+                // Stories section with skeleton
                 _buildStoriesSection(context),
+
                 SizedBox(height: 18.h),
-                _buildActionButtons(context),
+
+                // Action buttons skeleton or actual content
+                isLoading
+                    ? Container(
+                        margin: EdgeInsets.symmetric(horizontal: 24.h),
+                        child: Column(
+                          children: [
+                            CustomButtonSkeleton(),
+                            SizedBox(height: 12.h),
+                            CustomButtonSkeleton(),
+                          ],
+                        ),
+                      )
+                    : _buildActionButtons(context),
+
                 SizedBox(height: 20.h),
               ],
             ),
@@ -242,6 +272,19 @@ class EventTimelineViewScreenState
                       mainAxisSize: MainAxisSize.min,
                       spacing: 8.h,
                       children: [
+                        // DELETE BUTTON: Only show if current user is creator
+                        if (isCurrentUserCreator)
+                          CustomIconButton(
+                            iconPath: ImageConstant.imgIconRed50026x26,
+                            backgroundColor: appTheme.gray_900_03,
+                            borderRadius: 24.h,
+                            height: 48.h,
+                            width: 48.h,
+                            padding: EdgeInsets.all(12.h),
+                            onTap: () {
+                              onTapDeleteMemory(context);
+                            },
+                          ),
                         // EDIT BUTTON: Only show if current user is creator
                         if (isCurrentUserCreator)
                           CustomIconButton(
@@ -321,19 +364,9 @@ class EventTimelineViewScreenState
       );
     }
 
+    // UPDATED: Show empty state matching memory cards design when no stories
     if (timelineStories.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 20.h),
-          child: Text(
-            'No stories in this memory timeline yet',
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 16.sp,
-            ),
-          ),
-        ),
-      );
+      return _buildTimelineEmptyState(context);
     }
 
     // Debug logging for timeline window
@@ -377,6 +410,50 @@ class EventTimelineViewScreenState
     );
   }
 
+  /// NEW: Empty state for timeline matching memory cards design
+  Widget _buildTimelineEmptyState(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: EdgeInsets.all(24.h),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CustomImageView(
+              imagePath: ImageConstant.imgIcon10,
+              height: 56.h,
+              width: 56.h,
+              color: appTheme.blue_gray_300,
+            ),
+            SizedBox(height: 18.h),
+            Text(
+              'No stories in timeline yet',
+              style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+            SizedBox(height: 6.h),
+            Text(
+              'Start creating stories to build your memory timeline',
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 18.h),
+            CustomButton(
+              text: 'Create Story',
+              leftIcon: ImageConstant.imgIcon20x20,
+              onPressed: () => onTapCreateStory(context),
+              buttonStyle: CustomButtonStyle.fillPrimary,
+              buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+              height: 40.h,
+              width: 180.h,
+              padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 10.h),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Section Widget
   Widget _buildStoriesSection(BuildContext context) {
     return Container(
@@ -389,14 +466,25 @@ class EventTimelineViewScreenState
             child: Consumer(
               builder: (context, ref, _) {
                 final state = ref.watch(eventTimelineViewNotifier);
+                final isLoading = state.isLoading ?? false;
                 final storyCount =
                     state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
 
-                return Text(
-                  'Stories ($storyCount)',
-                  style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-                );
+                return isLoading
+                    ? Container(
+                        width: 100.h,
+                        height: 16.h,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          color: appTheme.blue_gray_300.withAlpha(77),
+                        ),
+                      )
+                    : Text(
+                        'Stories ($storyCount)',
+                        style: TextStyleHelper
+                            .instance.body14BoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                      );
               },
             ),
           ),
@@ -412,8 +500,26 @@ class EventTimelineViewScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
+        final isLoading = state.isLoading ?? false;
         final storyItems = state.eventTimelineViewModel?.customStoryItems ?? [];
 
+        // Show skeleton loaders during loading
+        if (isLoading) {
+          return Container(
+            margin: EdgeInsets.only(left: 20.h),
+            height: 202.h,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: 3,
+              separatorBuilder: (context, index) => SizedBox(width: 8.h),
+              itemBuilder: (context, index) {
+                return CustomStorySkeleton();
+              },
+            ),
+          );
+        }
+
+        // Show empty state when no stories
         if (storyItems.isEmpty) {
           return Container(
             margin: EdgeInsets.only(left: 20.h),
@@ -432,6 +538,7 @@ class EventTimelineViewScreenState
           );
         }
 
+        // Show actual story list
         return CustomStoryList(
           storyItems: (storyItems as List).cast<CustomStoryItem>(),
           onStoryTap: (index) {
@@ -644,6 +751,115 @@ class EventTimelineViewScreenState
         builder: (context) => Container(
           height: MediaQuery.of(context).size.height * 0.9,
           child: MemoryDetailsScreen(memoryId: memoryId),
+        ),
+      );
+    }
+  }
+
+  /// Handles delete memory button tap - shows confirmation dialog
+  void onTapDeleteMemory(BuildContext context) {
+    final state = ref.read(eventTimelineViewNotifier);
+    final memoryId = state.eventTimelineViewModel?.memoryId;
+    final memoryTitle = state.eventTimelineViewModel?.eventTitle;
+
+    if (memoryId != null) {
+      print('🔍 TIMELINE: Opening delete confirmation dialog');
+      print('   - Memory ID: $memoryId');
+      print('   - Memory Title: $memoryTitle');
+
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: appTheme.gray_900_01,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.h),
+          ),
+          title: Text(
+            'Delete Memory?',
+            style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
+          ),
+          content: Text(
+            'Are you sure you want to delete "${memoryTitle ?? 'this memory'}"? This action cannot be undone.',
+            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'Cancel',
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Close confirmation dialog first
+                Navigator.pop(dialogContext);
+
+                // Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (loadingContext) => Center(
+                    child: CircularProgressIndicator(
+                      color: appTheme.deep_purple_A100,
+                    ),
+                  ),
+                );
+
+                try {
+                  // Call delete method from notifier
+                  await ref
+                      .read(eventTimelineViewNotifier.notifier)
+                      .deleteMemory(memoryId);
+
+                  // Close loading indicator
+                  if (context.mounted) Navigator.pop(context);
+
+                  // Show success toast
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Memory deleted successfully'),
+                        backgroundColor: appTheme.deep_purple_A100,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+
+                  // Wait briefly for toast to appear, then navigate
+                  await Future.delayed(Duration(milliseconds: 300));
+
+                  // Navigate back to memories list
+                  if (context.mounted) {
+                    NavigatorService.popAndPushNamed(AppRoutes.appMemories);
+                  }
+                } catch (e) {
+                  // Close loading indicator
+                  if (context.mounted) Navigator.pop(context);
+
+                  // Show error message
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('Failed to delete memory: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text(
+                'Delete',
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: Colors.red),
+              ),
+            ),
+          ],
         ),
       );
     }

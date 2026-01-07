@@ -81,6 +81,9 @@ class MemoryShareOptionsNotifier
   Future<void> copyLinkToClipboard(BuildContext context) async {
     if (state.inviteCode == null) return;
 
+    // Set copied state to true to trigger animation
+    state = state.copyWith(isLinkCopied: true);
+
     final link = 'https://capapp.co/join/memory/${state.inviteCode}';
     await Clipboard.setData(ClipboardData(text: link));
 
@@ -93,6 +96,10 @@ class MemoryShareOptionsNotifier
         ),
       );
     }
+
+    // Reset copied state after animation duration
+    await Future.delayed(Duration(milliseconds: 1500));
+    state = state.copyWith(isLinkCopied: false);
   }
 
   Future<void> sendInvites(BuildContext context) async {
