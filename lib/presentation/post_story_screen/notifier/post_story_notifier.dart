@@ -45,14 +45,14 @@ class PostStoryNotifier extends StateNotifier<PostStoryState> {
 
   void shareStory() {
     state = state.copyWith(
-      isLoading: true,
+      isSharing: true,
     );
 
     // Simulate story sharing process
     Future.delayed(Duration(seconds: 2), () {
       if (mounted) {
         state = state.copyWith(
-          isLoading: false,
+          isSharing: false,
           isShared: true,
         );
       }

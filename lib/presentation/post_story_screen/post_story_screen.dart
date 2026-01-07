@@ -3,8 +3,6 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_chip.dart';
 import '../../widgets/custom_image_view.dart';
 import 'notifier/post_story_notifier.dart';
 
@@ -16,11 +14,24 @@ class PostStoryScreen extends ConsumerStatefulWidget {
 }
 
 class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
+  String? memoryLocation;
+  DateTime? memoryDate;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(postStoryNotifier.notifier).initialize();
+
+      // Get navigation arguments for memory location and date
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null) {
+        setState(() {
+          memoryLocation = args['memoryLocation'] as String?;
+          memoryDate = args['memoryDate'] as DateTime?;
+        });
+      }
     });
   }
 
@@ -65,6 +76,35 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
     );
   }
 
+  /// Helper Widget for Memory Info
+  Widget? _buildMemoryInfo() {
+    if (memoryLocation == null && memoryDate == null) return null;
+
+    final locationText = memoryLocation ?? 'Unknown Location';
+    final dateText = memoryDate != null
+        ? '${memoryDate!.day}/${memoryDate!.month}/${memoryDate!.year}'
+        : '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (memoryLocation != null)
+          Text(
+            locationText,
+            style: TextStyleHelper.instance.body12BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50.withAlpha(204)),
+          ),
+        if (memoryDate != null) SizedBox(height: 2.h),
+        if (memoryDate != null)
+          Text(
+            dateText,
+            style: TextStyleHelper.instance.body12BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50.withAlpha(153)),
+          ),
+      ],
+    );
+  }
+
   /// Section Widget
   Widget _buildStoryContent(BuildContext context) {
     return Consumer(
@@ -79,7 +119,6 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
             alignment: Alignment.center,
             children: [
               _buildImageAndInfo(context),
-              _buildToolsOverlay(context),
             ],
           ),
         );
@@ -118,121 +157,10 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
                   ),
                 ),
               ),
-              _buildStoryDestination(context),
             ],
           ),
         );
       },
-    );
-  }
-
-  /// Section Widget
-  Widget _buildStoryDestination(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Story will be posted to your',
-          style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-              .copyWith(color: appTheme.gray_50),
-        ),
-        CustomChip(
-          iconPath: ImageConstant.imgVector,
-          text: 'Vacation',
-          padding: EdgeInsets.symmetric(horizontal: 6.h),
-        ),
-        SizedBox(width: 6.h),
-        CustomImageView(
-          imagePath: ImageConstant.imgEllipse826x26,
-          width: 32.h,
-          height: 32.h,
-          fit: BoxFit.cover,
-        ),
-      ],
-    );
-  }
-
-  /// Section Widget
-  Widget _buildToolsOverlay(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Container(
-        margin: EdgeInsets.only(top: 164.h),
-        width: double.infinity,
-        child: Column(
-          spacing: 38.h,
-          children: [
-            _buildToolOption(
-              context,
-              'Text',
-              ImageConstant.imgIcons,
-              () => _onTapTextTool(context),
-            ),
-            _buildToolOption(
-              context,
-              'Music',
-              ImageConstant.imgIconsWhiteA700,
-              () => _onTapMusicTool(context),
-            ),
-            _buildToolOption(
-              context,
-              'Draw',
-              ImageConstant.imgIconsWhiteA70026x26,
-              () => _onTapDrawTool(context),
-            ),
-            _buildToolOption(
-              context,
-              'Sticker',
-              ImageConstant.imgIcons26x26,
-              () => _onTapStickerTool(context),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Section Widget
-  Widget _buildToolOption(
-      BuildContext context, String text, String iconPath, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Text(
-            text,
-            style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                .copyWith(color: appTheme.white_A700),
-          ),
-          SizedBox(width: 18.h),
-          CustomImageView(
-            imagePath: iconPath,
-            width: 26.h,
-            height: 26.h,
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Section Widget
-  Widget _buildBottomSection(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 26.h),
-      child: Column(
-        children: [
-          CustomButton(
-            text: 'Share',
-            width: double.infinity,
-            onPressed: () => _onTapShare(context),
-            buttonStyle: CustomButtonStyle.fillPrimary,
-            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-            margin: EdgeInsets.only(bottom: 12.h),
-          ),
-        ],
-      ),
     );
   }
 
@@ -260,32 +188,19 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
     return status == PermissionStatus.granted;
   }
 
-  /// Handles text tool tap
-  void _onTapTextTool(BuildContext context) {
-    ref.read(postStoryNotifier.notifier).selectTool('text');
-    // Add text overlay functionality here
-  }
-
-  /// Handles music tool tap
-  void _onTapMusicTool(BuildContext context) {
-    ref.read(postStoryNotifier.notifier).selectTool('music');
-    // Add music selection functionality here
-  }
-
-  /// Handles draw tool tap
-  void _onTapDrawTool(BuildContext context) {
-    ref.read(postStoryNotifier.notifier).selectTool('draw');
-    // Add drawing functionality here
-  }
-
-  /// Handles sticker tool tap
-  void _onTapStickerTool(BuildContext context) {
-    ref.read(postStoryNotifier.notifier).selectTool('sticker');
-    // Add sticker selection functionality here
-  }
-
   /// Handles share button tap
   void _onTapShare(BuildContext context) {
     ref.read(postStoryNotifier.notifier).shareStory();
+  }
+
+  /// Section Widget - Bottom section with share button
+  Widget _buildBottomSection(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(16.h),
+      child: ElevatedButton(
+        onPressed: () => _onTapShare(context),
+        child: Text('Share Story'),
+      ),
+    );
   }
 }

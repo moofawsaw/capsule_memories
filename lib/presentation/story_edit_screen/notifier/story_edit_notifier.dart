@@ -8,7 +8,7 @@ import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 
 import '../../../services/supabase_service.dart';
-import '../../../services/location_service.dart';
+import '../../../services/story_service.dart';
 import '../models/story_edit_model.dart';
 
 final storyEditProvider =
@@ -21,6 +21,7 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
 
   final _supabase = SupabaseService.instance.client!;
   final _uuid = const Uuid();
+  final _storyService = StoryService();
 
   /// Initialize screen with media path
   void initializeScreen(String mediaPath) {
@@ -157,6 +158,8 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
     }
   }
 
+  /// CRITICAL FIX: Refactored to use StoryService.createStory() for proper location handling
+  /// This ensures coordinates and location_name are fetched and stored like memory creation
   Future<bool> uploadAndShareStory({
     required String memoryId,
     required String mediaPath,
@@ -181,23 +184,6 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       // Generate story ID upfront
       final storyId = _uuid.v4();
       print('🆔 Generated Story ID: $storyId');
-
-      // FIXED: Use geocoding service to get proper location name (city/state format)
-      print(
-          '📍 FETCHING LOCATION: Getting user location for story creation...');
-      Map<String, dynamic>? locationData;
-      try {
-        locationData = await LocationService.getLocationData();
-        if (locationData != null) {
-          print(
-              '✅ LOCATION FETCHED: ${locationData['location_name']} (${locationData['latitude']}, ${locationData['longitude']})');
-        } else {
-          print(
-              '⚠️ LOCATION UNAVAILABLE: Story will be created without location');
-        }
-      } catch (e) {
-        print('⚠️ Location capture failed: $e - continuing without location');
-      }
 
       // Read media file
       final mediaFile = File(mediaPath);
@@ -257,49 +243,31 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         thumbnailRelativePath = imageRelativePath;
       }
 
-      // Step 5: Build the complete story insert data
-      final storyInsertData = <String, dynamic>{
-        'id': storyId,
-        'memory_id': memoryId,
-        'contributor_id': userId,
-        'media_type': isVideo ? 'video' : 'image',
-        'duration_seconds': durationSeconds,
-        'capture_timestamp': DateTime.now().toIso8601String(),
-        'created_at': DateTime.now().toIso8601String(),
-      };
+      // CRITICAL FIX: Use StoryService.createStory() instead of direct database insertion
+      // This ensures proper location fetching and geocoding matching memory creation pattern
+      print(
+          '📍 Creating story with StoryService (includes location fetching)...');
 
-      // Add media URLs
-      if (videoRelativePath != null) {
-        storyInsertData['video_url'] = videoRelativePath;
-      }
-      if (imageRelativePath != null) {
-        storyInsertData['image_url'] = imageRelativePath;
-      }
-      if (thumbnailRelativePath != null) {
-        storyInsertData['thumbnail_url'] = thumbnailRelativePath;
+      final mediaUrl = isVideo ? videoRelativePath! : imageRelativePath!;
+      final storyData = await _storyService.createStory(
+        memoryId: memoryId,
+        contributorId: userId,
+        mediaUrl: mediaUrl,
+        mediaType: isVideo ? 'video' : 'image',
+        thumbnailUrl: thumbnailRelativePath,
+        caption: caption.isNotEmpty ? caption : null,
+        durationSeconds: durationSeconds,
+      );
+
+      if (storyData == null) {
+        throw Exception('Failed to create story via StoryService');
       }
 
-      // Add location data if available
-      if (locationData != null) {
-        storyInsertData['location_lat'] = locationData['latitude'];
-        storyInsertData['location_lng'] = locationData['longitude'];
-        storyInsertData['location_name'] = locationData['location_name'];
-      }
-
-      // Add caption as text overlay if provided
-      if (caption.isNotEmpty) {
-        storyInsertData['text_overlays'] = [
-          {'text': caption, 'position': 'bottom'}
-        ];
-      }
-
-      // Step 6: Insert story record with ALL data in single operation
-      print('📝 Inserting complete story record...');
-      print('Insert data: $storyInsertData');
-
-      await _supabase.from('stories').insert(storyInsertData);
-
-      print('✅ Story created and shared successfully!');
+      final locationName = storyData['location_name'] as String?;
+      print('✅ Story created successfully via StoryService');
+      print('   - Story ID: ${storyData['id']}');
+      print('   - Location: ${locationName ?? "Location unavailable"}');
+      print('   - Coordinates fetched: ${locationName != null ? "YES" : "NO"}');
 
       state = state.copyWith(isUploading: false);
       return true;
