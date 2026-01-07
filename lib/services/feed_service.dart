@@ -91,8 +91,10 @@ class FeedService {
       validationErrors.add('Category icon_url is missing for "$categoryName"');
     }
 
-    if (stories.isEmpty) {
-      validationErrors.add('No stories found in memory');
+    // CRITICAL FIX: Only show memories with at least 2 stories
+    if (stories.length < 2) {
+      validationErrors
+          .add('Memory has less than 2 stories (found ${stories.length})');
     }
 
     if (validationErrors.isNotEmpty) {

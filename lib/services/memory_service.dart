@@ -25,21 +25,28 @@ class MemoryService {
         throw Exception('Category ID is required');
       }
 
-      // Get location data with proper geocoding using LocationService
+      // STEP 1: Fetch location data with proper geocoding using LocationService
       // If geocoding fails after all retries, location_name will be NULL
       print('📍 MEMORY CREATION: Fetching location data...');
       final locationData = await LocationService.getLocationData();
 
-      // CRITICAL FIX: Allow memory creation even if location fetch fails
-      // This matches story creation behavior and prevents memory creation failures
-      if (locationData == null) {
+      double? latitude;
+      double? longitude;
+      String? locationName;
+
+      if (locationData != null) {
+        latitude = locationData['latitude'];
+        longitude = locationData['longitude'];
+        locationName = locationData['location_name'];
+
+        print('✅ MEMORY LOCATION DATA OBTAINED:');
+        print('   - Latitude: $latitude');
+        print('   - Longitude: $longitude');
         print(
-            '⚠️ MEMORY CREATION: Location data unavailable - proceeding with NULL location');
+            '   - Location Name: ${locationName ?? "NULL (geocoding failed)"}');
       } else {
-        print('📦 MEMORY CREATION: Location data received:');
-        print('   - latitude: ${locationData['latitude']}');
-        print('   - longitude: ${locationData['longitude']}');
-        print('   - location_name: ${locationData['location_name']}');
+        print('⚠️ MEMORY CREATION: LocationService returned NULL');
+        print('   Memory will be created without location data');
       }
 
       // Get category-based duration
@@ -57,29 +64,28 @@ class MemoryService {
       print('   - start_time: ${startTime.toIso8601String()}');
       print('   - end_time: ${endTime.toIso8601String()}');
 
-      // Create memory record with NULL-safe location handling
+      // STEP 2: Create memory with location data
+      print('💾 MEMORY CREATION: Inserting into database...');
       final memoryData = {
         'title': title,
         'creator_id': creatorId,
         'category_id': categoryId,
         'visibility': visibility,
         'duration': duration,
-        'location_lat': locationData?['latitude'],
-        'location_lng': locationData?['longitude'],
-        'location_name': locationData?['location_name'],
+        'location_lat': latitude,
+        'location_lng': longitude,
+        'location_name': locationName,
         'created_at': now.toIso8601String(),
         'expires_at': durationTime.toIso8601String(),
         'start_time': startTime.toIso8601String(),
         'end_time': endTime.toIso8601String(),
       };
 
-      print('📤 MEMORY CREATION: Inserting memory into database...');
-      print('   Data being inserted:');
-      print('   - title: ${memoryData['title']}');
-      print(
-          '   - location_name: ${memoryData['location_name'] ?? 'NULL (location unavailable)'}');
-      print('   - location_lat: ${memoryData['location_lat']}');
-      print('   - location_lng: ${memoryData['location_lng']}');
+      print('📝 MEMORY DATA TO INSERT:');
+      print('   - title: $title');
+      print('   - latitude: ${latitude ?? "NULL"}');
+      print('   - longitude: ${longitude ?? "NULL"}');
+      print('   - location_name: ${locationName ?? "NULL"}');
 
       // Insert and validate response
       final response = await _supabase

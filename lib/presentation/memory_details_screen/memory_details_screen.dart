@@ -635,16 +635,29 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       size: 24.h,
                     ),
                   ),
-                  // Native Share button
+                  // Native Share button with loading state
                   GestureDetector(
-                    onTap: () {
-                      notifier.shareMemoryNative();
-                    },
-                    child: Icon(
-                      Icons.share,
-                      color: appTheme.gray_50,
-                      size: 24.h,
-                    ),
+                    onTap: state.isSharing
+                        ? null
+                        : () {
+                            notifier.shareMemoryNative();
+                          },
+                    child: state.isSharing
+                        ? SizedBox(
+                            width: 24.h,
+                            height: 24.h,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                appTheme.gray_50,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            Icons.share,
+                            color: appTheme.gray_50,
+                            size: 24.h,
+                          ),
                   ),
                 ],
               ),

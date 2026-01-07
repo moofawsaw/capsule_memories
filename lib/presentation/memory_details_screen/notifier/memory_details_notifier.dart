@@ -929,11 +929,17 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
 
   /// NEW: Share memory using native share dialog
   Future<void> shareMemoryNative() async {
-    if (state.memoryId == null) return;
+    if (state.memoryId == null || state.isSharing) return;
+
+    // Set loading state to prevent double clicking
+    state = state.copyWith(isSharing: true);
 
     try {
       final client = SupabaseService.instance.client;
-      if (client == null) return;
+      if (client == null) {
+        state = state.copyWith(isSharing: false);
+        return;
+      }
 
       // Fetch memory details for sharing
       final memoryResponse = await client
@@ -945,7 +951,10 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
       final inviteCode = memoryResponse['invite_code'] as String?;
       final memoryTitle = memoryResponse['title'] as String?;
 
-      if (inviteCode == null || memoryTitle == null) return;
+      if (inviteCode == null || memoryTitle == null) {
+        state = state.copyWith(isSharing: false);
+        return;
+      }
 
       // Build join URL
       final joinUrl = 'https://capapp.co/join/memory/$inviteCode';
@@ -957,6 +966,7 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
       );
 
       state = state.copyWith(
+        isSharing: false,
         showSuccessMessage: true,
         successMessage: 'Share dialog opened',
       );
@@ -972,6 +982,7 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     } catch (e) {
       print('❌ Error sharing memory: $e');
       state = state.copyWith(
+        isSharing: false,
         showSuccessMessage: true,
         successMessage: 'Failed to share memory',
       );

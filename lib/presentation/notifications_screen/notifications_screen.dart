@@ -432,13 +432,56 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     // Dismiss any existing snackbar to show new one
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-                    // Show undo toast at bottom
+                    // Show undo toast with countdown timer at bottom
+                    int remainingSeconds = 5;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(
-                          'Notification deleted (${_deletedNotificationsStack.length} in stack)',
+                        content: StatefulBuilder(
+                          builder: (context, setState) {
+                            // Start countdown timer
+                            Future.delayed(Duration.zero, () async {
+                              for (int i = remainingSeconds; i > 0; i--) {
+                                await Future.delayed(
+                                    const Duration(seconds: 1));
+                                if (context.mounted) {
+                                  setState(() {
+                                    remainingSeconds = i - 1;
+                                  });
+                                }
+                              }
+                            });
+
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Notification deleted (${_deletedNotificationsStack.length} in stack)',
+                                  ),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8.w,
+                                    vertical: 4.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        appTheme.deep_purple_A100.withAlpha(77),
+                                    borderRadius: BorderRadius.circular(4.h),
+                                  ),
+                                  child: Text(
+                                    '${remainingSeconds}s',
+                                    style: TextStyle(
+                                      color: appTheme.white_A700,
+                                      fontSize: 12.fSize,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
-                        duration: const Duration(seconds: 4),
+                        duration: const Duration(seconds: 5),
                         behavior: SnackBarBehavior.floating,
                         margin: EdgeInsets.only(
                           bottom: 80.h,
