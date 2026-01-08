@@ -317,7 +317,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           isPrivate: visibility == 'private',
           categoryIcon: categoryIconUrl,
           participantImages: contributorAvatars,
-          customStoryItems: state.eventTimelineViewModel?.customStoryItems ?? [],
+          customStoryItems:
+              state.eventTimelineViewModel?.customStoryItems ?? [],
           timelineDetail: TimelineDetailModel(
             centerLocation: location ?? 'Unknown Location',
             centerDistance: '0km',
@@ -403,10 +404,12 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           [];
 
       // Normalize memory window times to UTC
-      final DateTime? startUtc =
-          memoryResponse['start_time'] != null ? _parseUtc(memoryResponse['start_time']) : null;
-      final DateTime? endUtc =
-          memoryResponse['end_time'] != null ? _parseUtc(memoryResponse['end_time']) : null;
+      final DateTime? startUtc = memoryResponse['start_time'] != null
+          ? _parseUtc(memoryResponse['start_time'])
+          : null;
+      final DateTime? endUtc = memoryResponse['end_time'] != null
+          ? _parseUtc(memoryResponse['end_time'])
+          : null;
 
       state = state.copyWith(
         memoryId: navArgs.memoryId,
@@ -463,9 +466,9 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
             customStoryItems: [],
             timelineDetail: TimelineDetailModel(
-              centerLocation:
-                  state.eventTimelineViewModel?.timelineDetail?.centerLocation ??
-                      'Unknown Location',
+              centerLocation: state
+                      .eventTimelineViewModel?.timelineDetail?.centerLocation ??
+                  'Unknown Location',
               centerDistance: '0km',
               timelineStories: [],
             ),
@@ -496,12 +499,14 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         memoryStartTime = _parseUtc(memoryResponse['start_time']);
         memoryEndTime = _parseUtc(memoryResponse['end_time']);
 
-        print('✅ TIMELINE DEBUG: Using memory window timestamps (UTC-normalized):');
+        print(
+            '✅ TIMELINE DEBUG: Using memory window timestamps (UTC-normalized):');
         print('   - Event start: ${memoryStartTime.toIso8601String()}');
         print('   - Event end:   ${memoryEndTime.toIso8601String()}');
       } else {
         // Fallback based on story timestamps (UTC-normalized)
-        final storyTimes = storiesData.map((s) => _parseUtc(s['created_at'])).toList();
+        final storyTimes =
+            storiesData.map((s) => _parseUtc(s['created_at'])).toList();
         storyTimes.sort();
 
         memoryStartTime = storyTimes.first;
@@ -511,7 +516,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         memoryStartTime = memoryStartTime.subtract(padding);
         memoryEndTime = memoryEndTime.add(padding);
 
-        print('⚠️ TIMELINE DEBUG: Memory window unavailable, using story range with padding (UTC-normalized)');
+        print(
+            '⚠️ TIMELINE DEBUG: Memory window unavailable, using story range with padding (UTC-normalized)');
         print('   - Derived start: ${memoryStartTime.toIso8601String()}');
         print('   - Derived end:   ${memoryEndTime.toIso8601String()}');
       }
@@ -546,7 +552,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         );
 
         final diffMin = createdAt.difference(memoryStartTime).inMinutes;
-        print('🧭 TIMELINE DIFF: story=$storyId diffMin=$diffMin createdAt=${createdAt.toIso8601String()} start=${memoryStartTime.toIso8601String()}');
+        print(
+            '🧭 TIMELINE DIFF: story=$storyId diffMin=$diffMin createdAt=${createdAt.toIso8601String()} start=${memoryStartTime.toIso8601String()}');
 
         return TimelineStoryItem(
           backgroundImage: backgroundImage,
@@ -692,6 +699,61 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('✅ DELETE MEMORY: Cache cleared');
     } catch (e, stackTrace) {
       print('❌ DELETE MEMORY ERROR: $e');
+      print('   Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// JOIN MEMORY: Add current user as a contributor to the memory
+  Future<void> joinMemory(String memoryId) async {
+    try {
+      print('🔍 JOIN MEMORY: Starting join process');
+      print('   - Memory ID: $memoryId');
+
+      final client = SupabaseService.instance.client;
+      if (client == null) {
+        throw Exception('Supabase client is not initialized');
+      }
+
+      final currentUser = client.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('No authenticated user');
+      }
+
+      // Check if user is already a member
+      final existingContributor = await client
+          .from('memory_contributors')
+          .select('id')
+          .eq('memory_id', memoryId)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+      if (existingContributor != null) {
+        print('⚠️ JOIN MEMORY: User is already a member');
+
+        // Update membership status in state
+        state = state.copyWith(isCurrentUserMember: true);
+        return;
+      }
+
+      // Add user as contributor
+      await client.from('memory_contributors').insert({
+        'memory_id': memoryId,
+        'user_id': currentUser.id,
+        'joined_at': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      print('✅ JOIN MEMORY: User added as contributor');
+
+      // Update membership status in state
+      state = state.copyWith(isCurrentUserMember: true);
+
+      // Refresh cache
+      await _cacheService.refreshMemoryCache(currentUser.id);
+
+      print('✅ JOIN MEMORY: Successfully joined memory');
+    } catch (e, stackTrace) {
+      print('❌ JOIN MEMORY ERROR: $e');
       print('   Stack trace: $stackTrace');
       rethrow;
     }

@@ -206,7 +206,51 @@ class NotificationService {
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response);
+      // Enrich memory_invite notifications with inviter and memory names
+      final enrichedNotifications = await Future.wait(
+        (response).map((notification) async {
+          if (notification['type'] == 'memory_invite') {
+            try {
+              final data = notification['data'] as Map<String, dynamic>?;
+              final memoryId = data?['memory_id'] as String?;
+
+              if (memoryId != null) {
+                // Fetch memory details
+                final memoryResponse = await client
+                    .from('memories')
+                    .select(
+                        'title, creator_id, user_profiles!memories_creator_id_fkey(display_name)')
+                    .eq('id', memoryId)
+                    .single();
+
+                final memoryName = memoryResponse['title'] as String?;
+                final creatorProfile =
+                    memoryResponse['user_profiles'] as Map<String, dynamic>?;
+                final inviterName =
+                    creatorProfile?['display_name'] as String?;
+
+                // Update message with enriched information
+                final enrichedMessage =
+                    '${inviterName ?? 'Someone'} invited you to join ${memoryName ?? 'a memory'}';
+
+                return {
+                  ...notification,
+                  'message': enrichedMessage,
+                  'enriched_data': {
+                    'memory_name': memoryName,
+                    'inviter_name': inviterName,
+                  }
+                };
+                            }
+            } catch (e) {
+              debugPrint('⚠️ Error enriching notification: $e');
+            }
+          }
+          return notification;
+        }),
+      );
+
+      return enrichedNotifications;
     } catch (error) {
       debugPrint('❌ Error fetching notifications: $error');
       return [];

@@ -214,10 +214,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       final memoryId = data?['memory_id'];
       if (memoryId != null) {
         debugPrint('🔔 Navigating to memory timeline: $memoryId');
+        // CRITICAL FIX: Use 'id' key instead of 'memoryId' to match MemoryNavArgs.fromMap expectation
         Navigator.pushNamed(
           context,
           AppRoutes.appTimelineSealed,
-          arguments: {'memoryId': memoryId},
+          arguments: {'id': memoryId}, // Changed from 'memoryId' to 'id'
         );
       } else {
         debugPrint('⚠️ Missing memory_id for memory notification');

@@ -1,14 +1,9 @@
 import '../../core/app_export.dart';
 import '../../core/utils/memory_nav_args.dart';
-import '../../core/utils/navigator_service.dart';
-import '../../routes/app_routes.dart';
-import '../../services/supabase_service.dart';
-import '../../theme/text_style_helper.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_header_row.dart';
 import '../../widgets/custom_image_view.dart';
 import './notifier/group_join_confirmation_notifier.dart';
-import 'notifier/group_join_confirmation_notifier.dart';
 
 class GroupJoinConfirmationScreen extends ConsumerStatefulWidget {
   const GroupJoinConfirmationScreen({Key? key}) : super(key: key);

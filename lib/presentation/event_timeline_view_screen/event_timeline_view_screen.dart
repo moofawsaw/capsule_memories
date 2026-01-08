@@ -574,7 +574,7 @@ class EventTimelineViewScreenState
                 },
               ),
               SizedBox(height: 12.h),
-              // CONDITIONAL BUTTON: Show Create Story if member, else Share Memory
+              // CONDITIONAL BUTTON: Show Create Story if member, else Join Memory button
               if (isCurrentUserMember)
                 CustomButton(
                   text: 'Create Story',
@@ -587,19 +587,13 @@ class EventTimelineViewScreenState
                 )
               else
                 CustomButton(
-                  text: 'Share Memory',
+                  text: 'Join Memory',
                   width: double.infinity,
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   onPressed: () {
-                    if (memoryId != null && memoryName != null) {
-                      NavigatorService.pushNamed(
-                        AppRoutes.memoryShareOptionsScreen,
-                        arguments: {
-                          'memory_id': memoryId,
-                          'memory_name': memoryName,
-                        },
-                      );
+                    if (memoryId != null) {
+                      _onJoinMemory(context, memoryId);
                     }
                   },
                 ),
@@ -608,6 +602,58 @@ class EventTimelineViewScreenState
         );
       },
     );
+  }
+
+  /// Handle join memory action
+  void _onJoinMemory(BuildContext context, String memoryId) async {
+    try {
+      final notifier = ref.read(eventTimelineViewNotifier.notifier);
+
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (loadingContext) => Center(
+          child: CircularProgressIndicator(
+            color: appTheme.deep_purple_A100,
+          ),
+        ),
+      );
+
+      // Add user as contributor
+      await notifier.joinMemory(memoryId);
+
+      // Close loading indicator
+      if (context.mounted) Navigator.pop(context);
+
+      // Show success message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully joined memory!'),
+            backgroundColor: appTheme.deep_purple_A100,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Reload timeline to show create story button
+      await notifier.loadMemoryStories(memoryId);
+    } catch (e) {
+      // Close loading indicator
+      if (context.mounted) Navigator.pop(context);
+
+      // Show error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to join memory: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   /// CRITICAL FIX: Handle timeline story card tap - Navigate to story viewer
