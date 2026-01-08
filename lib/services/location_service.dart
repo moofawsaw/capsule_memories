@@ -11,17 +11,27 @@ class LocationService {
   static Future<bool> checkAndRequestPermission() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return false;
+      if (!serviceEnabled) {
+        print('⚠️ Location services are disabled');
+        return false;
+      }
 
       var permission = await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return false;
+        if (permission == LocationPermission.denied) {
+          print('⚠️ Location permission denied');
+          return false;
+        }
       }
 
-      if (permission == LocationPermission.deniedForever) return false;
+      if (permission == LocationPermission.deniedForever) {
+        print('⚠️ Location permission denied forever');
+        return false;
+      }
 
+      print('✅ Location permission granted: $permission');
       return true;
     } catch (e) {
       print('⚠️ Location permission error: $e');
@@ -29,7 +39,12 @@ class LocationService {
     }
   }
 
-  /// Get current location with medium accuracy
+  /// Get current location with reliable fallbacks
+  ///
+  /// Key fix:
+  /// - Try last-known location immediately (works after resume/background, faster)
+  /// - Then try a fresh fix with a shorter timeout
+  /// - If fresh fails, return last-known instead of null
   static Future<Position?> getCurrentLocation() async {
     try {
       final hasPermission = await checkAndRequestPermission();
@@ -38,17 +53,37 @@ class LocationService {
         return null;
       }
 
-      print('📍 Fetching current location...');
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 15),
-      );
+      // 1) Try last known immediately
+      Position? lastKnown;
+      try {
+        lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null) {
+          print(
+              '✅ Using last known location: ${lastKnown.latitude}, ${lastKnown.longitude}');
+        } else {
+          print('ℹ️ No last known location available');
+        }
+      } catch (e) {
+        print('⚠️ Failed to get last known position: $e');
+      }
 
-      print('✅ Location obtained: ${position.latitude}, ${position.longitude}');
-      return position;
-    } on TimeoutException catch (e) {
-      print('⏱️ Location fetch timeout: $e');
-      return null;
+      // 2) Try a fresh fix (do not hard-fail if it times out)
+      print('📍 Fetching current location (fresh fix)...');
+      try {
+        final fresh = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 10),
+        );
+
+        print('✅ Fresh location obtained: ${fresh.latitude}, ${fresh.longitude}');
+        return fresh;
+      } on TimeoutException catch (e) {
+        print('⏱️ Fresh location fetch timeout: $e');
+        return lastKnown;
+      } catch (e) {
+        print('⚠️ Failed to get fresh location: $e');
+        return lastKnown;
+      }
     } catch (e) {
       print('⚠️ Failed to get location: $e');
       return null;
@@ -56,7 +91,8 @@ class LocationService {
   }
 
   /// Public reverse geocode entrypoint
-  static Future<String?> getLocationName(double latitude, double longitude) async {
+  static Future<String?> getLocationName(
+      double latitude, double longitude) async {
     // IMPORTANT: geocoding package is not supported on web; use HTTP reverse geocode instead.
     if (kIsWeb) {
       return _getLocationNameWeb(latitude, longitude);
@@ -65,15 +101,19 @@ class LocationService {
   }
 
   /// Native (Android/iOS) reverse geocoding using geocoding plugin
-  static Future<String?> _getLocationNameNative(double latitude, double longitude) async {
+  static Future<String?> _getLocationNameNative(
+      double latitude, double longitude) async {
     for (int attempt = 1; attempt <= 4; attempt++) {
       try {
-        print('🗺️ GEOCODING (NATIVE) ATTEMPT $attempt/4 for ($latitude, $longitude)');
+        print(
+            '🗺️ GEOCODING (NATIVE) ATTEMPT $attempt/4 for ($latitude, $longitude)');
 
-        final placemarks = await placemarkFromCoordinates(latitude, longitude).timeout(
+        final placemarks =
+        await placemarkFromCoordinates(latitude, longitude).timeout(
           const Duration(seconds: 15),
           onTimeout: () {
-            print('⏱️ GEOCODING (NATIVE) ATTEMPT $attempt: Timeout after 15 seconds');
+            print(
+                '⏱️ GEOCODING (NATIVE) ATTEMPT $attempt: Timeout after 15 seconds');
             return <Placemark>[];
           },
         );
@@ -94,15 +134,20 @@ class LocationService {
         final city = (p.locality?.trim().isNotEmpty ?? false)
             ? p.locality!.trim()
             : (p.subAdministrativeArea?.trim().isNotEmpty ?? false)
-                ? p.subAdministrativeArea!.trim()
-                : null;
+            ? p.subAdministrativeArea!.trim()
+            : null;
 
         final country = p.country?.trim();
-        final admin = p.administrativeArea?.trim(); // e.g., "Ontario" or "New York"
+        final admin = p.administrativeArea
+            ?.trim(); // e.g., "Ontario" or "New York"
 
         final stateAbbrev = _abbreviateRegion(admin, country);
 
-        final formatted = _formatLocation(city: city, region: stateAbbrev ?? admin, country: country);
+        final formatted = _formatLocation(
+          city: city,
+          region: stateAbbrev ?? admin,
+          country: country,
+        );
 
         if (formatted != null) {
           print('✅ GEOCODING (NATIVE) SUCCESS: "$formatted"');
@@ -132,10 +177,12 @@ class LocationService {
   }
 
   /// Web reverse geocoding using OpenStreetMap Nominatim
-  static Future<String?> _getLocationNameWeb(double latitude, double longitude) async {
+  static Future<String?> _getLocationNameWeb(
+      double latitude, double longitude) async {
     for (int attempt = 1; attempt <= 4; attempt++) {
       try {
-        print('🗺️ GEOCODING (WEB) ATTEMPT $attempt/4 for ($latitude, $longitude)');
+        print(
+            '🗺️ GEOCODING (WEB) ATTEMPT $attempt/4 for ($latitude, $longitude)');
 
         final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
           'format': 'jsonv2',
@@ -160,7 +207,8 @@ class LocationService {
         );
 
         if (res.statusCode != 200) {
-          print('⚠️ GEOCODING (WEB) ATTEMPT $attempt: HTTP ${res.statusCode}');
+          print(
+              '⚠️ GEOCODING (WEB) ATTEMPT $attempt: HTTP ${res.statusCode}');
           if (attempt < 4) {
             final waitTime = attempt * 2;
             print('⏳ Waiting ${waitTime}s before retry...');
@@ -174,7 +222,8 @@ class LocationService {
         final address = (data['address'] as Map?)?.cast<String, dynamic>();
 
         if (address == null) {
-          print('⚠️ GEOCODING (WEB) ATTEMPT $attempt: Missing address in response');
+          print(
+              '⚠️ GEOCODING (WEB) ATTEMPT $attempt: Missing address in response');
           if (attempt < 4) {
             final waitTime = attempt * 2;
             print('⏳ Waiting ${waitTime}s before retry...');
@@ -195,7 +244,8 @@ class LocationService {
         ]);
 
         final country = _firstNonEmptyString([address['country']]);
-        final stateFull = _firstNonEmptyString([address['state']]); // e.g., Ontario, New York
+        final stateFull =
+        _firstNonEmptyString([address['state']]); // Ontario, New York
         final stateAbbrev = _abbreviateRegion(stateFull, country);
 
         final formatted = _formatLocation(
@@ -231,7 +281,11 @@ class LocationService {
     return null;
   }
 
-  static String? _formatLocation({required String? city, required String? region, required String? country}) {
+  static String? _formatLocation({
+    required String? city,
+    required String? region,
+    required String? country,
+  }) {
     final c = city?.trim();
     final r = region?.trim();
     final co = country?.trim();
@@ -357,8 +411,14 @@ class LocationService {
         return null;
       }
 
+      final lat = position.latitude;
+      final lng = position.longitude;
+
+      print('✅ Coordinates obtained: $lat, $lng');
       print('🗺️ Reverse geocoding location...');
-      final locationName = await getLocationName(position.latitude, position.longitude).timeout(
+
+      final locationName =
+      await getLocationName(lat, lng).timeout(
         const Duration(seconds: 60),
         onTimeout: () {
           print('⏱️ Geocoding timed out after 60 seconds total');
@@ -373,8 +433,8 @@ class LocationService {
       }
 
       return {
-        'latitude': position.latitude,
-        'longitude': position.longitude,
+        'latitude': lat,
+        'longitude': lng,
         'location_name': locationName,
       };
     } catch (e) {

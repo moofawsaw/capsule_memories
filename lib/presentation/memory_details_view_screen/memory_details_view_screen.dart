@@ -159,6 +159,7 @@ class MemoryDetailsViewScreenState
         return CustomEventCard(
           eventTitle: state.memoryDetailsViewModel?.eventTitle,
           eventDate: state.memoryDetailsViewModel?.eventDate,
+          eventLocation: state.memoryDetailsViewModel?.eventLocation,
           isPrivate: state.memoryDetailsViewModel?.isPrivate,
           iconButtonImagePath: state.memoryDetailsViewModel?.categoryIcon ??
               ImageConstant.imgFrame13,

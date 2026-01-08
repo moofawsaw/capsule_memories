@@ -46,6 +46,7 @@ class CustomEventCard extends StatelessWidget {
     print('🚨 CUSTOM EVENT CARD DEBUG: build() called');
     print('   - eventTitle: "$eventTitle"');
     print('   - eventDate: "$eventDate"');
+    print('   - eventLocation: "$eventLocation"');
     print('   - participantImages count: ${participantImages?.length ?? 0}');
     print('   - iconButtonImagePath: "$iconButtonImagePath"');
 
@@ -146,6 +147,10 @@ class CustomEventCard extends StatelessWidget {
   }
 
   Widget _buildEventDetails(BuildContext context) {
+    // CRITICAL DEBUG: Log the actual location value being rendered
+    final locationText = eventLocation ?? 'Event Location';
+    print('🎯 CUSTOM EVENT CARD: Rendering location text = "$locationText"');
+
     return Expanded(
       child: Padding(
         padding: EdgeInsets.only(top: 14.h),
@@ -161,7 +166,7 @@ class CustomEventCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  eventLocation ?? 'Event Location',
+                  locationText,
                   style: TextStyleHelper.instance.body12MediumPlusJakartaSans
                       .copyWith(height: 1.33),
                 ),

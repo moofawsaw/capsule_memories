@@ -6,6 +6,7 @@ class MemoryDetailsViewModel extends Equatable {
   final String? memoryId;
   final String? eventTitle;
   final String? eventDate;
+  final String? eventLocation;
   final bool? isPrivate;
   final String? categoryIcon;
   final List<String>? participantImages;
@@ -19,6 +20,7 @@ class MemoryDetailsViewModel extends Equatable {
     this.memoryId,
     this.eventTitle,
     this.eventDate,
+    this.eventLocation,
     this.isPrivate,
     this.categoryIcon,
     this.participantImages,
@@ -33,6 +35,7 @@ class MemoryDetailsViewModel extends Equatable {
     String? memoryId,
     String? eventTitle,
     String? eventDate,
+    String? eventLocation,
     bool? isPrivate,
     String? categoryIcon,
     List<String>? participantImages,
@@ -46,6 +49,7 @@ class MemoryDetailsViewModel extends Equatable {
       memoryId: memoryId ?? this.memoryId,
       eventTitle: eventTitle ?? this.eventTitle,
       eventDate: eventDate ?? this.eventDate,
+      eventLocation: eventLocation ?? this.eventLocation,
       isPrivate: isPrivate ?? this.isPrivate,
       categoryIcon: categoryIcon ?? this.categoryIcon,
       participantImages: participantImages ?? this.participantImages,
@@ -62,6 +66,7 @@ class MemoryDetailsViewModel extends Equatable {
         memoryId,
         eventTitle,
         eventDate,
+        eventLocation,
         isPrivate,
         categoryIcon,
         participantImages,

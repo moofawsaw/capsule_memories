@@ -489,7 +489,10 @@ class MemoryFeedDashboardNotifier
     try {
       final storyId = payload.newRecord['id'] as String;
       final contributorId = payload.newRecord['contributor_id'] as String;
+      final memoryId =
+          payload.newRecord['memory_id'] as String; // CRITICAL: Get memory ID
       final rawThumbnailUrl = payload.newRecord['thumbnail_url'] as String?;
+      final videoUrl = payload.newRecord['video_url'] as String?;
       final client = SupabaseService.instance.client;
 
       if (client == null) return;
@@ -555,13 +558,60 @@ class MemoryFeedDashboardNotifier
           state.memoryFeedDashboardModel?.happeningNowStories ?? [];
       final updatedStories = [newStoryData, ...currentStories];
 
+      // 🚀 NEW: Update memory card in Public Memories timeline
+      final currentMemories =
+          state.memoryFeedDashboardModel?.publicMemories ?? [];
+      List<CustomMemoryItem>? updatedMemories;
+
+      print('🔍 REALTIME: Looking for memory "$memoryId" in public memories');
+
+      // Find the memory that this story belongs to
+      final memoryIndex = currentMemories.indexWhere((m) => m.id == memoryId);
+
+      if (memoryIndex != -1) {
+        print(
+            '✅ REALTIME: Found memory at index $memoryIndex - updating media items');
+
+        final targetMemory = currentMemories[memoryIndex];
+        final currentMediaItems = targetMemory.mediaItems ?? [];
+
+        // Create new media item for this story
+        final newMediaItem = CustomMediaItem(
+          imagePath: resolvedThumbnailUrl ?? '',
+          hasPlayButton: videoUrl != null,
+        );
+
+        // Add new media item at the beginning (most recent first)
+        final updatedMediaItems =
+            [newMediaItem, ...currentMediaItems].take(2).toList();
+
+        // Create updated memory with new media items
+        final updatedMemory = targetMemory.copyWith(
+          mediaItems: updatedMediaItems,
+        );
+
+        // Replace the memory in the list
+        updatedMemories = [...currentMemories];
+        updatedMemories[memoryIndex] = updatedMemory;
+
+        print('✅ REALTIME: Memory card updated with new story media');
+        print('   Media items count: ${updatedMediaItems.length}');
+      } else {
+        print(
+            '⚠️ REALTIME: Memory "$memoryId" not found in public memories - may not be public');
+        // Memory not in public feed (could be private or not yet loaded)
+        updatedMemories = null;
+      }
+
       final updatedModel = state.memoryFeedDashboardModel?.copyWith(
         happeningNowStories: updatedStories.cast<HappeningNowStoryData>(),
+        publicMemories: updatedMemories, // Update memory cards if found
       );
 
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
 
-      print('✅ REALTIME: New story added to feed with loaded images');
+      print(
+          '✅ REALTIME: New story added to feed ${updatedMemories != null ? "and memory card updated" : "(memory card not updated)"}');
     } catch (e) {
       print('❌ REALTIME: Error handling new story: $e');
     }

@@ -5,9 +5,9 @@ import '../../../services/memory_cache_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../../widgets/custom_story_list.dart';
+import '../../../widgets/timeline_widget.dart' as timeline_widget;
 import '../models/memory_details_view_model.dart';
 import '../models/timeline_detail_model.dart';
-import '../../../widgets/timeline_widget.dart' as timeline_widget;
 
 part 'memory_details_view_state.dart';
 
@@ -83,6 +83,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
       memoryDetailsViewModel: MemoryDetailsViewModel(
         eventTitle: snapshot.title,
         eventDate: snapshot.date,
+        eventLocation: snapshot.location,
         isPrivate: snapshot.isPrivate,
         categoryIcon: snapshot.categoryIcon ?? ImageConstant.imgFrame13,
         participantImages: snapshot.participantAvatars ?? [],
@@ -118,12 +119,13 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
 
       final memoryResponse = await SupabaseService.instance.client
           ?.from('memories')
-          .select('start_time, end_time')
+          .select('start_time, end_time, location_name')
           .eq('id', memoryId)
           .single();
 
       DateTime memoryStartTime;
       DateTime memoryEndTime;
+      String? memoryLocation;
 
       if (memoryResponse != null &&
           memoryResponse['start_time'] != null &&
@@ -131,11 +133,13 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         // CRITICAL FIX: Normalize to UTC consistently
         memoryStartTime = _parseUtc(memoryResponse['start_time']);
         memoryEndTime = _parseUtc(memoryResponse['end_time']);
+        memoryLocation = memoryResponse['location_name'] as String?;
 
         print(
             '✅ SEALED DEBUG: Using memory window timestamps (UTC-normalized):');
         print('   - Event start: ${memoryStartTime.toIso8601String()}');
         print('   - Event end:   ${memoryEndTime.toIso8601String()}');
+        print('   - Event location: $memoryLocation');
       } else {
         if (storiesData.isNotEmpty) {
           // CRITICAL FIX: Normalize story timestamps to UTC consistently
@@ -203,11 +207,10 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
 
       state = state.copyWith(
         memoryDetailsViewModel: state.memoryDetailsViewModel?.copyWith(
+          eventLocation: memoryLocation ?? 'Unknown Location',
           customStoryItems: timelineStories,
           timelineDetail: TimelineDetailModel(
-            centerLocation:
-                state.memoryDetailsViewModel?.timelineDetail?.centerLocation ??
-                    'Unknown Location',
+            centerLocation: memoryLocation ?? 'Unknown Location',
             centerDistance:
                 state.memoryDetailsViewModel?.timelineDetail?.centerDistance ??
                     '0km',

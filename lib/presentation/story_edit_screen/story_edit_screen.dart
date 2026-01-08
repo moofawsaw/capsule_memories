@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_export.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_image_view.dart';
 import './notifier/story_edit_notifier.dart';
 
 class StoryEditScreen extends ConsumerStatefulWidget {
@@ -75,14 +73,8 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
                   // Video/Image Preview (full screen)
                   _buildMediaPreview(),
 
-                  // Top Header
-                  _buildTopHeader(),
-
-                  // Right Side Editing Tools
-                  _buildEditingTools(),
-
-                  // Bottom Caption & Share Section
-                  _buildBottomSection(),
+                  // Share to Memory Button (bottom)
+                  _buildShareButton(context, state),
                 ],
               ),
       ),
@@ -115,201 +107,43 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
     );
   }
 
-  /// Top header with back button, memory name, and Next button
-  Widget _buildTopHeader() {
+  /// Share to Memory button positioned at bottom
+  Widget _buildShareButton(BuildContext context, StoryEditState state) {
     return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withAlpha(178),
-              Colors.transparent,
-            ],
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Back button
-            GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: EdgeInsets.all(8.h),
-                decoration: BoxDecoration(
-                  color: Colors.black.withAlpha(102),
-                  shape: BoxShape.circle,
-                ),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgArrowLeft,
-                  height: 20.h,
-                  width: 20.h,
-                  color: appTheme.gray_50,
-                ),
-              ),
+      left: 16.w,
+      right: 16.w,
+      bottom: 24.h,
+      child: IgnorePointer(
+        ignoring: state.isUploading,
+        child: ElevatedButton(
+          onPressed: state.isUploading ? null : () => _onShareStory(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: state.isUploading
+                ? appTheme.deep_purple_A100.withAlpha(128)
+                : appTheme.deep_purple_A100,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(vertical: 2.h),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0),
             ),
-
-            // Memory name with category icon
-            Row(
-              children: [
-                if (widget.categoryIcon != null)
-                  CustomImageView(
-                    imagePath: widget.categoryIcon!,
-                    height: 20.h,
-                    width: 20.h,
-                    fit: BoxFit.contain,
+            elevation: 4,
+          ),
+          child: state.isUploading
+              ? SizedBox(
+                  height: 20.sp,
+                  width: 20.sp,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
-                SizedBox(width: 8.h),
-                Text(
-                  widget.memoryTitle,
-                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
+                )
+              : Text(
+                  'Share to Memory',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ],
-            ),
-
-            // Empty spacer to maintain layout balance (REMOVED duplicate Next button)
-            SizedBox(width: 72.h),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Right side vertical editing tools
-  Widget _buildEditingTools() {
-    return Positioned(
-      right: 16.h,
-      top: 100.h,
-      bottom: 200.h,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildEditingToolButton(
-            icon: Icons.text_fields,
-            label: 'Text',
-            onTap: () => _onTextTap(),
-          ),
-          _buildEditingToolButton(
-            icon: Icons.emoji_emotions_outlined,
-            label: 'Stickers',
-            onTap: () => _onStickersTap(),
-          ),
-          _buildEditingToolButton(
-            icon: Icons.draw_outlined,
-            label: 'Draw',
-            onTap: () => _onDrawTap(),
-          ),
-          _buildEditingToolButton(
-            icon: Icons.music_note,
-            label: 'Music',
-            onTap: () => _onMusicTap(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Individual editing tool button
-  Widget _buildEditingToolButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(12.h),
-        decoration: BoxDecoration(
-          color: Colors.black.withAlpha(102),
-          shape: BoxShape.circle,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: appTheme.gray_50,
-              size: 24.h,
-            ),
-            SizedBox(height: 4.h),
-            Text(
-              label,
-              style: TextStyleHelper.instance.body10BoldPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Bottom section with caption input and share button
-  Widget _buildBottomSection() {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding: EdgeInsets.all(16.h),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [
-              Colors.black.withAlpha(204),
-              Colors.transparent,
-            ],
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Caption input
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
-              decoration: BoxDecoration(
-                color: Colors.black.withAlpha(102),
-                borderRadius: BorderRadius.circular(24.h),
-              ),
-              child: TextField(
-                controller: _captionController,
-                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
-                maxLines: 3,
-                minLines: 1,
-                decoration: InputDecoration(
-                  hintText: 'Add a caption...',
-                  hintStyle: TextStyleHelper
-                      .instance.body14MediumPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                onChanged: (value) {
-                  ref.read(storyEditProvider.notifier).updateCaption(value);
-                },
-              ),
-            ),
-
-            SizedBox(height: 16.h),
-
-            // Share to Memory button
-            CustomButton(
-              text: 'Share to Memory',
-              width: double.infinity,
-              onPressed: () => _onShareStory(context),
-              buttonStyle: CustomButtonStyle.fillPrimary,
-              buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-            ),
-          ],
         ),
       ),
     );
