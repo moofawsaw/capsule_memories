@@ -1,3 +1,5 @@
+import 'package:Capsule/theme/custom_button_style.dart';
+
 import '../../../core/app_export.dart';
 
 /// Data model for timeline story items
@@ -141,15 +143,7 @@ class TimelineStoryWidget extends StatelessWidget {
       height: 40.h,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF8B5CF6), // Purple
-            Color(0xFFEC4899), // Pink
-            Color(0xFFF97316), // Orange
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xFFA186F0),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF8B5CF6).withOpacity(0.4),

@@ -89,23 +89,19 @@ class HappeningNowStoryCard extends StatelessWidget {
                           EdgeInsets.all(2.h), // Gap between ring and avatar
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: story.isRead
-                            ? null // No gradient for read stories
-                            : LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: const [
-                                  Color(0xFF8B5CF6), // Purple
-                                  Color(0xFFF97316), // Orange
-                                ],
-                              ),
-                        color: story.isRead
-                            ? Color(0xFF9CA3AF)
-                            : null, // Gray for read
+
+                        // Solid ring color (unread)
+                        color: story.isRead ? null : const Color(0xFFA186F0),
+
+                        // Read = gray outline
                         border: story.isRead
-                            ? Border.all(color: Color(0xFF9CA3AF), width: 2.h)
+                            ? Border.all(
+                          color: const Color(0xFF9CA3AF),
+                          width: 2.h,
+                        )
                             : null,
                       ),
+
                       child: Container(
                         width: 38.h,
                         height: 38.h,
