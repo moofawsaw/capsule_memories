@@ -135,7 +135,7 @@ class _MemoriesDashboardScreenState
           SizedBox(height: 12.h),
           SizedBox(
             height: 140.h,
-            child: isLoading || items.isEmpty
+            child: isLoading
                 ? ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: EdgeInsets.only(left: 20.h),
@@ -146,21 +146,34 @@ class _MemoriesDashboardScreenState
                       child: CustomStorySkeleton(isCompact: true),
                     ),
                   )
-                : CustomStoryList(
-                    storyItems: items
-                        .map(
-                          (e) => CustomStoryItem(
-                            backgroundImage: e.backgroundImage ?? '',
-                            profileImage: e.profileImage ?? '',
-                            timestamp: e.timestamp ?? '',
-                            navigateTo: e.navigateTo,
-                            storyId: e.id,
-                            isRead: e.isRead ?? false,
+                : items.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20.h),
+                          child: Text(
+                            'No stories yet',
+                            style: TextStyleHelper
+                                .instance.body14RegularPlusJakartaSans
+                                .copyWith(
+                                    color: appTheme.gray_50.withAlpha(128)),
                           ),
-                        )
-                        .toList(),
-                    onStoryTap: (i) => _onStoryTap(context, i),
-                  ),
+                        ),
+                      )
+                    : CustomStoryList(
+                        storyItems: items
+                            .map(
+                              (e) => CustomStoryItem(
+                                backgroundImage: e.backgroundImage ?? '',
+                                profileImage: e.profileImage ?? '',
+                                timestamp: e.timestamp ?? '',
+                                navigateTo: e.navigateTo,
+                                storyId: e.id,
+                                isRead: e.isRead ?? false,
+                              ),
+                            )
+                            .toList(),
+                        onStoryTap: (i) => _onStoryTap(context, i),
+                      ),
           ),
         ],
       );
@@ -244,7 +257,16 @@ class _MemoriesDashboardScreenState
 
       final memories = notifier.getFilteredMemories(user.id);
       if (memories.isEmpty) {
-        return SizedBox(height: 200.h);
+        return Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 40.h),
+            child: Text(
+              'No memories yet',
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50.withAlpha(128)),
+            ),
+          ),
+        );
       }
 
       return SingleChildScrollView(
