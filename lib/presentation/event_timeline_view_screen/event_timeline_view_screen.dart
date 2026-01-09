@@ -24,10 +24,11 @@ class EventTimelineViewScreen extends ConsumerStatefulWidget {
 }
 
 class EventTimelineViewScreenState
-    extends ConsumerState<EventTimelineViewScreen> {
+    extends ConsumerState<EventTimelineViewScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // CRITICAL FIX: Use typed navigation contract
       final rawArgs = ModalRoute.of(context)?.settings.arguments;
@@ -106,6 +107,30 @@ class EventTimelineViewScreenState
         }
       });
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // Refresh timeline data when app resumes
+    if (state == AppLifecycleState.resumed) {
+      final memoryId =
+          ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
+      if (memoryId != null) {
+        print(
+            '🔄 TIMELINE: Screen resumed - refreshing data for memory: $memoryId');
+        ref
+            .read(eventTimelineViewNotifier.notifier)
+            .validateMemoryData(memoryId);
+      }
+    }
   }
 
   /// DEBUG TOAST: Show validation results for data passing

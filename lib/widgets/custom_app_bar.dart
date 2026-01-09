@@ -81,48 +81,32 @@ class CustomAppBar extends ConsumerStatefulWidget
 }
 
 class _CustomAppBarState extends ConsumerState<CustomAppBar> {
-  bool _isUserAuthenticated = false;
-
   @override
   void initState() {
     super.initState();
-    // Delay to avoid modifying provider during build
-    Future.microtask(() => _checkAuthenticationState());
+    // Load avatar only if not already cached
+    if (widget.showProfileImage) {
+      Future.microtask(() => _ensureAvatarLoaded());
+    }
   }
 
-  /// Check authentication state WITHOUT loading avatar
-  /// Avatar is loaded once at app startup in main.dart
-  Future<void> _checkAuthenticationState() async {
-    if (!widget.showProfileImage) return;
-
+  /// Ensure avatar is loaded if user is authenticated but avatar not cached
+  Future<void> _ensureAvatarLoaded() async {
     try {
       final client = SupabaseService.instance.client;
-      if (client == null) {
-        if (mounted) setState(() => _isUserAuthenticated = false);
-        return;
-      }
+      if (client == null) return;
 
       final user = client.auth.currentUser;
-      if (user == null) {
-        if (mounted) setState(() => _isUserAuthenticated = false);
-        return;
-      }
+      if (user == null) return;
 
-      if (mounted) setState(() => _isUserAuthenticated = true);
-
-      // 🔥 CACHE CHECK: Only load avatar if it's NOT already cached in global state
       final currentAvatarState = ref.read(avatarStateProvider);
 
-      // If avatar is not loaded yet AND user is authenticated, load it ONCE
-      if (currentAvatarState.avatarUrl == null &&
-          currentAvatarState.userId == null &&
-          !currentAvatarState.isLoading) {
-        // Delay avatar loading to happen AFTER build completes
+      // Only load if not already cached
+      if (currentAvatarState.userId == null && !currentAvatarState.isLoading) {
         await ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
       }
     } catch (e) {
-      print('❌ Error checking authentication: $e');
-      if (mounted) setState(() => _isUserAuthenticated = false);
+      print('❌ Error ensuring avatar loaded: $e');
     }
   }
 
@@ -157,6 +141,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
   }
 
   Widget _buildLogoWithActionsLayout(BuildContext context, int unreadCount) {
+    // 🔥 SYNCHRONOUSLY derive auth state from cached avatar provider - NO DELAY
+    final avatarState = ref.watch(avatarStateProvider);
+    final isAuthenticated = avatarState.userId != null;
+
     // 🔥 Get current route to determine active state
     final currentRoute = ModalRoute.of(context)?.settings.name ?? '';
 
@@ -181,8 +169,8 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
             ),
             SizedBox(width: 18.h),
           ],
-          // Only show action buttons and icons if user is authenticated
-          if (_isUserAuthenticated) ...[
+          // 🔥 Use synchronously-derived auth state - NO FLASH
+          if (isAuthenticated) ...[
             if (widget.showIconButton &&
                 widget.iconButtonImagePath != null) ...[
               Container(
@@ -313,11 +301,13 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
   }
 
   /// Build authentication widget - shows login button or user avatar based on auth state
+  /// 🔥 OPTIMIZED: Uses cached avatar state synchronously - NO ASYNC DELAY
   Widget _buildAuthenticationWidget(BuildContext context) {
-    // 🔥 Watch global avatar state - will automatically refresh when avatar changes
     final avatarState = ref.watch(avatarStateProvider);
+    final isAuthenticated = avatarState.userId != null;
 
-    if (avatarState.isLoading) {
+    // Show loading state only if explicitly loading
+    if (avatarState.isLoading && avatarState.userId == null) {
       return Container(
         width: 50.h,
         height: 50.h,
@@ -338,8 +328,8 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
       );
     }
 
-    if (!_isUserAuthenticated) {
-      // Show login button when user is not authenticated
+    // 🔥 SYNCHRONOUS AUTH CHECK - NO FLASH
+    if (!isAuthenticated) {
       return GestureDetector(
         onTap: () => _handleLoginButtonTap(context),
         child: Container(
@@ -357,7 +347,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
       );
     }
 
-    // Show user avatar when authenticated - automatically updates from global state
+    // Show user avatar when authenticated
     return GestureDetector(
       onTap: () => _handleProfileTap(context),
       child: _buildUserAvatar(avatarState),

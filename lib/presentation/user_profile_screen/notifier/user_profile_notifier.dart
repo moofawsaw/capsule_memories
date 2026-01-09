@@ -142,13 +142,20 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
 
       print('🔍 USER PROFILE: Fetching stories for user: $targetUserId');
 
-      // Check friendship status if viewing another user's profile
+      // CRITICAL FIX: Always check friendship status when viewing any profile (including own)
       bool isFriend = false;
-      if (currentUserId != null && targetUserId != currentUserId) {
+      bool isFollowing = false;
+
+      if (currentUserId != null) {
+        // Check if already friends using friends table
         isFriend =
             await _friendsService.areFriends(currentUserId, targetUserId);
         print(
-            '✅ USER PROFILE: Friendship status checked - isFriend: $isFriend');
+            '✅ USER PROFILE: Friendship status - isFriend: $isFriend (current: $currentUserId, target: $targetUserId)');
+
+        // Check following status
+        isFollowing =
+            await _followsService.isFollowing(currentUserId, targetUserId);
       }
 
       // CRITICAL FIX: Use fetchStoriesByAuthor to show only stories authored by this user
@@ -206,6 +213,7 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
           storyItems: storyItems,
         ),
         isFriend: isFriend,
+        isFollowing: isFollowing,
         isLoading: false,
       );
     } catch (e) {
@@ -250,6 +258,27 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
   Future<void> onAddFriendButtonPressed(String targetUserId) async {
     final currentUser = SupabaseService.instance.client?.auth.currentUser;
     if (currentUser == null) return;
+
+    // CRITICAL FIX: Check if already friends before sending request
+    final alreadyFriends =
+        await _friendsService.areFriends(currentUser.id, targetUserId);
+
+    if (alreadyFriends) {
+      print('❌ USER PROFILE: Cannot send friend request - already friends');
+      // Update state to reflect actual friendship status
+      state = state.copyWith(isFriend: true);
+      return;
+    }
+
+    // Check if there's already a pending request
+    final hasPending =
+        await _friendsService.hasPendingRequest(currentUser.id, targetUserId);
+
+    if (hasPending) {
+      print(
+          '❌ USER PROFILE: Cannot send friend request - request already pending');
+      return;
+    }
 
     // Send friend request
     final success =

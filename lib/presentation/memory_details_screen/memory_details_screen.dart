@@ -102,6 +102,9 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                         // NEW: Category selection section
                         _buildCategorySection(context),
                         SizedBox(height: 24.h),
+                        // NEW: Duration selection section
+                        _buildDurationSection(context),
+                        SizedBox(height: 24.h),
                         _buildMemoryInfo(context),
                         SizedBox(height: 24.h),
                         _buildMembersList(context),
@@ -341,7 +344,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                         child: Text(
                           state.selectedCategoryName ?? 'Select Category',
                           style: TextStyleHelper
-                              .instance.title16RegularPlusJakartaSans
+                              .instance.body16BoldPlusJakartaSans
                               .copyWith(
                             color: state.selectedCategoryName != null
                                 ? appTheme.gray_50
@@ -567,6 +570,286 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
         ),
       ),
     );
+  }
+
+  /// NEW: Duration Section Widget
+  Widget _buildDurationSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryDetailsNotifier);
+        final notifier = ref.read(memoryDetailsNotifier.notifier);
+        final isCreator = state.isCreator;
+
+        // Duration options with human-readable labels
+        final durationOptions = [
+          {'value': '12_hours', 'label': '12 Hours'},
+          {'value': '24_hours', 'label': '24 Hours'},
+          {'value': '3_days', 'label': '3 Days'},
+        ];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  color: appTheme.blue_gray_300,
+                  size: 18.h,
+                ),
+                SizedBox(width: 6.h),
+                Text(
+                  'Memory Duration',
+                  style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                      .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+                ),
+              ],
+            ),
+            SizedBox(height: 12.h),
+
+            // Duration Selection
+            if (isCreator)
+              GestureDetector(
+                onTap: () {
+                  _showDurationSelectionBottomSheet(
+                      context, notifier, state, durationOptions);
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.h,
+                    vertical: 14.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900,
+                    borderRadius: BorderRadius.circular(8.h),
+                    border: Border.all(
+                      color: appTheme.blue_gray_300.withAlpha(77),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          state.selectedDuration != null
+                              ? durationOptions
+                                  .firstWhere(
+                                    (opt) =>
+                                        opt['value'] == state.selectedDuration,
+                                    orElse: () => durationOptions[0],
+                                  )['label']
+                                  .toString()
+                              : 'Select Duration',
+                          style: TextStyleHelper
+                              .instance.title16RegularPlusJakartaSans
+                              .copyWith(
+                            color: state.selectedDuration != null
+                                ? appTheme.gray_50
+                                : appTheme.blue_gray_300,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: appTheme.gray_50,
+                        size: 24.h,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 16.h,
+                  vertical: 14.h,
+                ),
+                decoration: BoxDecoration(
+                  color: appTheme.gray_900,
+                  borderRadius: BorderRadius.circular(8.h),
+                  border: Border.all(
+                    color: appTheme.blue_gray_300.withAlpha(77),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  state.selectedDuration != null
+                      ? durationOptions
+                          .firstWhere(
+                            (opt) => opt['value'] == state.selectedDuration,
+                            orElse: () => durationOptions[0],
+                          )['label']
+                          .toString()
+                      : 'No duration set',
+                  style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                ),
+              ),
+
+            // Show end time if available
+            if (state.endTime != null) ...[
+              SizedBox(height: 8.h),
+              Row(
+                children: [
+                  Icon(
+                    Icons.event_outlined,
+                    color: appTheme.blue_gray_300,
+                    size: 14.h,
+                  ),
+                  SizedBox(width: 4.h),
+                  Text(
+                    'Ends: ${_formatDateTime(state.endTime!)}',
+                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300),
+                  ),
+                ],
+              ),
+            ],
+
+            if (!isCreator) ...[
+              SizedBox(height: 8.h),
+              Text(
+                'Duration can only be changed by the creator',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  /// NEW: Show duration selection bottom sheet
+  void _showDurationSelectionBottomSheet(
+    BuildContext context,
+    dynamic notifier,
+    dynamic state,
+    List<Map<String, String>> durationOptions,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: appTheme.gray_900_02,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
+        ),
+      ),
+      builder: (modalContext) => Container(
+        padding: EdgeInsets.all(20.h),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Select Duration',
+                  style: TextStyleHelper.instance.title20BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                ),
+                GestureDetector(
+                  onTap: () => Navigator.pop(modalContext),
+                  child: Icon(
+                    Icons.close,
+                    color: appTheme.gray_50,
+                    size: 24.h,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 20.h),
+
+            // Duration options list
+            ListView.separated(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              itemCount: durationOptions.length,
+              separatorBuilder: (context, index) => SizedBox(height: 12.h),
+              itemBuilder: (context, index) {
+                final option = durationOptions[index];
+                final durationValue = option['value'] as String;
+                final durationLabel = option['label'] as String;
+                final isSelected = durationValue == state.selectedDuration;
+
+                return GestureDetector(
+                  onTap: () {
+                    notifier.updateMemoryDuration(durationValue);
+                    Navigator.pop(modalContext);
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(16.h),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? appTheme.deep_purple_A100.withAlpha(26)
+                          : appTheme.gray_900,
+                      borderRadius: BorderRadius.circular(8.h),
+                      border: Border.all(
+                        color: isSelected
+                            ? appTheme.deep_purple_A100
+                            : appTheme.blue_gray_300.withAlpha(77),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.timer,
+                              color: isSelected
+                                  ? appTheme.deep_purple_A100
+                                  : appTheme.blue_gray_300,
+                              size: 24.h,
+                            ),
+                            SizedBox(width: 12.h),
+                            Text(
+                              durationLabel,
+                              style: TextStyleHelper
+                                  .instance.body16BoldPlusJakartaSans
+                                  .copyWith(
+                                color: appTheme.gray_50,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (isSelected)
+                          Icon(
+                            Icons.check_circle,
+                            color: appTheme.deep_purple_A100,
+                            size: 24.h,
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            SizedBox(height: 20.h),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Helper method to format DateTime
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = dateTime.difference(now);
+
+    if (difference.isNegative) {
+      return 'Expired';
+    } else if (difference.inHours < 24) {
+      return 'in ${difference.inHours}h ${difference.inMinutes.remainder(60)}m';
+    } else {
+      return 'in ${difference.inDays}d ${difference.inHours.remainder(24)}h';
+    }
   }
 
   /// Section Widget

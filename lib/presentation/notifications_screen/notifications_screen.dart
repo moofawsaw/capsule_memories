@@ -38,18 +38,30 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     try {
       _notificationService.subscribeToNotifications(
         onNewNotification: (notification) {
+          // CRITICAL FIX: Reload notifications list silently without showing snackbar
+          // This prevents duplicate notifications when user restores deleted notifications
           _loadNotifications();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(notification['message'] ?? 'New notification'),
-                duration: const Duration(seconds: 3),
-                action: SnackBarAction(
-                  label: 'View',
-                  onPressed: () => _handleNotificationTap(notification),
+
+          // ONLY show snackbar for truly new notifications (not restored ones)
+          // Check if this notification was just created (within last 2 seconds)
+          final createdAt = notification['created_at'] as String?;
+          if (createdAt != null) {
+            final notificationTime = DateTime.parse(createdAt);
+            final timeDifference = DateTime.now().difference(notificationTime);
+
+            // Only show snackbar if notification is brand new (created within last 2 seconds)
+            if (timeDifference.inSeconds <= 2 && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(notification['message'] ?? 'New notification'),
+                  duration: const Duration(seconds: 3),
+                  action: SnackBarAction(
+                    label: 'View',
+                    onPressed: () => _handleNotificationTap(notification),
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           }
         },
       );

@@ -57,7 +57,7 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
       final memoryResponse = await client
           .from('memories')
           .select(
-              'id, title, invite_code, visibility, creator_id, state, location_name, location_lat, location_lng, category_id')
+              'id, title, invite_code, visibility, creator_id, state, location_name, location_lat, location_lng, category_id, duration, start_time, end_time')
           .eq('id', memoryId)
           .single();
 
@@ -126,6 +126,21 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         }
       }
 
+      // NEW: Load duration data
+      final duration = memoryResponse['duration'] as String?;
+      final startTimeStr = memoryResponse['start_time'] as String?;
+      final endTimeStr = memoryResponse['end_time'] as String?;
+
+      DateTime? parsedStartTime;
+      DateTime? parsedEndTime;
+
+      if (startTimeStr != null) {
+        parsedStartTime = DateTime.parse(startTimeStr);
+      }
+      if (endTimeStr != null) {
+        parsedEndTime = DateTime.parse(endTimeStr);
+      }
+
       state = state.copyWith(
         titleController: titleController,
         inviteLinkController: inviteLinkController,
@@ -141,6 +156,10 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         // NEW: Set current category
         selectedCategoryId: currentCategoryId,
         selectedCategoryName: currentCategoryName,
+        // NEW: Set duration data
+        selectedDuration: duration,
+        startTime: parsedStartTime,
+        endTime: parsedEndTime,
         memberUserIds: memberUserIds,
         memoryDetailsModel: state.memoryDetailsModel?.copyWith(
           title: memoryResponse['title'] as String? ?? '',
@@ -357,6 +376,34 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     }
   }
 
+  /// NEW: Update memory duration
+  void updateMemoryDuration(String newDuration) {
+    if (!state.isCreator) return;
+
+    // Calculate new end_time based on duration
+    final now = DateTime.now();
+    DateTime newEndTime;
+
+    switch (newDuration) {
+      case '12_hours':
+        newEndTime = now.add(Duration(hours: 12));
+        break;
+      case '24_hours':
+        newEndTime = now.add(Duration(hours: 24));
+        break;
+      case '3_days':
+        newEndTime = now.add(Duration(days: 3));
+        break;
+      default:
+        newEndTime = now.add(Duration(hours: 12));
+    }
+
+    state = state.copyWith(
+      selectedDuration: newDuration,
+      endTime: newEndTime,
+    );
+  }
+
   /// NEW: Update selected category
   void updateCategory(String categoryId, String categoryName) {
     if (!state.isCreator) return;
@@ -513,6 +560,9 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         'location_lng': state.locationLng,
         // NEW: Update category
         'category_id': state.selectedCategoryId,
+        // NEW: Update duration and end_time
+        'duration': state.selectedDuration,
+        'end_time': state.endTime?.toIso8601String(),
       }).eq('id', state.memoryId!);
 
       state = state.copyWith(

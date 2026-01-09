@@ -40,12 +40,18 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(userProfileNotifier);
 
+    // Extract userId from route arguments for onRefresh
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final userId = args is Map ? args['userId'] as String? : null;
+
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
         body: RefreshIndicator(
           onRefresh: () async {
-            await ref.read(userProfileNotifier.notifier).initialize();
+            await ref
+                .read(userProfileNotifier.notifier)
+                .initialize(userId: userId);
           },
           color: appTheme.deep_purple_A100,
           backgroundColor: appTheme.gray_900_01,
@@ -361,12 +367,13 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       onTap: () => onTapStoryItem(context, 0),
                       showDeleteButton: showDeleteButton,
                       currentUserId: currentUserId,
-                      onDelete: state
-                                  .userProfileModel?.storyItems?[0].storyId !=
-                              null
-                          ? () => notifier.confirmAndDeleteStory(context,
-                              state.userProfileModel!.storyItems![0].storyId!)
-                          : null,
+                      onDelete:
+                          state.userProfileModel?.storyItems?[0].storyId != null
+                              ? () => notifier.confirmAndDeleteStory(
+                                  context,
+                                  state.userProfileModel!.storyItems![0]
+                                      .storyId!)
+                              : null,
                     ),
                   ),
                   SizedBox(width: 1.h),
@@ -377,12 +384,13 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       onTap: () => onTapStoryItem(context, 1),
                       showDeleteButton: showDeleteButton,
                       currentUserId: currentUserId,
-                      onDelete: state
-                                  .userProfileModel?.storyItems?[1].storyId !=
-                              null
-                          ? () => notifier.confirmAndDeleteStory(context,
-                              state.userProfileModel!.storyItems![1].storyId!)
-                          : null,
+                      onDelete:
+                          state.userProfileModel?.storyItems?[1].storyId != null
+                              ? () => notifier.confirmAndDeleteStory(
+                                  context,
+                                  state.userProfileModel!.storyItems![1]
+                                      .storyId!)
+                              : null,
                     ),
                   ),
                   SizedBox(width: 1.h),
@@ -393,12 +401,13 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       onTap: () => onTapStoryItem(context, 2),
                       showDeleteButton: showDeleteButton,
                       currentUserId: currentUserId,
-                      onDelete: state
-                                  .userProfileModel?.storyItems?[2].storyId !=
-                              null
-                          ? () => notifier.confirmAndDeleteStory(context,
-                              state.userProfileModel!.storyItems![2].storyId!)
-                          : null,
+                      onDelete:
+                          state.userProfileModel?.storyItems?[2].storyId != null
+                              ? () => notifier.confirmAndDeleteStory(
+                                  context,
+                                  state.userProfileModel!.storyItems![2]
+                                      .storyId!)
+                              : null,
                     ),
                   ),
                 ],
@@ -411,11 +420,10 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 width: 116.h,
                 showDeleteButton: showDeleteButton,
                 currentUserId: currentUserId,
-                onDelete:
-                    state.userProfileModel?.storyItems?[3].storyId != null
-                        ? () => notifier.confirmAndDeleteStory(context,
-                            state.userProfileModel!.storyItems![3].storyId!)
-                        : null,
+                onDelete: state.userProfileModel?.storyItems?[3].storyId != null
+                    ? () => notifier.confirmAndDeleteStory(context,
+                        state.userProfileModel!.storyItems![3].storyId!)
+                    : null,
               ),
             ],
           ),

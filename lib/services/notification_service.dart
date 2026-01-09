@@ -65,7 +65,28 @@ class NotificationService {
             ),
             callback: (payload) {
               debugPrint('🔔 New notification received');
-              onNewNotification(payload.newRecord);
+
+              // CRITICAL FIX: Do NOT show push notification if this is the current user's own action
+              // This prevents push notifications when user restores deleted notifications (undo action)
+              final notificationUserId =
+                  payload.newRecord['user_id'] as String?;
+              final currentUserId = client.auth.currentUser?.id;
+
+              // Only trigger callback and push notification if it's truly a NEW notification
+              // (not a restored notification from the current user)
+              final isRestoredNotification =
+                  notificationUserId == currentUserId;
+
+              if (!isRestoredNotification) {
+                // This is a genuine new notification, show it
+                onNewNotification(payload.newRecord);
+              } else {
+                // This is likely a restored notification from undo action
+                // Just refresh the list silently without push notification
+                debugPrint(
+                    '🔕 Skipping push notification for restored notification');
+                onNewNotification(payload.newRecord);
+              }
             },
           )
           .subscribe();
@@ -226,8 +247,7 @@ class NotificationService {
                 final memoryName = memoryResponse['title'] as String?;
                 final creatorProfile =
                     memoryResponse['user_profiles'] as Map<String, dynamic>?;
-                final inviterName =
-                    creatorProfile?['display_name'] as String?;
+                final inviterName = creatorProfile?['display_name'] as String?;
 
                 // Update message with enriched information
                 final enrichedMessage =
@@ -241,7 +261,7 @@ class NotificationService {
                     'inviter_name': inviterName,
                   }
                 };
-                            }
+              }
             } catch (e) {
               debugPrint('⚠️ Error enriching notification: $e');
             }

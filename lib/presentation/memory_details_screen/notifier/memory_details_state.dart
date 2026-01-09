@@ -29,6 +29,9 @@ class MemoryDetailsState {
   final List<Map<String, dynamic>> friendsList;
   final List<Map<String, dynamic>> filteredFriendsList;
   final Set<String> memberUserIds;
+  final String? selectedDuration; // '12_hours', '24_hours', '3_days'
+  final DateTime? startTime;
+  final DateTime? endTime;
 
   MemoryDetailsState({
     this.memoryDetailsModel,
@@ -58,6 +61,9 @@ class MemoryDetailsState {
     this.friendsList = const [],
     this.filteredFriendsList = const [],
     this.memberUserIds = const {},
+    this.selectedDuration,
+    this.startTime,
+    this.endTime,
   });
 
   MemoryDetailsState copyWith({
@@ -88,6 +94,9 @@ class MemoryDetailsState {
     List<Map<String, dynamic>>? friendsList,
     List<Map<String, dynamic>>? filteredFriendsList,
     Set<String>? memberUserIds,
+    String? selectedDuration,
+    DateTime? startTime,
+    DateTime? endTime,
   }) {
     return MemoryDetailsState(
       memoryDetailsModel: memoryDetailsModel ?? this.memoryDetailsModel,
@@ -117,6 +126,9 @@ class MemoryDetailsState {
       friendsList: friendsList ?? this.friendsList,
       filteredFriendsList: filteredFriendsList ?? this.filteredFriendsList,
       memberUserIds: memberUserIds ?? this.memberUserIds,
+      selectedDuration: selectedDuration ?? this.selectedDuration,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
     );
   }
 }

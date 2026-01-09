@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../core/app_export.dart';
 import '../../../core/utils/memory_nav_args.dart';
 import '../../../services/avatar_helper_service.dart';
@@ -23,6 +25,9 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
   // Store story IDs for cycling functionality
   List<String> _currentMemoryStoryIds = [];
+
+  // Real-time subscription to memories table
+  RealtimeChannel? _memorySubscription;
 
   EventTimelineViewNotifier() : super(EventTimelineViewState());
 
@@ -442,10 +447,150 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('🔍 TIMELINE NOTIFIER: Loading stories for memory...');
       await loadMemoryStories(navArgs.memoryId);
       print('✅ TIMELINE NOTIFIER: Stories loading complete');
+
+      // CRITICAL: Set up real-time subscription for memory updates
+      _setupRealtimeSubscription(navArgs.memoryId);
     } catch (e, stackTrace) {
       print('❌ ERROR in initializeFromMemory: $e');
       print('Stack trace: $stackTrace');
     }
+  }
+
+  /// Set up real-time subscription to memories table for the specific memory
+  void _setupRealtimeSubscription(String memoryId) {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) {
+        print(
+            '⚠️ REALTIME: Supabase client is null, cannot setup subscription');
+        return;
+      }
+
+      // Remove existing subscription if any
+      if (_memorySubscription != null) {
+        print('🔄 REALTIME: Removing existing subscription');
+        _memorySubscription!.unsubscribe();
+        _memorySubscription = null;
+      }
+
+      print('🔗 REALTIME: Setting up subscription for memory: $memoryId');
+
+      // Create channel for memory updates
+      _memorySubscription = client
+          .channel('memory-updates-$memoryId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'memories',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: memoryId,
+            ),
+            callback: (payload) {
+              print('🔔 REALTIME: Memory update detected');
+              print('   - Memory ID: $memoryId');
+              print(
+                  '   - Changed fields: ${payload.newRecord.keys.join(", ")}');
+
+              // Reload memory data with updated information
+              _handleMemoryUpdate(memoryId, payload.newRecord);
+            },
+          )
+          .subscribe();
+
+      print('✅ REALTIME: Subscription active for memory: $memoryId');
+    } catch (e, stackTrace) {
+      print('❌ REALTIME ERROR: Failed to setup subscription: $e');
+      print('   Stack trace: $stackTrace');
+    }
+  }
+
+  /// Handle real-time memory update
+  Future<void> _handleMemoryUpdate(
+      String memoryId, Map<String, dynamic> updatedData) async {
+    try {
+      print('🔄 REALTIME: Processing memory update');
+      print('   - Memory ID: $memoryId');
+
+      // Extract updated fields
+      final title = updatedData['title'] as String?;
+      final visibility = updatedData['visibility'] as String?;
+      final startTime = updatedData['start_time'];
+      final endTime = updatedData['end_time'];
+      final location = updatedData['location_name'] as String?;
+      final state = updatedData['state'] as String?;
+
+      print('🔍 REALTIME: Updated fields:');
+      print('   - Title: $title');
+      print('   - End Time: $endTime');
+      print('   - Start Time: $startTime');
+      print('   - Location: $location');
+      print('   - State: $state');
+
+      // Normalize times to UTC
+      final DateTime? startUtc =
+          startTime != null ? _parseUtc(startTime) : null;
+      final DateTime? endUtc = endTime != null ? _parseUtc(endTime) : null;
+
+      // Update state with new data
+      this.state = this.state.copyWith(
+            eventTimelineViewModel: this.state.eventTimelineViewModel?.copyWith(
+                  eventTitle:
+                      title ?? this.state.eventTimelineViewModel?.eventTitle,
+                  isPrivate: visibility == 'private',
+                  timelineDetail: TimelineDetailModel(
+                    centerLocation: location ??
+                        this
+                            .state
+                            .eventTimelineViewModel
+                            ?.timelineDetail
+                            ?.centerLocation ??
+                        'Unknown Location',
+                    centerDistance: this
+                            .state
+                            .eventTimelineViewModel
+                            ?.timelineDetail
+                            ?.centerDistance ??
+                        '0km',
+                    memoryStartTime: startUtc ??
+                        this
+                            .state
+                            .eventTimelineViewModel
+                            ?.timelineDetail
+                            ?.memoryStartTime,
+                    memoryEndTime: endUtc ??
+                        this
+                            .state
+                            .eventTimelineViewModel
+                            ?.timelineDetail
+                            ?.memoryEndTime,
+                    timelineStories: this
+                            .state
+                            .eventTimelineViewModel
+                            ?.timelineDetail
+                            ?.timelineStories ??
+                        [],
+                  ),
+                ),
+          );
+
+      print('✅ REALTIME: Timeline state updated with new memory data');
+    } catch (e, stackTrace) {
+      print('❌ REALTIME ERROR: Failed to handle memory update: $e');
+      print('   Stack trace: $stackTrace');
+    }
+  }
+
+  /// Clean up subscription when notifier is disposed
+  @override
+  void dispose() {
+    print('🧹 REALTIME: Cleaning up memory subscription');
+    if (_memorySubscription != null) {
+      _memorySubscription!.unsubscribe();
+      _memorySubscription = null;
+    }
+    super.dispose();
   }
 
   /// Public loader used by initializeFromMemory
