@@ -90,7 +90,8 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
     }
   }
 
-  /// Ensure avatar is loaded if user is authenticated but avatar not cached
+  /// Ensure avatar is loaded whenever avatarUrl is null/empty
+  /// 🎯 UPDATED: Load based on avatarUrl state, not userId
   Future<void> _ensureAvatarLoaded() async {
     try {
       final client = SupabaseService.instance.client;
@@ -101,9 +102,12 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
 
       final currentAvatarState = ref.read(avatarStateProvider);
 
-      // Only load if not already cached
-      if (currentAvatarState.userId == null && !currentAvatarState.isLoading) {
+      // 🎯 CRITICAL: Load if avatarUrl is null/empty (not based on userId)
+      if ((currentAvatarState.avatarUrl == null ||
+              currentAvatarState.avatarUrl!.isEmpty) &&
+          !currentAvatarState.isLoading) {
         await ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
+        print('✅ Avatar loaded in custom_app_bar based on empty avatarUrl');
       }
     } catch (e) {
       print('❌ Error ensuring avatar loaded: $e');

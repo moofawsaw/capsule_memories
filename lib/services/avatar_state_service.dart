@@ -36,14 +36,10 @@ class AvatarStateNotifier extends StateNotifier<AvatarState> {
   AvatarStateNotifier() : super(AvatarState());
 
   /// Load current user's avatar from database
-  /// 🔥 CACHE OPTIMIZATION: This should only be called ONCE at app startup or after avatar updates
+  /// 🎯 HANDLES BOTH GOOGLE OAUTH URLS AND SUPABASE STORAGE KEYS
+  /// - Google OAuth URLs (start with http/https) are used directly
+  /// - Supabase Storage keys (like userId/file.png) are converted to signed URLs
   Future<void> loadCurrentUserAvatar() async {
-    // 🔥 PREVENT redundant loads if avatar is already cached
-    if (state.avatarUrl != null && state.userId != null && !state.isLoading) {
-      print('✅ Avatar already cached, skipping database call');
-      return;
-    }
-
     state = state.copyWith(isLoading: true);
 
     try {
@@ -64,21 +60,32 @@ class AvatarStateNotifier extends StateNotifier<AvatarState> {
 
       if (userProfile != null) {
         final avatarStoragePath = userProfile['avatar_url'] as String?;
-        String? signedUrl;
+        String? displayReadyUrl;
 
         if (avatarStoragePath != null && avatarStoragePath.isNotEmpty) {
-          signedUrl =
-              await UserProfileService.instance.getAvatarUrl(avatarStoragePath);
+          // 🎯 CRITICAL: Check if avatar_url is already a full URL (Google OAuth)
+          if (avatarStoragePath.startsWith('http://') ||
+              avatarStoragePath.startsWith('https://')) {
+            // ✅ Google OAuth URL - use directly
+            displayReadyUrl = avatarStoragePath;
+            print('✅ Using Google OAuth avatar URL directly');
+          } else {
+            // ✅ Supabase Storage key - convert to signed URL
+            displayReadyUrl = await UserProfileService.instance
+                .getAvatarUrl(avatarStoragePath);
+            print('✅ Converted Supabase Storage key to signed URL');
+          }
         }
 
         state = AvatarState(
-          avatarUrl: signedUrl,
+          avatarUrl: displayReadyUrl,
           userEmail: userProfile['email'] as String?,
           isLoading: false,
           userId: user.id,
         );
 
-        print('✅ Avatar loaded from database and cached');
+        print(
+            '✅ Avatar loaded and cached: ${displayReadyUrl != null ? "URL available" : "No avatar"}');
       } else {
         state = AvatarState(isLoading: false);
       }
