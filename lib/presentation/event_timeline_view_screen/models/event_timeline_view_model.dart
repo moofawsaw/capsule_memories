@@ -15,15 +15,7 @@ class EventTimelineViewModel extends Equatable {
     this.customStoryItems,
     this.timelineDetail,
     this.memoryId,
-  }) {
-    eventTitle = eventTitle ?? 'Beach Day Adventure';
-    eventDate = eventDate ?? 'Dec 22';
-    isPrivate = isPrivate ?? false;
-    categoryIcon = categoryIcon ?? ImageConstant.imgFrame13;
-    participantImages = participantImages ?? [];
-    customStoryItems = customStoryItems ?? [];
-    memoryId = memoryId ?? '';
-  }
+  });
 
   String? eventTitle;
   String? eventDate;

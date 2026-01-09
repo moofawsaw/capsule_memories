@@ -12,33 +12,31 @@ part 'memories_dashboard_state.dart';
 
 final memoriesDashboardNotifier = StateNotifierProvider.autoDispose<
     MemoriesDashboardNotifier, MemoriesDashboardState>(
-  (ref) => MemoriesDashboardNotifier(),
+      (ref) => MemoriesDashboardNotifier(),
 );
 
 class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   final _cacheService = MemoryCacheService();
 
-  // NEW: Real-time subscription channels
   RealtimeChannel? _storiesChannel;
   RealtimeChannel? _memoriesChannel;
-  RealtimeChannel? _contributorsChannel; // NEW: Listen to contributor joins
+  RealtimeChannel? _contributorsChannel;
+
   bool _isDisposed = false;
 
   MemoriesDashboardNotifier()
       : super(MemoriesDashboardState(
-          memoriesDashboardModel: MemoriesDashboardModel(),
-        )) {
-    // CRITICAL FIX: Enable real-time subscriptions for new stories and memories
+    memoriesDashboardModel: MemoriesDashboardModel(),
+  )) {
     _setupRealtimeSubscriptions();
   }
 
-  void initialize() async {
-    // CRITICAL FIX: Always reload data from cache on initialization
-    // This ensures the screen shows latest data including newly created memories
+  /// Call this from screen initState (once).
+  Future<void> initialize() async {
     print('🔍 MEMORIES DEBUG: Initializing memories dashboard');
 
-    // Set loading state
-    state = state.copyWith(isLoading: true);
+    // Always set loading true at start
+    _safeSetState(state.copyWith(isLoading: true));
 
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
@@ -46,192 +44,169 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       if (currentUser == null) {
         print('❌ MEMORIES DEBUG: No authenticated user found');
-        state = state.copyWith(isLoading: false);
+        _safeSetState(state.copyWith(isLoading: false));
         return;
       }
 
-      // CRITICAL FIX: Force cache refresh on initialization to prevent stale data
-      // This ensures newly created memories appear immediately when navigating to this screen
+      // Force refresh on first entry to avoid stale / stuck states
       await _loadFromCache(currentUser.id, forceRefresh: true);
 
-      state = state.copyWith(
-        isLoading: false,
-        selectedTabIndex: 0,
-        selectedOwnership: 'created', // Default: "Created by Me"
-        selectedState: 'all', // Default: "All"
+      _safeSetState(
+        state.copyWith(
+          isLoading: false,
+          selectedTabIndex: 0,
+          selectedOwnership: 'created',
+          selectedState: 'all',
+        ),
       );
 
       print('✅ MEMORIES DEBUG: Initialization complete');
     } catch (e) {
       print('❌ MEMORIES DEBUG: Error initializing memories dashboard: $e');
-      state = state.copyWith(isLoading: false);
+      _safeSetState(state.copyWith(isLoading: false));
     }
   }
 
-  Future<void> _loadFromCache(String userId,
-      {bool forceRefresh = false}) async {
+  /// Centralized cache load -> updates dashboard model + counts
+  Future<void> _loadFromCache(
+      String userId, {
+        bool forceRefresh = false,
+      }) async {
+    print('🔍 MEMORIES DEBUG: Loading from cache (forceRefresh: $forceRefresh)');
+
     try {
-      print(
-          '🔍 MEMORIES DEBUG: Loading data from cache service (forceRefresh: $forceRefresh)');
+      // IMPORTANT: fetch stories+memories in parallel
+      final results = await Future.wait([
+        _cacheService.getStories(userId, forceRefresh: forceRefresh),
+        _cacheService.getMemories(userId, forceRefresh: forceRefresh),
+      ]);
 
-      // CRITICAL FIX: Pass forceRefresh flag to cache service
-      // This ensures fresh data is fetched when needed (e.g., after memory creation)
-      final stories =
-          await _cacheService.getStories(userId, forceRefresh: forceRefresh);
-      final memories =
-          await _cacheService.getMemories(userId, forceRefresh: forceRefresh);
+      final stories = results[0] as List<StoryItemModel>;
+      final memories = results[1] as List<MemoryItemModel>;
 
       print(
-          '✅ MEMORIES DEBUG: Loaded ${stories.length} stories and ${memories.length} memories from cache');
+          '✅ MEMORIES DEBUG: Loaded ${stories.length} stories and ${memories.length} memories');
 
       final liveMemories = memories.where((m) => m.state == 'open').toList();
-      final sealedMemories =
-          memories.where((m) => m.state == 'sealed').toList();
+      final sealedMemories = memories.where((m) => m.state == 'sealed').toList();
 
-      state = state.copyWith(
-        memoriesDashboardModel: state.memoriesDashboardModel?.copyWith(
-          storyItems: stories,
-          memoryItems: memories,
-          liveMemoryItems: liveMemories,
-          sealedMemoryItems: sealedMemories,
-          allCount: memories.length,
-          liveCount: liveMemories.length,
-          sealedCount: sealedMemories.length,
-        ),
+      final updatedModel = (state.memoriesDashboardModel ?? MemoriesDashboardModel())
+          .copyWith(
+        storyItems: stories,
+        memoryItems: memories,
+        liveMemoryItems: liveMemories,
+        sealedMemoryItems: sealedMemories,
+        allCount: memories.length,
+        liveCount: liveMemories.length,
+        sealedCount: sealedMemories.length,
       );
 
-      print('✅ MEMORIES DEBUG: State updated with cached data');
+      _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
     } catch (e) {
       print('❌ MEMORIES DEBUG: Error loading from cache: $e');
+      // Do not throw; just leave previous data and stop loading
     }
   }
 
   void updateSelectedTabIndex(int index) {
-    state = state.copyWith(selectedTabIndex: index);
+    _safeSetState(state.copyWith(selectedTabIndex: index));
   }
 
-  /// Update ownership filter ("created" or "joined")
   void updateOwnershipFilter(String ownership) {
     print('🔍 MEMORIES DEBUG: Updating ownership filter to: $ownership');
-    state = state.copyWith(selectedOwnership: ownership);
+    _safeSetState(state.copyWith(selectedOwnership: ownership));
   }
 
-  /// Update state filter ("all", "live", or "sealed")
   void updateStateFilter(String stateFilter) {
     print('🔍 MEMORIES DEBUG: Updating state filter to: $stateFilter');
-    state = state.copyWith(selectedState: stateFilter);
+    _safeSetState(state.copyWith(selectedState: stateFilter));
   }
 
-  /// Get filtered memories based on ownership and state filters
   List<MemoryItemModel> getFilteredMemories(String userId) {
     final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
     final ownership = state.selectedOwnership ?? 'created';
     final stateFilter = state.selectedState ?? 'all';
 
-    print('🔍 MEMORIES DEBUG: Filtering memories');
-    print('   - Ownership: $ownership');
-    print('   - State: $stateFilter');
-    print('   - Total memories: ${allMemories.length}');
-
-    // Step 1: Filter by ownership
     List<MemoryItemModel> filteredByOwnership;
     if (ownership == 'created') {
-      filteredByOwnership =
-          allMemories.where((m) => m.creatorId == userId).toList();
-      print(
-          '   - Filtered by "Created by Me": ${filteredByOwnership.length} memories');
+      filteredByOwnership = allMemories.where((m) => m.creatorId == userId).toList();
     } else {
-      // "joined" - memories where user is NOT the creator
-      filteredByOwnership =
-          allMemories.where((m) => m.creatorId != userId).toList();
-      print(
-          '   - Filtered by "Joined": ${filteredByOwnership.length} memories');
+      filteredByOwnership = allMemories.where((m) => m.creatorId != userId).toList();
     }
 
-    // Step 2: Filter by state
-    List<MemoryItemModel> finalFiltered;
-    if (stateFilter == 'all') {
-      finalFiltered = filteredByOwnership;
-    } else if (stateFilter == 'live') {
-      finalFiltered =
-          filteredByOwnership.where((m) => m.state == 'open').toList();
-    } else {
-      // sealed
-      finalFiltered =
-          filteredByOwnership.where((m) => m.state == 'sealed').toList();
+    if (stateFilter == 'all') return filteredByOwnership;
+    if (stateFilter == 'live') {
+      return filteredByOwnership.where((m) => m.state == 'open').toList();
     }
-
-    print('✅ MEMORIES DEBUG: Final filtered count: ${finalFiltered.length}');
-    return finalFiltered;
+    return filteredByOwnership.where((m) => m.state == 'sealed').toList();
   }
 
-  /// NEW METHOD: Get count of memories for specific ownership filter
   int getOwnershipCount(String userId, String ownership) {
     final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
-
     if (ownership == 'created') {
       return allMemories.where((m) => m.creatorId == userId).length;
-    } else {
-      return allMemories.where((m) => m.creatorId != userId).length;
     }
+    return allMemories.where((m) => m.creatorId != userId).length;
   }
 
-  void loadAllStories() async {
-    state = state.copyWith(isLoading: true);
+  Future<void> loadAllStories() async {
+    _safeSetState(state.copyWith(isLoading: true));
 
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
       if (currentUser != null) {
-        final stories = await _cacheService.getStories(currentUser.id);
-        state = state.copyWith(
-          memoriesDashboardModel: state.memoriesDashboardModel?.copyWith(
-            storyItems: stories,
-          ),
-        );
+        final stories = await _cacheService.getStories(currentUser.id, forceRefresh: true);
+        final updatedModel = (state.memoriesDashboardModel ?? MemoriesDashboardModel())
+            .copyWith(storyItems: stories);
+        _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
       }
 
-      state = state.copyWith(
-        isLoading: false,
-        isSuccess: true,
-      );
+      _safeSetState(state.copyWith(isLoading: false, isSuccess: true));
+
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!_isDisposed) _safeSetState(state.copyWith(isSuccess: false));
+      });
     } catch (e) {
       print('Error loading all stories: $e');
-      state = state.copyWith(isLoading: false);
+      _safeSetState(state.copyWith(isLoading: false));
     }
   }
 
+  /// Call this from RefreshIndicator
+  /// FIX: forceRefresh true + always stop loading
   Future<void> refreshMemories() async {
-    // FIXED: Properly handle cache refresh and loading state
-    print('🔄 MEMORIES DEBUG: Refreshing memories...');
+    print('🔄 MEMORIES DEBUG: Pull-to-refresh triggered');
+
+    _safeSetState(state.copyWith(isLoading: true));
 
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
-      if (currentUser != null) {
-        // FIXED: Use immediate cache refresh instead of debounced
-        // This ensures data is loaded immediately after deletion
-        await _loadFromCache(currentUser.id);
-
-        // Force immediate cache update in background
-        _cacheService.refreshMemoryCache(currentUser.id);
-
-        print('✅ MEMORIES DEBUG: Memories refreshed successfully');
-
-        // Show success feedback briefly
-        state = state.copyWith(isSuccess: true);
-
-        // Reset success flag after short delay
-        Future.delayed(Duration(milliseconds: 500), () {
-          if (!_isDisposed) {
-            state = state.copyWith(isSuccess: false);
-          }
-        });
+      if (currentUser == null) {
+        _safeSetState(state.copyWith(isLoading: false));
+        return;
       }
+
+      // Force refresh immediately
+      await _loadFromCache(currentUser.id, forceRefresh: true);
+
+      // Optional: debounced background refresh to catch any concurrent realtime updates
+      _cacheService.refreshMemoryCache(currentUser.id);
+
+      _safeSetState(state.copyWith(isLoading: false, isSuccess: true));
+
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!_isDisposed) _safeSetState(state.copyWith(isSuccess: false));
+      });
+
+      print('✅ MEMORIES DEBUG: Refresh complete');
     } catch (e) {
       print('❌ MEMORIES DEBUG: Error refreshing memories: $e');
+      _safeSetState(state.copyWith(isLoading: false));
     }
   }
 
-  /// NEW METHOD: Setup real-time subscriptions for stories and memories
+  // ========================= REALTIME =========================
+
   void _setupRealtimeSubscriptions() {
     final client = SupabaseService.instance.client;
     if (client == null) {
@@ -240,55 +215,52 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     }
 
     try {
-      // Subscribe to new stories in user's memories
       _storiesChannel = client
           .channel('memories_dashboard:stories')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'stories',
-            callback: _handleNewStory,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'stories',
+        callback: _handleNewStory,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'stories',
-            callback: _handleStoryUpdate,
-          )
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'stories',
+        callback: _handleStoryUpdate,
+      )
           .subscribe();
 
-      // Subscribe to memory updates and deletions
       _memoriesChannel = client
           .channel('memories_dashboard:memories')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleNewMemory,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleNewMemory,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleMemoryUpdate,
-          )
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleMemoryUpdate,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.delete,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleMemoryDelete,
-          )
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleMemoryDelete,
+      )
           .subscribe();
 
-      // NEW: Subscribe to memory_contributors to detect when user joins memories
       _contributorsChannel = client
           .channel('memories_dashboard:contributors')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'memory_contributors',
-            callback: _handleContributorJoin,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'memory_contributors',
+        callback: _handleContributorJoin,
+      )
           .subscribe();
 
       print('✅ REALTIME: Subscriptions setup complete for memories dashboard');
@@ -297,7 +269,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     }
   }
 
-  /// NEW METHOD: Handle new story inserted
   void _handleNewStory(PostgresChangePayload payload) async {
     if (_isDisposed) return;
 
@@ -312,11 +283,9 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       if (client == null) return;
 
-      // Check if this story belongs to user's memories
       final currentUserId = client.auth.currentUser?.id;
       if (currentUserId == null) return;
 
-      // Verify user has access to this memory
       final memoryResponse = await client
           .from('memories')
           .select('creator_id')
@@ -327,7 +296,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       final isUserMemory = memoryResponse['creator_id'] == currentUserId;
 
-      // Check if user is a contributor
       final contributorCheck = await client
           .from('memory_contributors')
           .select('id')
@@ -339,14 +307,11 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       final isContributor = contributorCheck != null;
 
-      // Only process if user owns or is contributor to this memory
       if (!isUserMemory && !isContributor) return;
 
-      // Resolve media URLs
       final resolvedThumbnailUrl =
-          StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
+      StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
 
-      // Fetch contributor profile
       final profileResponse = await client
           .from('user_profiles')
           .select('id, display_name, avatar_url')
@@ -358,7 +323,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final rawAvatarUrl = profileResponse['avatar_url'] as String?;
       final resolvedAvatarUrl = StorageUtils.resolveAvatarUrl(rawAvatarUrl);
 
-      // Create new story item
       final newStoryItem = StoryItemModel(
         id: storyId,
         backgroundImage: resolvedThumbnailUrl ?? '',
@@ -368,35 +332,26 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         isRead: false,
       );
 
-      // Add to beginning of stories list
       final currentStories = state.memoriesDashboardModel?.storyItems ?? [];
       final updatedStories = [newStoryItem, ...currentStories];
 
-      final updatedModel = state.memoriesDashboardModel?.copyWith(
-        storyItems: updatedStories.cast<StoryItemModel>(),
-      );
+      final updatedModel = (state.memoriesDashboardModel ?? MemoriesDashboardModel())
+          .copyWith(storyItems: updatedStories.cast<StoryItemModel>());
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
-
-      print('✅ REALTIME: New story added to memories dashboard');
     } catch (e) {
       print('❌ REALTIME: Error handling new story: $e');
     }
   }
 
-  /// NEW METHOD: Handle story update
   void _handleStoryUpdate(PostgresChangePayload payload) {
     if (_isDisposed) return;
-
-    print('🔔 REALTIME: Story updated: ${payload.newRecord['id']}');
 
     try {
       final storyId = payload.newRecord['id'] as String;
       final currentModel = state.memoriesDashboardModel;
-
       if (currentModel == null) return;
 
-      // Update story in list if it exists
       final storyItems = currentModel.storyItems;
       if (storyItems == null || storyItems.isEmpty) return;
 
@@ -419,19 +374,13 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       );
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
-
-      print('✅ REALTIME: Story updated in memories dashboard');
     } catch (e) {
       print('❌ REALTIME: Error handling story update: $e');
     }
   }
 
-  /// NEW METHOD: Handle when user joins a memory as contributor
   void _handleContributorJoin(PostgresChangePayload payload) async {
     if (_isDisposed) return;
-
-    print(
-        '🔔 REALTIME: New contributor detected: ${payload.newRecord['user_id']} joined memory ${payload.newRecord['memory_id']}');
 
     try {
       final contributorUserId = payload.newRecord['user_id'] as String;
@@ -443,13 +392,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final currentUserId = client.auth.currentUser?.id;
       if (currentUserId == null) return;
 
-      // Only process if this is the current user joining the memory
       if (contributorUserId != currentUserId) return;
 
-      print(
-          '✅ REALTIME: Current user joined memory $memoryId - fetching details...');
-
-      // Fetch full memory details for the joined memory
       final response = await client.from('memories').select('''
             id,
             title,
@@ -476,29 +420,16 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final category = response['memory_categories'] as Map<String, dynamic>?;
       final creatorId = response['creator_id'] as String;
 
-      // CRITICAL FIX: Add null check and error handling for date parsing
-      String? startTimeStr = response['start_time'] as String?;
-      String? endTimeStr = response['end_time'] as String?;
+      final startTimeStr = response['start_time'] as String?;
+      final endTimeStr = response['end_time'] as String?;
 
-      // Validate date strings before parsing
-      if (startTimeStr == null || startTimeStr.isEmpty) {
-        print('❌ REALTIME: Invalid start_time in contributor join - skipping');
-        return;
-      }
+      if (startTimeStr == null || startTimeStr.trim().isEmpty) return;
+      if (endTimeStr == null || endTimeStr.trim().isEmpty) return;
 
-      if (endTimeStr == null || endTimeStr.isEmpty) {
-        print('❌ REALTIME: Invalid end_time in contributor join - skipping');
-        return;
-      }
-
-      // CRITICAL FIX: Add try-catch around date parsing to prevent FormatException
-      DateTime? startTime;
-
+      DateTime startTime;
       try {
-        startTime = DateTime.parse(startTimeStr);
-      } catch (e) {
-        print(
-            '❌ REALTIME: FormatException parsing start_time in contributor join: $startTimeStr - $e');
+        startTime = DateTime.parse(startTimeStr.trim());
+      } catch (_) {
         return;
       }
 
@@ -522,26 +453,19 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         creatorId: creatorId,
       );
 
-      // Check if memory already exists in the list (prevent duplicates)
       final currentMemories = state.memoriesDashboardModel?.memoryItems ?? [];
       final memoryExists = currentMemories.any((m) => m.id == memoryId);
+      if (memoryExists) return;
 
-      if (memoryExists) {
-        print(
-            '⚠️ REALTIME: Memory $memoryId already exists in feed - skipping');
-        return;
-      }
-
-      // Add to beginning of memories list
       final updatedMemories = [newMemoryItem, ...currentMemories];
 
-      // Recalculate counts
       final liveMemories =
-          updatedMemories.where((m) => m.state == 'open').toList();
+      updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
-          updatedMemories.where((m) => m.state == 'sealed').toList();
+      updatedMemories.where((m) => m.state == 'sealed').toList();
 
-      final updatedModel = state.memoriesDashboardModel?.copyWith(
+      final updatedModel = (state.memoriesDashboardModel ?? MemoriesDashboardModel())
+          .copyWith(
         memoryItems: updatedMemories.cast<MemoryItemModel>(),
         liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
         sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
@@ -551,34 +475,25 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       );
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
-
-      print(
-          '✅ REALTIME: Joined memory added to dashboard - ${updatedMemories.length} total memories');
     } catch (e) {
       print('❌ REALTIME: Error handling contributor join: $e');
     }
   }
 
-  /// NEW METHOD: Handle new memory inserted
   void _handleNewMemory(PostgresChangePayload payload) async {
     if (_isDisposed) return;
-
-    print('🔔 REALTIME: New memory detected: ${payload.newRecord['id']}');
 
     try {
       final memoryId = payload.newRecord['id'] as String;
       final creatorId = payload.newRecord['creator_id'] as String;
       final client = SupabaseService.instance.client;
-
       if (client == null) return;
 
       final currentUserId = client.auth.currentUser?.id;
       if (currentUserId == null) return;
 
-      // Only add if user created this memory
       if (creatorId != currentUserId) return;
 
-      // Fetch full memory details
       final response = await client.from('memories').select('''
             id,
             title,
@@ -606,74 +521,23 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final contributors = response['memory_contributors'] as List? ?? [];
       final category = response['memory_categories'] as Map<String, dynamic>?;
 
-      // CRITICAL FIX: Add comprehensive null/empty validation for ALL date fields
-      // This prevents FormatException when realtime receives invalid date data
-      String? startTimeStr = response['start_time'] as String?;
-      String? endTimeStr = response['end_time'] as String?;
+      final startTimeStr = response['start_time'] as String?;
+      final endTimeStr = response['end_time'] as String?;
 
-      // ENHANCED VALIDATION: Check for null, empty, and whitespace-only strings
-      if (startTimeStr == null || startTimeStr.trim().isEmpty) {
-        print('❌ REALTIME: Invalid or null start_time - skipping memory');
-        return;
-      }
+      if (startTimeStr == null || startTimeStr.trim().isEmpty) return;
+      if (endTimeStr == null || endTimeStr.trim().isEmpty) return;
 
-      if (endTimeStr == null || endTimeStr.trim().isEmpty) {
-        print('❌ REALTIME: Invalid or null end_time - skipping memory');
-        return;
-      }
-
-      // CRITICAL FIX: Add try-catch around date parsing to prevent FormatException
-      DateTime? startTime;
-      DateTime? endTime;
+      DateTime startTime;
+      DateTime endTime;
 
       try {
         startTime = DateTime.parse(startTimeStr.trim());
-      } catch (e) {
-        print(
-            '❌ REALTIME: FormatException parsing start_time: "$startTimeStr" - $e');
-        return;
-      }
-
-      try {
         endTime = DateTime.parse(endTimeStr.trim());
-      } catch (e) {
-        print(
-            '❌ REALTIME: FormatException parsing end_time: "$endTimeStr" - $e');
+      } catch (_) {
         return;
       }
 
-      // CRITICAL FIX: Add location data validation and logging
       final locationName = response['location_name'] as String?;
-      final locationLat = response['location_lat'];
-      final locationLng = response['location_lng'];
-
-      print('📍 REALTIME: Location data received:');
-      print('   - location_name: $locationName');
-      print('   - location_lat: $locationLat');
-      print('   - location_lng: $locationLng');
-
-      // Validate location data format
-      if (locationName == null || locationName.isEmpty) {
-        print(
-            '⚠️ REALTIME: location_name is NULL or EMPTY in realtime payload');
-      } else {
-        // Check if location_name is still in coordinate format
-        final parts = locationName.split(',');
-        if (parts.length == 2) {
-          final firstPart = parts[0].trim();
-          final secondPart = parts[1].trim();
-          final isCoordinates = double.tryParse(firstPart) != null &&
-              double.tryParse(secondPart) != null;
-
-          if (isCoordinates) {
-            print(
-                '❌ REALTIME: location_name contains COORDINATES instead of City, State: "$locationName"');
-          } else {
-            print(
-                '✅ REALTIME: location_name properly formatted: "$locationName"');
-          }
-        }
-      }
 
       final newMemoryItem = MemoryItemModel(
         id: response['id'],
@@ -695,17 +559,16 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         creatorId: creatorId,
       );
 
-      // Add to beginning of memories list
       final currentMemories = state.memoriesDashboardModel?.memoryItems ?? [];
       final updatedMemories = [newMemoryItem, ...currentMemories];
 
-      // Recalculate counts
       final liveMemories =
-          updatedMemories.where((m) => m.state == 'open').toList();
+      updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
-          updatedMemories.where((m) => m.state == 'sealed').toList();
+      updatedMemories.where((m) => m.state == 'sealed').toList();
 
-      final updatedModel = state.memoriesDashboardModel?.copyWith(
+      final updatedModel = (state.memoriesDashboardModel ?? MemoriesDashboardModel())
+          .copyWith(
         memoryItems: updatedMemories.cast<MemoryItemModel>(),
         liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
         sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
@@ -715,23 +578,17 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       );
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
-
-      print('✅ REALTIME: New memory added to dashboard');
     } catch (e) {
       print('❌ REALTIME: Error handling new memory: $e');
     }
   }
 
-  /// NEW METHOD: Handle memory update
   void _handleMemoryUpdate(PostgresChangePayload payload) {
     if (_isDisposed) return;
-
-    print('🔔 REALTIME: Memory updated: ${payload.newRecord['id']}');
 
     try {
       final memoryId = payload.newRecord['id'] as String;
       final currentModel = state.memoriesDashboardModel;
-
       if (currentModel == null) return;
 
       final memoryItems = currentModel.memoryItems;
@@ -756,37 +613,29 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       );
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
-
-      print('✅ REALTIME: Memory updated in dashboard');
     } catch (e) {
       print('❌ REALTIME: Error handling memory update: $e');
     }
   }
 
-  /// NEW METHOD: Handle memory deletion
   void _handleMemoryDelete(PostgresChangePayload payload) {
     if (_isDisposed) return;
-
-    print('🔔 REALTIME: Memory deleted: ${payload.oldRecord['id']}');
 
     try {
       final memoryId = payload.oldRecord['id'] as String;
       final currentModel = state.memoriesDashboardModel;
-
       if (currentModel == null) return;
 
       final memoryItems = currentModel.memoryItems;
       if (memoryItems == null || memoryItems.isEmpty) return;
 
-      // Remove deleted memory from list
       final updatedMemories =
-          memoryItems.where((memory) => memory.id != memoryId).toList();
+      memoryItems.where((memory) => memory.id != memoryId).toList();
 
-      // Recalculate counts
       final liveMemories =
-          updatedMemories.where((m) => m.state == 'open').toList();
+      updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
-          updatedMemories.where((m) => m.state == 'sealed').toList();
+      updatedMemories.where((m) => m.state == 'sealed').toList();
 
       final updatedModel = currentModel.copyWith(
         memoryItems: updatedMemories.cast<MemoryItemModel>(),
@@ -798,34 +647,28 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       );
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
-
-      print(
-          '✅ REALTIME: Memory deleted from dashboard - ${updatedMemories.length} memories remaining');
     } catch (e) {
       print('❌ REALTIME: Error handling memory deletion: $e');
     }
   }
 
-  /// NEW METHOD: Cleanup real-time subscriptions
   void _cleanupSubscriptions() {
     try {
       _storiesChannel?.unsubscribe();
       _memoriesChannel?.unsubscribe();
-      _contributorsChannel?.unsubscribe(); // NEW: Clean up contributors channel
+      _contributorsChannel?.unsubscribe();
       print('✅ REALTIME: Subscriptions cleaned up');
     } catch (e) {
       print('⚠️ REALTIME: Error cleaning up subscriptions: $e');
     }
   }
 
-  /// NEW METHOD: Safely set state only if notifier is not disposed
   void _safeSetState(MemoriesDashboardState newState) {
     if (_isDisposed) return;
     try {
       state = newState;
     } catch (e) {
-      if (e.toString().contains('dispose') ||
-          e.toString().contains('Bad state')) {
+      if (e.toString().contains('dispose') || e.toString().contains('Bad state')) {
         _isDisposed = true;
         print('⚠️ MEMORIES NOTIFIER: Attempted to set state after dispose');
       } else {

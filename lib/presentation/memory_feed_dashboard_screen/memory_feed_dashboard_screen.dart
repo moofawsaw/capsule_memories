@@ -9,7 +9,6 @@ import '../../widgets/custom_public_memories.dart' as custom_widget;
 import '../../widgets/custom_story_skeleton.dart';
 import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../create_memory_screen/create_memory_screen.dart';
-import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import './widgets/happening_now_story_card.dart';
 import './widgets/memory_selection_bottom_sheet.dart';
 import './widgets/native_camera_recording_screen.dart';
@@ -490,19 +489,10 @@ class _MemoryFeedDashboardScreenState
                             return HappeningNowStoryCard(
                               story: story,
                               onTap: () {
-                                // Create feed context with all story IDs from latest stories feed
-                                final feedContext = FeedStoryContext(
-                                  feedType: 'latest_stories',
-                                  storyIds: latestStories
-                                      .map((s) => s.storyId)
-                                      .where((id) => id.isNotEmpty)
-                                      .toList(),
-                                  initialStoryId: story.storyId,
-                                );
-
+                                // Navigate directly without FeedStoryContext
                                 NavigatorService.pushNamed(
                                   AppRoutes.appStoryView,
-                                  arguments: feedContext,
+                                  arguments: story.storyId,
                                 );
                               },
                             );
@@ -601,19 +591,10 @@ class _MemoryFeedDashboardScreenState
                             return HappeningNowStoryCard(
                               story: story,
                               onTap: () {
-                                // Create feed context with all story IDs from happening now feed
-                                final feedContext = FeedStoryContext(
-                                  feedType: 'happening_now',
-                                  storyIds: stories
-                                      .map((s) => s.storyId)
-                                      .where((id) => id.isNotEmpty)
-                                      .toList(),
-                                  initialStoryId: story.storyId,
-                                );
-
+                                // Navigate directly without FeedStoryContext
                                 NavigatorService.pushNamed(
                                   AppRoutes.appStoryView,
-                                  arguments: feedContext,
+                                  arguments: story.storyId,
                                 );
                               },
                             );
@@ -821,19 +802,10 @@ class _MemoryFeedDashboardScreenState
                             return HappeningNowStoryCard(
                               story: story,
                               onTap: () {
-                                // Create feed context with all story IDs from trending feed
-                                final feedContext = FeedStoryContext(
-                                  feedType: 'trending',
-                                  storyIds: stories
-                                      .map((s) => s.storyId)
-                                      .where((id) => id.isNotEmpty)
-                                      .toList(),
-                                  initialStoryId: story.storyId,
-                                );
-
+                                // Navigate directly without FeedStoryContext
                                 NavigatorService.pushNamed(
                                   AppRoutes.appStoryView,
-                                  arguments: feedContext,
+                                  arguments: story.storyId,
                                 );
                               },
                             );
@@ -1023,18 +995,10 @@ class _MemoryFeedDashboardScreenState
                             return HappeningNowStoryCard(
                               story: story,
                               onTap: () {
-                                final feedContext = FeedStoryContext(
-                                  feedType: 'longest_streaks',
-                                  storyIds: stories
-                                      .map((s) => s.storyId)
-                                      .where((id) => id.isNotEmpty)
-                                      .toList(),
-                                  initialStoryId: story.storyId,
-                                );
-
+                                // Navigate directly without FeedStoryContext
                                 NavigatorService.pushNamed(
                                   AppRoutes.appStoryView,
-                                  arguments: feedContext,
+                                  arguments: story.storyId,
                                 );
                               },
                             );
@@ -1133,18 +1097,10 @@ class _MemoryFeedDashboardScreenState
                             return HappeningNowStoryCard(
                               story: story,
                               onTap: () {
-                                final feedContext = FeedStoryContext(
-                                  feedType: 'popular_users',
-                                  storyIds: stories
-                                      .map((s) => s.storyId)
-                                      .where((id) => id.isNotEmpty)
-                                      .toList(),
-                                  initialStoryId: story.storyId,
-                                );
-
+                                // Navigate directly without FeedStoryContext
                                 NavigatorService.pushNamed(
                                   AppRoutes.appStoryView,
-                                  arguments: feedContext,
+                                  arguments: story.storyId,
                                 );
                               },
                             );

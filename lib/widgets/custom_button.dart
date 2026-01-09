@@ -40,7 +40,7 @@ class CustomButton extends StatelessWidget {
   /// Callback function when button is pressed
   final VoidCallback? onPressed;
 
-  /// Button width - required parameter for proper width control
+  /// Button width - can be specific value or null for auto-sizing
   final double? width;
 
   /// Button height
@@ -124,7 +124,7 @@ class CustomButton extends StatelessWidget {
     );
   }
 
-  /// ✅ FIX: outline buttons must render an OutlinedButton (you previously returned SizedBox())
+  /// outline buttons must render an OutlinedButton
   Widget _buildOutlinedButton(
       CustomButtonStyle style,
       CustomButtonTextStyle textStyle,
@@ -196,9 +196,12 @@ class CustomButton extends StatelessWidget {
       );
     }
 
+    // ✅ CRITICAL FIX:
+    // Row(mainAxisSize: max) can request infinite width in unbounded parents
+    // (common inside horizontal scroll + Row).
+    // Use min + no Flexible so the button content always shrink-wraps.
     return Row(
-      // Use max so full-width buttons center nicely
-      mainAxisSize: MainAxisSize.max,
+      mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (hasLeftIcon) ...[
@@ -210,15 +213,13 @@ class CustomButton extends StatelessWidget {
           if (hasText) SizedBox(width: 8.h),
         ],
         if (hasText)
-          Flexible(
-            child: Text(
-              text!,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              style: TextStyleHelper.instance.bodyTextPlusJakartaSans
-                  .copyWith(color: textStyle.color),
-            ),
+          Text(
+            text!,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            style: TextStyleHelper.instance.bodyTextPlusJakartaSans
+                .copyWith(color: textStyle.color),
           ),
         if (hasRightIcon) ...[
           if (hasText) SizedBox(width: 8.h),
@@ -247,7 +248,6 @@ class CustomButtonStyle {
   final double? borderRadius;
   final CustomButtonVariant variant;
 
-  // Predefined styles based on JSON analysis
   static CustomButtonStyle get fillPrimary => CustomButtonStyle(
     backgroundColor: appTheme.deep_purple_A100,
     variant: CustomButtonVariant.fill,

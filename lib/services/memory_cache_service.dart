@@ -6,9 +6,9 @@ import './avatar_helper_service.dart';
 import './story_service.dart';
 import './supabase_service.dart';
 
-/// In-memory cache service for memory objects with auto-refresh functionality
-/// Ensures data consistency when navigating between /memories and /timeline
-/// Optimized for concurrent updates across multiple users
+/// In-memory cache service for memory objects with auto-refresh functionality.
+/// Fixes deadlocks by removing custom RW locks and using in-flight request dedupe.
+/// Ensures navigating away/back cannot wedge the cache.
 class MemoryCacheService {
   static final MemoryCacheService _instance = MemoryCacheService._internal();
   factory MemoryCacheService() => _instance;
@@ -16,7 +16,7 @@ class MemoryCacheService {
 
   final _storyService = StoryService();
 
-  // Cache storage
+  // Cache storage (single-user app assumption; keyed by userId)
   List<MemoryItemModel>? _cachedMemories;
   List<StoryItemModel>? _cachedStories;
   String? _cachedUserId;
@@ -29,61 +29,28 @@ class MemoryCacheService {
   static const int _maxRetries = 3;
   static const Duration _initialRetryDelay = Duration(milliseconds: 500);
 
-  // Read-write lock for concurrent access control
-  bool _isWriting = false;
-  final List<Completer<void>> _readQueue = [];
-
   // Debouncing for rapid cache refreshes
   Timer? _refreshDebounceTimer;
   static const _refreshDebounceDuration = Duration(milliseconds: 500);
+
+  // In-flight request dedupe (prevents overlapping loads + wedges)
+  Future<List<MemoryItemModel>>? _memoriesInFlight;
+  Future<List<StoryItemModel>>? _storiesInFlight;
 
   // Optimistic update tracking
   final Map<String, dynamic> _pendingUpdates = {};
 
   // Stream controllers for cache updates
   final _memoriesStreamController =
-      StreamController<List<MemoryItemModel>>.broadcast();
+  StreamController<List<MemoryItemModel>>.broadcast();
   final _storiesStreamController =
-      StreamController<List<StoryItemModel>>.broadcast();
+  StreamController<List<StoryItemModel>>.broadcast();
 
   Stream<List<MemoryItemModel>> get memoriesStream =>
       _memoriesStreamController.stream;
   Stream<List<StoryItemModel>> get storiesStream =>
       _storiesStreamController.stream;
 
-  /// Acquire read lock - ensures data consistency during concurrent reads
-  Future<void> _acquireReadLock() async {
-    if (_isWriting) {
-      final completer = Completer<void>();
-      _readQueue.add(completer);
-      await completer.future;
-    }
-  }
-
-  /// Release read lock - allows pending operations to proceed
-  void _releaseReadLock() {
-    if (_readQueue.isNotEmpty) {
-      _readQueue.removeAt(0).complete();
-    }
-  }
-
-  /// Acquire write lock - prevents concurrent modifications
-  Future<void> _acquireWriteLock() async {
-    while (_isWriting || _readQueue.isNotEmpty) {
-      await Future.delayed(Duration(milliseconds: 50));
-    }
-    _isWriting = true;
-  }
-
-  /// Release write lock - allows queued operations to execute
-  void _releaseWriteLock() {
-    _isWriting = false;
-    if (_readQueue.isNotEmpty) {
-      _readQueue.removeAt(0).complete();
-    }
-  }
-
-  /// Check if cache is valid for the current user
   bool _isCacheValid(String userId) {
     if (_cachedMemories == null || _cachedStories == null) return false;
     if (_cachedUserId != userId) return false;
@@ -93,110 +60,106 @@ class MemoryCacheService {
     return cacheAge < _cacheDuration;
   }
 
-  /// Get cached memories or fetch from database with automatic retry
-  /// Thread-safe with read-write locking
-  Future<List<MemoryItemModel>> getMemories(String userId,
-      {bool forceRefresh = false}) async {
-    print('🔍 CACHE: getMemories called for userId: $userId');
-    print('🔍 CACHE: forceRefresh = $forceRefresh');
+  /// Public: get memories with cache + deduped fetch
+  Future<List<MemoryItemModel>> getMemories(
+      String userId, {
+        bool forceRefresh = false,
+      }) async {
+    print('🔍 CACHE: getMemories called for userId: $userId (forceRefresh=$forceRefresh)');
 
-    await _acquireReadLock();
-
-    try {
-      // Return cached data if valid
-      if (!forceRefresh && _isCacheValid(userId)) {
-        print(
-            '✅ CACHE: Returning cached memories (${_cachedMemories!.length})');
-        return _cachedMemories!;
-      }
-
-      _releaseReadLock();
-
-      // Need to refresh - acquire write lock
-      await _acquireWriteLock();
-
-      try {
-        // Double-check cache validity after acquiring write lock
-        if (!forceRefresh && _isCacheValid(userId)) {
-          print('✅ CACHE: Another thread already refreshed, using cache');
-          return _cachedMemories!;
-        }
-
-        print('🔄 CACHE: Fetching fresh memories from database');
-        _cachedMemories = await _retryOperation(
-          () => _loadUserMemories(userId),
-          'load memories',
-        );
-        _cachedUserId = userId;
-        _lastCacheTime = DateTime.now();
-
-        _memoriesStreamController.add(_cachedMemories!);
-        print('✅ CACHE: Cached ${_cachedMemories!.length} memories');
-
-        return _cachedMemories!;
-      } finally {
-        _releaseWriteLock();
-      }
-    } catch (e) {
-      _releaseReadLock();
-      rethrow;
+    // If switching users, hard reset cache and in-flight
+    if (_cachedUserId != null && _cachedUserId != userId) {
+      print('🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
+      clearCache();
+      _cachedUserId = userId;
     }
+
+    // Return cache if valid
+    if (!forceRefresh && _isCacheValid(userId)) {
+      print('✅ CACHE: Returning cached memories (${_cachedMemories!.length})');
+      return _cachedMemories!;
+    }
+
+    // If a fetch is already in-flight, await it instead of starting another
+    if (_memoriesInFlight != null) {
+      print('⏳ CACHE: Awaiting in-flight memories request...');
+      return _memoriesInFlight!;
+    }
+
+    // Start a new fetch
+    _memoriesInFlight = _retryOperation(
+          () => _loadUserMemories(userId),
+      'load memories',
+    ).then((memories) {
+      _cachedUserId = userId;
+      _cachedMemories = memories;
+      _lastCacheTime = DateTime.now();
+      _memoriesStreamController.add(memories);
+      print('✅ CACHE: Cached ${memories.length} memories');
+      return memories;
+    }).catchError((e, st) {
+      print('❌ CACHE: getMemories failed: $e');
+      // Do NOT poison cache; just clear inflight and rethrow
+      throw e;
+    }).whenComplete(() {
+      _memoriesInFlight = null;
+    });
+
+    return _memoriesInFlight!;
   }
 
-  /// Get cached stories or fetch from database with automatic retry
-  /// Thread-safe with read-write locking
-  Future<List<StoryItemModel>> getStories(String userId,
-      {bool forceRefresh = false}) async {
-    print('🔍 CACHE: getStories called for userId: $userId');
-    print('🔍 CACHE: forceRefresh = $forceRefresh');
+  /// Public: get stories with cache + deduped fetch
+  Future<List<StoryItemModel>> getStories(
+      String userId, {
+        bool forceRefresh = false,
+      }) async {
+    print('🔍 CACHE: getStories called for userId: $userId (forceRefresh=$forceRefresh)');
 
-    await _acquireReadLock();
-
-    try {
-      // Return cached data if valid
-      if (!forceRefresh && _isCacheValid(userId)) {
-        print('✅ CACHE: Returning cached stories (${_cachedStories!.length})');
-        return _cachedStories!;
-      }
-
-      _releaseReadLock();
-
-      // Need to refresh - acquire write lock
-      await _acquireWriteLock();
-
-      try {
-        // Double-check cache validity after acquiring write lock
-        if (!forceRefresh && _isCacheValid(userId)) {
-          print('✅ CACHE: Another thread already refreshed, using cache');
-          return _cachedStories!;
-        }
-
-        print('🔄 CACHE: Fetching fresh stories from database');
-        _cachedStories = await _retryOperation(
-          () => _loadUserStories(userId),
-          'load stories',
-        );
-        _cachedUserId = userId;
-        _lastCacheTime = DateTime.now();
-
-        _storiesStreamController.add(_cachedStories!);
-        print('✅ CACHE: Cached ${_cachedStories!.length} stories');
-
-        return _cachedStories!;
-      } finally {
-        _releaseWriteLock();
-      }
-    } catch (e) {
-      _releaseReadLock();
-      rethrow;
+    // If switching users, hard reset cache and in-flight
+    if (_cachedUserId != null && _cachedUserId != userId) {
+      print('🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
+      clearCache();
+      _cachedUserId = userId;
     }
+
+    // Return cache if valid
+    if (!forceRefresh && _isCacheValid(userId)) {
+      print('✅ CACHE: Returning cached stories (${_cachedStories!.length})');
+      return _cachedStories!;
+    }
+
+    // If a fetch is already in-flight, await it instead of starting another
+    if (_storiesInFlight != null) {
+      print('⏳ CACHE: Awaiting in-flight stories request...');
+      return _storiesInFlight!;
+    }
+
+    // Start a new fetch
+    _storiesInFlight = _retryOperation(
+          () => _loadUserStories(userId),
+      'load stories',
+    ).then((stories) {
+      _cachedUserId = userId;
+      _cachedStories = stories;
+      _lastCacheTime = DateTime.now();
+      _storiesStreamController.add(stories);
+      print('✅ CACHE: Cached ${stories.length} stories');
+      return stories;
+    }).catchError((e, st) {
+      print('❌ CACHE: getStories failed: $e');
+      throw e;
+    }).whenComplete(() {
+      _storiesInFlight = null;
+    });
+
+    return _storiesInFlight!;
   }
 
   /// Retry operation with exponential backoff
   Future<T> _retryOperation<T>(
-    Future<T> Function() operation,
-    String operationName,
-  ) async {
+      Future<T> Function() operation,
+      String operationName,
+      ) async {
     int attempt = 0;
     Duration delay = _initialRetryDelay;
 
@@ -207,76 +170,60 @@ class MemoryCacheService {
         attempt++;
 
         if (attempt >= _maxRetries) {
-          print(
-              '❌ CACHE: Failed to $operationName after $attempt attempts: $e');
+          print('❌ CACHE: Failed to $operationName after $attempt attempts: $e');
           rethrow;
         }
 
         print('⚠️ CACHE: Attempt $attempt to $operationName failed: $e');
         print('🔄 CACHE: Retrying in ${delay.inMilliseconds}ms...');
-
         await Future.delayed(delay);
-        delay *= 2; // Exponential backoff
+        delay *= 2;
       }
     }
   }
 
-  /// Refresh cache for specific memory with debouncing
-  /// Prevents excessive refreshes during rapid concurrent updates
+  /// Debounced refresh. IMPORTANT: no locks. Just forceRefresh loads.
   Future<void> refreshMemoryCache(String userId) async {
-    print('🔄 CACHE: Debounced cache refresh requested for userId: $userId');
+    print('🔄 CACHE: Debounced refresh requested for userId: $userId');
 
-    // Cancel previous refresh if still pending
     _refreshDebounceTimer?.cancel();
 
-    // Set new debounced refresh
-    _refreshDebounceTimer = Timer(_refreshDebounceDuration, () async {
-      print('🔄 CACHE: Executing debounced cache refresh');
+    final completer = Completer<void>();
 
-      await _acquireWriteLock();
+    _refreshDebounceTimer = Timer(_refreshDebounceDuration, () async {
+      print('🔄 CACHE: Executing debounced refresh');
 
       try {
+        // Force refresh both; in-flight dedupe will prevent overlaps
         await Future.wait([
           getMemories(userId, forceRefresh: true),
           getStories(userId, forceRefresh: true),
         ]);
-        print('✅ CACHE: Cache refresh complete');
-      } finally {
-        _releaseWriteLock();
+        print('✅ CACHE: Debounced refresh complete');
+        completer.complete();
+      } catch (e) {
+        print('❌ CACHE: Debounced refresh failed: $e');
+        if (!completer.isCompleted) completer.completeError(e);
       }
     });
+
+    return completer.future;
   }
 
-  /// Optimistically update cache item before database sync completes
-  /// Provides immediate UI feedback while database operation is in progress
+  /// Optimistic update (tracking only; keep your current behavior)
   void optimisticUpdate(String itemId, Map<String, dynamic> updates) {
     print('⚡ CACHE: Optimistic update for item $itemId');
     _pendingUpdates[itemId] = updates;
-
-    // Apply optimistic update to cached data
-    if (_cachedMemories != null) {
-      final index = _cachedMemories!.indexWhere((m) => m.id == itemId);
-      if (index != -1) {
-        // Create updated memory with new data
-        // Note: This is a simplified example - actual implementation would
-        // need proper model copying with updated fields
-        print('⚡ CACHE: Applied optimistic update to memory cache');
-      }
-    }
   }
 
-  /// Confirm optimistic update succeeded
   void confirmOptimisticUpdate(String itemId) {
     print('✅ CACHE: Confirmed optimistic update for item $itemId');
     _pendingUpdates.remove(itemId);
   }
 
-  /// Rollback optimistic update if database operation failed
   Future<void> rollbackOptimisticUpdate(String itemId, String userId) async {
     print('⚠️ CACHE: Rolling back optimistic update for item $itemId');
     _pendingUpdates.remove(itemId);
-
-    // Force refresh to get accurate data
     await refreshMemoryCache(userId);
   }
 
@@ -284,10 +231,15 @@ class MemoryCacheService {
   void clearCache() {
     print('🗑️ CACHE: Clearing all cached data');
     _refreshDebounceTimer?.cancel();
+
     _cachedMemories = null;
     _cachedStories = null;
     _cachedUserId = null;
     _lastCacheTime = null;
+
+    _memoriesInFlight = null;
+    _storiesInFlight = null;
+
     _pendingUpdates.clear();
   }
 
@@ -296,7 +248,6 @@ class MemoryCacheService {
     try {
       final storiesData = await _storyService.fetchUserStories(userId);
 
-      // Fetch all story views for the current user in one query
       final storyIds = storiesData.map((s) => s['id'] as String).toList();
 
       Set<String> viewedStoryIds = {};
@@ -310,8 +261,7 @@ class MemoryCacheService {
         if (viewsResponse != null) {
           viewedStoryIds =
               viewsResponse.map((view) => view['story_id'] as String).toSet();
-          print(
-              '🔍 CACHE: Found ${viewedStoryIds.length} viewed stories for user');
+          print('🔍 CACHE: Found ${viewedStoryIds.length} viewed stories for user');
         }
       }
 
@@ -329,7 +279,6 @@ class MemoryCacheService {
             contributor?['username'] as String? ??
             'Unknown';
 
-        // Determine if story has been viewed by current user
         final isRead = viewedStoryIds.contains(storyId);
 
         return StoryItemModel(
@@ -359,89 +308,69 @@ class MemoryCacheService {
       final memoriesData = await _storyService.fetchUserTimelines(userId);
 
       final allMemories =
-          await Future.wait(memoriesData.map((memoryData) async {
+      await Future.wait(memoriesData.map((memoryData) async {
         final creator = memoryData['user_profiles'] as Map<String, dynamic>?;
         final category =
-            memoryData['memory_categories'] as Map<String, dynamic>?;
+        memoryData['memory_categories'] as Map<String, dynamic>?;
         final stories = memoryData['stories'] as List?;
 
-        // CRITICAL FIX: Add robust date parsing with try-catch for all date fields
         DateTime createdAt;
         DateTime? expiresAt;
         DateTime? sealedAt;
         DateTime startTime;
         DateTime endTime;
 
-        // Parse created_at with error handling
         try {
           createdAt = DateTime.parse(memoryData['created_at'] as String);
-        } catch (e) {
-          print(
-              '❌ CACHE: Invalid created_at format: ${memoryData['created_at']}');
+        } catch (_) {
           createdAt = DateTime.now();
         }
 
-        // Parse expires_at with error handling
         try {
           expiresAt = memoryData['expires_at'] != null
               ? DateTime.parse(memoryData['expires_at'] as String)
               : null;
-        } catch (e) {
-          print(
-              '❌ CACHE: Invalid expires_at format: ${memoryData['expires_at']}');
+        } catch (_) {
           expiresAt = null;
         }
 
-        // Parse sealed_at with error handling
         try {
           sealedAt = memoryData['sealed_at'] != null
               ? DateTime.parse(memoryData['sealed_at'] as String)
               : null;
-        } catch (e) {
-          print(
-              '❌ CACHE: Invalid sealed_at format: ${memoryData['sealed_at']}');
+        } catch (_) {
           sealedAt = null;
         }
 
-        // CRITICAL FIX: Use start_time/end_time if available with error handling
-        // Fallback to created_at/expires_at if parsing fails
         try {
           startTime = memoryData['start_time'] != null
               ? DateTime.parse(memoryData['start_time'] as String)
               : createdAt;
-        } catch (e) {
-          print(
-              '❌ CACHE: Invalid start_time format: ${memoryData['start_time']}, using created_at');
+        } catch (_) {
           startTime = createdAt;
         }
 
         try {
           endTime = memoryData['end_time'] != null
               ? DateTime.parse(memoryData['end_time'] as String)
-              : (expiresAt ?? createdAt.add(Duration(hours: 12)));
-        } catch (e) {
-          print(
-              '❌ CACHE: Invalid end_time format: ${memoryData['end_time']}, using fallback');
-          endTime = expiresAt ?? createdAt.add(Duration(hours: 12));
+              : (expiresAt ?? createdAt.add(const Duration(hours: 12)));
+        } catch (_) {
+          endTime = expiresAt ?? createdAt.add(const Duration(hours: 12));
         }
 
         final memoryThumbnails = stories
-                ?.map((story) {
-                  return (story['thumbnail_url'] ?? story['image_url'] ?? '')
-                      as String;
-                })
-                .where((url) => url.isNotEmpty)
-                .toList() ??
+            ?.map((story) {
+          return (story['thumbnail_url'] ?? story['image_url'] ?? '')
+          as String;
+        })
+            .where((url) => url.isNotEmpty)
+            .toList() ??
             [];
 
         final memoryId = memoryData['id'] as String;
         List<String> participantAvatars = [];
 
         try {
-          print('🔍 CACHE: Fetching contributors for memory $memoryId');
-
-          // FIXED: Query memory_contributors table (correct table name from schema)
-          // Matches working /feed implementation pattern
           final contributorsResponse = await SupabaseService.instance.client
               ?.from('memory_contributors')
               .select('user_id, user_profiles!inner(avatar_url, display_name)')
@@ -449,10 +378,6 @@ class MemoryCacheService {
               .order('joined_at', ascending: true);
 
           if (contributorsResponse != null) {
-            print(
-                '🔍 CACHE: Retrieved ${contributorsResponse.length} contributors from memory_contributors table');
-
-            // Get current user's avatar URL for filtering
             final currentUserAvatarData = await SupabaseService.instance.client
                 ?.from('user_profiles')
                 .select('avatar_url')
@@ -463,43 +388,24 @@ class MemoryCacheService {
               currentUserAvatarData?['avatar_url'] as String?,
             );
 
-            print('🔍 CACHE: Current user avatar: $currentUserAvatar');
-
-            // Extract all contributor avatars
             final allContributorAvatars = contributorsResponse
                 .map((contributor) {
-                  final userProfile =
-                      contributor['user_profiles'] as Map<String, dynamic>?;
-                  final displayName =
-                      userProfile?['display_name'] as String? ?? 'Unknown';
-                  final avatarUrl = AvatarHelperService.getAvatarUrl(
-                    userProfile?['avatar_url'] as String?,
-                  );
-                  print(
-                      '🔍 CACHE: Contributor "$displayName" has avatar: $avatarUrl');
-                  return avatarUrl;
-                })
+              final userProfile =
+              contributor['user_profiles'] as Map<String, dynamic>?;
+              return AvatarHelperService.getAvatarUrl(
+                userProfile?['avatar_url'] as String?,
+              );
+            })
                 .where((url) => url.isNotEmpty)
                 .toList();
 
-            print(
-                '🔍 CACHE: Found ${allContributorAvatars.length} total contributor avatars');
-
-            // Filter out current user and limit to 3 for header display
             participantAvatars = allContributorAvatars
                 .where((avatar) => avatar != currentUserAvatar)
                 .take(3)
                 .toList();
-
-            print(
-                '✅ CACHE: Final participant avatars for header (${participantAvatars.length}): $participantAvatars');
-          } else {
-            print('⚠️ CACHE: No contributors found for memory $memoryId');
           }
         } catch (e) {
-          print(
-              '❌ CACHE: Error fetching contributor avatars from memory_contributors: $e');
-          print('❌ CACHE: Stack trace: ${StackTrace.current}');
+          print('❌ CACHE: Error fetching contributor avatars: $e');
         }
 
         return MemoryItemModel(
@@ -533,15 +439,13 @@ class MemoryCacheService {
         );
       }));
 
-      // FIXED: Sort memories by creation date descending (newest first)
       allMemories.sort((a, b) {
         final dateA = a.createdAt ?? DateTime.now();
         final dateB = b.createdAt ?? DateTime.now();
-        return dateB.compareTo(dateA); // Descending order - newest first
+        return dateB.compareTo(dateA);
       });
 
       print('✅ CACHE: Sorted ${allMemories.length} memories by newest first');
-
       return allMemories;
     } catch (e) {
       print('❌ CACHE: Error loading user memories: $e');
@@ -549,26 +453,14 @@ class MemoryCacheService {
     }
   }
 
-  /// Format date as "Dec 4" format
   String _formatDate(DateTime dateTime) {
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
+      'Jan','Feb','Mar','Apr','May','Jun',
+      'Jul','Aug','Sep','Oct','Nov','Dec'
     ];
     return '${months[dateTime.month - 1]} ${dateTime.day}';
   }
 
-  /// Format time as "3:18pm" format
   String _formatTime(DateTime dateTime) {
     var hour = dateTime.hour;
     final minute = dateTime.minute;
@@ -583,7 +475,6 @@ class MemoryCacheService {
     return '$hour:${minute.toString().padLeft(2, '0')}$period';
   }
 
-  /// Dispose streams and cleanup
   void dispose() {
     _refreshDebounceTimer?.cancel();
     _memoriesStreamController.close();

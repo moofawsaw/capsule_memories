@@ -1,21 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
-/** 
- * CustomEventCard - A reusable event card component that displays event information
- * including title, date, privacy status, and participant avatars with navigation controls.
- * 
- * Features:
- * - Event title and date display
- * - Privacy status indicator (Private/Public)
- * - Participant avatar stack with overlapping layout
- * - Interactive back navigation and icon button
- * - Responsive design with consistent styling
- * - Flexible content configuration
- * - Database-backed category icons from category-icons bucket
- */
 class CustomEventCard extends StatelessWidget {
   final String? eventTitle;
   final String? eventDate;
@@ -40,37 +28,35 @@ class CustomEventCard extends StatelessWidget {
     this.onAvatarTap,
   }) : super(key: key);
 
+  bool _isNetworkUrl(String s) => s.startsWith('http://') || s.startsWith('https://');
+  bool _isSvg(String s) => s.toLowerCase().split('?').first.endsWith('.svg');
+
   @override
   Widget build(BuildContext context) {
-    // CRITICAL DEBUG: Log what CustomEventCard receives for rendering
-    print('🚨 CUSTOM EVENT CARD DEBUG: build() called');
-    print('   - eventTitle: "$eventTitle"');
-    print('   - eventDate: "$eventDate"');
-    print('   - eventLocation: "$eventLocation"');
-    print('   - participantImages count: ${participantImages?.length ?? 0}');
-    print('   - iconButtonImagePath: "$iconButtonImagePath"');
+    final String iconPath = (iconButtonImagePath ?? '').trim().isNotEmpty
+        ? iconButtonImagePath!.trim()
+        : ImageConstant.imgFrame13;
+
+    final bool isNetwork = _isNetworkUrl(iconPath);
+    final bool isSvg = isNetwork && _isSvg(iconPath);
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: appTheme.gray_900_01,
         border: Border(
-          bottom: BorderSide(
-            color: appTheme.blue_gray_900,
-            width: 1,
-          ),
+          bottom: BorderSide(color: appTheme.blue_gray_900, width: 1),
         ),
       ),
       padding: EdgeInsets.fromLTRB(12.h, 12.h, 12.h, 12.h),
       child: Column(
         children: [
-          // Header row with back button, title, and options
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildBackButton(),
               SizedBox(width: 16.h),
-              _buildIconButton(),
+              _buildIconButton(iconPath, isNetwork, isSvg),
               SizedBox(width: 16.h),
               _buildEventDetails(context),
               SizedBox(width: 16.h),
@@ -96,60 +82,63 @@ class CustomEventCard extends StatelessWidget {
     );
   }
 
-  Widget _buildIconButton() {
-    // CRITICAL FIX: Use database icon URL if provided, otherwise fallback
-    final String iconPath =
-        iconButtonImagePath != null && iconButtonImagePath!.isNotEmpty
-            ? iconButtonImagePath!
-            : ImageConstant.imgFrame13;
-
-    print('🔍 DEBUG CustomEventCard: Using icon path = "$iconPath"');
-
+  Widget _buildIconButton(String iconPath, bool isNetwork, bool isSvg) {
     return Padding(
       padding: EdgeInsets.only(top: 14.h),
-      child: Container(
-        width: 36.h,
-        height: 36.h,
-        decoration: BoxDecoration(
-          color: appTheme.color41C124,
-          borderRadius: BorderRadius.circular(18.h),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18.h),
-          child: CachedNetworkImage(
-            imageUrl: iconPath,
-            width: 36.h,
-            height: 36.h,
-            fit: BoxFit.cover,
-            placeholder: (context, url) => Center(
-              child: SizedBox(
-                width: 20.h,
-                height: 20.h,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: appTheme.whiteCustom,
-                ),
-              ),
-            ),
-            errorWidget: (context, url, error) {
-              // Fallback to local asset if database icon fails
-              return CustomImageView(
-                imagePath: ImageConstant.imgFrame13,
-                width: 36.h,
-                height: 36.h,
-                fit: BoxFit.cover,
-              );
-            },
-          ),
+      child: GestureDetector(
+        onTap: onIconButtonTap,
+        child: Container(
+          width: 42.h,
+          height: 42.h,
+          // color: appTheme.color41C124,
+          // padding: EdgeInsets.all(6.h),
+          alignment: Alignment.center,
+          child: _buildIcon(iconPath, isNetwork, isSvg),
         ),
       ),
     );
   }
 
+  Widget _buildIcon(String iconPath, bool isNetwork, bool isSvg) {
+    if (!isNetwork) {
+      return CustomImageView(imagePath: iconPath, fit: BoxFit.contain);
+    }
+
+    if (isSvg) {
+      return SvgPicture.network(
+        iconPath,
+        fit: BoxFit.contain,
+        placeholderBuilder: (_) => SizedBox(
+          width: 26.h,
+          height: 26.h,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: appTheme.whiteCustom,
+          ),
+        ),
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: iconPath,
+      fit: BoxFit.contain,
+      placeholder: (context, url) => SizedBox(
+        width: 26.h,
+        height: 26.h,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: appTheme.whiteCustom,
+        ),
+      ),
+      errorWidget: (context, url, error) => CustomImageView(
+        imagePath: ImageConstant.imgFrame13,
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+
   Widget _buildEventDetails(BuildContext context) {
-    // CRITICAL DEBUG: Log the actual location value being rendered
-    final locationText = eventLocation ?? 'Event Location';
-    print('🎯 CUSTOM EVENT CARD: Rendering location text = "$locationText"');
+    final locationText = eventLocation ?? 'no location';
 
     return Expanded(
       child: Padding(
@@ -183,16 +172,12 @@ class CustomEventCard extends StatelessWidget {
   Widget _buildPrivacyButton() {
     final bool isEventPrivate = isPrivate ?? true;
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 8.h,
-        vertical: 2.h,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 2.h),
       decoration: BoxDecoration(
         color: appTheme.gray_900_03,
         borderRadius: BorderRadius.circular(6.h),
       ),
       child: Row(
-        spacing: 4.h,
         mainAxisSize: MainAxisSize.min,
         children: [
           CustomImageView(
@@ -202,6 +187,7 @@ class CustomEventCard extends StatelessWidget {
             height: 14.h,
             width: 14.h,
           ),
+          SizedBox(width: 4.h),
           Text(
             isEventPrivate ? 'PRIVATE' : 'PUBLIC',
             style: TextStyleHelper.instance.body12BoldPlusJakartaSans
@@ -214,11 +200,27 @@ class CustomEventCard extends StatelessWidget {
 
   Widget _buildAvatarStack() {
     final List<String> avatars = participantImages ??
-        [
-          ImageConstant.imgFrame2,
-          ImageConstant.imgFrame1,
-          ImageConstant.imgEllipse81,
-        ];
+        [ImageConstant.imgFrame2, ImageConstant.imgFrame1, ImageConstant.imgEllipse81];
+
+    Widget avatarAt(int index, double right) {
+      if (avatars.length <= index) return const SizedBox.shrink();
+
+      return Positioned(
+        right: right,
+        child: SizedBox(
+          width: 36.h,
+          height: 36.h,
+          child: ClipOval(
+            child: CustomImageView(
+              imagePath: avatars[index],
+              width: 36.h,
+              height: 36.h,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: EdgeInsets.only(top: 14.h),
@@ -228,37 +230,11 @@ class CustomEventCard extends StatelessWidget {
           width: 84.h,
           height: 36.h,
           child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              if (avatars.isNotEmpty)
-                Positioned(
-                  left: 0,
-                  child: CustomImageView(
-                    imagePath: avatars[0],
-                    width: 36.h,
-                    height: 36.h,
-                    radius: BorderRadius.circular(18.h),
-                  ),
-                ),
-              if (avatars.length > 1)
-                Positioned(
-                  left: 24.h,
-                  child: CustomImageView(
-                    imagePath: avatars[1],
-                    width: 36.h,
-                    height: 36.h,
-                    radius: BorderRadius.circular(18.h),
-                  ),
-                ),
-              if (avatars.length > 2)
-                Positioned(
-                  left: 48.h,
-                  child: CustomImageView(
-                    imagePath: avatars[2],
-                    width: 36.h,
-                    height: 36.h,
-                    radius: BorderRadius.circular(18.h),
-                  ),
-                ),
+              avatarAt(0, 0),
+              avatarAt(1, 24.h),
+              avatarAt(2, 48.h),
             ],
           ),
         ),

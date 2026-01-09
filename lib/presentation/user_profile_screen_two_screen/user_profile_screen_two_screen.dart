@@ -1,5 +1,4 @@
 import '../../core/app_export.dart';
-import '../../presentation/event_stories_view_screen/models/event_stories_view_model.dart';
 import '../../services/avatar_state_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_profile_header.dart';
@@ -542,12 +541,12 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       return;
     }
 
-    // Create FeedStoryContext with all user stories for cycling
-    final feedContext = FeedStoryContext(
-      feedType: 'user_profile',
-      storyIds: storyIds,
-      initialStoryId: clickedStoryId,
-    );
+    // Create feed context map with all user stories for cycling
+    final feedContext = {
+      'feedType': 'user_profile',
+      'storyIds': storyIds,
+      'initialStoryId': clickedStoryId,
+    };
 
     print(
         '🚀 DEBUG: Navigating to story viewer with ${storyIds.length} stories');

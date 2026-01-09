@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../core/models/feed_story_context.dart';
 import '../../core/app_export.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../services/feed_service.dart';
@@ -17,7 +18,6 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/story_reactions.dart';
-import 'models/event_stories_view_model.dart';
 
 /// Enum for different haptic feedback types
 enum HapticFeedbackType {

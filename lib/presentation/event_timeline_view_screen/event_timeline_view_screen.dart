@@ -205,6 +205,7 @@ class EventTimelineViewScreenState
         return CustomEventCard(
           eventTitle: state.eventTimelineViewModel?.eventTitle,
           eventDate: state.eventTimelineViewModel?.eventDate,
+          eventLocation: state.eventTimelineViewModel?.timelineDetail?.centerLocation,
           isPrivate: state.eventTimelineViewModel?.isPrivate,
           iconButtonImagePath: state.eventTimelineViewModel?.categoryIcon ??
               ImageConstant.imgFrame13,
@@ -545,7 +546,7 @@ class EventTimelineViewScreenState
             onTapStoryItem(context, index);
           },
           itemGap: 8.h,
-          margin: EdgeInsets.only(left: 20.h),
+          // margin: EdgeInsets.only(left: 20.h),
         );
       },
     );

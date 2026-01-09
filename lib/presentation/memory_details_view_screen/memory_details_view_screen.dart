@@ -1,11 +1,15 @@
 import '../../core/app_export.dart';
+import '../../core/models/feed_story_context.dart';
+import '../../core/utils/image_constant.dart';
 import '../../core/utils/memory_nav_args.dart';
+import '../../core/utils/navigator_service.dart';
+import '../../routes/app_routes.dart';
+import '../../theme/text_style_helper.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/timeline_widget.dart';
 import '../add_memory_upload_screen/add_memory_upload_screen.dart';
-import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import 'notifier/memory_details_view_notifier.dart';
 
@@ -386,15 +390,9 @@ class MemoryDetailsViewScreenState
   void _handleTimelineStoryTap(BuildContext context, String storyId) {
     final notifier = ref.read(memoryDetailsViewNotifier.notifier);
 
-    final feedContext = FeedStoryContext(
-      feedType: 'memory_timeline',
-      storyIds: notifier.currentMemoryStoryIds,
-      initialStoryId: storyId,
-    );
-
     NavigatorService.pushNamed(
       AppRoutes.appStoryView,
-      arguments: feedContext,
+      arguments: storyId,
     );
   }
 
@@ -406,15 +404,9 @@ class MemoryDetailsViewScreenState
     if (index < storyItems.length) {
       final storyItem = storyItems[index];
 
-      final feedContext = FeedStoryContext(
-        feedType: 'memory_timeline',
-        storyIds: notifier.currentMemoryStoryIds,
-        initialStoryId: storyItem.storyId ?? '',
-      );
-
       NavigatorService.pushNamed(
         AppRoutes.appStoryView,
-        arguments: feedContext,
+        arguments: storyItem.storyId ?? '',
       );
     }
   }

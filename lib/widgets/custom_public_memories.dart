@@ -784,13 +784,13 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       child: Stack(
         children: List.generate(count, (index) {
           return Positioned(
-            left: (index * 24).h,
+            right: (index * 24).h,
             child: Container(
               height: 36.h,
               width: 36.h,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: appTheme.whiteCustom, width: 1.h),
+/*                border: Border.all(color: appTheme.whiteCustom, width: 1.h),*/
               ),
               child: ClipOval(
                 child: CustomImageView(

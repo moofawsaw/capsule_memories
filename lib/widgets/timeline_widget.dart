@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../core/app_export.dart';
 
 /// Data model for timeline story items
@@ -56,12 +58,12 @@ class TimelineWidget extends StatelessWidget {
 
   double get _totalHeight =>
       _cardHeight +
-          _connectorAboveBar +
-          _barHeight +
-          _connectorBelowBar +
-          _avatarSize +
-          _markerAreaHeight +
-          20.0;
+      _connectorAboveBar +
+      _barHeight +
+      _connectorBelowBar +
+      _avatarSize +
+      _markerAreaHeight +
+      20.0;
 
   double get _barYPosition => _cardHeight + _connectorAboveBar;
 
@@ -79,8 +81,9 @@ class TimelineWidget extends StatelessWidget {
         final double timelineWidth = constraints.maxWidth;
         const double padding = _horizontalPadding;
 
-        final double usableWidth =
-        (timelineWidth - (padding * 2)).clamp(0.0, double.infinity).toDouble();
+        final double usableWidth = (timelineWidth - (padding * 2))
+            .clamp(0.0, double.infinity)
+            .toDouble();
 
         final double progressRatio = _memoryProgressRatio();
 
@@ -118,7 +121,7 @@ class TimelineWidget extends StatelessWidget {
     final fillColor = appTheme.deep_purple_A100;
 
     final double fillWidth =
-    (usableWidth * progressRatio).clamp(0.0, usableWidth).toDouble();
+        (usableWidth * progressRatio).clamp(0.0, usableWidth).toDouble();
 
     return SizedBox(
       height: _barHeight.h,
@@ -179,13 +182,15 @@ class TimelineWidget extends StatelessWidget {
     final double halfMarker = _storyMarkerWidth / 2;
 
     return sorted.map((story) {
-      final double centerX = _calculateTimePosition(story.postedAt, usableWidth);
+      final double centerX =
+          _calculateTimePosition(story.postedAt, usableWidth);
 
       double leftPos = padding + centerX - halfMarker;
 
       // Clamp so center can reach both ends (allow overflow off the edges)
       final double minLeft = padding - halfMarker; // center at x=0
-      final double maxLeft = padding + usableWidth - halfMarker; // center at x=max
+      final double maxLeft =
+          padding + usableWidth - halfMarker; // center at x=max
       leftPos = leftPos.clamp(minLeft, maxLeft).toDouble();
 
       return Positioned(
@@ -220,7 +225,7 @@ class TimelineWidget extends StatelessWidget {
     final int safeTotalMs = totalMs <= 0 ? 1 : totalMs;
 
     final DateTime midUtc =
-    startUtc.add(Duration(milliseconds: (safeTotalMs / 2).round()));
+        startUtc.add(Duration(milliseconds: (safeTotalMs / 2).round()));
 
     final markers = <_MarkerSpec>[
       _MarkerSpec(
@@ -244,16 +249,21 @@ class TimelineWidget extends StatelessWidget {
     final double halfLabel = _markerLabelWidth / 2;
 
     for (final m in markers) {
-      final double rawPos = _calculateTimePosition(m.timeForPositionUtc, usableWidth);
+      final double rawPos =
+          _calculateTimePosition(m.timeForPositionUtc, usableWidth);
 
       // === OPTION B: keep markers away from edges ===
       final double minCenter = _markerEdgeInset;
-      final double maxCenter = (usableWidth - _markerEdgeInset).clamp(0.0, double.infinity).toDouble();
-      final double clampedCenter = rawPos.clamp(minCenter, maxCenter).toDouble();
+      final double maxCenter = (usableWidth - _markerEdgeInset)
+          .clamp(0.0, double.infinity)
+          .toDouble();
+      final double clampedCenter =
+          rawPos.clamp(minCenter, maxCenter).toDouble();
 
       final double leftPos = (padding + clampedCenter - halfLabel).toDouble();
 
-      final _MarkerTextParts parts = _formatMarkerPartsLocal(m.timeForLabelExact);
+      final _MarkerTextParts parts =
+          _formatMarkerPartsLocal(m.timeForLabelExact);
 
       widgets.add(
         Positioned(
@@ -277,8 +287,10 @@ class TimelineWidget extends StatelessWidget {
                       parts.dateLine,
                       textAlign: TextAlign.center,
                       style: (m.isEmphasized
-                          ? TextStyleHelper.instance.body14BoldPlusJakartaSans
-                          : TextStyleHelper.instance.body14RegularPlusJakartaSans)
+                              ? TextStyleHelper
+                                  .instance.body14BoldPlusJakartaSans
+                              : TextStyleHelper
+                                  .instance.body14RegularPlusJakartaSans)
                           .copyWith(color: appTheme.gray_50),
                       maxLines: 1,
                     ),
@@ -287,7 +299,8 @@ class TimelineWidget extends StatelessWidget {
                     Text(
                       parts.timeLine,
                       textAlign: TextAlign.center,
-                      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                      style: TextStyleHelper
+                          .instance.body14RegularPlusJakartaSans
                           .copyWith(color: appTheme.blue_gray_300),
                       maxLines: 1,
                     ),
@@ -328,8 +341,18 @@ class TimelineWidget extends StatelessWidget {
     final DateTime local = _toLocal(dt);
 
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     final String month = months[local.month - 1];
     final int day = local.day;
@@ -428,18 +451,87 @@ class _TimelineStoryWidget extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(6.h),
-        child: Image.network(
-          item.backgroundImage,
+        child: CachedNetworkImage(
+          imageUrl: item.backgroundImage,
+          key: ValueKey(
+              'story_thumbnail_${item.storyId}_${item.backgroundImage.hashCode}'),
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
+          memCacheWidth: 200, // Optimize memory cache size
+          memCacheHeight: 280,
+          maxHeightDiskCache: 400, // Optimize disk cache size
+          maxWidthDiskCache: 280,
+          fadeInDuration: const Duration(milliseconds: 200),
+          fadeOutDuration: const Duration(milliseconds: 100),
+          placeholder: (context, url) => Container(
             color: const Color(0xFF2A2A3A),
             alignment: Alignment.center,
-            child: Icon(
-              Icons.image_not_supported,
-              color: Colors.white38,
-              size: 18.h,
+            child: SizedBox(
+              width: 16.h,
+              height: 16.h,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  appTheme.deep_purple_A100.withAlpha(128),
+                ),
+              ),
             ),
           ),
+          errorWidget: (context, url, error) {
+            // CRITICAL FIX: Retry loading image on error
+            // This ensures thumbnails reload properly after viewing stories
+            print(
+                '🔄 TIMELINE: Thumbnail load failed for ${item.storyId}, retrying...');
+
+            return FutureBuilder(
+              future: Future.delayed(
+                const Duration(milliseconds: 500),
+                () => CachedNetworkImage(
+                  imageUrl: item.backgroundImage,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 200,
+                  memCacheHeight: 280,
+                  errorWidget: (context, url, retryError) => Container(
+                    color: const Color(0xFF2A2A3A),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.refresh,
+                      color: Colors.white38,
+                      size: 18.h,
+                    ),
+                  ),
+                ),
+              ),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Container(
+                    color: const Color(0xFF2A2A3A),
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: 16.h,
+                      height: 16.h,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          appTheme.deep_purple_A100.withAlpha(128),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return snapshot.data ??
+                    Container(
+                      color: const Color(0xFF2A2A3A),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: Colors.white38,
+                        size: 18.h,
+                      ),
+                    );
+              },
+            );
+          },
         ),
       ),
     );
@@ -450,10 +542,31 @@ class _TimelineStoryWidget extends StatelessWidget {
       width: TimelineWidget._avatarSize.h,
       height: TimelineWidget._avatarSize.h,
       child: ClipOval(
-        child: Image.network(
-          item.userAvatar,
+        child: CachedNetworkImage(
+          imageUrl: item.userAvatar,
+          key: ValueKey('avatar_${item.storyId}_${item.userAvatar.hashCode}'),
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(
+          memCacheWidth: 80,
+          memCacheHeight: 80,
+          maxHeightDiskCache: 120,
+          maxWidthDiskCache: 120,
+          fadeInDuration: const Duration(milliseconds: 200),
+          fadeOutDuration: const Duration(milliseconds: 100),
+          placeholder: (context, url) => Container(
+            color: const Color(0xFF2A2A3A),
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: 12.h,
+              height: 12.h,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  appTheme.deep_purple_A100.withAlpha(128),
+                ),
+              ),
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
             color: const Color(0xFF2A2A3A),
             alignment: Alignment.center,
             child: Icon(

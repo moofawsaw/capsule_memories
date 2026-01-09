@@ -1,81 +1,79 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Storage utility for resolving Supabase Storage URLs
-/// Handles conversion of raw database paths to full Supabase Storage URLs
 class StorageUtils {
   static const String supabaseUrl = 'https://resdvutqgrbbylknaxjp.supabase.co';
 
-  /// Resolves story media URL from raw database path to full Supabase Storage URL
-  ///
-  /// Returns null for null/empty paths
-  /// Returns full URLs unchanged
-  /// Resolves relative paths to full Supabase Storage URLs
+  static bool _isFullUrl(String s) =>
+      s.startsWith('http://') || s.startsWith('https://');
+
+  static String _stripLeadingSlash(String s) =>
+      s.startsWith('/') ? s.substring(1) : s;
+
   static String? resolveStoryMediaUrl(String? path) {
-    if (path == null || path.isEmpty) return null;
+    if (path == null || path.trim().isEmpty) return null;
+    final raw = path.trim();
 
-    // Already a full URL - return as-is
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
+    if (_isFullUrl(raw)) return raw;
 
-    // Normalize: strip leading slash or bucket prefix
-    String normalized = path;
-    if (normalized.startsWith('/')) normalized = normalized.substring(1);
+    String normalized = _stripLeadingSlash(raw);
     if (normalized.startsWith('story-media/')) {
       normalized = normalized.substring('story-media/'.length);
     }
 
-    // Use Supabase client to get public URL
     return Supabase.instance.client.storage
         .from('story-media')
         .getPublicUrl(normalized);
   }
 
-  /// Resolves avatar URL from raw database path to full Supabase Storage URL
-  ///
-  /// Returns null for null/empty paths
-  /// Returns full URLs unchanged
-  /// Resolves relative paths to full Supabase Storage URLs
   static String? resolveAvatarUrl(String? path) {
-    if (path == null || path.isEmpty) return null;
+    if (path == null || path.trim().isEmpty) return null;
+    final raw = path.trim();
 
-    // Already a full URL - return as-is
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
+    if (_isFullUrl(raw)) return raw;
 
-    // Normalize: strip leading slash or bucket prefix
-    String normalized = path;
-    if (normalized.startsWith('/')) normalized = normalized.substring(1);
+    String normalized = _stripLeadingSlash(raw);
     if (normalized.startsWith('avatars/')) {
       normalized = normalized.substring('avatars/'.length);
     }
 
-    // Use Supabase client to get public URL
-    return Supabase.instance.client.storage
-        .from('avatars')
-        .getPublicUrl(normalized);
+    return Supabase.instance.client.storage.from('avatars').getPublicUrl(normalized);
   }
 
-  /// Resolves category icon URL from icon_name to full Supabase Storage URL
-  ///
-  /// Returns null for null/empty icon names
-  /// Constructs proper path for category-icons bucket
-  ///
-  /// Example: resolveMemoryCategoryIconUrl('graduation')
-  /// → https://resdvutqgrbbylknaxjp.supabase.co/storage/v1/object/public/category-icons/graduation.svg
-  static String? resolveMemoryCategoryIconUrl(String? iconName) {
-    if (iconName == null || iconName.isEmpty) return null;
+  /// Accepts:
+  /// - Full URL: "https://.../category-icons/graduation.svg"
+  /// - Bucket path: "category-icons/graduation.svg" or "/category-icons/graduation.svg"
+  /// - File name: "graduation.svg" / "graduation.png"
+  /// - Raw name: "graduation"  -> tries .svg then .png fallback (optional)
+  static String? resolveMemoryCategoryIconUrl(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final raw = value.trim();
 
-    // Normalize: remove any path separators or file extensions
-    String normalized = iconName.replaceAll('/', '').replaceAll('.svg', '');
+    if (_isFullUrl(raw)) return raw;
 
-    // Construct full path with .svg extension
-    String path = '$normalized.svg';
+    String normalized = _stripLeadingSlash(raw);
 
-    // Use Supabase client to get public URL from category-icons bucket
+    // If DB stored "category-icons/....", strip the bucket prefix
+    if (normalized.startsWith('category-icons/')) {
+      normalized = normalized.substring('category-icons/'.length);
+    }
+
+    // If it already has an extension, use it as-is
+    final lower = normalized.toLowerCase();
+    final hasExt = lower.endsWith('.svg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.webp');
+
+    if (hasExt) {
+      return Supabase.instance.client.storage
+          .from('category-icons')
+          .getPublicUrl(normalized);
+    }
+
+    // Default strategy: SVG-first (swap if your bucket is mostly PNG)
     return Supabase.instance.client.storage
         .from('category-icons')
-        .getPublicUrl(path);
+        .getPublicUrl('$normalized.svg');
   }
 }

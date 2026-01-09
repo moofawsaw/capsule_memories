@@ -7,7 +7,7 @@ class EventStoriesViewState extends Equatable {
     this.errorMessage,
   });
 
-  final EventStoriesViewModel? eventStoriesViewModel;
+  final Map<String, dynamic>? eventStoriesViewModel;
   final bool isLoading;
   final String? errorMessage;
 
@@ -19,7 +19,7 @@ class EventStoriesViewState extends Equatable {
       ];
 
   EventStoriesViewState copyWith({
-    EventStoriesViewModel? eventStoriesViewModel,
+    Map<String, dynamic>? eventStoriesViewModel,
     bool? isLoading,
     String? errorMessage,
   }) {

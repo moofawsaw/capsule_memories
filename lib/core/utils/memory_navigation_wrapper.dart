@@ -164,7 +164,8 @@ class MemoryNavigationWrapper {
     // Extract snapshot data from flat or nested structure
     final title = memoryData['title'] as String?;
     final date = memoryData['date'] as String?;
-    final location = memoryData['location'] as String?;
+    final location = (memoryData['location_name'] as String?) ??
+        (memoryData['location'] as String?);
     final categoryIcon = memoryData['category_icon'] as String? ??
         memoryData['categoryIconUrl'] as String?;
     final participantAvatars = _extractAvatarsFromMap(memoryData);

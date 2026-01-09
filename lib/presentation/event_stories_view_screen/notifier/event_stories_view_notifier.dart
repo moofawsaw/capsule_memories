@@ -10,7 +10,14 @@ final eventStoriesViewNotifier = StateNotifierProvider.autoDispose<
     EventStoriesViewNotifier, EventStoriesViewState>(
   (ref) => EventStoriesViewNotifier(
     EventStoriesViewState(
-      eventStoriesViewModel: EventStoriesViewModel(),
+      eventStoriesViewModel: EventStoriesViewModel(
+        eventTitle: '',
+        eventDate: '',
+        eventLocation: '',
+        viewCount: '0',
+        contributorsList: const [],
+        storiesList: const [],
+      ),
     ),
   ),
 );
@@ -65,7 +72,7 @@ class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
           .toList();
 
       state = state.copyWith(
-        eventStoriesViewModel: state.eventStoriesViewModel?.copyWith(
+        eventStoriesViewModel: EventStoriesViewModel(
           eventTitle: memoryData['eventTitle'] ?? '',
           eventDate: memoryData['eventDate'] ?? '',
           eventLocation: memoryData['eventLocation'] ?? '',

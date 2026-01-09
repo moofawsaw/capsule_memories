@@ -1,72 +1,61 @@
 import '../../../core/app_export.dart';
-import './contributor_item_model.dart';
-import './story_item_model.dart';
+import '../../../widgets/custom_story_list.dart';
 
-/// This class is used in the [event_stories_view_screen] screen.
+/// This class is used in the [event_timeline_view_screen] screen.
 
 // ignore_for_file: must_be_immutable
-class EventStoriesViewModel extends Equatable {
-  EventStoriesViewModel({
+class EventTimelineViewModel extends Equatable {
+  EventTimelineViewModel({
     this.eventTitle,
     this.eventDate,
-    this.eventLocation,
-    this.viewCount,
-    this.contributorsList,
-    this.storiesList,
-  }) {
-    eventTitle = eventTitle ?? "Nixon Wedding 2025";
-    eventDate = eventDate ?? "Dec 4, 2025";
-    eventLocation = eventLocation ?? "Tillsonburg, ON";
-    viewCount = viewCount ?? "19";
-    contributorsList = contributorsList ?? [];
-    storiesList = storiesList ?? [];
-  }
+    this.eventLocation, // ✅ add
+    this.isPrivate,
+    this.categoryIcon,
+    this.participantImages,
+    this.customStoryItems,
+    this.memoryId,
+  });
 
   String? eventTitle;
   String? eventDate;
-  String? eventLocation;
-  String? viewCount;
-  List<ContributorItemModel>? contributorsList;
-  List<StoryItemModel>? storiesList;
+  String? eventLocation; // ✅ add
+  bool? isPrivate;
+  String? categoryIcon;
+  List<String>? participantImages;
+  List<CustomStoryItem>? customStoryItems;
+  String? memoryId;
 
-  EventStoriesViewModel copyWith({
+  EventTimelineViewModel copyWith({
     String? eventTitle,
     String? eventDate,
-    String? eventLocation,
-    String? viewCount,
-    List<ContributorItemModel>? contributorsList,
-    List<StoryItemModel>? storiesList,
+    String? eventLocation, // ✅ add
+    bool? isPrivate,
+    String? categoryIcon,
+    List<String>? participantImages,
+    List<CustomStoryItem>? customStoryItems,
+    String? memoryId,
   }) {
-    return EventStoriesViewModel(
+    return EventTimelineViewModel(
       eventTitle: eventTitle ?? this.eventTitle,
       eventDate: eventDate ?? this.eventDate,
-      eventLocation: eventLocation ?? this.eventLocation,
-      viewCount: viewCount ?? this.viewCount,
-      contributorsList: contributorsList ?? this.contributorsList,
-      storiesList: storiesList ?? this.storiesList,
+      eventLocation: eventLocation ?? this.eventLocation, // ✅ add
+      isPrivate: isPrivate ?? this.isPrivate,
+      categoryIcon: categoryIcon ?? this.categoryIcon,
+      participantImages: participantImages ?? this.participantImages,
+      customStoryItems: customStoryItems ?? this.customStoryItems,
+      memoryId: memoryId ?? this.memoryId,
     );
   }
 
   @override
   List<Object?> get props => [
-        eventTitle,
-        eventDate,
-        eventLocation,
-        viewCount,
-        contributorsList,
-        storiesList,
-      ];
-}
-
-/// Model for passing feed context to story viewer
-class FeedStoryContext {
-  final String feedType; // 'happening_now' or 'trending'
-  final List<String> storyIds; // All story IDs in this feed
-  final String initialStoryId; // Which story was clicked
-
-  FeedStoryContext({
-    required this.feedType,
-    required this.storyIds,
-    required this.initialStoryId,
-  });
+    eventTitle,
+    eventDate,
+    eventLocation, // ✅ add
+    isPrivate,
+    categoryIcon,
+    participantImages,
+    customStoryItems,
+    memoryId,
+  ];
 }
