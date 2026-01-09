@@ -14,6 +14,7 @@ class NotificationSettingsModel extends Equatable {
     this.friendRequestsEnabled,
     this.groupInvitesEnabled,
     this.id,
+    this.createdAt,
   }) {
     pushNotificationsEnabled = pushNotificationsEnabled ?? true;
     memoryInvitesEnabled = memoryInvitesEnabled ?? true;
@@ -35,6 +36,7 @@ class NotificationSettingsModel extends Equatable {
   bool? friendRequestsEnabled;
   bool? groupInvitesEnabled;
   String? id;
+  final DateTime? createdAt;
 
   NotificationSettingsModel copyWith({
     bool? pushNotificationsEnabled,
@@ -46,6 +48,7 @@ class NotificationSettingsModel extends Equatable {
     bool? friendRequestsEnabled,
     bool? groupInvitesEnabled,
     String? id,
+    DateTime? createdAt,
   }) {
     return NotificationSettingsModel(
       pushNotificationsEnabled:
@@ -60,6 +63,7 @@ class NotificationSettingsModel extends Equatable {
           friendRequestsEnabled ?? this.friendRequestsEnabled,
       groupInvitesEnabled: groupInvitesEnabled ?? this.groupInvitesEnabled,
       id: id ?? this.id,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 

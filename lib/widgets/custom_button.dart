@@ -11,6 +11,7 @@ import './custom_image_view.dart';
  * @param buttonStyle - The style variant of the button
  * @param buttonTextStyle - Text style configuration for the button text
  * @param isDisabled - Whether the button is disabled
+ * @param isLoading - Whether the button should show a loading spinner and block taps
  * @param alignment - Button alignment within its parent
  * @param leftIcon - Icon to display on the left side of the text
  * @param rightIcon - Icon to display on the right side of the text
@@ -27,6 +28,7 @@ class CustomButton extends StatelessWidget {
     this.buttonStyle,
     this.buttonTextStyle,
     this.isDisabled,
+    this.isLoading, // ✅ NEW
     this.alignment,
     this.leftIcon,
     this.rightIcon,
@@ -54,6 +56,9 @@ class CustomButton extends StatelessWidget {
 
   /// Whether the button is disabled
   final bool? isDisabled;
+
+  /// Whether the button is loading (shows spinner and blocks taps)
+  final bool? isLoading; // ✅ NEW
 
   /// Button alignment within its parent
   final Alignment? alignment;
@@ -84,7 +89,9 @@ class CustomButton extends StatelessWidget {
   Widget _buildButton(BuildContext context) {
     final style = buttonStyle ?? CustomButtonStyle.fillPrimary;
     final textStyle = buttonTextStyle ?? CustomButtonTextStyle.bodyMedium;
-    final disabled = isDisabled ?? false;
+
+    // ✅ loading should also disable taps
+    final disabled = (isDisabled ?? false) || (isLoading ?? false);
 
     switch (style.variant) {
       case CustomButtonVariant.fill:
@@ -181,6 +188,20 @@ class CustomButton extends StatelessWidget {
   }
 
   Widget _buildButtonContent(CustomButtonTextStyle textStyle) {
+    // ✅ NEW: loading state replaces content with a spinner
+    if (isLoading ?? false) {
+      return SizedBox(
+        height: 20.h,
+        width: 20.h,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(
+            textStyle.color ?? appTheme.whiteCustom,
+          ),
+        ),
+      );
+    }
+
     final hasLeftIcon = leftIcon != null && leftIcon!.isNotEmpty;
     final hasRightIcon = rightIcon != null && rightIcon!.isNotEmpty;
     final hasText = text != null && text!.isNotEmpty;

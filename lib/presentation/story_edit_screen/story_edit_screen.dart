@@ -1,7 +1,9 @@
 import 'dart:io';
-
-import 'package:video_player/video_player.dart';
+import 'dart:ui';
+import '../../widgets/custom_button.dart';
 import 'package:intl/intl.dart';
+import 'package:video_player/video_player.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
@@ -29,14 +31,16 @@ class StoryEditScreen extends ConsumerStatefulWidget {
 
 class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   final TextEditingController _captionController = TextEditingController();
+  final FocusNode _captionFocus = FocusNode();
+
   VideoPlayerController? _videoController;
 
-  // Memory details
-  String? _categoryName;
   String? _categoryIconUrl;
   DateTime? _createdAt;
   String? _locationName;
   bool _isLoadingMemoryDetails = true;
+
+  bool _showVideoControls = true;
 
   @override
   void initState() {
@@ -44,9 +48,11 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(storyEditProvider.notifier).initializeScreen(widget.mediaPath);
       _fetchMemoryDetails();
-      if (widget.isVideo) {
-        _initializeVideoPlayer();
-      }
+      if (widget.isVideo) _initializeVideoPlayer();
+    });
+
+    _captionController.addListener(() {
+      if (mounted) setState(() {});
     });
   }
 
@@ -55,29 +61,30 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
       setState(() => _isLoadingMemoryDetails = true);
 
       final client = SupabaseService.instance.client;
-      if (client == null) {
-        print('❌ Supabase client not initialized');
-        setState(() => _isLoadingMemoryDetails = false);
-        return;
-      }
+      if (client == null) return;
 
       final response = await client
           .from('memories')
           .select(
-              'title, created_at, location_name, category_id, memory_categories(name, icon_url)')
+          'created_at, location_name, memory_categories(icon_url)')
           .eq('id', widget.memoryId)
           .single();
 
-      final categoryData = response['memory_categories'];
+      final rawCategory = response['memory_categories'];
+
+      Map<String, dynamic>? category;
+      if (rawCategory is Map) {
+        category = Map<String, dynamic>.from(rawCategory);
+      }
+
       setState(() {
-        _categoryName = categoryData?['name'];
-        _categoryIconUrl = categoryData?['icon_url'];
-        _createdAt = DateTime.parse(response['created_at']);
-        _locationName = response['location_name'];
+        _categoryIconUrl = category?['icon_url']?.toString();
+        _createdAt =
+            DateTime.tryParse(response['created_at']?.toString() ?? '');
+        _locationName = response['location_name']?.toString();
         _isLoadingMemoryDetails = false;
       });
-        } catch (e) {
-      print('❌ Error fetching memory details: $e');
+    } catch (_) {
       setState(() => _isLoadingMemoryDetails = false);
     }
   }
@@ -93,9 +100,13 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   @override
   void dispose() {
     _captionController.dispose();
+    _captionFocus.dispose();
     _videoController?.dispose();
     super.dispose();
   }
+
+  String get _safeMemoryName =>
+      widget.memoryTitle.trim().isEmpty ? 'Memory' : widget.memoryTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -103,178 +114,283 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
 
     return SafeArea(
       child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
+        backgroundColor: Colors.black,
         body: state.isLoading
             ? Center(
-                child: CircularProgressIndicator(
-                  color: appTheme.deep_purple_A100,
-                ),
-              )
+          child: CircularProgressIndicator(
+              color: appTheme.deep_purple_A100),
+        )
             : Stack(
-                children: [
-                  // Video/Image Preview (full screen)
-                  _buildMediaPreview(),
-
-                  // Memory Details Header (top)
-                  _buildMemoryDetailsHeader(),
-
-                  // Share to Memory Button (bottom)
-                  _buildShareButton(context, state),
-                ],
-              ),
+          children: [
+            _buildMediaPreview(),
+            _buildTopOverlay(),
+            _buildBottomOverlay(state),
+          ],
+        ),
       ),
     );
   }
 
-  /// Memory details header showing name, category, creation date, and location
-  Widget _buildMemoryDetailsHeader() {
-    if (_isLoadingMemoryDetails) {
-      return Positioned(
-        top: 16.h,
-        left: 16.w,
-        right: 16.w,
-        child: Container(
-          padding: EdgeInsets.all(2.w),
-          decoration: BoxDecoration(
-            color: Colors.black.withAlpha(179),
-            borderRadius: BorderRadius.circular(12.0),
-          ),
-          child: Center(
+  Widget _buildMediaPreview() {
+    return Positioned.fill(
+      child: widget.isVideo && _videoController != null
+          ? _buildVideo()
+          : Image.file(
+        File(widget.mediaPath),
+        fit: BoxFit.cover,
+      ),
+    );
+  }
+
+  Widget _buildVideo() {
+    final vc = _videoController!;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Positioned.fill(
+          child: FittedBox(
+            fit: BoxFit.cover,
             child: SizedBox(
-              height: 20.sp,
-              width: 20.sp,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(appTheme.deep_purple_A100),
+              width: vc.value.size.width,
+              height: vc.value.size.height,
+              child: VideoPlayer(vc),
+            ),
+          ),
+        ),
+        AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: _showVideoControls ? 1 : 0,
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                vc.value.isPlaying ? vc.pause() : vc.play();
+                _showVideoControls = !vc.value.isPlaying;
+              });
+            },
+            child: Container(
+              width: 62.sp,
+              height: 62.sp,
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(130),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                vc.value.isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 38.sp,
               ),
             ),
           ),
         ),
-      );
-    }
+      ],
+    );
+  }
 
+  /// TOP OVERLAY
+  Widget _buildTopOverlay() {
     return Positioned(
-      top: 16.h,
-      left: 16.w,
-      right: 16.w,
+      top: 0,
+      left: 0,
+      right: 0,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+        padding:
+        EdgeInsets.only(left: 12.w, right: 12.w, top: 10.h, bottom: 12.h),
         decoration: BoxDecoration(
-          color: Colors.black.withAlpha(179),
-          borderRadius: BorderRadius.circular(12.0),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withAlpha(220),
+              Colors.black.withAlpha(120),
+              Colors.transparent,
+            ],
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
-            // Memory title
-            Text(
-              widget.memoryTitle,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18.sp,
-                fontWeight: FontWeight.bold,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                _roundIcon(Icons.close_rounded,
+                        () => Navigator.of(context).maybePop()),
+                Expanded(
+                  child: Text(
+                    'Post Story',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _roundIcon(Icons.refresh_rounded,
+                        () => Navigator.of(context).maybePop()),
+              ],
             ),
-            SizedBox(height: 1.h),
+            SizedBox(height: 12.h),
+            _isLoadingMemoryDetails
+                ? const SizedBox()
+                : _memoryMetaCard(),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // Category with icon
-            if (_categoryName != null)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_categoryIconUrl != null)
-                    Padding(
-                      padding: EdgeInsets.only(right: 1.w),
-                      child: Image.network(
-                        _categoryIconUrl!,
-                        width: 20.sp,
-                        height: 20.sp,
-                        errorBuilder: (context, error, stackTrace) => Icon(
-                          Icons.category,
-                          size: 20.sp,
-                          color: appTheme.deep_purple_A100,
-                        ),
-                      ),
-                    ),
-                  Flexible(
-                    child: Text(
-                      _categoryName!,
+  Widget _memoryMetaCard() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: EdgeInsets.all(12.w),
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(18),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              _buildCategoryIcon(),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _safeMemoryName,
                       style: TextStyle(
-                        color: appTheme.deep_purple_A100,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                      ),
+                          color: Colors.white,
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.w700),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
-              ),
-
-            SizedBox(height: 1.h),
-
-            // Creation date and location
-            Row(
-              children: [
-                // Creation date
-                if (_createdAt != null) ...[
-                  Icon(
-                    Icons.calendar_today,
-                    size: 14.sp,
-                    color: Colors.white70,
-                  ),
-                  SizedBox(width: 1.w),
-                  Text(
-                    DateFormat('MMM d, yyyy').format(_createdAt!),
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12.sp,
-                    ),
-                  ),
-                ],
-
-                // Separator
-                if (_createdAt != null && _locationName != null) ...[
-                  SizedBox(width: 2.w),
-                  Container(
-                    width: 1,
-                    height: 12.sp,
-                    color: Colors.white70,
-                  ),
-                  SizedBox(width: 2.w),
-                ],
-
-                // Location
-                if (_locationName != null)
-                  Flexible(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    SizedBox(height: 6.h),
+                    Row(
                       children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 14.sp,
-                          color: Colors.white70,
-                        ),
-                        SizedBox(width: 1.w),
-                        Flexible(
-                          child: Text(
-                            _locationName!,
+                        if (_createdAt != null)
+                          Text(
+                            DateFormat('MMM d, yyyy').format(_createdAt!),
                             style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12.sp,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                                color: Colors.white70, fontSize: 13.sp),
                           ),
-                        ),
+                        if (_locationName != null) ...[
+                          SizedBox(width: 10.w),
+                          Expanded(
+                            child: Text(
+                              _locationName!,
+                              style: TextStyle(
+                                  color: Colors.white70, fontSize: 13.sp),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-              ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 🔥 SVG-AWARE CATEGORY ICON
+  Widget _buildCategoryIcon() {
+    final url = _categoryIconUrl?.trim() ?? '';
+    if (url.isEmpty) {
+      return Icon(Icons.category_rounded,
+          size: 22.sp, color: Colors.white54);
+    }
+
+    final isSvg = url.toLowerCase().endsWith('.svg');
+
+    return isSvg
+        ? SvgPicture.network(
+      url,
+      width: 22.sp,
+      height: 22.sp,
+      placeholderBuilder: (_) => SizedBox(
+        width: 22.sp,
+        height: 22.sp,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor:
+          AlwaysStoppedAnimation<Color>(Colors.white70),
+        ),
+      ),
+    )
+        : Image.network(
+      url,
+      width: 22.sp,
+      height: 22.sp,
+      errorBuilder: (_, __, ___) => Icon(Icons.category_rounded,
+          size: 22.sp, color: Colors.white70),
+    );
+  }
+
+  Widget _roundIcon(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40.sp,
+        height: 40.sp,
+        decoration: BoxDecoration(
+          color: Colors.black.withAlpha(120),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white),
+      ),
+    );
+  }
+
+  /// BOTTOM OVERLAY
+  Widget _buildBottomOverlay(StoryEditState state) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              Colors.black.withAlpha(240),
+              Colors.black.withAlpha(140),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Share to $_safeMemoryName',
+                onPressed: state.isUploading ? null : () => _onShareStory(context),
+                isDisabled: state.isUploading,
+                isLoading: state.isUploading, // 🔥 loading spinner
+                buttonStyle: CustomButtonStyle.fillPrimary,
+                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+              ),
+            ),
+
+            SizedBox(height: 8.h),
+
+            Text(
+              'Your story will be added to the timeline for $_safeMemoryName.',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 12.sp,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -282,141 +398,16 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
     );
   }
 
-  /// Media preview showing the captured video/photo
-  Widget _buildMediaPreview() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black,
-        child: Center(
-          child: widget.isVideo && _videoController != null
-              ? _videoController!.value.isInitialized
-                  ? AspectRatio(
-                      aspectRatio: _videoController!.value.aspectRatio,
-                      child: VideoPlayer(_videoController!),
-                    )
-                  : CircularProgressIndicator(
-                      color: appTheme.deep_purple_A100,
-                    )
-              : Image.file(
-                  File(widget.mediaPath),
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
-                ),
-        ),
-      ),
-    );
-  }
 
-  /// Share to Memory button positioned at bottom
-  Widget _buildShareButton(BuildContext context, StoryEditState state) {
-    return Positioned(
-      left: 16.w,
-      right: 16.w,
-      bottom: 24.h,
-      child: IgnorePointer(
-        ignoring: state.isUploading,
-        child: ElevatedButton(
-          onPressed: state.isUploading ? null : () => _onShareStory(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: state.isUploading
-                ? appTheme.deep_purple_A100.withAlpha(128)
-                : appTheme.deep_purple_A100,
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(vertical: 2.h),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12.0),
-            ),
-            elevation: 4,
-          ),
-          child: state.isUploading
-              ? SizedBox(
-                  height: 20.sp,
-                  width: 20.sp,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Text(
-                  'Share to Memory',
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
 
-  /// Handle text overlay addition
-  void _onTextTap() {
-    // TODO: Implement text overlay UI
-    print('🎨 Text tool tapped');
-  }
-
-  /// Handle sticker addition
-  void _onStickersTap() {
-    // TODO: Implement sticker picker UI
-    print('🎨 Stickers tool tapped');
-  }
-
-  /// Handle drawing tool
-  void _onDrawTap() {
-    // TODO: Implement drawing canvas UI
-    print('🎨 Draw tool tapped');
-  }
-
-  /// Handle music/audio selection
-  void _onMusicTap() {
-    // TODO: Implement music picker UI
-    print('🎨 Music tool tapped');
-  }
-
-  /// Share story to memory
   Future<void> _onShareStory(BuildContext context) async {
     final notifier = ref.read(storyEditProvider.notifier);
-
-    try {
-      final success = await notifier.uploadAndShareStory(
-        memoryId: widget.memoryId,
-        mediaPath: widget.mediaPath,
-        isVideo: widget.isVideo,
-        caption: _captionController.text,
-      );
-
-      if (success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Story shared successfully!'),
-              backgroundColor: appTheme.deep_purple_A100,
-            ),
-          );
-          // Pop back to feed screen
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to share story. Please try again.'),
-              backgroundColor: appTheme.red_500,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      print('❌ Error sharing story: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An error occurred while sharing story'),
-            backgroundColor: appTheme.red_500,
-          ),
-        );
-      }
-    }
+    await notifier.uploadAndShareStory(
+      memoryId: widget.memoryId,
+      mediaPath: widget.mediaPath,
+      isVideo: widget.isVideo,
+      caption: _captionController.text.trim(),
+    );
+    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
   }
 }

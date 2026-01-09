@@ -9,7 +9,7 @@ part 'memory_feed_dashboard_state.dart';
 
 final memoryFeedDashboardProvider = StateNotifierProvider.autoDispose<
     MemoryFeedDashboardNotifier, MemoryFeedDashboardState>(
-  (ref) => MemoryFeedDashboardNotifier(),
+      (ref) => MemoryFeedDashboardNotifier(),
 );
 
 /// A notifier that manages the state of the MemoryFeedDashboard screen.
@@ -28,13 +28,86 @@ class MemoryFeedDashboardNotifier
 
   MemoryFeedDashboardNotifier()
       : super(MemoryFeedDashboardState(
-          memoryFeedDashboardModel: MemoryFeedDashboardModel(),
-        )) {
+    memoryFeedDashboardModel: MemoryFeedDashboardModel(),
+  )) {
     loadInitialData();
     // NEW: Subscribe to real-time story view updates
     _subscribeToStoryViews();
     // CRITICAL FIX: Enable real-time subscriptions for new stories
     _setupRealtimeSubscriptions();
+  }
+
+  /// Normalize a visibility value into 'public' | 'private' | ''
+  String _normVisibility(dynamic v) {
+    return (v ?? '').toString().trim().toLowerCase();
+  }
+
+  /// CRITICAL FIX: Ensure activeMemories includes `visibility`.
+  /// If FeedService didn't include it, we fetch visibilities from `memories` table and merge.
+  Future<List<Map<String, dynamic>>> _hydrateActiveMemoriesWithVisibility(
+      dynamic activeMemoriesData,
+      ) async {
+    final client = SupabaseService.instance.client;
+    if (client == null) return const [];
+
+    // Convert to List<Map<String, dynamic>>
+    final List<Map<String, dynamic>> list = (activeMemoriesData as List<dynamic>?)
+        ?.map((e) => (e as Map).cast<String, dynamic>())
+        .toList() ??
+        <Map<String, dynamic>>[];
+
+    if (list.isEmpty) return list;
+
+    // Extract memory ids (your maps might use `id` or `memory_id`)
+    final ids = <String>[];
+    for (final m in list) {
+      final id = (m['id'] ?? m['memory_id'])?.toString();
+      if (id != null && id.isNotEmpty) ids.add(id);
+    }
+
+    if (ids.isEmpty) return list;
+
+    // Fetch visibility for those memory ids
+    try {
+      final visRows = await client
+          .from('memories')
+          .select('id, visibility')
+          .inFilter('id', ids);
+
+      final visMap = <String, String>{};
+      for (final row in (visRows as List<dynamic>)) {
+        final r = (row as Map).cast<String, dynamic>();
+        final id = r['id']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        visMap[id] = _normVisibility(r['visibility']);
+      }
+
+      // Merge into original maps (do NOT overwrite if FeedService already set it)
+      final merged = list.map((m) {
+        final id = (m['id'] ?? m['memory_id'])?.toString() ?? '';
+        final existing = _normVisibility(m['visibility']);
+        final hydrated = existing.isNotEmpty ? existing : (visMap[id] ?? '');
+        return <String, dynamic>{
+          ...m,
+          'visibility': hydrated,
+        };
+      }).toList();
+
+      // Debug: log first few
+      if (merged.isNotEmpty) {
+        for (int i = 0; i < merged.length && i < 3; i++) {
+          final mm = merged[i];
+          print(
+              '✅ ACTIVE MEMORY VIS HYDRATE: title="${mm['title']}" id="${mm['id'] ?? mm['memory_id']}" visibility="${mm['visibility']}"');
+        }
+      }
+
+      return merged;
+    } catch (e) {
+      print('❌ HYDRATE VISIBILITY FAILED: $e');
+      // return original list if hydration fails
+      return list;
+    }
   }
 
   /// Load initial data from the database
@@ -45,7 +118,11 @@ class MemoryFeedDashboardNotifier
 
     try {
       // Fetch active memories for the current user
-      final activeMemoriesData = await _feedService.fetchUserActiveMemories();
+      final rawActiveMemoriesData = await _feedService.fetchUserActiveMemories();
+
+      // ✅ CRITICAL FIX: hydrate visibility so the bottom sheet can display it
+      final activeMemoriesData =
+      await _hydrateActiveMemoriesWithVisibility(rawActiveMemoriesData);
 
       // 📊 DEBUG: Log fetch start
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -92,7 +169,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: categoryIcon,
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // Use actual read status from database
         );
       }).toList();
@@ -126,35 +203,35 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
 
       final publicMemories = publicMemoriesData
           .map((item) => CustomMemoryItem(
-                id: item['id'],
-                title: item['title'],
-                date: item['date'],
-                iconPath: item['category_icon'] ?? '',
-                profileImages:
-                    (item['contributor_avatars'] as List?)?.cast<String>() ??
-                        [],
-                mediaItems: (item['media_items'] as List?)
-                        ?.map((media) => CustomMediaItem(
-                              imagePath: media['thumbnail_url'] ?? '',
-                              hasPlayButton: media['video_url'] != null,
-                            ))
-                        .toList() ??
-                    [],
-                startDate: item['start_date'],
-                startTime: item['start_time'],
-                endDate: item['end_date'],
-                endTime: item['end_time'],
-                location: item['location'],
-                distance: '',
-                isLiked: false,
-              ))
+        id: item['id'],
+        title: item['title'],
+        date: item['date'],
+        iconPath: item['category_icon'] ?? '',
+        profileImages:
+        (item['contributor_avatars'] as List?)?.cast<String>() ??
+            [],
+        mediaItems: (item['media_items'] as List?)
+            ?.map((media) => CustomMediaItem(
+          imagePath: media['thumbnail_url'] ?? '',
+          hasPlayButton: media['video_url'] != null,
+        ))
+            .toList() ??
+            [],
+        startDate: item['start_date'],
+        startTime: item['start_time'],
+        endDate: item['end_date'],
+        endTime: item['end_time'],
+        location: item['location'],
+        distance: '',
+        isLiked: false,
+      ))
           .toList();
 
       // Transform trending stories - NOW INCLUDING categoryIcon
@@ -170,7 +247,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
@@ -188,7 +265,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
@@ -206,7 +283,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
@@ -221,7 +298,7 @@ class MemoryFeedDashboardNotifier
         publicMemories: publicMemories.isNotEmpty ? publicMemories : null,
         trendingStories: trendingStories.cast<HappeningNowStoryData>(),
         longestStreakStories:
-            longestStreakStories.cast<HappeningNowStoryData>(),
+        longestStreakStories.cast<HappeningNowStoryData>(),
         popularUserStories: popularUserStories.cast<HappeningNowStoryData>(),
       );
 
@@ -328,9 +405,9 @@ class MemoryFeedDashboardNotifier
     // CRITICAL FIX: Update story in ALL lists where it appears
     // Helper function to update story in a list
     List<HappeningNowStoryData>? updateListIfPresent(
-      List<HappeningNowStoryData>? stories,
-      String listName,
-    ) {
+        List<HappeningNowStoryData>? stories,
+        String listName,
+        ) {
       if (stories == null || stories.isEmpty) return null;
 
       bool foundInList = false;
@@ -396,8 +473,8 @@ class MemoryFeedDashboardNotifier
       trendingStories: updatedTrending?.cast<HappeningNowStoryData>() ??
           currentModel.trendingStories,
       longestStreakStories:
-          updatedLongestStreak?.cast<HappeningNowStoryData>() ??
-              currentModel.longestStreakStories,
+      updatedLongestStreak?.cast<HappeningNowStoryData>() ??
+          currentModel.longestStreakStories,
       popularUserStories: updatedPopularUsers?.cast<HappeningNowStoryData>() ??
           currentModel.popularUserStories,
     );
@@ -433,34 +510,34 @@ class MemoryFeedDashboardNotifier
       _storiesChannel = client
           .channel('public:stories')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'stories',
-            callback: _handleNewStory,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'stories',
+        callback: _handleNewStory,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'stories',
-            callback: _handleStoryUpdate,
-          )
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'stories',
+        callback: _handleStoryUpdate,
+      )
           .subscribe();
 
       // Subscribe to memory updates
       _memoriesChannel = client
           .channel('public:memories')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleNewMemory,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleNewMemory,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleMemoryUpdate,
-          )
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleMemoryUpdate,
+      )
           .subscribe();
 
       print('✅ REALTIME: Subscriptions setup complete');
@@ -490,7 +567,7 @@ class MemoryFeedDashboardNotifier
       final storyId = payload.newRecord['id'] as String;
       final contributorId = payload.newRecord['contributor_id'] as String;
       final memoryId =
-          payload.newRecord['memory_id'] as String; // CRITICAL: Get memory ID
+      payload.newRecord['memory_id'] as String; // CRITICAL: Get memory ID
       final rawThumbnailUrl = payload.newRecord['thumbnail_url'] as String?;
       final videoUrl = payload.newRecord['video_url'] as String?;
       final client = SupabaseService.instance.client;
@@ -499,7 +576,7 @@ class MemoryFeedDashboardNotifier
 
       // CRITICAL FIX: Resolve media URLs BEFORE creating story object
       final resolvedThumbnailUrl =
-          StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
+      StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
 
       print('🔍 REALTIME: Raw thumbnail URL: $rawThumbnailUrl');
       print('🔍 REALTIME: Resolved thumbnail URL: $resolvedThumbnailUrl');
@@ -540,10 +617,10 @@ class MemoryFeedDashboardNotifier
         profileImage: resolvedAvatarUrl ?? '', // ✅ RESOLVED URL
         userName: profileResponse['display_name'] as String? ?? 'Unknown User',
         categoryName: memoryResponse['memories']['memory_categories']['name']
-                as String? ??
+        as String? ??
             '',
         categoryIcon: memoryResponse['memories']['memory_categories']
-                ['icon_url'] as String? ??
+        ['icon_url'] as String? ??
             '',
         timestamp: 'Just now',
         isRead: false,
@@ -583,7 +660,7 @@ class MemoryFeedDashboardNotifier
 
         // Add new media item at the beginning (most recent first)
         final updatedMediaItems =
-            [newMediaItem, ...currentMediaItems].take(2).toList();
+        [newMediaItem, ...currentMediaItems].take(2).toList();
 
         // Create updated memory with new media items
         final updatedMemory = targetMemory.copyWith(
@@ -710,9 +787,9 @@ class MemoryFeedDashboardNotifier
             .toList(),
         mediaItems: stories
             .map((s) => CustomMediaItem(
-                  imagePath: s['thumbnail_url'] ?? '',
-                  hasPlayButton: s['video_url'] != null,
-                ))
+          imagePath: s['thumbnail_url'] ?? '',
+          hasPlayButton: s['video_url'] != null,
+        ))
             .toList(),
         startDate: response['start_time'],
         startTime: response['start_time'],
@@ -776,10 +853,10 @@ class MemoryFeedDashboardNotifier
 
   /// Helper to update story in a list
   List<HappeningNowStoryData>? _updateStoryInList(
-    List<HappeningNowStoryData>? stories,
-    String storyId,
-    Map<String, dynamic> newRecord,
-  ) {
+      List<HappeningNowStoryData>? stories,
+      String storyId,
+      Map<String, dynamic> newRecord,
+      ) {
     if (stories == null) return null;
 
     bool found = false;
@@ -788,7 +865,7 @@ class MemoryFeedDashboardNotifier
         found = true;
         return story.copyWith(
           backgroundImage:
-              newRecord['thumbnail_url'] as String? ?? story.backgroundImage,
+          newRecord['thumbnail_url'] as String? ?? story.backgroundImage,
         );
       }
       return story;
@@ -844,7 +921,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
@@ -902,7 +979,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
@@ -944,28 +1021,28 @@ class MemoryFeedDashboardNotifier
 
       final newMemories = newData
           .map((item) => CustomMemoryItem(
-                id: item['id'],
-                title: item['title'],
-                date: item['date'],
-                iconPath: item['category_icon'] ?? '',
-                profileImages:
-                    (item['contributor_avatars'] as List?)?.cast<String>() ??
-                        [],
-                mediaItems: (item['media_items'] as List?)
-                        ?.map((media) => CustomMediaItem(
-                              imagePath: media['thumbnail_url'] ?? '',
-                              hasPlayButton: media['video_url'] != null,
-                            ))
-                        .toList() ??
-                    [],
-                startDate: item['start_date'],
-                startTime: item['start_time'],
-                endDate: item['end_date'],
-                endTime: item['end_time'],
-                location: item['location'],
-                distance: '',
-                isLiked: false,
-              ))
+        id: item['id'],
+        title: item['title'],
+        date: item['date'],
+        iconPath: item['category_icon'] ?? '',
+        profileImages:
+        (item['contributor_avatars'] as List?)?.cast<String>() ??
+            [],
+        mediaItems: (item['media_items'] as List?)
+            ?.map((media) => CustomMediaItem(
+          imagePath: media['thumbnail_url'] ?? '',
+          hasPlayButton: media['video_url'] != null,
+        ))
+            .toList() ??
+            [],
+        startDate: item['start_date'],
+        startTime: item['start_time'],
+        endDate: item['end_date'],
+        endTime: item['end_time'],
+        location: item['location'],
+        distance: '',
+        isLiked: false,
+      ))
           .toList();
 
       final currentMemories =
@@ -1016,7 +1093,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
@@ -1070,7 +1147,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
@@ -1124,7 +1201,7 @@ class MemoryFeedDashboardNotifier
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
           timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead, // FIXED: Use actual read status from database
         );
       }).toList();
@@ -1168,28 +1245,28 @@ class MemoryFeedDashboardNotifier
 
       final newMemories = newData
           .map((item) => CustomMemoryItem(
-                id: item['id'],
-                title: item['title'],
-                date: item['date'],
-                iconPath: item['category_icon'] ?? '',
-                profileImages:
-                    (item['contributor_avatars'] as List?)?.cast<String>() ??
-                        [],
-                mediaItems: (item['media_items'] as List?)
-                        ?.map((media) => CustomMediaItem(
-                              imagePath: media['thumbnail_url'] ?? '',
-                              hasPlayButton: media['video_url'] != null,
-                            ))
-                        .toList() ??
-                    [],
-                startDate: item['start_date'],
-                startTime: item['start_time'],
-                endDate: item['end_date'],
-                endTime: item['end_time'],
-                location: item['location'],
-                distance: '',
-                isLiked: false,
-              ))
+        id: item['id'],
+        title: item['title'],
+        date: item['date'],
+        iconPath: item['category_icon'] ?? '',
+        profileImages:
+        (item['contributor_avatars'] as List?)?.cast<String>() ??
+            [],
+        mediaItems: (item['media_items'] as List?)
+            ?.map((media) => CustomMediaItem(
+          imagePath: media['thumbnail_url'] ?? '',
+          hasPlayButton: media['video_url'] != null,
+        ))
+            .toList() ??
+            [],
+        startDate: item['start_date'],
+        startTime: item['start_time'],
+        endDate: item['end_date'],
+        endTime: item['end_time'],
+        location: item['location'],
+        distance: '',
+        isLiked: false,
+      ))
           .toList();
 
       final currentMemories =

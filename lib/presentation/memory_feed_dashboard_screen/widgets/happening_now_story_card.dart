@@ -46,8 +46,12 @@ class HappeningNowStoryCard extends StatelessWidget {
           child: Stack(
             children: [
               // Background image filling the entire card
+              // CRITICAL FIX: Use ValueKey to preserve CustomImageView animation state across rebuilds
+              // This prevents thumbnail animation from retriggering when story viewer closes
               Positioned.fill(
                 child: CustomImageView(
+                  key: ValueKey(story
+                      .backgroundImage), // Preserve state for this specific URL
                   imagePath: story.backgroundImage ?? '',
                   fit: BoxFit.cover,
                 ),

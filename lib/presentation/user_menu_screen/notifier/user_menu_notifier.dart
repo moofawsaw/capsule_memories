@@ -52,10 +52,11 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
         return;
       }
 
-      // Fetch user profile from database
+      // Fetch user profile from database - now includes auth_provider and created_at
       final response = await client
           .from('user_profiles')
-          .select('username, email, display_name, avatar_url, bio')
+          .select(
+              'username, email, display_name, avatar_url, bio, auth_provider, created_at')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -70,9 +71,11 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
             userName: response['display_name'] ?? response['username'] ?? '',
             userEmail: response['email'] ?? '',
             avatarImagePath: cleanAvatarUrl,
-            bio: response['bio'],
-            userId: user.id,
             isDarkModeEnabled: state.userMenuModel?.isDarkModeEnabled ?? true,
+            authProvider: response['auth_provider'] as String?,
+            createdAt: response['created_at'] != null
+                ? DateTime.parse(response['created_at'] as String)
+                : null,
           ),
         );
       }
@@ -173,6 +176,33 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
 
   // Refresh user profile data
   Future<void> refreshProfile() async {
-    await _loadUserProfile();
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) return;
+
+      final user = client.auth.currentUser;
+      if (user == null) return;
+
+      final response = await client
+          .from('user_profiles')
+          .select('display_name, email, avatar_url, auth_provider, created_at')
+          .eq('id', user.id)
+          .single();
+
+      state = state.copyWith(
+        userMenuModel: UserMenuModel(
+          userName: response['display_name'] as String?,
+          userEmail: response['email'] as String?,
+          avatarImagePath: response['avatar_url'] as String?,
+          isDarkModeEnabled: state.userMenuModel?.isDarkModeEnabled,
+          authProvider: response['auth_provider'] as String?,
+          createdAt: response['created_at'] != null
+              ? DateTime.parse(response['created_at'] as String)
+              : null,
+        ),
+      );
+        } catch (e) {
+      debugPrint('Error refreshing profile: $e');
+    }
   }
 }

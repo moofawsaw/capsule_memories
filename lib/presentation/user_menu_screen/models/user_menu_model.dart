@@ -1,35 +1,35 @@
 class UserMenuModel {
-  final String userName;
-  final String userEmail;
+  final String? userName;
+  final String? userEmail;
   final String? avatarImagePath;
-  final String? bio;
-  final String? userId;
-  final bool isDarkModeEnabled;
+  final bool? isDarkModeEnabled;
+  final String? authProvider;
+  final DateTime? createdAt;
 
   UserMenuModel({
-    this.userName = '',
-    this.userEmail = '',
+    this.userName,
+    this.userEmail,
     this.avatarImagePath,
-    this.bio,
-    this.userId,
-    this.isDarkModeEnabled = true,
+    this.isDarkModeEnabled,
+    this.authProvider,
+    this.createdAt,
   });
 
   UserMenuModel copyWith({
     String? userName,
     String? userEmail,
     String? avatarImagePath,
-    String? bio,
-    String? userId,
     bool? isDarkModeEnabled,
+    String? authProvider,
+    DateTime? createdAt,
   }) {
     return UserMenuModel(
       userName: userName ?? this.userName,
       userEmail: userEmail ?? this.userEmail,
       avatarImagePath: avatarImagePath ?? this.avatarImagePath,
-      bio: bio ?? this.bio,
-      userId: userId ?? this.userId,
       isDarkModeEnabled: isDarkModeEnabled ?? this.isDarkModeEnabled,
+      authProvider: authProvider ?? this.authProvider,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

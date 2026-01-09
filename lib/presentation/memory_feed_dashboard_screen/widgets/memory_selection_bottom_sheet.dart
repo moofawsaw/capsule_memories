@@ -66,9 +66,8 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
   }
 
   Widget _buildMemoryCard(BuildContext context, Map<String, dynamic> memory) {
-    // Calculate if expiration is less than 3 hours for text color
     bool isExpiringUrgently = false;
-    final expirationText = memory['expiration_text'] ?? '';
+    final expirationText = (memory['expiration_text'] ?? '').toString();
     if (expirationText.isNotEmpty) {
       final regex = RegExp(r'(\d+)\s*(hour|minute)');
       final match = regex.firstMatch(expirationText);
@@ -82,6 +81,10 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
         }
       }
     }
+
+    final rawVis = memory['visibility'];
+    final normVis = (rawVis ?? '').toString().trim().toLowerCase();
+    final isPublic = normVis == 'public';
 
     return GestureDetector(
       onTap: () {
@@ -113,21 +116,30 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
                 height: 32.h,
                 fit: BoxFit.contain,
               ),
-            SizedBox(width: 12.h),
+
+            SizedBox(width: 20.h), // 👈 increased spacing between icon & text
+
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // ── TITLE + VISIBILITY BADGE ───────────────────────────────
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         child: Text(
                           memory['title'] ?? 'Untitled Memory',
-                          style: TextStyleHelper
-                              .instance.title16BoldPlusJakartaSans
-                              .copyWith(color: appTheme.gray_50),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: TextStyleHelper
+                              .instance
+                              .title16BoldPlusJakartaSans
+                              .copyWith(
+                            fontSize: 17, // slightly larger
+                            fontWeight: FontWeight.w600,
+                            color: appTheme.gray_50,
+                          ),
                         ),
                       ),
                       SizedBox(width: 8.h),
@@ -138,8 +150,8 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
                         ),
                         decoration: BoxDecoration(
                           color: memory['visibility'] == 'public'
-                              ? appTheme.green_500.withAlpha(26)
-                              : appTheme.pink_200.withAlpha(26),
+                              ? appTheme.green_500.withOpacity(0.15)
+                              : appTheme.blue_gray_300.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12.h),
                         ),
                         child: Row(
@@ -152,7 +164,7 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
                               size: 14.h,
                               color: memory['visibility'] == 'public'
                                   ? appTheme.green_500
-                                  : Colors.pinkAccent,
+                                  : appTheme.blue_gray_300,
                             ),
                             SizedBox(width: 4.h),
                             Text(
@@ -160,11 +172,12 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
                                   ? 'Public'
                                   : 'Private',
                               style: TextStyleHelper
-                                  .instance.body12MediumPlusJakartaSans
+                                  .instance
+                                  .body12MediumPlusJakartaSans
                                   .copyWith(
                                 color: memory['visibility'] == 'public'
                                     ? appTheme.green_500
-                                    : Colors.pinkAccent,
+                                    : appTheme.blue_gray_300,
                               ),
                             ),
                           ],
@@ -172,20 +185,31 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    'created at: ${memory['created_date'] ?? 'Unknown'}',
-                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300.withAlpha(179)),
-                  ),
-                  SizedBox(height: 2.h),
+
+                  SizedBox(height: 6.h),
+
+                  // ── METADATA ───────────────────────────────────────────────
                   Text(
                     memory['expiration_text'] ?? 'No expiration',
-                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    style: TextStyleHelper
+                        .instance
+                        .body12MediumPlusJakartaSans
                         .copyWith(
+                      fontSize: 12,
                       color: isExpiringUrgently
                           ? appTheme.deep_orange_A700
-                          : appTheme.blue_gray_300.withAlpha(179),
+                          : appTheme.blue_gray_300.withOpacity(0.85),
+                    ),
+                  ),
+
+                  SizedBox(height: 2.h),
+
+                  Text(
+                    'created ${memory['created_date'] ?? 'Unknown'}'
+                        '${(memory['creator_name'] != null && memory['creator_name'].toString().isNotEmpty) ? ' by ${memory['creator_name']}' : ''}',
+                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
+                      fontSize: 11.h,
+                      color: appTheme.blue_gray_300.withAlpha(179),
                     ),
                   ),
                 ],
@@ -196,4 +220,5 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
       ),
     );
   }
+
 }

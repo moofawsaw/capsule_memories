@@ -104,8 +104,7 @@ class _MemoriesDashboardScreenState
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 height: 38.h,
-                padding:
-                EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+                padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
               ),
             ],
           ),
@@ -138,30 +137,30 @@ class _MemoriesDashboardScreenState
             height: 140.h,
             child: isLoading || items.isEmpty
                 ? ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.only(left: 20.h),
-              itemCount: 3,
-              itemBuilder: (_, __) => Container(
-                width: 120.h,
-                margin: EdgeInsets.only(right: 10.h),
-                child: CustomStorySkeleton(isCompact: true),
-              ),
-            )
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.only(left: 20.h),
+                    itemCount: 3,
+                    itemBuilder: (_, __) => Container(
+                      width: 120.h,
+                      margin: EdgeInsets.only(right: 10.h),
+                      child: CustomStorySkeleton(isCompact: true),
+                    ),
+                  )
                 : CustomStoryList(
-              storyItems: items
-                  .map(
-                    (e) => CustomStoryItem(
-                  backgroundImage: e.backgroundImage ?? '',
-                  profileImage: e.profileImage ?? '',
-                  timestamp: e.timestamp ?? '',
-                  navigateTo: e.navigateTo,
-                  storyId: e.id,
-                  isRead: e.isRead ?? false,
-                ),
-              )
-                  .toList(),
-              onStoryTap: (i) => _onStoryTap(context, i),
-            ),
+                    storyItems: items
+                        .map(
+                          (e) => CustomStoryItem(
+                            backgroundImage: e.backgroundImage ?? '',
+                            profileImage: e.profileImage ?? '',
+                            timestamp: e.timestamp ?? '',
+                            navigateTo: e.navigateTo,
+                            storyId: e.id,
+                            isRead: e.isRead ?? false,
+                          ),
+                        )
+                        .toList(),
+                    onStoryTap: (i) => _onStoryTap(context, i),
+                  ),
           ),
         ],
       );
@@ -175,55 +174,26 @@ class _MemoriesDashboardScreenState
       final state = ref.watch(memoriesDashboardNotifier);
       final notifier = ref.read(memoriesDashboardNotifier.notifier);
 
-      final ownership = state.selectedOwnership ?? 'created';
-      final filter = state.selectedState ?? 'all';
+      final ownership = state.selectedOwnership ?? 'all';
 
       return Container(
         margin: EdgeInsets.fromLTRB(16.h, 14.h, 16.h, 0),
-        child: Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: EdgeInsets.all(3.h),
-                decoration: BoxDecoration(
-                  color: appTheme.gray_900_02.withAlpha(128),
-                  borderRadius: BorderRadius.circular(22.h),
-                ),
-                child: Row(
-                  children: [
-                    _tab('Created', ownership == 'created',
-                            () => notifier.updateOwnershipFilter('created')),
-                    _tab('Joined', ownership == 'joined',
-                            () => notifier.updateOwnershipFilter('joined')),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(width: 10.h),
-            GestureDetector(
-              onTap: () => _showStateDropdown(context),
-              child: Container(
-                padding:
-                EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
-                decoration: BoxDecoration(
-                  color: appTheme.gray_900_02.withAlpha(128),
-                  borderRadius: BorderRadius.circular(22.h),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      _getStateLabel(filter),
-                      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                          .copyWith(color: appTheme.gray_50),
-                    ),
-                    SizedBox(width: 6.h),
-                    Icon(Icons.keyboard_arrow_down,
-                        size: 16.h, color: appTheme.gray_50),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        child: Container(
+          padding: EdgeInsets.all(3.h),
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02.withAlpha(128),
+            borderRadius: BorderRadius.circular(22.h),
+          ),
+          child: Row(
+            children: [
+              _tab('All', ownership == 'all',
+                  () => notifier.updateOwnershipFilter('all')),
+              _tab('Created', ownership == 'created',
+                  () => notifier.updateOwnershipFilter('created')),
+              _tab('Joined', ownership == 'joined',
+                  () => notifier.updateOwnershipFilter('joined')),
+            ],
+          ),
         ),
       );
     });
@@ -244,9 +214,9 @@ class _MemoriesDashboardScreenState
             textAlign: TextAlign.center,
             style: active
                 ? TextStyleHelper.instance.body14BoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_900_02)
+                    .copyWith(color: appTheme.gray_900_02)
                 : TextStyleHelper.instance.body14RegularPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
+                    .copyWith(color: appTheme.gray_50),
           ),
         ),
       ),
@@ -300,9 +270,9 @@ class _MemoriesDashboardScreenState
               ],
               onMemoryTap: (_) =>
                   MemoryNavigationWrapper.navigateFromMemoryItem(
-                    context: context,
-                    memoryItem: m,
-                  ),
+                context: context,
+                memoryItem: m,
+              ),
             );
           }).toList(),
         ),
@@ -335,7 +305,20 @@ class _MemoriesDashboardScreenState
     );
   }
 
-  void _onStoryTap(BuildContext context, int index) {}
+  void _onStoryTap(BuildContext context, int index) {
+    final state = ref.read(memoriesDashboardNotifier);
+    final items = state.memoriesDashboardModel?.storyItems ?? [];
+
+    if (index >= 0 && index < items.length) {
+      final story = items[index];
+      if (story.id != null && story.id!.isNotEmpty) {
+        NavigatorService.pushNamed(
+          AppRoutes.appStoryView,
+          arguments: story.id,
+        );
+      }
+    }
+  }
 
   void _showStateDropdown(BuildContext context) {}
 

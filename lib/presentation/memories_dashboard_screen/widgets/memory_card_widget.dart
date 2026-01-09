@@ -411,14 +411,31 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
     }
 
     if (_timelineStories.isEmpty) {
-      // FIXED: Show empty state with view details button instead of text
+      // FIXED: Empty state now shows "Create Story" button and opens story recording screen
       return GestureDetector(
         onTap: () {
+          final memoryId = widget.memoryItem.id;
+          if (memoryId == null || memoryId.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Unable to create story - missing memory ID'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
           print(
-              '🔍 TIMELINE EMPTY STATE TAPPED: Navigating to /timeline for memory ${widget.memoryItem.id}');
-          MemoryNavigationWrapper.navigateFromMemoryItem(
-            context: context,
-            memoryItem: widget.memoryItem,
+              '🎬 CREATE STORY TAPPED: Opening story record screen for memory $memoryId');
+
+          // Navigate to story recording screen with memory ID as argument
+          NavigatorService.pushNamed(
+            AppRoutes.appStoryRecord,
+            arguments: {
+              'memory_id': memoryId,
+              'memory_title': widget.memoryItem.title ?? 'Memory',
+              'category_icon': widget.memoryItem.categoryIconUrl,
+            },
           );
         },
         child: Container(
@@ -432,25 +449,21 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.timeline_outlined,
+                Icons.add_a_photo_outlined,
                 size: 32.h,
-                color: appTheme.blue_gray_300,
+                color: appTheme.deep_purple_A100,
               ),
               SizedBox(height: 8.h),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
                 decoration: BoxDecoration(
-                  color: appTheme.deep_purple_A100.withAlpha(26),
+                  color: appTheme.deep_purple_A100,
                   borderRadius: BorderRadius.circular(20.h),
-                  border: Border.all(
-                    color: appTheme.deep_purple_A100.withAlpha(77),
-                    width: 1.0,
-                  ),
                 ),
                 child: Text(
-                  'View Details',
+                  'Create Story',
                   style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-                      .copyWith(color: appTheme.deep_purple_A100),
+                      .copyWith(color: appTheme.gray_900_02),
                 ),
               ),
             ],

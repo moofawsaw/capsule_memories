@@ -1157,18 +1157,30 @@ class FeedService {
           .toList();
 
       // Fetch active (open) memories that haven't expired
+      //
+      // IMPORTANT:
+      // - We join user_profiles_public on creator_id so this works reliably without RLS surprises.
+      // - If your FK name differs, adjust the join name after the colon:
+      //   user_profiles_public:creator_id(...)
       final response = await _client!
           .from('memories')
           .select('''
             id,
             title,
             state,
+            visibility,
             created_at,
             expires_at,
+            creator_id,
             category_id,
             memory_categories:category_id(
               name,
               icon_url
+            ),
+            user_profiles_public:creator_id(
+              id,
+              display_name,
+              avatar_url
             )
           ''')
           .inFilter('id', memoryIds)
@@ -1178,18 +1190,32 @@ class FeedService {
 
       final activeMemories = (response as List).map((memory) {
         final category = memory['memory_categories'] as Map<String, dynamic>?;
+        final creator =
+        memory['user_profiles_public'] as Map<String, dynamic>?;
+
         final createdAt = DateTime.parse(memory['created_at']);
         final expiresAt = DateTime.parse(memory['expires_at']);
+
+        final creatorName = (creator?['display_name'] as String?)?.trim();
+        final safeCreatorName =
+        (creatorName != null && creatorName.isNotEmpty)
+            ? creatorName
+            : null;
 
         return {
           'id': memory['id'] ?? '',
           'title': memory['title'] ?? 'Untitled Memory',
+          'visibility': memory['visibility'] ?? 'private',
           'category_name': category?['name'] ?? 'Custom',
           'category_icon': category?['icon_url'] ?? '',
           'created_at': memory['created_at'] ?? '',
           'expires_at': memory['expires_at'] ?? '',
           'created_date': _formatDate(createdAt),
           'expiration_text': _formatExpirationTime(expiresAt),
+
+          // NEW:
+          'creator_id': memory['creator_id'],
+          'creator_name': safeCreatorName,
         };
       }).toList();
 

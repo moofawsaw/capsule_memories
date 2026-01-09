@@ -90,13 +90,39 @@ class CustomAccountSettings extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  option.title,
-                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(
-                          color: option.isDanger == true
-                              ? appTheme.red_500
-                              : appTheme.gray_50),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        option.title,
+                        style: TextStyleHelper
+                            .instance.title16BoldPlusJakartaSans
+                            .copyWith(
+                                color: option.isDanger == true
+                                    ? appTheme.red_500
+                                    : appTheme.gray_50),
+                      ),
+                      if (option.subtitle != null) ...[
+                        SizedBox(height: 4.h),
+                        Text(
+                          option.subtitle!,
+                          style: TextStyleHelper
+                              .instance.body14RegularPlusJakartaSans
+                              .copyWith(color: appTheme.blue_gray_300),
+                        ),
+                      ],
+                      if (option.trailingText != null) ...[
+                        SizedBox(height: 4.h),
+                        Text(
+                          option.trailingText!,
+                          style: TextStyleHelper
+                              .instance.body12RegularPlusJakartaSans
+                              .copyWith(color: appTheme.blue_gray_300),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
                 Icon(
                   Icons.chevron_right,
@@ -117,9 +143,13 @@ class CustomAccountOption {
     required this.title,
     required this.onTap,
     this.isDanger = false,
+    this.subtitle,
+    this.trailingText,
   });
 
   final String title;
   final VoidCallback onTap;
   final bool? isDanger;
+  final String? subtitle;
+  final String? trailingText;
 }

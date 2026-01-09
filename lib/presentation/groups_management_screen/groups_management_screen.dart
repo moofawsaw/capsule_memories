@@ -1,10 +1,9 @@
-// lib/presentation/groups_management_screen/groups_management_screen.dart
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_group_card.dart';
 import '../../widgets/custom_group_invitation_card.dart';
-import '../../widgets/custom_icon_button_row.dart';
+import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../create_group_screen/create_group_screen.dart';
 import '../friends_management_screen/widgets/qr_scanner_overlay.dart';
@@ -13,6 +12,8 @@ import '../group_qr_invite_screen/group_qr_invite_screen.dart';
 import './models/groups_management_model.dart';
 import 'notifier/groups_management_notifier.dart';
 
+// lib/presentation/groups_management_screen/groups_management_screen.dart
+
 class GroupsManagementScreen extends ConsumerStatefulWidget {
   const GroupsManagementScreen({Key? key}) : super(key: key);
 
@@ -20,7 +21,8 @@ class GroupsManagementScreen extends ConsumerStatefulWidget {
   GroupsManagementScreenState createState() => GroupsManagementScreenState();
 }
 
-class GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> {
+class GroupsManagementScreenState
+    extends ConsumerState<GroupsManagementScreen> {
   @override
   void initState() {
     super.initState();
@@ -108,13 +110,42 @@ class GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> 
             ),
             Spacer(),
 
-            // Right side actions (QR scan + new group)
-            CustomIconButtonRow(
-              firstIconPath: ImageConstant.imgButtons,
-              secondIcon: Icons.camera_alt,
-              secondIconSize: 24.h,
-              onFirstIconTap: () => onTapNewGroup(context),
-              onSecondIconTap: () => onTapCameraButton(context),
+            // Right side actions (New button + camera icon)
+            Row(
+              children: [
+                // New button with styled design
+                GestureDetector(
+                  onTap: () => onTapNewGroup(context),
+                  child: Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 16.h, vertical: 10.h),
+                    decoration: BoxDecoration(
+                      color: appTheme.deep_purple_A100,
+                      borderRadius: BorderRadius.circular(22.h),
+                    ),
+                    child: Text(
+                      'New',
+                      style: TextStyleHelper
+                          .instance.body14SemiBold
+                          .copyWith(
+                        color: appTheme.gray_50,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8.h),
+                // Camera icon button for QR scanning
+                CustomIconButton(
+                  height: 44.h,
+                  width: 44.h,
+                  icon: Icons.camera_alt,
+                  backgroundColor: appTheme.gray_900_01.withAlpha(179),
+                  borderRadius: 22.h,
+                  iconSize: 24.h,
+                  iconColor: appTheme.gray_50,
+                  onTap: () => onTapCameraButton(context),
+                ),
+              ],
             ),
           ],
         );
@@ -165,7 +196,7 @@ class GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> 
                   groupName: invitation.groupName ?? 'Unknown',
                   memberCount: invitation.memberCount ?? 0,
                   memberAvatarImagePath:
-                  invitation.avatarImage ?? ImageConstant.imgFrame403,
+                      invitation.avatarImage ?? ImageConstant.imgFrame403,
                   onAcceptTap: () => onTapAcceptInvitation(context),
                   onActionTap: () => onTapDeclineInvitation(context),
                 ),
@@ -183,27 +214,38 @@ class GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> 
       builder: (context, ref, _) {
         final state = ref.watch(groupsManagementNotifier);
         final groups = state.groups ?? <GroupModel>[];
-        final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
+        final currentUserId =
+            SupabaseService.instance.client?.auth.currentUser?.id;
 
         if (state.isLoading == true) {
           return Padding(
             padding: EdgeInsets.only(top: 30.h),
             child: Center(
-              child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
+              child:
+                  CircularProgressIndicator(color: appTheme.deep_purple_A100),
             ),
           );
         }
 
         if (groups.isEmpty) {
           return Padding(
-            padding: EdgeInsets.only(top: 20.h),
-            child: Center(
-              child: Text(
-                'No groups yet. Create your first group!',
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
-                textAlign: TextAlign.center,
-              ),
+            padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 40.h),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.group_outlined,
+                  size: 64.h,
+                  color: appTheme.gray_50.withAlpha(128),
+                ),
+                SizedBox(height: 16.h),
+                Text(
+                  'No groups yet. Add friends into reusable groups for when you create your memories!',
+                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           );
         }
@@ -220,7 +262,7 @@ class GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> 
                 groupData: CustomGroupData(
                   title: group.name ?? 'Unnamed Group',
                   memberCountText:
-                  '${group.memberCount ?? 0} member${(group.memberCount ?? 0) == 1 ? '' : 's'}',
+                      '${group.memberCount ?? 0} member${(group.memberCount ?? 0) == 1 ? '' : 's'}',
                   memberImages: group.memberImages?.isNotEmpty == true
                       ? group.memberImages!
                       : [ImageConstant.imgEllipse81],
@@ -228,7 +270,8 @@ class GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> 
                 ),
                 onActionTap: () => onTapGroupQR(context, group),
                 onDeleteTap: () => onTapDeleteGroup(context, group),
-                onEditTap: isCreator ? () => onTapEditGroup(context, group) : null,
+                onEditTap:
+                    isCreator ? () => onTapEditGroup(context, group) : null,
               ),
             );
           }).toList(),
@@ -284,7 +327,8 @@ class GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> 
     final confirmed = await CustomConfirmationDialog.show(
       context: context,
       title: 'Delete Group?',
-      message: 'Are you sure you want to delete "$groupName"? This action cannot be undone.',
+      message:
+          'Are you sure you want to delete "$groupName"? This action cannot be undone.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       icon: Icons.delete_outline,

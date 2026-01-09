@@ -332,33 +332,62 @@ class NotificationSettingsScreenState
 
   /// Section Widget - Account Settings
   Widget _buildAccountSettings(BuildContext context) {
-    return CustomAccountSettings(
-      headerIcon: ImageConstant.imgIcon2,
-      headerTitle: 'Account',
-      accountOptions: [
-        CustomAccountOption(
-          title: 'Linked Accounts',
-          onTap: () {
-            // Navigate to linked accounts screen
-          },
-        ),
-        CustomAccountOption(
-          title: 'Change Email',
-          onTap: () {
-            // Navigate to change email screen
-          },
-        ),
-        CustomAccountOption(
-          title: 'Reset Password',
-          onTap: () => _showResetPasswordWarning(context),
-        ),
-        CustomAccountOption(
-          title: 'Delete Account',
-          isDanger: true,
-          onTap: () => _showDeleteAccountWarning(context),
-        ),
-      ],
+    return Consumer(
+      builder: (context, ref, _) {
+        final userMenuState = ref.watch(userMenuNotifier);
+        final userProfile = userMenuState.userMenuModel;
+
+        // Format creation date
+        final createdAt = userProfile?.createdAt;
+        final formattedDate = createdAt != null
+            ? '${createdAt.day}/${createdAt.month}/${createdAt.year}'
+            : 'N/A';
+
+        return CustomAccountSettings(
+          headerIcon: ImageConstant.imgIcon2,
+          headerTitle: 'Account',
+          accountOptions: [
+            CustomAccountOption(
+              title: 'Linked Accounts',
+              subtitle:
+                  _getAccountTypeLabel(userProfile?.authProvider ?? 'email'),
+              trailingText: 'Created $formattedDate',
+              onTap: () {
+                // Show linked accounts details
+              },
+            ),
+            CustomAccountOption(
+              title: 'Change Email',
+              onTap: () {
+                // Navigate to change email screen
+              },
+            ),
+            CustomAccountOption(
+              title: 'Reset Password',
+              onTap: () => _showResetPasswordWarning(context),
+            ),
+            CustomAccountOption(
+              title: 'Delete Account',
+              isDanger: true,
+              onTap: () => _showDeleteAccountWarning(context),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  /// Get account type label with appropriate icon/badge
+  String _getAccountTypeLabel(String authProvider) {
+    switch (authProvider.toLowerCase()) {
+      case 'google':
+        return '🔵 Google Account';
+      case 'facebook':
+        return '📘 Facebook Account';
+      case 'email':
+      default:
+        return '📧 Email Account';
+    }
   }
 
   /// Section Widget - Blocked Users

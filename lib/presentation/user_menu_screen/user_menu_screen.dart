@@ -21,24 +21,26 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Background overlay - tapping dismisses menu
-        GestureDetector(
-          onTap: () => onTapCloseButton(context),
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: Colors.black.withAlpha(128),
+        // ✅ FIX: Make the overlay explicitly fill the screen so taps always register.
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () => onTapCloseButton(context),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              color: Colors.black.withAlpha(128),
+            ),
           ),
         ),
+
         // Menu content - prevent tap propagation
-        GestureDetector(
-          onTap: () {}, // Absorb taps on menu to prevent dismissal
-          child: Material(
-            color: Colors.transparent,
-            child: SafeArea(
-              child: Align(
-                alignment: Alignment.centerLeft,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: GestureDetector(
+            onTap: () {}, // Absorb taps on menu to prevent dismissal
+            behavior: HitTestBehavior.opaque,
+            child: Material(
+              color: Colors.transparent,
+              child: SafeArea(
                 child: Container(
                   width: 310.h,
                   height: double.infinity,
@@ -92,8 +94,8 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
       final avatarUrl = (avatarState.avatarUrl?.isNotEmpty ?? false)
           ? avatarState.avatarUrl
           : (userModel?.avatarImagePath?.isNotEmpty ?? false)
-              ? userModel?.avatarImagePath
-              : null;
+          ? userModel?.avatarImagePath
+          : null;
 
       // Generate avatar letter from email if no avatar URL
       final email = userModel?.userEmail ?? '';
@@ -103,106 +105,114 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
       final showLetterAvatar = avatarUrl == null || avatarUrl.isEmpty;
 
       return Padding(
-          padding: EdgeInsets.only(top: 2.h),
-          child: Row(children: [
+        padding: EdgeInsets.only(top: 2.h),
+        child: Row(
+          children: [
             Expanded(
-                flex: 7,
-                child: GestureDetector(
-                  onTap: () => _handleAvatarTap(context, ref),
-                  child: Row(
-                    children: [
-                      // Avatar - show letter or image with loading indicator
-                      Stack(
-                        children: [
+              flex: 7,
+              child: GestureDetector(
+                onTap: () => _handleAvatarTap(context, ref),
+                child: Row(
+                  children: [
+                    // Avatar - show letter or image with loading indicator
+                    Stack(
+                      children: [
+                        Container(
+                          width: 52.h,
+                          height: 52.h,
+                          decoration: BoxDecoration(
+                            color: showLetterAvatar
+                                ? appTheme.deep_purple_A100
+                                : null,
+                            shape: BoxShape.circle,
+                            image: !showLetterAvatar
+                                ? DecorationImage(
+                              image: NetworkImage(avatarUrl),
+                              fit: BoxFit.cover,
+                            )
+                                : null,
+                          ),
+                          child: showLetterAvatar
+                              ? Center(
+                            child: Text(
+                              avatarLetter,
+                              style: TextStyle(
+                                color: appTheme.white_A700,
+                                fontSize: 24.h,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )
+                              : null,
+                        ),
+                        // Loading overlay
+                        if (avatarState.isLoading)
                           Container(
                             width: 52.h,
                             height: 52.h,
                             decoration: BoxDecoration(
-                              color: showLetterAvatar
-                                  ? appTheme.deep_purple_A100
-                                  : null,
+                              color: Colors.black.withAlpha(128),
                               shape: BoxShape.circle,
-                              image: !showLetterAvatar
-                                  ? DecorationImage(
-                                      image: NetworkImage(avatarUrl),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
                             ),
-                            child: showLetterAvatar
-                                ? Center(
-                                    child: Text(
-                                      avatarLetter,
-                                      style: TextStyle(
-                                        color: appTheme.white_A700,
-                                        fontSize: 24.h,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          // Loading overlay
-                          if (avatarState.isLoading)
-                            Container(
-                              width: 52.h,
-                              height: 52.h,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withAlpha(128),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: SizedBox(
-                                  width: 24.h,
-                                  height: 24.h,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      appTheme.white_A700,
-                                    ),
+                            child: Center(
+                              child: SizedBox(
+                                width: 24.h,
+                                height: 24.h,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    appTheme.white_A700,
                                   ),
                                 ),
                               ),
                             ),
+                          ),
+                      ],
+                    ),
+                    SizedBox(width: 12.h),
+                    // User info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userModel?.userName ?? 'User',
+                            style: TextStyle(
+                              color: appTheme.white_A700,
+                              fontSize: 16.h,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            userModel?.userEmail ?? '',
+                            style: TextStyle(
+                              color: appTheme.gray_50,
+                              fontSize: 14.h,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
                       ),
-                      SizedBox(width: 12.h),
-                      // User info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              userModel?.userName ?? 'User',
-                              style: TextStyle(
-                                color: appTheme.white_A700,
-                                fontSize: 16.h,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            SizedBox(height: 4.h),
-                            Text(
-                              userModel?.userEmail ?? '',
-                              style: TextStyle(
-                                color: appTheme.gray_50,
-                                fontSize: 14.h,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             GestureDetector(
-                onTap: () => onTapCloseButton(context),
-                child: Icon(Icons.close,
-                    size: 26, color: Theme.of(context).colorScheme.onSurface)),
-          ]));
+              onTap: () => onTapCloseButton(context),
+              child: Icon(
+                Icons.close,
+                size: 26,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      );
     });
   }
 
@@ -249,7 +259,7 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
 
       // Get signed URL for display
       final signedUrl =
-          await UserProfileService.instance.getAvatarUrl(storagePath);
+      await UserProfileService.instance.getAvatarUrl(storagePath);
 
       if (signedUrl != null) {
         // Update global avatar state - this will refresh all widgets showing the avatar
@@ -263,7 +273,9 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
     } catch (e) {
       debugPrint('❌ Error updating avatar: $e');
       _showErrorSnackbar(
-          context, 'An error occurred while updating profile picture');
+        context,
+        'An error occurred while updating profile picture',
+      );
     }
   }
 
@@ -291,73 +303,91 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   Widget _buildNavigationMenu(BuildContext context) {
     final navigationItems = <CustomNavigationDrawerItem>[
       CustomNavigationDrawerItem(
-          icon: Icons.person_outline,
-          label: 'Profile',
-          onTap: () => onTapProfile(context)),
+        icon: Icons.person_outline,
+        label: 'Profile',
+        onTap: () => onTapProfile(context),
+      ),
       CustomNavigationDrawerItem(
-          icon: Icons.photo_outlined,
-          label: 'Memories',
-          onTap: () => onTapMemories(context)),
+        icon: Icons.photo_outlined,
+        label: 'Memories',
+        onTap: () => onTapMemories(context),
+      ),
       CustomNavigationDrawerItem(
-          icon: Icons.group_outlined,
-          label: 'Groups',
-          onTap: () => onTapGroups(context)),
+        icon: Icons.group_outlined,
+        label: 'Groups',
+        onTap: () => onTapGroups(context),
+      ),
       CustomNavigationDrawerItem(
-          icon: Icons.people_outline,
-          label: 'Friends',
-          onTap: () => onTapFriends(context)),
+        icon: Icons.people_outline,
+        label: 'Friends',
+        onTap: () => onTapFriends(context),
+      ),
       CustomNavigationDrawerItem(
-          icon: Icons.favorite_border,
-          label: 'Following',
-          onTap: () => onTapFollowing(context)),
+        icon: Icons.favorite_border,
+        label: 'Following',
+        onTap: () => onTapFollowing(context),
+      ),
       CustomNavigationDrawerItem(
-          icon: Icons.settings_outlined,
-          label: 'Settings',
-          onTap: () => onTapSettings(context)),
+        icon: Icons.settings_outlined,
+        label: 'Settings',
+        onTap: () => onTapSettings(context),
+      ),
     ];
 
     return CustomNavigationDrawer(
-        menuItems: navigationItems, margin: EdgeInsets.only(left: 12.h));
+      menuItems: navigationItems,
+      margin: EdgeInsets.only(left: 12.h),
+    );
   }
 
   /// Divider line
   Widget _buildDivider(BuildContext context) {
-    return Container(width: 304.h, height: 1.h, color: appTheme.color41C124);
+    return Container(
+      width: 304.h,
+      height: 1.h,
+      color: appTheme.color41C124,
+    );
   }
 
   /// Action buttons section
   Widget _buildActionButtons(BuildContext context) {
     return Padding(
-        padding: EdgeInsets.symmetric(horizontal: 12.h),
-        child: Column(children: [
+      padding: EdgeInsets.symmetric(horizontal: 12.h),
+      child: Column(
+        children: [
           CustomButton(
-              width: double.infinity,
-              height: 56.h,
-              text: 'Share the App',
-              leftIcon: ImageConstant.imgIconWhiteA70020x20,
-              onPressed: () => onTapShareApp(context),
-              buttonStyle: CustomButtonStyle.fillPrimary,
-              buttonTextStyle: CustomButtonTextStyle.bodyMedium),
+            width: double.infinity,
+            height: 56.h,
+            text: 'Share the App',
+            leftIcon: ImageConstant.imgIconWhiteA70020x20,
+            onPressed: () => onTapShareApp(context),
+            buttonStyle: CustomButtonStyle.fillPrimary,
+            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+          ),
           SizedBox(height: 8.h),
           CustomButton(
-              width: double.infinity,
-              height: 56.h,
-              text: 'Suggest a Feature',
-              leftIcon: ImageConstant.imgIconDeepPurpleA10020x20,
-              onPressed: () => onTapSuggestFeature(context),
-              buttonStyle: CustomButtonStyle.outlineDark,
-              buttonTextStyle: CustomButtonTextStyle.bodyMediumPrimary),
-        ]));
+            width: double.infinity,
+            height: 56.h,
+            text: 'Suggest a Feature',
+            leftIcon: ImageConstant.imgIconDeepPurpleA10020x20,
+            onPressed: () => onTapSuggestFeature(context),
+            buttonStyle: CustomButtonStyle.outlineDark,
+            buttonTextStyle: CustomButtonTextStyle.bodyMediumPrimary,
+          ),
+        ],
+      ),
+    );
   }
 
   /// Sign out section
   Widget _buildSignOutSection(BuildContext context) {
     return CustomMenuItem(
-        icon: Icons.logout_outlined,
-        title: 'Sign Out',
-        iconColor: Color(0xFFEF4444),
-        onTap: () => onTapSignOut(context),
-        margin: EdgeInsets.only(right: 8.h, left: 8.h));
+      icon: Icons.logout_outlined,
+      title: 'Sign Out',
+      iconColor: const Color(0xFFEF4444),
+      onTap: () => onTapSignOut(context),
+      margin: EdgeInsets.only(right: 8.h, left: 8.h),
+    );
   }
 
   /// Navigates to user profile screen

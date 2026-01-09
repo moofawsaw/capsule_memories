@@ -78,6 +78,8 @@ class _CustomImageViewState extends State<CustomImageView>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   String? _previousImagePath;
+  bool _hasAnimationCompleted =
+      false; // Track if animation finished for current URL
 
   @override
   void initState() {
@@ -97,12 +99,20 @@ class _CustomImageViewState extends State<CustomImageView>
       ),
     );
 
+    // Listen for animation completion to prevent retriggering on rebuilds
+    _animationController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _hasAnimationCompleted = true;
+      }
+    });
+
     // Only animate if this is a network image (avatar images are network images)
     if (_isNetworkImage(widget.imagePath)) {
       _animationController.forward();
     } else {
       // For non-network images, skip animation
       _animationController.value = 1.0;
+      _hasAnimationCompleted = true;
     }
   }
 
@@ -110,16 +120,30 @@ class _CustomImageViewState extends State<CustomImageView>
   void didUpdateWidget(CustomImageView oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Check if the image path ACTUALLY changed
-    if (_hasImagePathChanged(oldWidget.imagePath, widget.imagePath)) {
+    // Check if the image path ACTUALLY changed (not just widget rebuilt)
+    final bool urlChanged =
+        _hasImagePathChanged(oldWidget.imagePath, widget.imagePath);
+
+    if (urlChanged) {
+      // URL genuinely changed - reset animation state
       _previousImagePath = widget.imagePath;
+      _hasAnimationCompleted = false;
 
       // Only animate network images (avatars)
       if (_isNetworkImage(widget.imagePath)) {
         _animationController.reset();
         _animationController.forward();
+      } else {
+        _animationController.value = 1.0;
+        _hasAnimationCompleted = true;
+      }
+    } else if (!_hasAnimationCompleted && _isNetworkImage(widget.imagePath)) {
+      // Same URL but animation was interrupted - continue/restart animation
+      if (_animationController.status == AnimationStatus.dismissed) {
+        _animationController.forward();
       }
     }
+    // If URL is same and animation completed, do nothing (prevents retrigger on rebuild)
   }
 
   @override
@@ -134,7 +158,8 @@ class _CustomImageViewState extends State<CustomImageView>
     if (oldPath == null && newPath == null) return false;
     if (oldPath == null || newPath == null) return true;
 
-    // Compare paths - only return true if they're different
+    // CRITICAL: String comparison to detect actual URL changes
+    // This prevents animation retrigger when widget rebuilds with same URL
     return oldPath != newPath;
   }
 
