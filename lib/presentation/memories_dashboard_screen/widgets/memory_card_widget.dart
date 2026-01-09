@@ -135,8 +135,7 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
       onTap: widget.onTap,
       child: Container(
         width: 300.h,
-        height: 280
-            .h, // FIXED HEIGHT: Ensures all cards are same height regardless of text wrapping
+        height: 300.h, // UPDATED: Increased from 280.h to 300.h for state badge
         decoration: BoxDecoration(
           color: appTheme.gray_900_01,
           borderRadius: BorderRadius.circular(20.h),
@@ -160,8 +159,7 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
         currentUserId == widget.memoryItem.creatorId;
 
     return Container(
-      height: 88
-          .h, // FIXED HEIGHT: Accommodates text wrapping without expanding card
+      height: 110.h, // UPDATED: Increased height to accommodate state badge row
       padding: EdgeInsets.all(18.h),
       decoration: BoxDecoration(
         color: appTheme.color3BD81E,
@@ -170,82 +168,125 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
           topRight: Radius.circular(20.h),
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          // Use actual category icon if available, otherwise use fallback
-          CustomIconButton(
-            iconPath: widget.memoryItem.categoryIconUrl != null &&
-                    widget.memoryItem.categoryIconUrl!.isNotEmpty
-                ? widget.memoryItem.categoryIconUrl!
-                : ImageConstant.imgFrame13Red600,
-            backgroundColor: appTheme.color41C124,
-            borderRadius: 18.h,
-            height: 36.h,
-            width: 36.h,
-            padding: EdgeInsets.all(6.h),
-            iconSize: 24.h,
-          ),
-          SizedBox(width: 12.h),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _handleTitleTap(context),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    widget.memoryItem.title ?? 'Nixon Wedding 2025',
-                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    widget.memoryItem.date ?? 'Dec 4, 2025',
-                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans,
-                  ),
-                ],
+          // Title and controls row
+          Row(
+            children: [
+              // Use actual category icon if available, otherwise use fallback
+              CustomIconButton(
+                iconPath: widget.memoryItem.categoryIconUrl != null &&
+                        widget.memoryItem.categoryIconUrl!.isNotEmpty
+                    ? widget.memoryItem.categoryIconUrl!
+                    : ImageConstant.imgFrame13Red600,
+                backgroundColor: appTheme.color41C124,
+                borderRadius: 18.h,
+                height: 36.h,
+                width: 36.h,
+                padding: EdgeInsets.all(6.h),
+                iconSize: 24.h,
               ),
-            ),
-          ),
-          SizedBox(width: 8.h),
-          // Participant avatars section - using exact feed pattern
-          _buildParticipantAvatarsStack(),
-          // EDIT ICON - only show for memories created by current user
-          if (isCreator) ...[
-            SizedBox(width: 8.h),
-            Builder(
-              builder: (context) => GestureDetector(
-                onTap: () => _handleEditTap(context),
-                child: Container(
-                  padding: EdgeInsets.all(8.h),
-                  child: Icon(
-                    Icons.edit_outlined,
-                    size: 20.h,
-                    color: appTheme.gray_50,
+              SizedBox(width: 12.h),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _handleTitleTap(context),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.memoryItem.title ?? 'Nixon Wedding 2025',
+                        style: TextStyleHelper
+                            .instance.title16BoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        widget.memoryItem.date ?? 'Dec 4, 2025',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans,
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          ],
-          if (widget.onDelete != null) ...[
-            SizedBox(width: 8.h),
-            Builder(
-              builder: (context) => GestureDetector(
-                onTap: () => _handleDeleteTap(context),
-                child: Container(
-                  padding: EdgeInsets.all(8.h),
-                  child: Icon(
-                    Icons.delete_outline,
-                    size: 20.h,
-                    color: appTheme.gray_50,
+              SizedBox(width: 8.h),
+              // EDIT ICON - only show for memories created by current user
+              if (isCreator) ...[
+                Builder(
+                  builder: (context) => GestureDetector(
+                    onTap: () => _handleEditTap(context),
+                    child: Container(
+                      padding: EdgeInsets.all(8.h),
+                      child: Icon(
+                        Icons.edit_outlined,
+                        size: 20.h,
+                        color: appTheme.gray_50,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
+              ],
+              if (widget.onDelete != null) ...[
+                SizedBox(width: 8.h),
+                Builder(
+                  builder: (context) => GestureDetector(
+                    onTap: () => _handleDeleteTap(context),
+                    child: Container(
+                      padding: EdgeInsets.all(8.h),
+                      child: Icon(
+                        Icons.delete_outline,
+                        size: 20.h,
+                        color: appTheme.gray_50,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          SizedBox(height: 8.h),
+          // Members and state badge row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Participant avatars on the left
+              _buildParticipantAvatarsStack(),
+              // State badge on the right
+              _buildStateBadge(),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  /// Build state badge showing SEALED or OPEN
+  Widget _buildStateBadge() {
+    // Determine if memory is sealed
+    final isSealed = widget.memoryItem.isSealed ?? false;
+    final state = widget.memoryItem.state?.toUpperCase() ??
+        (isSealed ? 'SEALED' : 'OPEN');
+
+    // Color based on state
+    final badgeColor = isSealed
+        ? appTheme.red_500.withAlpha(204) // Red for sealed
+        : appTheme.green_500.withAlpha(204); // Green for open
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: badgeColor,
+        borderRadius: BorderRadius.circular(12.h),
+      ),
+      child: Text(
+        state,
+        style: TextStyleHelper.instance.body12BoldPlusJakartaSans.copyWith(
+          color: appTheme.gray_50,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }

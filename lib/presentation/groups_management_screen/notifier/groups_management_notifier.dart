@@ -233,6 +233,30 @@ class GroupsManagementNotifier extends StateNotifier<GroupsManagementState> {
     }
   }
 
+  Future<void> leaveGroup(String groupId) async {
+    try {
+      final success = await GroupsService.leaveGroup(groupId);
+
+      if (success) {
+        final updatedGroups =
+            state.groups?.where((g) => g.id != groupId).toList() ?? [];
+        state = state.copyWith(
+          groups: updatedGroups,
+          message: 'Left group successfully',
+        );
+      } else {
+        state = state.copyWith(
+          message: 'Failed to leave group',
+        );
+      }
+    } catch (e) {
+      print('Error leaving group: $e');
+      state = state.copyWith(
+        message: 'Error leaving group',
+      );
+    }
+  }
+
   void acceptInvitation() {
     final updatedInvitations = state.invitations
             ?.where((invite) => invite.groupName != 'Gang')

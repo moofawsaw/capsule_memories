@@ -8,6 +8,7 @@ class CustomGroupCard extends StatelessWidget {
     required this.groupData,
     this.onActionTap,
     this.onDeleteTap,
+    this.onLeaveTap,
     this.onEditTap,
     this.backgroundColor,
     this.borderRadius,
@@ -21,8 +22,11 @@ class CustomGroupCard extends StatelessWidget {
   /// Callback for the primary action button
   final VoidCallback? onActionTap;
 
-  /// Callback for the delete/remove action button
+  /// Callback for the delete action button (creators only)
   final VoidCallback? onDeleteTap;
+
+  /// Callback for the leave action button (non-creators only)
+  final VoidCallback? onLeaveTap;
 
   /// Callback for the edit action button (for creators)
   final VoidCallback? onEditTap;
@@ -207,14 +211,24 @@ class CustomGroupCard extends StatelessWidget {
           ),
         ),
         SizedBox(width: 19.h),
-        GestureDetector(
-          onTap: onDeleteTap,
-          child: CustomImageView(
-            imagePath: ImageConstant.imgIconRed50026x26,
-            height: 26.h,
-            width: 26.h,
+        if (groupData.isCreator == true)
+          GestureDetector(
+            onTap: onDeleteTap,
+            child: CustomImageView(
+              imagePath: ImageConstant.imgIconRed50026x26,
+              height: 26.h,
+              width: 26.h,
+            ),
+          )
+        else
+          GestureDetector(
+            onTap: onLeaveTap,
+            child: Icon(
+              Icons.logout,
+              size: 26.h,
+              color: appTheme.gray_50,
+            ),
           ),
-        ),
       ],
     );
   }

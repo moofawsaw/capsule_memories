@@ -125,9 +125,7 @@ class GroupsManagementScreenState
                     ),
                     child: Text(
                       'New',
-                      style: TextStyleHelper
-                          .instance.body14SemiBold
-                          .copyWith(
+                      style: TextStyleHelper.instance.body14SemiBold.copyWith(
                         color: appTheme.gray_50,
                       ),
                     ),
@@ -269,7 +267,10 @@ class GroupsManagementScreenState
                   isCreator: isCreator,
                 ),
                 onActionTap: () => onTapGroupQR(context, group),
-                onDeleteTap: () => onTapDeleteGroup(context, group),
+                onDeleteTap:
+                    isCreator ? () => onTapDeleteGroup(context, group) : null,
+                onLeaveTap:
+                    !isCreator ? () => onTapLeaveGroup(context, group) : null,
                 onEditTap:
                     isCreator ? () => onTapEditGroup(context, group) : null,
               ),
@@ -335,8 +336,26 @@ class GroupsManagementScreenState
     );
 
     if (confirmed == true) {
-      // If your notifier expects name, keep name. If it expects id, swap to id.
       ref.read(groupsManagementNotifier.notifier).deleteGroup(groupName);
+    }
+  }
+
+  /// Leave group confirmation + leave
+  void onTapLeaveGroup(BuildContext context, GroupModel group) async {
+    final groupName = group.name ?? 'this group';
+
+    final confirmed = await CustomConfirmationDialog.show(
+      context: context,
+      title: 'Leave Group?',
+      message:
+          'Are you sure you want to leave "$groupName"? You can rejoin if invited again.',
+      confirmText: 'Leave',
+      cancelText: 'Cancel',
+      icon: Icons.logout,
+    );
+
+    if (confirmed == true && group.id != null) {
+      ref.read(groupsManagementNotifier.notifier).leaveGroup(group.id!);
     }
   }
 

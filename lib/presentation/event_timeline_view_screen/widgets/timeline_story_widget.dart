@@ -1,5 +1,3 @@
-import 'package:Capsule/theme/custom_button_style.dart';
-
 import '../../../core/app_export.dart';
 
 /// Data model for timeline story items
@@ -90,7 +88,7 @@ class TimelineStoryWidget extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
+            color: Colors.black.withAlpha(102),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -114,14 +112,14 @@ class TimelineStoryWidget extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             // Play icon overlay (for videos)
             if (item.isVideo)
               Center(
                 child: Container(
                   padding: EdgeInsets.all(8.h),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
+                    color: Colors.black.withAlpha(128),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -143,10 +141,11 @@ class TimelineStoryWidget extends StatelessWidget {
       height: 40.h,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFFA186F0),
+        // Solid primary purple color instead of gradient
+        color: const Color(0xFF8B5CF6),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF8B5CF6).withOpacity(0.4),
+            color: const Color(0xFF8B5CF6).withAlpha(102),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
