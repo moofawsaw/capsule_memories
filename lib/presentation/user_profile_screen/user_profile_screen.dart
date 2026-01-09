@@ -1,7 +1,7 @@
 import '../../core/app_export.dart';
+import '../../services/avatar_state_service.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_profile_display.dart';
 import '../../widgets/custom_stat_card.dart';
 import '../user_menu_screen/user_menu_screen.dart';
 import './widgets/story_grid_item.dart';
@@ -97,34 +97,97 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
   /// Profile Header Widget
   Widget _buildProfileHeader(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 10.h),
-      child: Row(
-        children: [
-          CustomImageView(
-            imagePath: ImageConstant.imgIcon32x32,
-            height: 32.h,
-            width: 32.h,
-          ),
-          Expanded(
-            child: Container(
-              margin: EdgeInsets.only(left: 32.h),
-              child: CustomProfileDisplay(
-                imagePath: ImageConstant.imgEllipse864x64,
-                name: 'Lucy Ball',
-                imageSize: 64.h,
-                textStyle:
-                    TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans,
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(userProfileNotifier);
+        final avatarState = ref.watch(avatarStateProvider);
+
+        // Use global avatar state if available, otherwise fallback to local state
+        final avatarUrl = (avatarState.avatarUrl?.isNotEmpty ?? false)
+            ? avatarState.avatarUrl
+            : (state.userProfileModel?.profileImage?.isNotEmpty ?? false)
+                ? state.userProfileModel?.profileImage
+                : null;
+
+        // Generate avatar letter from display name or email
+        final displayName = state.userProfileModel?.userName ?? '';
+        final email = avatarState.userEmail ?? '';
+        final avatarLetter = displayName.isNotEmpty
+            ? displayName[0].toUpperCase()
+            : (email.isNotEmpty ? email[0].toUpperCase() : 'U');
+
+        // Determine if we should show letter avatar (no valid URL)
+        final showLetterAvatar = avatarUrl == null || avatarUrl.isEmpty;
+
+        return Container(
+          margin: EdgeInsets.symmetric(horizontal: 10.h),
+          child: Row(
+            children: [
+              CustomImageView(
+                imagePath: ImageConstant.imgIcon32x32,
+                height: 32.h,
+                width: 32.h,
               ),
-            ),
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(left: 32.h),
+                  child: Row(
+                    children: [
+                      // Avatar - show letter or image (handles both storage paths and Google OAuth URLs)
+                      Container(
+                        width: 64.h,
+                        height: 64.h,
+                        decoration: BoxDecoration(
+                          color: showLetterAvatar
+                              ? appTheme.deep_purple_A100
+                              : null,
+                          shape: BoxShape.circle,
+                          image: !showLetterAvatar
+                              ? DecorationImage(
+                                  image: NetworkImage(avatarUrl),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                        ),
+                        child: showLetterAvatar
+                            ? Center(
+                                child: Text(
+                                  avatarLetter,
+                                  style: TextStyleHelper
+                                      .instance.title20ExtraBoldPlusJakartaSans
+                                      .copyWith(
+                                    color: appTheme.white_A700,
+                                    fontSize: 28.h,
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
+                      SizedBox(width: 12.h),
+                      // User name
+                      Expanded(
+                        child: Text(
+                          displayName.isNotEmpty ? displayName : 'User',
+                          style: TextStyleHelper
+                              .instance.title20ExtraBoldPlusJakartaSans
+                              .copyWith(color: appTheme.white_A700),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              CustomImageView(
+                imagePath: ImageConstant.imgIcon6,
+                height: 32.h,
+                width: 32.h,
+              ),
+            ],
           ),
-          CustomImageView(
-            imagePath: ImageConstant.imgIcon6,
-            height: 32.h,
-            width: 32.h,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

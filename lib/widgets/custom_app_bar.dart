@@ -361,45 +361,57 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
 
   /// Build user avatar widget with real data from global state
   /// Automatically refreshes when avatar changes anywhere in the app
+  /// 🎯 Uses same logic as user_menu_screen.dart - handles both storage paths and Google OAuth URLs
   Widget _buildUserAvatar(AvatarState avatarState) {
+    // Use global avatar state if available, otherwise fallback to local state
+    final avatarUrl = (avatarState.avatarUrl?.isNotEmpty ?? false)
+        ? avatarState.avatarUrl
+        : null;
+
+    // Generate avatar letter from email if no avatar URL
+    final email = avatarState.userEmail ?? '';
+    final avatarLetter = email.isNotEmpty ? email[0].toUpperCase() : 'U';
+
+    // Determine if we should show letter avatar (no valid URL)
+    final showLetterAvatar = avatarUrl == null || avatarUrl.isEmpty;
+
     return Container(
       width: 50.h,
       height: 50.h,
       decoration: BoxDecoration(
-        color: appTheme.deep_purple_A100,
+        color: showLetterAvatar ? appTheme.deep_purple_A100 : null,
         shape: BoxShape.circle,
+        image: !showLetterAvatar
+            ? DecorationImage(
+                image: NetworkImage(avatarUrl),
+                fit: BoxFit.cover,
+              )
+            : null,
       ),
-      child: avatarState.isLoading
+      child: showLetterAvatar
           ? Center(
-              child: SizedBox(
-                width: 20.h,
-                height: 20.h,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.h,
-                  valueColor: AlwaysStoppedAnimation<Color>(appTheme.gray_50),
+              child: Text(
+                avatarLetter,
+                style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                    .copyWith(
+                  color: appTheme.gray_50,
+                  fontSize: 20.h,
                 ),
               ),
             )
-          : avatarState.avatarUrl != null && avatarState.avatarUrl!.isNotEmpty
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(25.h),
-                  child: CustomImageView(
-                    imagePath: avatarState.avatarUrl!,
-                    width: 50.h,
-                    height: 50.h,
-                    fit: BoxFit.cover,
-                  ),
-                )
-              : Center(
-                  child: Text(
-                    _getAvatarFallbackText(avatarState.userEmail),
-                    style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-                        .copyWith(
-                      color: appTheme.gray_50,
-                      fontSize: 20.h,
+          : avatarState.isLoading
+              ? Center(
+                  child: SizedBox(
+                    width: 20.h,
+                    height: 20.h,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.h,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(appTheme.gray_50),
                     ),
                   ),
-                ),
+                )
+              : null,
     );
   }
 

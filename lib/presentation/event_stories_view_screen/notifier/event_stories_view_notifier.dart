@@ -72,14 +72,6 @@ class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
           .toList();
 
       state = state.copyWith(
-        eventStoriesViewModel: EventStoriesViewModel(
-          eventTitle: memoryData['eventTitle'] ?? '',
-          eventDate: memoryData['eventDate'] ?? '',
-          eventLocation: memoryData['eventLocation'] ?? '',
-          viewCount: memoryData['viewCount'] ?? '0',
-          contributorsList: contributorsList,
-          storiesList: storiesList,
-        ),
         isLoading: false,
       );
     } catch (e) {
