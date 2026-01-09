@@ -1,4 +1,5 @@
 import '../../core/app_export.dart';
+import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_button_skeleton.dart';
@@ -10,7 +11,6 @@ import '../../widgets/custom_story_skeleton.dart';
 import '../../widgets/custom_timeline_header_skeleton.dart';
 import '../../widgets/custom_timeline_widget_skeleton.dart';
 import '../../widgets/timeline_widget.dart';
-import '../event_stories_view_screen/models/event_stories_view_model.dart';
 import '../memory_details_screen/memory_details_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import '../qr_timeline_share_screen/qr_timeline_share_screen.dart';
@@ -205,7 +205,8 @@ class EventTimelineViewScreenState
         return CustomEventCard(
           eventTitle: state.eventTimelineViewModel?.eventTitle,
           eventDate: state.eventTimelineViewModel?.eventDate,
-          eventLocation: state.eventTimelineViewModel?.timelineDetail?.centerLocation,
+          eventLocation:
+              state.eventTimelineViewModel?.timelineDetail?.centerLocation,
           isPrivate: state.eventTimelineViewModel?.isPrivate,
           iconButtonImagePath: state.eventTimelineViewModel?.categoryIcon ??
               ImageConstant.imgFrame13,
