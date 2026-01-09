@@ -183,15 +183,11 @@ class EventTimelineViewScreenState
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
-                // Header skeleton or actual content
-                isLoading
-                    ? CustomTimelineHeaderSkeleton()
-                    : _buildEventHeader(context),
+                // Header section with its own skeleton
+                _buildEventHeader(context),
 
-                // Timeline section skeleton or actual content
-                isLoading
-                    ? CustomTimelineWidgetSkeleton()
-                    : _buildTimelineSection(context),
+                // Timeline section with its own skeleton
+                _buildTimelineSection(context),
 
                 // Stories section with skeleton
                 _buildStoriesSection(context),
@@ -226,6 +222,12 @@ class EventTimelineViewScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
+        final isLoading = state.isLoading ?? false;
+
+        // Show skeleton during loading
+        if (isLoading) {
+          return CustomTimelineHeaderSkeleton();
+        }
 
         return CustomEventCard(
           eventTitle: state.eventTimelineViewModel?.eventTitle,
@@ -255,8 +257,14 @@ class EventTimelineViewScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
+        final isLoading = state.isLoading ?? false;
         final isCurrentUserMember = state.isCurrentUserMember ?? false;
         final isCurrentUserCreator = state.isCurrentUserCreator ?? false;
+
+        // Show skeleton during loading
+        if (isLoading) {
+          return CustomTimelineWidgetSkeleton();
+        }
 
         print('🔍 TIMELINE BUTTONS: Visibility check');
         print('   - isCurrentUserMember = $isCurrentUserMember');

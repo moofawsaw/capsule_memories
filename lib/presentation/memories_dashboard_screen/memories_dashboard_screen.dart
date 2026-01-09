@@ -279,7 +279,6 @@ class _MemoriesDashboardScreenState
 
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.only(left: 20.h),
         child: Row(
           children: memories.map((m) {
             return unified_widget.CustomPublicMemories(

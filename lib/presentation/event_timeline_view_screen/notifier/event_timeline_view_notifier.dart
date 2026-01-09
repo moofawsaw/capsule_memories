@@ -349,8 +349,9 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('🔍 TIMELINE NOTIFIER: Initializing from MemoryNavArgs');
       print('   - Memory ID: ${navArgs.memoryId}');
 
-      // Store memory ID immediately
+      // CRITICAL FIX: Set loading state TRUE immediately to trigger skeleton loading
       state = state.copyWith(
+        isLoading: true,
         memoryId: navArgs.memoryId,
         eventTimelineViewModel:
             EventTimelineViewModel(memoryId: navArgs.memoryId),
@@ -440,6 +441,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         ),
         isCurrentUserMember: isMember,
         isCurrentUserCreator: isCreator,
+        // Keep loading true until stories are loaded
+        isLoading: true,
       );
 
       print('✅ TIMELINE NOTIFIER: State updated with all data');
@@ -453,6 +456,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
     } catch (e, stackTrace) {
       print('❌ ERROR in initializeFromMemory: $e');
       print('Stack trace: $stackTrace');
+      // Set loading false on error
+      state = state.copyWith(isLoading: false);
     }
   }
 

@@ -35,7 +35,7 @@ class CustomPublicMemories extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: margin ?? EdgeInsets.only(top: 30.h),
+      margin: margin ?? EdgeInsets.only(top: 16.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -502,11 +502,11 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           padding: EdgeInsets.all(16.h),
           decoration: BoxDecoration(
             color: appTheme.gray_900_02.withAlpha(128),
-            borderRadius: BorderRadius.circular(16.h),
-            border: Border.all(
-              color: appTheme.blue_gray_300.withAlpha(51),
-              width: 1.0,
-            ),
+            // borderRadius: BorderRadius.circular(16.h),
+            // border: Border.all(
+            //   color: appTheme.blue_gray_300.withAlpha(51),
+            //   width: 1.0,
+            // ),
           ),
           child: Column(
             children: [
@@ -620,14 +620,14 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   Widget _buildTimelineSkeleton() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 16.h),
-      height: 180.h,
+      // height: 90.h,
       child: Column(
         children: [
           Container(
             height: 4.h,
             decoration: BoxDecoration(
               color: appTheme.blue_gray_300.withAlpha(51),
-              borderRadius: BorderRadius.circular(999),
+              // borderRadius: BorderRadius.circular(999),
             ),
           ),
           SizedBox(height: 24.h),

@@ -446,9 +446,9 @@ class _MemoryConfirmationScreenState
                             decoration: BoxDecoration(
                               color: appTheme.gray_900_01,
                               borderRadius: BorderRadius.circular(12.h),
-                              border: Border.all(
-                                color: appTheme.blue_gray_300.withAlpha(77),
-                              ),
+                              // border: Border.all(
+                              //   color: appTheme.blue_gray_300.withAlpha(77),
+                              // ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -509,9 +509,9 @@ class _MemoryConfirmationScreenState
                           decoration: BoxDecoration(
                             color: appTheme.gray_900_01,
                             borderRadius: BorderRadius.circular(12.h),
-                            border: Border.all(
-                              color: appTheme.blue_gray_300.withAlpha(77),
-                            ),
+                            // border: Border.all(
+                            //   color: appTheme.blue_gray_300.withAlpha(77),
+                            // ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,9 +601,9 @@ class _MemoryConfirmationScreenState
                             decoration: BoxDecoration(
                               color: appTheme.gray_900_01,
                               borderRadius: BorderRadius.circular(12.h),
-                              border: Border.all(
-                                color: appTheme.deep_purple_A100.withAlpha(128),
-                              ),
+                              // border: Border.all(
+                              //   color: appTheme.deep_purple_A100.withAlpha(128),
+                              // ),
                             ),
                             child: Column(
                               children: [
