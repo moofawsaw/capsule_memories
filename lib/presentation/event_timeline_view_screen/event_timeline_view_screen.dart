@@ -784,7 +784,17 @@ class EventTimelineViewScreenState
 
   /// Handles view all tap
   void onTapViewAll(BuildContext context) {
-    // Handle view all stories
+    final state = ref.read(eventTimelineViewNotifier);
+    final memoryId = state.eventTimelineViewModel?.memoryId;
+
+    if (memoryId != null) {
+      print('🔍 TIMELINE: Opening playback screen for memory: $memoryId');
+
+      NavigatorService.pushNamed(
+        AppRoutes.memoryTimelinePlayback,
+        arguments: memoryId,
+      );
+    }
   }
 
   /// Navigates to create story

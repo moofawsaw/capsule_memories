@@ -31,6 +31,7 @@ import '../presentation/memory_feed_dashboard_screen/memory_feed_dashboard_scree
 import '../presentation/memory_invitation_screen/memory_invitation_screen.dart';
 import '../presentation/memory_members_screen/memory_members_screen.dart';
 import '../presentation/memory_share_options_screen/memory_share_options_screen.dart';
+import '../presentation/memory_timeline_playback_screen/memory_timeline_playback_screen.dart';
 import '../presentation/notification_settings_screen/notification_settings_screen.dart';
 import '../presentation/notifications_screen/notifications_screen.dart';
 import '../presentation/password_reset_screen/password_reset_screen.dart';
@@ -123,6 +124,9 @@ class AppRoutes {
 
   static const String initialRoute = appFeed;
 
+  static const String memoryTimelinePlayback =
+      '/memory-timeline-playback-screen';
+
   /// Get the child widget for a given app route
   static Widget _getAppChild(String routeName) {
     switch (routeName) {
@@ -207,8 +211,10 @@ class AppRoutes {
             : null;
         return AddMemoryUploadScreen(
           memoryId: uploadArgs?['memoryId'] as String? ?? '',
-          memoryStartDate: uploadArgs?['memoryStartDate'] as DateTime? ?? DateTime.now(),
-          memoryEndDate: uploadArgs?['memoryEndDate'] as DateTime? ?? DateTime.now(),
+          memoryStartDate:
+              uploadArgs?['memoryStartDate'] as DateTime? ?? DateTime.now(),
+          memoryEndDate:
+              uploadArgs?['memoryEndDate'] as DateTime? ?? DateTime.now(),
         );
       case appBsDetails:
         // Add this line: Extract memoryId from route settings
@@ -390,40 +396,20 @@ class AppRoutes {
         qrScannerScreen: (context) => const QRScannerScreen(),
         friendRequestConfirmationDialog: (context) =>
             const FriendRequestConfirmationDialog(),
+        appStoryEdit: (context) {
+          final args =
+              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return StoryEditScreen(
+            mediaPath: args['video_path'] as String,
+            isVideo: args['is_video'] as bool? ?? true,
+            memoryId: args['memory_id'] as String,
+            memoryTitle: args['memory_title'] as String,
+            categoryIcon: args['category_icon'] as String?,
+          );
+        },
+        memoryTimelinePlayback: (context) {
+          final memoryId = ModalRoute.of(context)!.settings.arguments as String;
+          return MemoryTimelinePlaybackScreen(memoryId: memoryId);
+        },
       };
-}
-
-class AppRouter {
-  static Map<String, WidgetBuilder> routes = {
-    AppRoutes.authLogin: (context) => LoginScreen(),
-    AppRoutes.authRegister: (context) => AccountRegistrationScreen(),
-    AppRoutes.authReset: (context) => PasswordResetScreen(),
-    AppRoutes.splash: (context) => SplashScreen(),
-    AppRoutes.qrCodeShareScreenTwo: (context) =>
-        const QRCodeShareScreenTwoScreen(),
-    AppRoutes.qrTimelineShare: (context) {
-      final memoryId = ModalRoute.of(context)?.settings.arguments as String?;
-      return QRTimelineShareScreen(
-        memoryId: memoryId ?? '',
-      );
-    },
-    AppRoutes.memoryShareOptionsScreen: (context) =>
-        const MemoryShareOptionsScreen(),
-    AppRoutes.memoryConfirmationScreen: (context) =>
-        const MemoryConfirmationScreen(),
-    AppRoutes.qrScannerScreen: (context) => const QRScannerScreen(),
-    AppRoutes.friendRequestConfirmationDialog: (context) =>
-        const FriendRequestConfirmationDialog(),
-    AppRoutes.appStoryEdit: (context) {
-      final args =
-          ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-      return StoryEditScreen(
-        mediaPath: args['video_path'] as String,
-        isVideo: args['is_video'] as bool? ?? true,
-        memoryId: args['memory_id'] as String,
-        memoryTitle: args['memory_title'] as String,
-        categoryIcon: args['category_icon'] as String?,
-      );
-    },
-  };
 }

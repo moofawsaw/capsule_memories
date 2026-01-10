@@ -13,8 +13,8 @@ final eventStoriesViewNotifier = StateNotifierProvider.autoDispose<
         eventDate: '',
         eventLocation: '',
         viewCount: '0',
-        contributorsList: [],
-        storiesList: [],
+        contributorsList: const [],
+        storiesList: const [],
       ),
     ),
   ),
@@ -53,15 +53,13 @@ class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
         return;
       }
 
-      final contributorsList = (memoryData['contributorsList'] as List)
-          .map((c) => state.eventStoriesViewModel.contributorsList.runtimeType == List<ContributorItemModel>
-              ? {
+      final contributorsList = (memoryData['contributorsList'] as List?)
+          ?.map((c) => {
                 'contributorId': c['contributorId'] ?? '',
                 'contributorName': c['contributorName'] ?? 'Unknown User',
                 'contributorImage': c['contributorImage'] ?? '',
-              }
-              : c)
-          .toList();
+              })
+          .toList() ?? [];
 
       final storiesList = (memoryData['storiesList'] as List)
           .map((s) => {
@@ -75,10 +73,10 @@ class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
         isLoading: false,
       );
     } catch (e) {
-      print('❌ ERROR loading memory data: $e');
+      print('❌ ERROR loading memory data: \$e');
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Error loading memory: ${e.toString()}',
+        errorMessage: 'Error loading memory: \${e.toString()}',
       );
     }
   }
