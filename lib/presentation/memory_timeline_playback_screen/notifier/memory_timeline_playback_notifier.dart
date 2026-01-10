@@ -62,15 +62,31 @@ class MemoryTimelinePlaybackNotifier
       final stories = (storiesResponse as List).map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
 
+        // CRITICAL FIX: Resolve video and image URLs to full Supabase Storage URLs
+        final rawVideoUrl = storyData['video_url'] as String?;
+        final rawImageUrl = storyData['image_url'] as String?;
+        final rawThumbnailUrl = storyData['thumbnail_url'] as String?;
+
+        final resolvedVideoUrl = StoryService.resolveStoryMediaUrl(rawVideoUrl);
+        final resolvedImageUrl = StoryService.resolveStoryMediaUrl(rawImageUrl);
+        final resolvedThumbnailUrl =
+            StoryService.resolveStoryMediaUrl(rawThumbnailUrl);
+
+        debugPrint('📹 VIDEO URL RESOLUTION:');
+        debugPrint('   Raw video_url: $rawVideoUrl');
+        debugPrint('   Resolved video_url: $resolvedVideoUrl');
+        debugPrint('   Raw image_url: $rawImageUrl');
+        debugPrint('   Resolved image_url: $resolvedImageUrl');
+
         return PlaybackStoryModel(
           storyId: storyData['id'],
           contributorId: storyData['contributor_id'],
           contributorName: contributor?['display_name'] ?? 'Unknown',
           contributorAvatar: contributor?['avatar_url'],
           mediaType: storyData['media_type'],
-          imageUrl: storyData['image_url'],
-          videoUrl: storyData['video_url'],
-          thumbnailUrl: storyData['thumbnail_url'] ?? storyData['image_url'],
+          imageUrl: resolvedImageUrl,
+          videoUrl: resolvedVideoUrl,
+          thumbnailUrl: resolvedThumbnailUrl ?? resolvedImageUrl,
           captureTimestamp: storyData['capture_timestamp'] != null
               ? DateTime.parse(storyData['capture_timestamp'])
               : null,
@@ -116,23 +132,56 @@ class MemoryTimelinePlaybackNotifier
     currentVideoController = null;
 
     // Initialize video player if story is video
-    if (story.mediaType == 'video' && story.videoUrl != null) {
-      currentVideoController = VideoPlayerController.network(story.videoUrl!);
+    if (story.mediaType == 'video' &&
+        story.videoUrl != null &&
+        story.videoUrl!.isNotEmpty) {
+      try {
+        debugPrint('🎬 INITIALIZING VIDEO PLAYER:');
+        debugPrint('   Story ID: ${story.storyId}');
+        debugPrint('   Video URL: ${story.videoUrl}');
 
-      await currentVideoController!.initialize();
-
-      // Auto-play video
-      if (state.isPlaying ?? false) {
-        await currentVideoController!.play();
-      }
-
-      // Listen for video completion to auto-advance
-      currentVideoController!.addListener(() {
-        if (currentVideoController!.value.position ==
-            currentVideoController!.value.duration) {
-          skipForward();
+        // CRITICAL FIX: Validate URL format before initializing
+        final videoUrl = story.videoUrl!;
+        if (!videoUrl.startsWith('http://') &&
+            !videoUrl.startsWith('https://')) {
+          debugPrint(
+              '❌ ERROR: Invalid video URL format (not HTTP/HTTPS): $videoUrl');
+          state = state.copyWith(
+            errorMessage: 'Invalid video URL format',
+          );
+          return;
         }
-      });
+
+        currentVideoController = VideoPlayerController.networkUrl(
+          Uri.parse(videoUrl),
+        );
+
+        debugPrint('⏳ Initializing video controller...');
+        await currentVideoController!.initialize();
+        debugPrint('✅ Video controller initialized successfully');
+
+        // Auto-play video
+        if (state.isPlaying ?? false) {
+          await currentVideoController!.play();
+          debugPrint('▶️ Video playback started');
+        }
+
+        // Listen for video completion to auto-advance
+        currentVideoController!.addListener(() {
+          if (currentVideoController!.value.position ==
+              currentVideoController!.value.duration) {
+            debugPrint('⏭️ Video completed, skipping to next');
+            skipForward();
+          }
+        });
+      } catch (e, stackTrace) {
+        debugPrint('❌ ERROR INITIALIZING VIDEO PLAYER:');
+        debugPrint('   Error: $e');
+        debugPrint('   Stack trace: $stackTrace');
+        state = state.copyWith(
+          errorMessage: 'Failed to load video: ${e.toString()}',
+        );
+      }
     }
 
     state = state.copyWith(
