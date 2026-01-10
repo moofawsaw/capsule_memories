@@ -4,8 +4,8 @@ import '../../../services/avatar_helper_service.dart';
 import '../../../services/memory_cache_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
-import '../../../widgets/custom_story_list.dart';
-import '../../../widgets/timeline_widget.dart' as timeline_widget;
+import '../../../widgets/custom_story_list.dart'; // CustomStoryItem lives here
+import '../../../widgets/timeline_widget.dart' as timeline_widget; // TimelineStoryItem lives here
 import '../models/memory_details_view_model.dart';
 import '../models/timeline_detail_model.dart';
 
@@ -13,7 +13,7 @@ part 'memory_details_view_state.dart';
 
 final memoryDetailsViewNotifier = StateNotifierProvider.autoDispose<
     MemoryDetailsViewNotifier, MemoryDetailsViewState>(
-  (ref) => MemoryDetailsViewNotifier(),
+      (ref) => MemoryDetailsViewNotifier(),
 );
 
 class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
@@ -27,10 +27,6 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
   List<String> get currentMemoryStoryIds => _currentMemoryStoryIds;
 
   /// Parse any Supabase timestamp into a UTC DateTime consistently.
-  /// Handles:
-  /// - DateTime objects (keeps UTC)
-  /// - ISO strings with timezone (Z or +/-HH:MM)
-  /// - "naive" ISO strings (no timezone) -> treat as UTC by appending "Z"
   DateTime _parseUtc(dynamic value) {
     if (value == null) {
       return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
@@ -79,6 +75,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
   }
 
   void _displaySnapshot(MemorySnapshot snapshot) {
+    // ✅ FIX: MemorySnapshot doesn't have memoryId, so don't reference it.
     state = state.copyWith(
       memoryDetailsViewModel: MemoryDetailsViewModel(
         eventTitle: snapshot.title,
@@ -87,7 +84,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         isPrivate: snapshot.isPrivate,
         categoryIcon: snapshot.categoryIcon ?? ImageConstant.imgFrame13,
         participantImages: snapshot.participantAvatars ?? [],
-        customStoryItems: [],
+        customStoryItems: const <CustomStoryItem>[],
         timelineDetail: TimelineDetailModel(
           centerLocation: snapshot.location ?? 'Unknown',
           centerDistance: '0km',
@@ -108,14 +105,20 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
       print('🔍 SEALED DEBUG: Loading stories for memory: $memoryId');
 
       final storiesData = await _storyService.fetchMemoryStories(memoryId);
+      print('🔍 SEALED DEBUG: Fetched ${storiesData.length} stories from database');
 
-      print(
-          '🔍 SEALED DEBUG: Fetched ${storiesData.length} stories from database');
+      // ✅ CRITICAL FIX: Sort stories once, and build BOTH timeline + cycling IDs from same order
+      final sortedStories = List<Map<String, dynamic>>.from(storiesData)
+        ..sort((a, b) {
+          final aTime = _parseUtc(a['created_at']);
+          final bTime = _parseUtc(b['created_at']);
+          return aTime.compareTo(bTime); // oldest -> newest (timeline order)
+        });
 
       _currentMemoryStoryIds =
-          storiesData.map((storyData) => storyData['id'] as String).toList();
+          sortedStories.map((s) => s['id'] as String).toList();
 
-      print('🔍 SEALED DEBUG: Story IDs for cycling: $_currentMemoryStoryIds');
+      print('✅ SEALED DEBUG: Story IDs (timeline order): $_currentMemoryStoryIds');
 
       final memoryResponse = await SupabaseService.instance.client
           ?.from('memories')
@@ -130,22 +133,19 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
       if (memoryResponse != null &&
           memoryResponse['start_time'] != null &&
           memoryResponse['end_time'] != null) {
-        // CRITICAL FIX: Normalize to UTC consistently
         memoryStartTime = _parseUtc(memoryResponse['start_time']);
         memoryEndTime = _parseUtc(memoryResponse['end_time']);
         memoryLocation = memoryResponse['location_name'] as String?;
 
-        print(
-            '✅ SEALED DEBUG: Using memory window timestamps (UTC-normalized):');
+        print('✅ SEALED DEBUG: Using memory window timestamps (UTC-normalized):');
         print('   - Event start: ${memoryStartTime.toIso8601String()}');
         print('   - Event end:   ${memoryEndTime.toIso8601String()}');
         print('   - Event location: $memoryLocation');
       } else {
-        if (storiesData.isNotEmpty) {
-          // CRITICAL FIX: Normalize story timestamps to UTC consistently
+        if (sortedStories.isNotEmpty) {
           final storyTimes =
-              storiesData.map((s) => _parseUtc(s['created_at'])).toList();
-          storyTimes.sort();
+          sortedStories.map((s) => _parseUtc(s['created_at'])).toList()
+            ..sort();
 
           memoryStartTime = storyTimes.first;
           memoryEndTime = storyTimes.last;
@@ -164,7 +164,8 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         }
       }
 
-      final storyItems = storiesData.map((storyData) {
+      // ✅ This is your horizontal story list type: List<CustomStoryItem>
+      final List<CustomStoryItem> storyFeedItems = sortedStories.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
         final createdAt = _parseUtc(storyData['created_at']);
 
@@ -181,7 +182,9 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         );
       }).toList();
 
-      final timelineStories = storiesData.map((storyData) {
+      // ✅ This is your timeline type: List<TimelineStoryItem>
+      final List<timeline_widget.TimelineStoryItem> timelineStories =
+      sortedStories.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
         final createdAt = _parseUtc(storyData['created_at']);
         final storyId = storyData['id'] as String;
@@ -191,29 +194,33 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
           contributor?['avatar_url'] as String?,
         );
 
-        // Optional debug: check spacing math
-        final diffMin = createdAt.difference(memoryStartTime).inMinutes;
-        print(
-            '🧭 SEALED TIMELINE DIFF: story=$storyId diffMin=$diffMin createdAt=${createdAt.toIso8601String()} start=${memoryStartTime.toIso8601String()}');
-
         return timeline_widget.TimelineStoryItem(
           backgroundImage: backgroundImage,
           userAvatar: profileImage,
-          postedAt: createdAt, // UTC-normalized
+          postedAt: createdAt,
           timeLabel: _storyService.getTimeAgo(createdAt),
           storyId: storyId,
         );
       }).toList();
 
+      final existing = state.memoryDetailsViewModel;
+
       state = state.copyWith(
-        memoryDetailsViewModel: state.memoryDetailsViewModel?.copyWith(
-          eventLocation: memoryLocation ?? 'Unknown Location',
-          customStoryItems: timelineStories,
-          timelineDetail: TimelineDetailModel(
+        memoryDetailsViewModel: (existing ?? MemoryDetailsViewModel())
+            .copyWith(
+          memoryId: memoryId,
+          eventLocation: memoryLocation ??
+              existing?.eventLocation ??
+              'Unknown Location',
+          // ✅ FIX: customStoryItems expects List<CustomStoryItem>
+          customStoryItems: storyFeedItems,
+          timelineDetail: (existing?.timelineDetail ??
+              TimelineDetailModel(
+                centerLocation: memoryLocation ?? 'Unknown Location',
+                centerDistance: '0km',
+              ))
+              .copyWith(
             centerLocation: memoryLocation ?? 'Unknown Location',
-            centerDistance:
-                state.memoryDetailsViewModel?.timelineDetail?.centerDistance ??
-                    '0km',
             memoryStartTime: memoryStartTime,
             memoryEndTime: memoryEndTime,
             timelineStories: timelineStories,
@@ -222,7 +229,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         errorMessage: null,
       );
 
-      print('✅ SEALED DEBUG: Timeline updated with memory window');
+      print('✅ SEALED DEBUG: Timeline + feed updated with sorted story order');
     } catch (e, stackTrace) {
       print('❌ SEALED DEBUG: Error loading memory stories: $e');
       print('❌ SEALED DEBUG: Stack trace: $stackTrace');
@@ -240,17 +247,12 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
   }
 
   void onEventOptionsTap() {
-    state = state.copyWith(
-      showEventOptions: true,
-    );
+    state = state.copyWith(showEventOptions: true);
   }
 
   void onReplayAllTap() {
     state = state.copyWith(isLoading: true);
-    state = state.copyWith(
-      isLoading: false,
-      isReplayingAll: true,
-    );
+    state = state.copyWith(isLoading: false, isReplayingAll: true);
   }
 
   void onAddMediaTap() {
@@ -259,16 +261,10 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
   }
 
   void onStoryTap(int index) {
-    state = state.copyWith(
-      selectedStoryIndex: index,
-    );
+    state = state.copyWith(selectedStoryIndex: index);
   }
 
-  void onProfileTap() {
-    // Navigate to user profile
-  }
+  void onProfileTap() {}
 
-  void onNotificationTap() {
-    // Navigate to notifications
-  }
+  void onNotificationTap() {}
 }

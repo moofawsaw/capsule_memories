@@ -1,6 +1,4 @@
 import '../models/event_stories_view_model.dart';
-import '../models/contributor_item_model.dart';
-import '../models/story_item_model.dart';
 import '../../../core/app_export.dart';
 import '../../../services/feed_service.dart';
 
@@ -10,7 +8,7 @@ final eventStoriesViewNotifier = StateNotifierProvider.autoDispose<
     EventStoriesViewNotifier, EventStoriesViewState>(
   (ref) => EventStoriesViewNotifier(
     EventStoriesViewState(
-      eventStoriesViewModel: const EventStoriesViewModel(
+      eventStoriesViewModel: EventStoriesViewModel(
         eventTitle: '',
         eventDate: '',
         eventLocation: '',
@@ -56,7 +54,7 @@ class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
       }
 
       final contributorsList = (memoryData['contributorsList'] as List)
-          .map((c) => ContributorItemModel(
+          .map((c) => Contributoritemmodel(
                 contributorId: c['contributorId'] ?? '',
                 contributorName: c['contributorName'] ?? 'Unknown User',
                 contributorImage: c['contributorImage'] ?? '',
@@ -64,7 +62,7 @@ class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
           .toList();
 
       final storiesList = (memoryData['storiesList'] as List)
-          .map((s) => StoryItemModel(
+          .map((s) => Storyitemmodel(
                 storyId: s['storyId'] ?? '',
                 storyImage: s['storyImage'] ?? '',
                 timeAgo: s['timeAgo'] ?? '',

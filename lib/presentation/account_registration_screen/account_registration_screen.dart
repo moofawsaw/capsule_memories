@@ -56,7 +56,7 @@ class AccountRegistrationScreenState
         NavigatorService.pushNamed(AppRoutes.appFeed);
       },
       child: Container(
-        margin: EdgeInsets.only(top: 26.h),
+        margin: EdgeInsets.only(top: 16.h),
         width: SizeUtils.width * 0.38,
         child: CustomImageView(
           imagePath: ImageConstant.imgLogo,
@@ -70,7 +70,7 @@ class AccountRegistrationScreenState
   /// Section Widget - Create Account Text
   Widget _buildCreateAccountText(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(top: 26.h),
+      margin: EdgeInsets.only(top: 16.h),
       child: Text(
         'create your account',
         style: TextStyleHelper.instance.title16RegularPlusJakartaSans
@@ -113,7 +113,7 @@ class AccountRegistrationScreenState
         );
 
         return Container(
-          margin: EdgeInsets.only(top: 52.h),
+          margin: EdgeInsets.only(top: 34.h),
           child: Column(
             children: [
               // Name Field
@@ -255,7 +255,7 @@ class AccountRegistrationScreenState
   /// Section Widget - OR Divider
   Widget _buildOrDivider(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(top: 30.h),
+      margin: EdgeInsets.only(top: 24.h),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -286,7 +286,7 @@ class AccountRegistrationScreenState
   /// Section Widget - Sign In Link
   Widget _buildSignInLink(BuildContext context) {
     return Container(
-      margin: EdgeInsets.only(top: 34.h),
+      margin: EdgeInsets.only(top: 24.h),
       child: GestureDetector(
         onTap: () {
           onTapSignInLink(context);

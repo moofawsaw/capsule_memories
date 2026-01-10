@@ -1,5 +1,5 @@
 import '../../../core/app_export.dart';
-import '../../../widgets/timeline_widget.dart';
+import '../../../widgets/custom_story_list.dart'; // ✅ for CustomStoryItem
 import './timeline_detail_model.dart';
 
 class MemoryDetailsViewModel extends Equatable {
@@ -10,13 +10,16 @@ class MemoryDetailsViewModel extends Equatable {
   final bool? isPrivate;
   final String? categoryIcon;
   final List<String>? participantImages;
-  final List<TimelineStoryItem>? customStoryItems;
+
+  // ✅ FIX: feed list items must be CustomStoryItem (used by CustomStoryList)
+  final List<CustomStoryItem>? customStoryItems;
+
   final TimelineDetailModel? timelineDetail;
   final bool? isMemorySealed;
   final String? sealedDate;
   final int? storiesCount;
 
-  MemoryDetailsViewModel({
+  const MemoryDetailsViewModel({
     this.memoryId,
     this.eventTitle,
     this.eventDate,
@@ -39,7 +42,7 @@ class MemoryDetailsViewModel extends Equatable {
     bool? isPrivate,
     String? categoryIcon,
     List<String>? participantImages,
-    List<TimelineStoryItem>? customStoryItems,
+    List<CustomStoryItem>? customStoryItems,
     TimelineDetailModel? timelineDetail,
     bool? isMemorySealed,
     String? sealedDate,
@@ -63,17 +66,17 @@ class MemoryDetailsViewModel extends Equatable {
 
   @override
   List<Object?> get props => [
-        memoryId,
-        eventTitle,
-        eventDate,
-        eventLocation,
-        isPrivate,
-        categoryIcon,
-        participantImages,
-        customStoryItems,
-        timelineDetail,
-        isMemorySealed,
-        sealedDate,
-        storiesCount,
-      ];
+    memoryId,
+    eventTitle,
+    eventDate,
+    eventLocation,
+    isPrivate,
+    categoryIcon,
+    participantImages,
+    customStoryItems,
+    timelineDetail,
+    isMemorySealed,
+    sealedDate,
+    storiesCount,
+  ];
 }

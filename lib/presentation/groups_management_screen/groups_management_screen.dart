@@ -2,6 +2,7 @@ import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_group_card.dart';
+import '../../widgets/custom_button.dart';
 import '../../widgets/custom_group_invitation_card.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
@@ -114,23 +115,16 @@ class GroupsManagementScreenState
             Row(
               children: [
                 // New button with styled design
-                GestureDetector(
-                  onTap: () => onTapNewGroup(context),
-                  child: Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 16.h, vertical: 10.h),
-                    decoration: BoxDecoration(
-                      color: appTheme.deep_purple_A100,
-                      borderRadius: BorderRadius.circular(22.h),
-                    ),
-                    child: Text(
-                      'New',
-                      style: TextStyleHelper.instance.body14SemiBold.copyWith(
-                        color: appTheme.gray_50,
-                      ),
-                    ),
-                  ),
+                CustomButton(
+                  text: 'New',
+                  leftIcon: ImageConstant.imgIcon20x20, // same as screenshot; remove if not desired
+                  onPressed: () => onTapNewGroup(context),
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  height: 38.h,
+                  padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
                 ),
+
                 SizedBox(width: 8.h),
                 // Camera icon button for QR scanning
                 CustomIconButton(

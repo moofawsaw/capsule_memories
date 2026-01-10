@@ -1,4 +1,6 @@
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vibration/vibration.dart';
 
 import '../core/app_export.dart';
 
@@ -38,7 +40,15 @@ class _JoinHandlerPageState extends State<JoinHandlerPage> {
       );
 
       if (response.status == 200) {
-        // Success - navigate based on type
+        // SUCCESS: Trigger vibration
+        if (await Vibration.hasVibrator() ?? false) {
+          Vibration.vibrate(duration: 200);
+        }
+
+        // Show dynamic success confirmation dialog
+        await _showSuccessDialog();
+
+        // Navigate based on type
         if (mounted) {
           if (widget.type == 'friend') {
             Navigator.pushReplacementNamed(
@@ -50,6 +60,13 @@ class _JoinHandlerPageState extends State<JoinHandlerPage> {
               context,
               AppRoutes.appMemories,
             );
+          } else if (widget.type == 'group') {
+            Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.appGroups,
+            );
+            // Show toast after navigation to groups
+            _showSuccessToast();
           } else {
             Navigator.pushReplacementNamed(
               context,
@@ -66,6 +83,86 @@ class _JoinHandlerPageState extends State<JoinHandlerPage> {
         _isProcessing = false;
       });
     }
+  }
+
+  Future<void> _showSuccessDialog() async {
+    String entityType = '';
+    switch (widget.type) {
+      case 'friend':
+        entityType = 'friend';
+        break;
+      case 'memory':
+        entityType = 'memory';
+        break;
+      case 'group':
+        entityType = 'group';
+        break;
+      default:
+        entityType = widget.type;
+    }
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: appTheme.gray_900_02,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 64,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Congratulations!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You have successfully joined: $entityType',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withAlpha(204),
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                'OK',
+                style: TextStyle(color: appTheme.deep_purple_A100),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSuccessToast() {
+    Fluttertoast.showToast(
+      msg: 'Successfully joined group!',
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.green,
+      textColor: Colors.white,
+      fontSize: 16.0,
+    );
   }
 
   @override

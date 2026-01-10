@@ -16,51 +16,58 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+
     return Material(
       color: Colors.transparent,
-      child: Container(
-        width: double.maxFinite,
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_02,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20.h),
-            topRight: Radius.circular(20.h),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(height: 12.h),
-            // Drag handle indicator
-            Container(
-              width: 48.h,
-              height: 5.h,
-              decoration: BoxDecoration(
-                color: appTheme.colorFF3A3A,
-                borderRadius: BorderRadius.circular(2.5),
-              ),
+      child: AnimatedPadding(
+        padding: EdgeInsets.only(bottom: keyboardHeight),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        child: Container(
+          width: double.maxFinite,
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20.h),
+              topRight: Radius.circular(20.h),
             ),
-            SizedBox(height: 20.h),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 20.h),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(context),
-                      SizedBox(height: 24.h),
-                      _buildFriendsList(context),
-                      SizedBox(height: 24.h),
-                      _buildActionButtons(context),
-                      SizedBox(height: 20.h),
-                    ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: 12.h),
+              // Drag handle indicator
+              Container(
+                width: 48.h,
+                height: 5.h,
+                decoration: BoxDecoration(
+                  color: appTheme.colorFF3A3A,
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+              SizedBox(height: 20.h),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(horizontal: 20.h),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(context),
+                        SizedBox(height: 24.h),
+                        _buildFriendsList(context),
+                        SizedBox(height: 24.h),
+                        _buildActionButtons(context),
+                        SizedBox(height: 20.h),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
