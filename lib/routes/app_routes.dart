@@ -295,6 +295,17 @@ class AppRoutes {
       );
     }
 
+    // ✅ CRITICAL FIX: Explicit handling for memory timeline playback screen
+    if (routeName == memoryTimelinePlayback) {
+      return MaterialPageRoute(
+        builder: (context) {
+          final memoryId = settings.arguments as String;
+          return MemoryTimelinePlaybackScreen(memoryId: memoryId);
+        },
+        settings: settings,
+      );
+    }
+
     // ✅ NEW: Special handling for menu overlay - slides from left over current screen
     if (routeName == appMenu) {
       return _buildSlideOverlayRoute(UserMenuScreen(), settings);
@@ -397,8 +408,8 @@ class AppRoutes {
         friendRequestConfirmationDialog: (context) =>
             const FriendRequestConfirmationDialog(),
         appStoryEdit: (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          final args = ModalRoute.of(context)!.settings.arguments
+              as Map<String, dynamic>;
           return StoryEditScreen(
             mediaPath: args['video_path'] as String,
             isVideo: args['is_video'] as bool? ?? true,

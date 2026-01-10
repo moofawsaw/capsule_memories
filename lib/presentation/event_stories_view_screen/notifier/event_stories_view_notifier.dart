@@ -8,13 +8,13 @@ final eventStoriesViewNotifier = StateNotifierProvider.autoDispose<
     EventStoriesViewNotifier, EventStoriesViewState>(
   (ref) => EventStoriesViewNotifier(
     EventStoriesViewState(
-      eventStoriesViewModel: EventStoriesViewModel(
+      eventStoriesViewModel: const EventStoriesViewModel(
         eventTitle: '',
         eventDate: '',
         eventLocation: '',
         viewCount: '0',
-        contributorsList: const [],
-        storiesList: const [],
+        contributorsList: [],
+        storiesList: [],
       ),
     ),
   ),
