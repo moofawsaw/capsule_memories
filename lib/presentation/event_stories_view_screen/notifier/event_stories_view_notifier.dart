@@ -54,19 +54,21 @@ class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
       }
 
       final contributorsList = (memoryData['contributorsList'] as List)
-          .map((c) => Contributoritemmodel(
-                contributorId: c['contributorId'] ?? '',
-                contributorName: c['contributorName'] ?? 'Unknown User',
-                contributorImage: c['contributorImage'] ?? '',
-              ))
+          .map((c) => state.eventStoriesViewModel.contributorsList.runtimeType == List<ContributorItemModel>
+              ? {
+                'contributorId': c['contributorId'] ?? '',
+                'contributorName': c['contributorName'] ?? 'Unknown User',
+                'contributorImage': c['contributorImage'] ?? '',
+              }
+              : c)
           .toList();
 
       final storiesList = (memoryData['storiesList'] as List)
-          .map((s) => Storyitemmodel(
-                storyId: s['storyId'] ?? '',
-                storyImage: s['storyImage'] ?? '',
-                timeAgo: s['timeAgo'] ?? '',
-              ))
+          .map((s) => {
+                'storyId': s['storyId'] ?? '',
+                'storyImage': s['storyImage'] ?? '',
+                'timeAgo': s['timeAgo'] ?? '',
+              })
           .toList();
 
       state = state.copyWith(

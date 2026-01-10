@@ -13,7 +13,16 @@ import '../../widgets/custom_image_view.dart';
 import 'notifier/add_memory_upload_notifier.dart';
 
 class AddMemoryUploadScreen extends ConsumerStatefulWidget {
-  AddMemoryUploadScreen({Key? key}) : super(key: key);
+  final String memoryId;
+  final DateTime memoryStartDate;
+  final DateTime memoryEndDate;
+
+  AddMemoryUploadScreen({
+    Key? key,
+    required this.memoryId,
+    required this.memoryStartDate,
+    required this.memoryEndDate,
+  }) : super(key: key);
 
   @override
   AddMemoryUploadScreenState createState() => AddMemoryUploadScreenState();
@@ -21,6 +30,19 @@ class AddMemoryUploadScreen extends ConsumerStatefulWidget {
 
 class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
   final ImagePicker _imagePicker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    // Set memory details for date validation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(addMemoryUploadNotifier.notifier).setMemoryDetails(
+            memoryId: widget.memoryId,
+            startDate: widget.memoryStartDate,
+            endDate: widget.memoryEndDate,
+          );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -372,6 +394,8 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
           size: await image.length(),
         );
         notifier.setSelectedFile(file);
+        // Validate metadata after selection
+        await notifier.validateFileMetadata();
       }
     } catch (e) {
       notifier.setError('Failed to capture image: ${e.toString()}');
@@ -380,8 +404,7 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
 
   /// Pick image from gallery
   Future<void> _pickImageFromGallery() async {
-    final notifier = ref.read(addMemoryUploadNotifier
-        .notifier); // Modified: Defined notifier variable
+    final notifier = ref.read(addMemoryUploadNotifier.notifier);
 
     try {
       final XFile? image = await _imagePicker.pickImage(
@@ -395,6 +418,8 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
           size: await image.length(),
         );
         notifier.setSelectedFile(file);
+        // Validate metadata after selection
+        await notifier.validateFileMetadata();
       }
     } catch (e) {
       notifier.setError('Failed to select image: ${e.toString()}');
@@ -432,6 +457,8 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
         }
 
         notifier.setSelectedFile(file);
+        // Validate metadata after selection
+        await notifier.validateFileMetadata();
       }
     } catch (e) {
       notifier.setError('Failed to record video: ${e.toString()}');
@@ -461,6 +488,8 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
         }
 
         ref.read(addMemoryUploadNotifier.notifier).setSelectedFile(file);
+        // Validate metadata after selection
+        await ref.read(addMemoryUploadNotifier.notifier).validateFileMetadata();
       }
     } catch (e) {
       ref
@@ -489,6 +518,8 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
         }
 
         ref.read(addMemoryUploadNotifier.notifier).setSelectedFile(file);
+        // Validate metadata after selection
+        await ref.read(addMemoryUploadNotifier.notifier).validateFileMetadata();
       }
     } catch (e) {
       ref

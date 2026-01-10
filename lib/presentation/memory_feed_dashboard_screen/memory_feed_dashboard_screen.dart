@@ -320,7 +320,11 @@ class _MemoryFeedDashboardScreenState
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => AddMemoryUploadScreen(),
+                          builder: (context) => AddMemoryUploadScreen(
+                            memoryId: memory['id'],
+                            memoryStartDate: DateTime.parse(memory['start_date'] ?? DateTime.now().toIso8601String()),
+                            memoryEndDate: DateTime.parse(memory['end_date'] ?? DateTime.now().toIso8601String()),
+                          ),
                           settings: RouteSettings(
                             arguments: {
                               'memory_id': memory['id'],

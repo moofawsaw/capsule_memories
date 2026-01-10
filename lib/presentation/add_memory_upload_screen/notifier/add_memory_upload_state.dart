@@ -6,6 +6,10 @@ class AddMemoryUploadState extends Equatable {
   final bool? uploadSuccess;
   final String? errorMessage;
   final AddMemoryUploadModel? addMemoryUploadModel;
+  final String? memoryId;
+  final DateTime? memoryStartDate;
+  final DateTime? memoryEndDate;
+  final DateTime? captureTimestamp;
 
   AddMemoryUploadState({
     this.selectedFile,
@@ -13,6 +17,10 @@ class AddMemoryUploadState extends Equatable {
     this.uploadSuccess = false,
     this.errorMessage,
     this.addMemoryUploadModel,
+    this.memoryId,
+    this.memoryStartDate,
+    this.memoryEndDate,
+    this.captureTimestamp,
   });
 
   @override
@@ -22,6 +30,10 @@ class AddMemoryUploadState extends Equatable {
         uploadSuccess,
         errorMessage,
         addMemoryUploadModel,
+        memoryId,
+        memoryStartDate,
+        memoryEndDate,
+        captureTimestamp,
       ];
 
   AddMemoryUploadState copyWith({
@@ -30,6 +42,10 @@ class AddMemoryUploadState extends Equatable {
     bool? uploadSuccess,
     String? errorMessage,
     AddMemoryUploadModel? addMemoryUploadModel,
+    String? memoryId,
+    DateTime? memoryStartDate,
+    DateTime? memoryEndDate,
+    DateTime? captureTimestamp,
   }) {
     return AddMemoryUploadState(
       selectedFile: selectedFile ?? this.selectedFile,
@@ -37,6 +53,10 @@ class AddMemoryUploadState extends Equatable {
       uploadSuccess: uploadSuccess ?? this.uploadSuccess,
       errorMessage: errorMessage ?? this.errorMessage,
       addMemoryUploadModel: addMemoryUploadModel ?? this.addMemoryUploadModel,
+      memoryId: memoryId ?? this.memoryId,
+      memoryStartDate: memoryStartDate ?? this.memoryStartDate,
+      memoryEndDate: memoryEndDate ?? this.memoryEndDate,
+      captureTimestamp: captureTimestamp ?? this.captureTimestamp,
     );
   }
 }

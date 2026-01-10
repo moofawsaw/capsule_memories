@@ -199,7 +199,17 @@ class AppRoutes {
       case appBsStories:
         return EventStoriesViewScreen();
       case appBsUpload:
-        return AddMemoryUploadScreen();
+        // Add this line: Extract memoryId and dates from route settings
+        final uploadArgs = NavigatorService.navigatorKey.currentContext != null
+            ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)
+                ?.settings
+                .arguments as Map<String, dynamic>?
+            : null;
+        return AddMemoryUploadScreen(
+          memoryId: uploadArgs?['memoryId'] as String? ?? '',
+          memoryStartDate: uploadArgs?['memoryStartDate'] as DateTime? ?? DateTime.now(),
+          memoryEndDate: uploadArgs?['memoryEndDate'] as DateTime? ?? DateTime.now(),
+        );
       case appBsDetails:
         // Add this line: Extract memoryId from route settings
         final memoryId = NavigatorService.navigatorKey.currentContext != null

@@ -1,4 +1,7 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:path/path.dart' as path;
 
 class StorageUtils {
   static const String supabaseUrl = 'https://resdvutqgrbbylknaxjp.supabase.co';
@@ -36,7 +39,9 @@ class StorageUtils {
       normalized = normalized.substring('avatars/'.length);
     }
 
-    return Supabase.instance.client.storage.from('avatars').getPublicUrl(normalized);
+    return Supabase.instance.client.storage
+        .from('avatars')
+        .getPublicUrl(normalized);
   }
 
   /// Accepts:
@@ -75,5 +80,66 @@ class StorageUtils {
     return Supabase.instance.client.storage
         .from('category-icons')
         .getPublicUrl('$normalized.svg');
+  }
+
+  /// Upload media file to Supabase storage
+  /// Returns the path of the uploaded file or null if upload fails
+  static Future<String?> uploadMedia({
+    required PlatformFile file,
+    required String bucket,
+    required String folder,
+  }) async {
+    try {
+      final filePath = file.path;
+      if (filePath == null) {
+        throw Exception('File path is null');
+      }
+
+      // Generate unique filename with timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileExtension = path.extension(file.name);
+      final fileName = '${timestamp}_${file.name}';
+      final storagePath = '$folder/$fileName';
+
+      // Read file bytes
+      final fileBytes = await File(filePath).readAsBytes();
+
+      // Upload to Supabase storage
+      final uploadPath =
+          await Supabase.instance.client.storage.from(bucket).uploadBinary(
+                storagePath,
+                fileBytes,
+                fileOptions: FileOptions(
+                  contentType: _getContentType(fileExtension),
+                ),
+              );
+
+      // Return the storage path
+      return uploadPath;
+    } catch (e) {
+      print('Error uploading media: $e');
+      return null;
+    }
+  }
+
+  /// Determine content type based on file extension
+  static String _getContentType(String extension) {
+    switch (extension.toLowerCase()) {
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.gif':
+        return 'image/gif';
+      case '.mp4':
+        return 'video/mp4';
+      case '.mov':
+        return 'video/quicktime';
+      case '.avi':
+        return 'video/x-msvideo';
+      default:
+        return 'application/octet-stream';
+    }
   }
 }

@@ -336,17 +336,28 @@ class MemoryDetailsViewScreenState
             buttonStyle: CustomButtonStyle.fillPrimary,
             buttonTextStyle: CustomButtonTextStyle.bodyMedium,
             onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom,
+              final state = ref.read(memoryDetailsViewNotifier);
+              final memoryId = state.memoryDetailsViewModel?.memoryId;
+              final startDate = state.memoryDetailsViewModel?.timelineDetail?.memoryStartTime;
+              final endDate = state.memoryDetailsViewModel?.timelineDetail?.memoryEndTime;
+
+              if (memoryId != null && startDate != null && endDate != null) {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                    ),
+                    child: AddMemoryUploadScreen(
+                      memoryId: memoryId,
+                      memoryStartDate: startDate,
+                      memoryEndDate: endDate,
+                    ),
                   ),
-                  child: AddMemoryUploadScreen(),
-                ),
-              );
+                );
+              }
             },
           ),
           SizedBox(height: 14.h),
@@ -361,7 +372,7 @@ class MemoryDetailsViewScreenState
     );
   }
 
-  /// ✅ FIX: Timeline story tap should pass FeedStoryContext so story viewer only cycles this memory’s stories
+  /// ✅ FIX: Timeline story tap should pass FeedStoryContext so story viewer only cycles this memory's stories
   void _handleTimelineStoryTap(BuildContext context, String storyId) {
     final notifier = ref.read(memoryDetailsViewNotifier.notifier);
 
