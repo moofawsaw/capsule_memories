@@ -2,6 +2,7 @@ import '../../../core/app_export.dart';
 import '../../../services/memory_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/chromecast_service.dart';
 import '../models/memory_timeline_playback_model.dart';
 import './memory_timeline_playback_state.dart';
 import 'package:video_player/video_player.dart';
@@ -22,6 +23,7 @@ class MemoryTimelinePlaybackNotifier
     extends StateNotifier<MemoryTimelinePlaybackState> {
   final MemoryService _memoryService;
   final StoryService _storyService;
+  final ChromecastService _chromecastService = ChromecastService();
   VideoPlayerController? currentVideoController;
 
   MemoryTimelinePlaybackNotifier(
@@ -35,7 +37,40 @@ class MemoryTimelinePlaybackNotifier
           isTimelineScrubberExpanded: false,
           isChromecastConnected: false,
           playbackSpeed: 1.0,
-        ));
+        )) {
+    _initializeChromecast();
+  }
+
+  /// Initialize Chromecast service and set up callbacks
+  Future<void> _initializeChromecast() async {
+    // Set up connection state callback
+    _chromecastService.onConnectionStateChanged = (isConnected) {
+      state = state.copyWith(isChromecastConnected: isConnected);
+
+      if (isConnected) {
+        debugPrint(
+            '✅ Chromecast connected: ${_chromecastService.connectedDeviceName}');
+
+        // Automatically cast current media when connected
+        if (state.currentStory != null) {
+          _castCurrentStory();
+        }
+      } else {
+        debugPrint('🔌 Chromecast disconnected');
+      }
+    };
+
+    // Set up error callback
+    _chromecastService.onError = (error) {
+      debugPrint('❌ Chromecast error: $error');
+      state = state.copyWith(
+        errorMessage: 'Chromecast: $error',
+      );
+    };
+
+    // Initialize the service
+    await _chromecastService.initialize();
+  }
 
   /// Load memory playback data from database
   Future<void> loadMemoryPlayback(String memoryId) async {
@@ -131,6 +166,11 @@ class MemoryTimelinePlaybackNotifier
     await currentVideoController?.dispose();
     currentVideoController = null;
 
+    // If connected to Chromecast, cast the new story
+    if (_chromecastService.isConnected) {
+      await _castCurrentStory();
+    }
+
     // Initialize video player if story is video
     if (story.mediaType == 'video' &&
         story.videoUrl != null &&
@@ -194,11 +234,21 @@ class MemoryTimelinePlaybackNotifier
   void togglePlayPause() {
     final isPlaying = !(state.isPlaying ?? false);
 
+    // Control local video player
     if (currentVideoController != null) {
       if (isPlaying) {
         currentVideoController!.play();
       } else {
         currentVideoController!.pause();
+      }
+    }
+
+    // Control Chromecast playback
+    if (_chromecastService.isConnected) {
+      if (isPlaying) {
+        _chromecastService.play();
+      } else {
+        _chromecastService.pause();
       }
     }
 
@@ -237,16 +287,72 @@ class MemoryTimelinePlaybackNotifier
     );
   }
 
-  /// Toggle Chromecast connection
-  void toggleChromecast() {
-    final isConnected = !(state.isChromecastConnected ?? false);
+  /// Toggle Chromecast connection - show device picker if not connected
+  Future<void> toggleChromecast() async {
+    if (_chromecastService.isConnected) {
+      // Disconnect from current device
+      await _chromecastService.disconnect();
+      state = state.copyWith(isChromecastConnected: false);
+    } else {
+      // Show device picker dialog
+      // In production, this would trigger a native device picker UI
+      // For now, we'll auto-connect to the first available device
 
-    // In production, implement actual Chromecast SDK integration here
-    // For now, just toggle the state
+      final devices = _chromecastService.availableDevices;
 
-    state = state.copyWith(isChromecastConnected: isConnected);
+      if (devices.isEmpty) {
+        debugPrint('⚠️ No Chromecast devices found');
+        state = state.copyWith(
+          errorMessage: 'No Chromecast devices found on your network',
+        );
+        return;
+      }
 
-    debugPrint('Chromecast ${isConnected ? 'connected' : 'disconnected'}');
+      // Connect to first available device
+      final firstDevice = devices.first;
+      final connected =
+          await _chromecastService.connectToDevice(firstDevice.id);
+
+      if (connected) {
+        state = state.copyWith(isChromecastConnected: true);
+
+        // Cast current media after connection
+        if (state.currentStory != null) {
+          await _castCurrentStory();
+        }
+      }
+    }
+  }
+
+  /// Cast the current story to Chromecast device
+  Future<void> _castCurrentStory() async {
+    final story = state.currentStory;
+    if (story == null) return;
+
+    final mediaUrl =
+        story.mediaType == 'video' ? story.videoUrl : story.imageUrl;
+
+    if (mediaUrl == null || mediaUrl.isEmpty) {
+      debugPrint('⚠️ No media URL available for casting');
+      return;
+    }
+
+    final success = await _chromecastService.castMedia(
+      mediaUrl: mediaUrl,
+      mediaType: story.mediaType ?? 'image',
+      title: state.memoryTitle ?? 'Memory',
+      description: '${story.contributorName} • ${story.timestamp}',
+      thumbnailUrl: story.thumbnailUrl,
+    );
+
+    if (success) {
+      debugPrint('✅ Successfully casting to Chromecast');
+
+      // If casting video, sync playback with Chromecast
+      if (story.mediaType == 'video' && state.isPlaying == true) {
+        await _chromecastService.play();
+      }
+    }
   }
 
   /// Toggle favorite status
@@ -306,6 +412,7 @@ class MemoryTimelinePlaybackNotifier
   @override
   void dispose() {
     currentVideoController?.dispose();
+    _chromecastService.dispose();
     super.dispose();
   }
 }

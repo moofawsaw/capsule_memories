@@ -92,3 +92,9 @@ flutter_native_splash:
     color: "#6B4EFF"
 
 # Note: app_links package is NOT compatible with current Dart SDK 3.6.0 - deep linking implemented using native method channels instead
+
+# Google Cast SDK Configuration Notes:
+# Android: Add 'com.google.android.gms:play-services-cast-framework:21.5.0' to android/app/build.gradle dependencies
+# Android: Add Cast Options Provider meta-data to AndroidManifest.xml application tag
+# iOS: Add 'google-cast-sdk', '~> 4.8' to ios/Podfile and run pod install
+# iOS: Configure Info.plist with NSLocalNetworkUsageDescription and NSBonjourServices for Chromecast discovery
