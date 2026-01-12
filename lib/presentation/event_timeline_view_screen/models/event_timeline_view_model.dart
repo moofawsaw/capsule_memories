@@ -50,13 +50,13 @@ class EventTimelineViewModel extends Equatable {
 
   @override
   List<Object?> get props => [
-        eventTitle,
-        eventDate,
-        isPrivate,
-        categoryIcon,
-        participantImages,
-        customStoryItems,
-        timelineDetail,
-        memoryId,
-      ];
+    eventTitle,
+    eventDate,
+    isPrivate,
+    categoryIcon,
+    participantImages,
+    customStoryItems,
+    timelineDetail,
+    memoryId,
+  ];
 }

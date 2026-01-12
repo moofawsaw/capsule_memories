@@ -1,84 +1,168 @@
 import '../../../core/app_export.dart';
-import '../../../widgets/timeline_widget.dart';
 
+/// Data model for timeline story items
+class TimelineStoryItem {
+  const TimelineStoryItem({
+    required this.backgroundImage,
+    required this.userAvatar,
+    required this.postedAt,
+    this.timeLabel,
+    this.storyId,
+    this.isVideo = true,
+  });
+
+  final String backgroundImage;
+  final String userAvatar;
+  final DateTime postedAt;
+  final String? timeLabel;
+  final String? storyId;
+  final bool isVideo;
+}
+
+/// Individual timeline story widget with vertical layout
+/// Card at top, connector, avatar at bottom
 class TimelineStoryWidget extends StatelessWidget {
   final TimelineStoryItem item;
-  final DateTime? memoryStartTime;
-  final DateTime? memoryEndTime;
   final VoidCallback? onTap;
+  final double barPosition; // Y position of the horizontal bar
 
   const TimelineStoryWidget({
     Key? key,
     required this.item,
-    this.memoryStartTime,
-    this.memoryEndTime,
     this.onTap,
+    this.barPosition = 85.0,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final position = _calculatePosition();
-
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        margin: EdgeInsets.only(left: position, bottom: 16.h),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: SizedBox(
+        width: 70.w,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
+            _buildStoryCard(),
+
             Container(
-              width: 48.h,
-              height: 48.h,
+              width: 3.w,
+              height: 12.h,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8.h),
-                image: DecorationImage(
-                  image: NetworkImage(item.backgroundImage),
-                  fit: BoxFit.cover,
-                ),
+                color: const Color(0xFF3A3A4A),
+                borderRadius: BorderRadius.circular(1.5.w),
               ),
             ),
-            SizedBox(width: 8.w),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 32.h,
-                  height: 32.h,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    image: DecorationImage(
-                      image: NetworkImage(item.userAvatar),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  item.timeLabel ?? '',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300),
-                ),
-              ],
+
+            SizedBox(height: 4.h),
+
+            Container(
+              width: 3.w,
+              height: 12.h,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3A3A4A),
+                borderRadius: BorderRadius.circular(1.5.w),
+              ),
             ),
+
+            _buildAvatarWithRing(),
           ],
         ),
       ),
     );
   }
 
-  double _calculatePosition() {
-    if (memoryStartTime == null || memoryEndTime == null) {
-      return 20.w;
-    }
+  Widget _buildStoryCard() {
+    return Container(
+      width: 48.w,
+      height: 68.h,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10.h),
+        border: Border.all(
+          color: const Color(0xFF8B5CF6),
+          width: 2.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(102),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8.h),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              item.backgroundImage,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: const Color(0xFF2A2A3A),
+                child: Icon(
+                  Icons.image_not_supported,
+                  color: Colors.white38,
+                  size: 20.h,
+                ),
+              ),
+            ),
+            if (item.isVideo)
+              Center(
+                child: Container(
+                  padding: EdgeInsets.all(8.h),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(128),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 18.h,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
-    final totalDuration = memoryEndTime!.difference(memoryStartTime!);
-    final storyDuration = item.postedAt.difference(memoryStartTime!);
-
-    if (totalDuration.inSeconds <= 0) return 20.w;
-
-    final ratio = storyDuration.inSeconds / totalDuration.inSeconds;
-    final clampedRatio = ratio.clamp(0.0, 1.0);
-
-    return (clampedRatio * 300.w) + 20.w;
+  Widget _buildAvatarWithRing() {
+    return Container(
+      width: 40.h,
+      height: 40.h,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF8B5CF6),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withAlpha(102),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(2.5.h),
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFF1A1A2E),
+        ),
+        child: ClipOval(
+          child: Image.network(
+            item.userAvatar,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: const Color(0xFF2A2A3A),
+              child: Icon(
+                Icons.person,
+                color: Colors.white38,
+                size: 20.h,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

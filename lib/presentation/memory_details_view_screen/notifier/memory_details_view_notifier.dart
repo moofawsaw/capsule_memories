@@ -10,6 +10,9 @@ import '../../../widgets/custom_story_list.dart';
 import '../../../widgets/timeline_widget.dart' as timeline_widget;
 import '../models/memory_details_view_model.dart';
 import '../models/timeline_detail_model.dart';
+import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart'
+as timeline_story;
+
 
 part 'memory_details_view_state.dart';
 
@@ -228,7 +231,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
       }).toList();
 
       // Timeline items
-      final List<timeline_widget.TimelineStoryItem> timelineStories =
+      final List<timeline_story.TimelineStoryItem> timelineStories =
       sortedStories.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
         final createdAt = _parseUtc(storyData['created_at']);
@@ -239,7 +242,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
           contributor?['avatar_url'] as String?,
         );
 
-        return timeline_widget.TimelineStoryItem(
+        return timeline_story.TimelineStoryItem(
           backgroundImage: backgroundImage,
           userAvatar: profileImage,
           postedAt: createdAt,

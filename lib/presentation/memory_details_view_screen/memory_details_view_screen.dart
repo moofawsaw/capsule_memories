@@ -10,6 +10,8 @@ import '../../widgets/timeline_widget.dart';
 import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import 'notifier/memory_details_view_notifier.dart';
+import '../event_timeline_view_screen/widgets/timeline_story_widget.dart';
+
 
 class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
   MemoryDetailsViewScreen({Key? key}) : super(key: key);
@@ -433,7 +435,9 @@ class MemoryDetailsViewScreenState
         }
 
         final timelineDetail = state.memoryDetailsViewModel?.timelineDetail;
-        final timelineStories = timelineDetail?.timelineStories ?? [];
+        final List<TimelineStoryItem> timelineStories =
+            state.memoryDetailsViewModel?.timelineDetail?.timelineStories ??
+                <TimelineStoryItem>[];
 
         if (timelineDetail == null || timelineStories.isEmpty) {
           return const SizedBox.shrink();

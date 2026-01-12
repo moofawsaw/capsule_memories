@@ -1,25 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../core/app_export.dart';
-
-/// Data model for timeline story items
-class TimelineStoryItem {
-  const TimelineStoryItem({
-    required this.backgroundImage,
-    required this.userAvatar,
-    required this.postedAt,
-    this.timeLabel,
-    this.storyId,
-    this.isVideo = true,
-  });
-
-  final String backgroundImage;
-  final String userAvatar;
-  final DateTime postedAt;
-  final String? timeLabel;
-  final String? storyId;
-  final bool isVideo;
-}
+import '../presentation/event_timeline_view_screen/widgets/timeline_story_widget.dart';
 
 enum TimelineVariant { sealed, active }
 
@@ -58,12 +40,12 @@ class TimelineWidget extends StatelessWidget {
 
   double get _totalHeight =>
       _cardHeight +
-      _connectorAboveBar +
-      _barHeight +
-      _connectorBelowBar +
-      _avatarSize +
-      _markerAreaHeight +
-      20.0;
+          _connectorAboveBar +
+          _barHeight +
+          _connectorBelowBar +
+          _avatarSize +
+          _markerAreaHeight +
+          20.0;
 
   double get _barYPosition => _cardHeight + _connectorAboveBar;
 
@@ -116,12 +98,11 @@ class TimelineWidget extends StatelessWidget {
     required double usableWidth,
     required double progressRatio,
   }) {
-    // Track + fill
     final trackColor = appTheme.deep_purple_A100.withAlpha(70);
     final fillColor = appTheme.deep_purple_A100;
 
     final double fillWidth =
-        (usableWidth * progressRatio).clamp(0.0, usableWidth).toDouble();
+    (usableWidth * progressRatio).clamp(0.0, usableWidth).toDouble();
 
     return SizedBox(
       height: _barHeight.h,
@@ -183,7 +164,7 @@ class TimelineWidget extends StatelessWidget {
 
     return sorted.map((story) {
       final double centerX =
-          _calculateTimePosition(story.postedAt, usableWidth);
+      _calculateTimePosition(story.postedAt, usableWidth);
 
       double leftPos = padding + centerX - halfMarker;
 
@@ -225,7 +206,7 @@ class TimelineWidget extends StatelessWidget {
     final int safeTotalMs = totalMs <= 0 ? 1 : totalMs;
 
     final DateTime midUtc =
-        startUtc.add(Duration(milliseconds: (safeTotalMs / 2).round()));
+    startUtc.add(Duration(milliseconds: (safeTotalMs / 2).round()));
 
     final markers = <_MarkerSpec>[
       _MarkerSpec(
@@ -250,7 +231,7 @@ class TimelineWidget extends StatelessWidget {
 
     for (final m in markers) {
       final double rawPos =
-          _calculateTimePosition(m.timeForPositionUtc, usableWidth);
+      _calculateTimePosition(m.timeForPositionUtc, usableWidth);
 
       // === OPTION B: keep markers away from edges ===
       final double minCenter = _markerEdgeInset;
@@ -258,12 +239,12 @@ class TimelineWidget extends StatelessWidget {
           .clamp(0.0, double.infinity)
           .toDouble();
       final double clampedCenter =
-          rawPos.clamp(minCenter, maxCenter).toDouble();
+      rawPos.clamp(minCenter, maxCenter).toDouble();
 
       final double leftPos = (padding + clampedCenter - halfLabel).toDouble();
 
       final _MarkerTextParts parts =
-          _formatMarkerPartsLocal(m.timeForLabelExact);
+      _formatMarkerPartsLocal(m.timeForLabelExact);
 
       widgets.add(
         Positioned(
@@ -274,7 +255,7 @@ class TimelineWidget extends StatelessWidget {
               Container(
                 width: 2,
                 height: 8.h,
-                color: appTheme.blue_gray_900_02, // muted gridline
+                color: appTheme.blue_gray_900_02,
               ),
               SizedBox(height: 6.h),
               SizedBox(
@@ -282,20 +263,18 @@ class TimelineWidget extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Date (Dec 22) — bold for start/end
                     Text(
                       parts.dateLine,
                       textAlign: TextAlign.center,
                       style: (m.isEmphasized
-                              ? TextStyleHelper
-                                  .instance.body14BoldPlusJakartaSans
-                              : TextStyleHelper
-                                  .instance.body14RegularPlusJakartaSans)
+                          ? TextStyleHelper
+                          .instance.body14BoldPlusJakartaSans
+                          : TextStyleHelper
+                          .instance.body14RegularPlusJakartaSans)
                           .copyWith(color: appTheme.gray_50),
                       maxLines: 1,
                     ),
                     SizedBox(height: 6.h),
-                    // Time (6:33 PM) — regular muted
                     Text(
                       parts.timeLine,
                       textAlign: TextAlign.center,
@@ -417,18 +396,14 @@ class _TimelineStoryWidget extends StatelessWidget {
         child: Column(
           children: [
             _buildStoryCard(),
-
-            // spacing above bar (no connector)
             SizedBox(height: TimelineWidget._connectorAboveBar.h),
-
-            // bar height spacer
             SizedBox(height: TimelineWidget._barHeight.h),
 
-            // connector BELOW bar (thin, square ends)
+            // connector BELOW bar
             Container(
-              width: 2, // slightly thinner
+              width: 2,
               height: TimelineWidget._connectorBelowBar.h,
-              color: appTheme.deep_purple_A100, // muted gridline
+              color: appTheme.deep_purple_A100,
             ),
 
             _buildAvatar(),
@@ -443,7 +418,7 @@ class _TimelineStoryWidget extends StatelessWidget {
       width: TimelineWidget._cardWidth,
       height: TimelineWidget._cardHeight.h,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8.h), // slightly reduced
+        borderRadius: BorderRadius.circular(8.h),
         border: Border.all(
           color: appTheme.deep_purple_A200,
           width: 2,
@@ -456,9 +431,9 @@ class _TimelineStoryWidget extends StatelessWidget {
           key: ValueKey(
               'story_thumbnail_${item.storyId}_${item.backgroundImage.hashCode}'),
           fit: BoxFit.cover,
-          memCacheWidth: 200, // Optimize memory cache size
+          memCacheWidth: 200,
           memCacheHeight: 280,
-          maxHeightDiskCache: 400, // Optimize disk cache size
+          maxHeightDiskCache: 400,
           maxWidthDiskCache: 280,
           fadeInDuration: const Duration(milliseconds: 200),
           fadeOutDuration: const Duration(milliseconds: 100),
@@ -477,15 +452,13 @@ class _TimelineStoryWidget extends StatelessWidget {
             ),
           ),
           errorWidget: (context, url, error) {
-            // CRITICAL FIX: Retry loading image on error
-            // This ensures thumbnails reload properly after viewing stories
             print(
                 '🔄 TIMELINE: Thumbnail load failed for ${item.storyId}, retrying...');
 
             return FutureBuilder(
               future: Future.delayed(
                 const Duration(milliseconds: 500),
-                () => CachedNetworkImage(
+                    () => CachedNetworkImage(
                   imageUrl: item.backgroundImage,
                   fit: BoxFit.cover,
                   memCacheWidth: 200,
