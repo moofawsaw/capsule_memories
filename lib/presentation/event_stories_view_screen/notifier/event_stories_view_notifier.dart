@@ -3,19 +3,19 @@ import '../../../services/feed_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final eventStoriesViewNotifier = StateNotifierProvider.autoDispose<
-    EventStoriesViewNotifier, EventStoriesViewState>(
+    EventStoriesViewNotifier, EventStoriesViewModel>(
   (ref) => EventStoriesViewNotifier(
-    EventStoriesViewState(
+    EventStoriesViewModel(
       isLoading: false,
       errorMessage: null,
     ),
   ),
 );
 
-class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewState> {
+class EventStoriesViewNotifier extends StateNotifier<EventStoriesViewModel> {
   final FeedService _feedService = FeedService();
 
-  EventStoriesViewNotifier(EventStoriesViewState initialState) : super(initialState);
+  EventStoriesViewNotifier(EventStoriesViewModel initialState) : super(initialState);
 
   /// Initialize with memory ID from navigation arguments
   Future<void> initialize(String? memoryId) async {

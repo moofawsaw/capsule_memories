@@ -274,11 +274,11 @@ class _MemoriesDashboardScreenState
         child: Row(
           children: memories.map((m) {
             return unified_widget.CustomPublicMemories(
-              variant: unified_widget.MemoryCardVariant.dashboard, // ✅ dashboard cards
-              memories: [
-                unified_widget.CustomMemoryItem(
+              variant: unified_widget.MemoryCardVariant.dashboard,
+              memories: memories.map((m) {
+                return unified_widget.CustomMemoryItem(
                   id: m.id,
-                  userId: m.creatorId,              // ✅ IMPORTANT
+                  userId: m.creatorId,
                   title: m.title,
                   date: m.date,
                   iconPath: m.categoryIconUrl,
@@ -290,14 +290,19 @@ class _MemoriesDashboardScreenState
                   location: m.location,
                   distance: m.distance,
                   isLiked: false,
-                  state: m.state,                  // ✅ open / sealed
-                  visibility: m.visibility,        // ✅ public / private
-                ),
-              ],
-              onMemoryTap: (_) => MemoryNavigationWrapper.navigateFromMemoryItem(
-                context: context,
-                memoryItem: m,
-              ),
+                  state: m.state,
+                  visibility: m.visibility,
+                );
+              }).toList(),
+              onMemoryTap: (memoryItem) {
+                // You currently navigate using your `m` object; update to match your expected type.
+                // If MemoryNavigationWrapper expects your domain model, map back by id or change wrapper to accept CustomMemoryItem.
+                final found = memories.firstWhere((x) => x.id == memoryItem.id);
+                MemoryNavigationWrapper.navigateFromMemoryItem(
+                  context: context,
+                  memoryItem: found,
+                );
+              },
             );
 
           }).toList(),

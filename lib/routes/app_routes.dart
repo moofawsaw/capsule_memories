@@ -148,8 +148,6 @@ class AppRoutes {
         return const MemoryFeedDashboardScreen();
       case appMemories:
         return const MemoriesDashboardScreen();
-      case appProfile:
-        return UserProfileScreen();
       case appProfileUser:
         return UserProfileScreenTwo();
       case appNotifications:

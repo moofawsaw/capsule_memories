@@ -309,7 +309,7 @@ class StoryService {
         'text_overlays': caption != null ? [{'text': caption}] : [],
       };
 
-      final response = await _supabase!
+      final response = await _supabase
           .from('stories')
           .insert(storyData)
           .select('''
@@ -327,7 +327,7 @@ class StoryService {
       final parts = <String>[];
 
       final message = e.message;
-      if (message is String && message.isNotEmpty) {
+      if (message.isNotEmpty) {
         parts.add('message=$message');
       }
 
@@ -497,7 +497,7 @@ class StoryService {
     if (_supabase == null) return null;
 
     try {
-      final response = await _supabase!
+      final response = await _supabase
           .from('stories')
           .select('''
             id,
