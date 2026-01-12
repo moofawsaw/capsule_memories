@@ -1,6 +1,5 @@
 import '../../../core/app_export.dart';
 import '../widgets/timeline_story_widget.dart';
-import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart';
 
 /// This class is used in the [event_timeline_view_screen] screen.
 

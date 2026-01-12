@@ -34,9 +34,7 @@ class TimelineDetailWidget extends StatelessWidget {
               model!.timelineStories!.isNotEmpty)
             ...model!.timelineStories!.map(
               (story) => TimelineStoryWidget(
-                item: story,
-                memoryStartTime: model!.memoryStartTime,
-                memoryEndTime: model!.memoryEndTime,
+                item: story as TimelineStoryItem,
                 onTap: () {
                   if (onStoryTap != null && story.storyId != null) {
                     onStoryTap!(story.storyId!);

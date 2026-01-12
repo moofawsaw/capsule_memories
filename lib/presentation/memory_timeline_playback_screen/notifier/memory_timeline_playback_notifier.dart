@@ -1,7 +1,6 @@
 // lib/presentation/memory_timeline_playback_screen/notifier/memory_timeline_playback_notifier.dart
 import 'dart:async';
 
-import 'package:flutter/widgets.dart';
 import 'package:video_player/video_player.dart';
 import 'package:intl/intl.dart';
 

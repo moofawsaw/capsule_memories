@@ -7,7 +7,6 @@ import '../../../services/memory_cache_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../../widgets/custom_story_list.dart';
-import '../../../widgets/timeline_widget.dart' as timeline_widget;
 import '../models/memory_details_view_model.dart';
 import '../models/timeline_detail_model.dart';
 import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart'

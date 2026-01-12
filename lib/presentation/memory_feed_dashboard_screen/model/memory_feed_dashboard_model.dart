@@ -4,6 +4,10 @@ import '../../../core/app_export.dart';
 class MemoryFeedDashboardModel extends Equatable {
   final List<HappeningNowStoryData>? happeningNowStories;
   final List<CustomMemoryItem>? publicMemories;
+
+  // ✅ ADD THIS
+  final List<CustomMemoryItem>? popularMemories;
+
   final List<HappeningNowStoryData>? trendingStories;
   final List<HappeningNowStoryData>? longestStreakStories;
   final List<HappeningNowStoryData>? popularUserStories;
@@ -12,6 +16,10 @@ class MemoryFeedDashboardModel extends Equatable {
   MemoryFeedDashboardModel({
     this.happeningNowStories = const [],
     this.publicMemories = const [],
+
+    // ✅ ADD THIS
+    this.popularMemories = const [],
+
     this.trendingStories = const [],
     this.longestStreakStories = const [],
     this.popularUserStories = const [],
@@ -21,6 +29,10 @@ class MemoryFeedDashboardModel extends Equatable {
   MemoryFeedDashboardModel copyWith({
     List<HappeningNowStoryData>? happeningNowStories,
     List<CustomMemoryItem>? publicMemories,
+
+    // ✅ ADD THIS
+    List<CustomMemoryItem>? popularMemories,
+
     List<HappeningNowStoryData>? trendingStories,
     List<HappeningNowStoryData>? longestStreakStories,
     List<HappeningNowStoryData>? popularUserStories,
@@ -29,6 +41,10 @@ class MemoryFeedDashboardModel extends Equatable {
     return MemoryFeedDashboardModel(
       happeningNowStories: happeningNowStories ?? this.happeningNowStories,
       publicMemories: publicMemories ?? this.publicMemories,
+
+      // ✅ ADD THIS
+      popularMemories: popularMemories ?? this.popularMemories,
+
       trendingStories: trendingStories ?? this.trendingStories,
       longestStreakStories: longestStreakStories ?? this.longestStreakStories,
       popularUserStories: popularUserStories ?? this.popularUserStories,
@@ -38,13 +54,17 @@ class MemoryFeedDashboardModel extends Equatable {
 
   @override
   List<Object?> get props => [
-        happeningNowStories,
-        publicMemories,
-        trendingStories,
-        longestStreakStories,
-        popularUserStories,
-        latestStories,
-      ];
+    happeningNowStories,
+    publicMemories,
+
+    // ✅ ADD THIS
+    popularMemories,
+
+    trendingStories,
+    longestStreakStories,
+    popularUserStories,
+    latestStories,
+  ];
 }
 
 /// Data model for happening now stories and trending stories
@@ -94,15 +114,15 @@ class HappeningNowStoryData extends Equatable {
 
   @override
   List<Object?> get props => [
-        storyId,
-        backgroundImage,
-        profileImage,
-        userName,
-        categoryIcon,
-        categoryName,
-        timestamp,
-        isRead,
-      ];
+    storyId,
+    backgroundImage,
+    profileImage,
+    userName,
+    categoryIcon,
+    categoryName,
+    timestamp,
+    isRead,
+  ];
 }
 
 /// Data model for public memory items
@@ -171,20 +191,20 @@ class CustomMemoryItem extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        title,
-        date,
-        iconPath,
-        profileImages,
-        mediaItems,
-        startDate,
-        startTime,
-        endDate,
-        endTime,
-        location,
-        distance,
-        isLiked,
-      ];
+    id,
+    title,
+    date,
+    iconPath,
+    profileImages,
+    mediaItems,
+    startDate,
+    startTime,
+    endDate,
+    endTime,
+    location,
+    distance,
+    isLiked,
+  ];
 }
 
 /// Data model for media items in memory timeline

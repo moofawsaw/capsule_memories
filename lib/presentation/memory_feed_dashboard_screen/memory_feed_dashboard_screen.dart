@@ -673,10 +673,13 @@ class _MemoryFeedDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
-        final memories = state.memoryFeedDashboardModel?.publicMemories ?? [];
+
+        // ✅ FIX: Popular section must read popularMemories (not publicMemories)
+        final memories = state.memoryFeedDashboardModel?.popularMemories ?? [];
+
         final isLoading = state.isLoading ?? false;
 
-        // Convert memory_feed_dashboard_model.CustomMemoryItem to custom_public_memories.CustomMemoryItem
+        // Convert dashboard model items into the widget's item type
         final convertedMemories = memories.map((memory) {
           return custom_widget.CustomMemoryItem(
             id: memory.id,
@@ -706,7 +709,7 @@ class _MemoryFeedDashboardScreenState
           memories: convertedMemories,
           isLoading: isLoading,
           onMemoryTap: (memory) {
-            // CRITICAL FIX: Use validated navigation wrapper
+            // ✅ HARD GUARD: Popular Memories are always public feed cards
             MemoryNavigationWrapper.navigateToTimeline(
               context: context,
               memoryId: memory.id ?? '',
@@ -715,7 +718,7 @@ class _MemoryFeedDashboardScreenState
               location: memory.location,
               categoryIcon: memory.iconPath,
               participantAvatars: memory.profileImages,
-              isPrivate: false, // Popular memories are public
+              isPrivate: false, // ✅ FIX: don't read memory.visibility
             );
           },
           margin: EdgeInsets.only(top: 30.h),
@@ -723,6 +726,8 @@ class _MemoryFeedDashboardScreenState
       },
     );
   }
+
+
 
   Widget _buildTrendingStoriesSection(BuildContext context) {
     return Consumer(

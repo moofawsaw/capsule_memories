@@ -2,20 +2,12 @@ import '../models/event_stories_view_model.dart';
 import '../../../services/feed_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-part 'event_stories_view_state.dart';
-
 final eventStoriesViewNotifier = StateNotifierProvider.autoDispose<
     EventStoriesViewNotifier, EventStoriesViewState>(
   (ref) => EventStoriesViewNotifier(
     EventStoriesViewState(
-      eventStoriesViewModel: const EventStoriesViewModel(
-        eventTitle: '',
-        eventDate: '',
-        eventLocation: '',
-        viewCount: '0',
-        contributorsList: [],
-        storiesList: [],
-      ),
+      isLoading: false,
+      errorMessage: null,
     ),
   ),
 );

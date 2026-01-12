@@ -9,7 +9,6 @@ import './custom_memory_skeleton.dart';
 import './timeline_widget.dart';
 import '../presentation/event_timeline_view_screen/widgets/timeline_story_widget.dart';
 
-
 /// Controls card sizing + badge behavior per screen.
 enum MemoryCardVariant {
   dashboard, // My memories screen (shows state + visibility badges)
@@ -36,8 +35,36 @@ class CustomPublicMemories extends StatelessWidget {
   final EdgeInsetsGeometry? margin;
   final bool isLoading;
 
-  /// ✅ NEW: controls layout + height + badge visibility rules
+  /// controls layout + height + badge visibility rules
   final MemoryCardVariant variant;
+
+  Future<List<CustomMemoryItem>> _filterFeedMemoriesWithStories(
+      List<CustomMemoryItem> input,
+      ) async {
+    // Rule: feed must only show memories with 1+ stories.
+    // We enforce it here so the parent can show empty state correctly.
+    final StoryService storyService = StoryService();
+
+    final List<CustomMemoryItem> filtered = <CustomMemoryItem>[];
+
+    for (final CustomMemoryItem memory in input) {
+      final String? memoryId = memory.id;
+      if (memoryId == null || memoryId.isEmpty) continue;
+
+      try {
+        final List<dynamic> stories = await storyService.fetchMemoryStories(memoryId);
+        if (stories.isNotEmpty) {
+          filtered.add(memory);
+        }
+      } catch (e) {
+        // ignore: avoid_print
+        print('❌ FEED FILTER: Error checking stories for memory $memoryId: $e');
+        // If the check fails, treat as not eligible for feed to avoid flashing empty memories.
+      }
+    }
+
+    return filtered;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,47 +123,60 @@ class CustomPublicMemories extends StatelessWidget {
       );
     }
 
-    final List<CustomMemoryItem> memoryList = memories ?? <CustomMemoryItem>[];
+    final List<CustomMemoryItem> memoryListRaw = memories ?? <CustomMemoryItem>[];
 
-    if (memoryList.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24.h),
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24.h),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CustomImageView(
-                  imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
-                  height: 48.h,
-                  width: 48.h,
-                  color: appTheme.blue_gray_300,
-                ),
-                SizedBox(height: 12.h),
-                Text(
-                  'No memories yet',
-                  style: TextStyleHelper.instance.title16MediumPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  'Create your first memory',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300),
-                ),
-              ],
-            ),
-          ),
-        ),
+    // If nothing came down at all, show empty state immediately.
+    if (memoryListRaw.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    // ✅ CRITICAL FIX:
+    // For FEED variant, pre-filter memories so we can show empty state if none have stories.
+    if (variant == MemoryCardVariant.feed) {
+      return FutureBuilder<List<CustomMemoryItem>>(
+        future: _filterFeedMemoriesWithStories(memoryListRaw),
+        builder: (context, snapshot) {
+          // While filtering, show skeletons (same layout).
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Row(
+                children: List.generate(3, (index) {
+                  return Container(
+                    width: 300.h,
+                    margin: EdgeInsets.only(
+                      left: index == 0 ? 24.h : 0,
+                      right: 12.h,
+                    ),
+                    child: CustomMemorySkeleton(),
+                  );
+                }),
+              ),
+            );
+          }
+
+          final List<CustomMemoryItem> filtered = snapshot.data ?? <CustomMemoryItem>[];
+
+          if (filtered.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          return _buildMemoryRow(context, filtered);
+        },
       );
     }
 
+    // Dashboard (or non-feed) behavior: show what we received.
+    return _buildMemoryRow(context, memoryListRaw);
+  }
+
+  Widget _buildMemoryRow(BuildContext context, List<CustomMemoryItem> list) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: List.generate(memoryList.length, (index) {
-          final CustomMemoryItem memory = memoryList[index];
+        children: List.generate(list.length, (index) {
+          final CustomMemoryItem memory = list[index];
           return Container(
             margin: EdgeInsets.only(
               left: index == 0 ? 24.h : 0,
@@ -149,6 +189,40 @@ class CustomPublicMemories extends StatelessWidget {
             ),
           );
         }),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24.h),
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.h),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CustomImageView(
+                imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
+                height: 48.h,
+                width: 48.h,
+                color: appTheme.blue_gray_300,
+              ),
+              SizedBox(height: 12.h),
+              Text(
+                'No memories yet',
+                style: TextStyleHelper.instance.title16MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                'Check back soon to view public memories',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -360,8 +434,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         memoryEnd = _parseMemoryEndTime();
       }
 
-      final List<dynamic> storiesData =
-      await _storyService.fetchMemoryStories(memoryId);
+      final List<dynamic> storiesData = await _storyService.fetchMemoryStories(memoryId);
 
       if (!mounted) return;
 
@@ -380,14 +453,12 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         final Map<String, dynamic>? contributor =
         storyData['user_profiles'] as Map<String, dynamic>?;
 
-        final DateTime createdAt =
-        DateTime.parse(storyData['created_at'] as String);
+        final DateTime createdAt = DateTime.parse(storyData['created_at'] as String);
         final String storyId = storyData['id'] as String;
 
         final String backgroundImage = _storyService.getStoryMediaUrl(storyData);
 
-        final String? avatarUrl =
-        contributor != null ? contributor['avatar_url'] as String? : null;
+        final String? avatarUrl = contributor != null ? contributor['avatar_url'] as String? : null;
         final String profileImage = AvatarHelperService.getAvatarUrl(avatarUrl);
 
         return TimelineStoryItem(
@@ -608,7 +679,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   Widget _buildMemoryTimeline() {
     return SizedBox(
-      height: 220.h, // ✅ fixed so cards stay uniform
+      height: 220.h,
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
         child: Container(
@@ -653,7 +724,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     final DateTime start = _memoryStartTime ?? _parseMemoryStartTime();
     final DateTime end = _memoryEndTime ?? _parseMemoryEndTime();
 
-    // ✅ vertically center the timeline inside the fixed height
     return Center(
       child: TimelineWidget(
         stories: _timelineStories,
@@ -668,15 +738,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   // ======= NAV =======
 
-  void _onInviteTap() {
-    if (widget.memory.id != null) {
-      NavigatorService.pushNamed(
-        AppRoutes.appBsMembers,
-        arguments: widget.memory.id,
-      );
-    }
-  }
-
   void _onCreateStoryTap() {
     if (widget.memory.id != null) {
       NavigatorService.pushNamed(
@@ -686,19 +747,9 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     }
   }
 
-  void _onEditTap() {
-    if (widget.memory.id != null) {
-      NavigatorService.pushNamed(
-        AppRoutes.appBsDetails,
-        arguments: widget.memory.id,
-      );
-    }
-  }
-
   // ======= LAYOUT RULES =======
 
   bool _shouldShowBadges(CustomMemoryItem memory) {
-    // ✅ Only show badges on dashboard variant (your current rule)
     if (widget.variant != MemoryCardVariant.dashboard) return false;
 
     final hasState = (memory.state ?? '').trim().isNotEmpty;
@@ -711,8 +762,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   @override
   Widget build(BuildContext context) {
     final bool isFeed = widget.variant == MemoryCardVariant.feed;
-
-    // ✅ Different overall card height per screen
     final double cardHeight = isFeed ? 300.h : 330.h;
 
     return GestureDetector(
@@ -810,10 +859,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   Widget _buildMemoryHeader(BuildContext context) {
     final CustomMemoryItem memory = widget.memory;
-
     final bool showBadges = _shouldShowBadges(memory);
-
-    // ✅ shrink header height when badges aren't shown (feed)
     final double headerHeight = showBadges ? 110.h : 74.h;
 
     return SizedBox(
@@ -830,7 +876,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Row 1
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -874,7 +919,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
                 _buildProfileStack(context, memory.profileImages ?? <String>[]),
               ],
             ),
-
             if (showBadges) ...[
               SizedBox(height: 10.h),
               SizedBox(

@@ -71,13 +71,16 @@ class FeedService {
   /// 🛡️ VALIDATION: Validates memory data completeness before rendering
   /// Returns true if all critical data is present, false if validation fails
   ///
-  /// UPDATED: Allow memories with at least 1 story (previously required 2+)
+  /// UPDATED: Use stories_count (DB enforced) instead of relying on joined stories list.
   bool _validateMemoryData(Map<String, dynamic> memory, String context) {
     final category = memory['memory_categories'] as Map<String, dynamic>?;
     final categoryIconUrl = category?['icon_url'] as String?;
     final categoryName = category?['name'] as String?;
     final title = memory['title'] as String?;
-    final stories = memory['stories'] as List? ?? [];
+
+    final int storiesCount = (memory['stories_count'] is int)
+        ? (memory['stories_count'] as int)
+        : int.tryParse('${memory['stories_count'] ?? 0}') ?? 0;
 
     final validationErrors = <String>[];
 
@@ -93,9 +96,9 @@ class FeedService {
       validationErrors.add('Category icon_url is missing for "$categoryName"');
     }
 
-    // ✅ UPDATED: Only require at least 1 story
-    if (stories.isEmpty) {
-      validationErrors.add('Memory has no stories (found 0)');
+    // ✅ UPDATED: Require stories_count > 0 (matches your new DB rule)
+    if (storiesCount <= 0) {
+      validationErrors.add('Memory has no stories (stories_count=$storiesCount)');
     }
 
     if (validationErrors.isNotEmpty) {
@@ -108,6 +111,7 @@ class FeedService {
 
     return true;
   }
+
 
   /// NEW METHOD: Subscribe to real-time story_views updates
   /// Calls the provided callback whenever a story view is inserted
@@ -327,49 +331,46 @@ class FeedService {
       final response = await _client!
           .from('memories')
           .select('''
-            id,
-            title,
-            created_at,
-            expires_at,
-            location_name,
-            contributor_count,
-            state,
-            visibility,
-            creator_id,
-            category_id,
-            memory_categories:category_id(
-              name,
-              icon_url
-            ),
-            stories(
-              thumbnail_url,
-              video_url
-            )
-          ''')
+          id,
+          title,
+          created_at,
+          expires_at,
+          location_name,
+          contributor_count,
+          state,
+          visibility,
+          creator_id,
+          category_id,
+          stories_count,
+          memory_categories:category_id(
+            name,
+            icon_url
+          ),
+          stories(
+            thumbnail_url,
+            video_url
+          )
+        ''')
           .eq('visibility', 'public')
+          .gt('stories_count', 0)
           .eq('state', 'open')
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
-      // Debug logging for category data
       print('🔍 DEBUG: Fetched ${(response as List).length} public memories');
 
       final List<Map<String, dynamic>> transformedMemories = [];
 
       for (final memory in response) {
-        // 🛡️ VALIDATION: Validate memory data before processing
+        // 🛡️ VALIDATION
         if (!_validateMemoryData(memory, 'PublicMemories')) {
-          continue; // Skip this memory if validation fails
+          continue;
         }
 
         final category = memory['memory_categories'] as Map<String, dynamic>?;
         final categoryIconUrl = category?['icon_url'] ?? '';
 
-        // Debug log for category icon
-        print(
-            '🔍 DEBUG: Memory "${memory['title']}" - Category: ${category?['name']}, Icon URL: "$categoryIconUrl"');
-
-        // CRITICAL: Fetch contributors using user_profiles_public for anonymous access
+        // Contributors (avatars)
         final contributorsResponse = await _client!
             .from('memory_contributors')
             .select('user_id, user_profiles_public!inner(avatar_url)')
@@ -378,11 +379,8 @@ class FeedService {
 
         final contributorAvatars = (contributorsResponse as List)
             .map((c) {
-          final profile =
-          c['user_profiles_public'] as Map<String, dynamic>?;
-          return AvatarHelperService.getAvatarUrl(
-            profile?['avatar_url'],
-          );
+          final profile = c['user_profiles_public'] as Map<String, dynamic>?;
+          return AvatarHelperService.getAvatarUrl(profile?['avatar_url']);
         })
             .where((url) => url.isNotEmpty)
             .toList();
@@ -399,7 +397,7 @@ class FeedService {
         })
             .toList();
 
-        // 🛡️ VALIDATION: Skip memory if no valid media items
+        // If for any reason the joined stories list is empty, skip (keeps UI rule consistent)
         if (mediaItems.isEmpty) {
           print(
               '⚠️ WARNING: Skipping memory "${memory['title']}" - no valid media items');
@@ -422,17 +420,19 @@ class FeedService {
           'end_time': _formatTime(expiresAt),
           'location': memory['location_name'] ?? '',
           'state': memory['state'] ?? 'open',
+          'visibility': memory['visibility'] ?? 'public',
+          'stories_count': memory['stories_count'] ?? 0,
         });
       }
 
-      print(
-          '✅ VALIDATION: ${transformedMemories.length} memories passed validation');
+      print('✅ VALIDATION: ${transformedMemories.length} memories passed validation');
       return transformedMemories;
     } catch (e) {
       print('❌ ERROR fetching public memories: $e');
       return [];
     }
   }
+
 
   /// Fetch trending stories with pagination
   Future<List<Map<String, dynamic>>> fetchTrendingStories({
@@ -776,30 +776,33 @@ class FeedService {
       final response = await _client!
           .from('memories')
           .select('''
-            id,
-            title,
-            created_at,
-            expires_at,
-            location_name,
-            contributor_count,
-            state,
-            visibility,
-            creator_id,
-            category_id,
-            popularity_score,
-            memory_categories:category_id(
-              name,
-              icon_url
-            ),
-            stories(
-              thumbnail_url,
-              video_url
-            )
-          ''')
+      id,
+      title,
+      created_at,
+      expires_at,
+      location_name,
+      contributor_count,
+      state,
+      visibility,
+      creator_id,
+      category_id,
+      popularity_score,
+      stories_count,
+      memory_categories:category_id(
+        name,
+        icon_url
+      ),
+      stories(
+        thumbnail_url,
+        video_url
+      )
+    ''')
           .eq('visibility', 'public')
+          .gt('stories_count', 0)
           .eq('state', 'open')
           .order('popularity_score', ascending: false)
           .range(offset, offset + limit - 1);
+
 
       // Debug logging for category data
       print('🔍 DEBUG: Fetched ${(response as List).length} popular memories');
