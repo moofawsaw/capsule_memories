@@ -250,6 +250,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       ),
                     ),
                   ),
+
                 if (state.isFetchingLocation)
                   SizedBox(
                     width: 20.h,

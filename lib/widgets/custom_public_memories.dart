@@ -8,12 +8,13 @@ import './custom_image_view.dart';
 import './custom_memory_skeleton.dart';
 import './timeline_widget.dart';
 
+/// Controls card sizing + badge behavior per screen.
+enum MemoryCardVariant {
+  dashboard, // My memories screen (shows state + visibility badges)
+  feed, // Feed cards (usually no badges, tighter height)
+}
+
 /// CustomPublicMemories - A horizontal scrolling component that displays public memory cards.
-/// Loading behavior:
-/// - When [isLoading] is true: shows the SAME skeleton loader used in MemoriesDashboardScreen
-///   (3x CustomMemorySkeleton).
-/// - When loaded: shows real cards. Each card fetches its own timeline stories; when there are
-///   no stories yet, we STILL show a timeline skeleton preview (empty-state guidance), not just on load.
 class CustomPublicMemories extends StatelessWidget {
   const CustomPublicMemories({
     Key? key,
@@ -23,6 +24,7 @@ class CustomPublicMemories extends StatelessWidget {
     this.onMemoryTap,
     this.margin,
     this.isLoading = false,
+    this.variant = MemoryCardVariant.dashboard,
   }) : super(key: key);
 
   final String? sectionTitle;
@@ -31,6 +33,9 @@ class CustomPublicMemories extends StatelessWidget {
   final Function(CustomMemoryItem)? onMemoryTap;
   final EdgeInsetsGeometry? margin;
   final bool isLoading;
+
+  /// ✅ NEW: controls layout + height + badge visibility rules
+  final MemoryCardVariant variant;
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +143,7 @@ class CustomPublicMemories extends StatelessWidget {
             child: _PublicMemoryCard(
               memory: memory,
               onTap: () => onMemoryTap?.call(memory),
+              variant: variant,
             ),
           );
         }),
@@ -150,7 +156,7 @@ class CustomPublicMemories extends StatelessWidget {
 class CustomMemoryItem {
   CustomMemoryItem({
     this.id,
-    this.userId, // ✅ add owner id so we don't rely on a per-card RLS-blocked query
+    this.userId, // owner id
     this.title,
     this.date,
     this.iconPath,
@@ -163,10 +169,12 @@ class CustomMemoryItem {
     this.location,
     this.distance,
     this.isLiked,
+    this.state, // open / sealed
+    this.visibility, // public / private
   });
 
   final String? id;
-  final String? userId; // ✅ owner/creator id (from your memory list query)
+  final String? userId;
   final String? title;
   final String? date;
   final String? iconPath;
@@ -179,6 +187,9 @@ class CustomMemoryItem {
   final String? location;
   final String? distance;
   final bool? isLiked;
+
+  final String? state;
+  final String? visibility;
 }
 
 /// Data model for media items in the timeline (kept for compatibility)
@@ -196,11 +207,13 @@ class CustomMediaItem {
 class _PublicMemoryCard extends StatefulWidget {
   final CustomMemoryItem memory;
   final VoidCallback? onTap;
+  final MemoryCardVariant variant;
 
   const _PublicMemoryCard({
     Key? key,
     required this.memory,
     this.onTap,
+    this.variant = MemoryCardVariant.dashboard,
   }) : super(key: key);
 
   @override
@@ -228,14 +241,11 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     _fetchMemberCount();
   }
 
-  /// ✅ Prefer using userId passed into the model (no RLS risk).
-  /// Fallback to DB check only if userId not provided.
   void _deriveOwnershipFast() {
     final currentUser = SupabaseService.instance.client?.auth.currentUser;
     final ownerId = widget.memory.userId;
 
     if (currentUser == null || ownerId == null || ownerId.isEmpty) {
-      // We'll try DB fallback async (best effort) if needed.
       _isUserCreatedMemory = false;
       _checkMemoryOwnershipFallback();
       return;
@@ -268,7 +278,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         setState(() => _isUserCreatedMemory = false);
       }
     } catch (e) {
-      // If RLS blocks it, we stay false (joined view)
       // ignore: avoid_print
       print('❌ Error checking memory ownership (fallback): $e');
       if (mounted) setState(() => _isUserCreatedMemory = false);
@@ -310,7 +319,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       _fetchMemberCount();
       _loadTimelineData();
     } else if (oldWidget.memory.userId != widget.memory.userId) {
-      // ownership info changed
       _deriveOwnershipFast();
       if (mounted) setState(() {});
     }
@@ -350,7 +358,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         memoryEnd = _parseMemoryEndTime();
       }
 
-      final List<dynamic> storiesData = await _storyService.fetchMemoryStories(memoryId);
+      final List<dynamic> storiesData =
+      await _storyService.fetchMemoryStories(memoryId);
 
       if (!mounted) return;
 
@@ -365,16 +374,18 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       }
 
       final List<TimelineStoryItem> timelineStories =
-          storiesData.map<TimelineStoryItem>((dynamic storyData) {
+      storiesData.map<TimelineStoryItem>((dynamic storyData) {
         final Map<String, dynamic>? contributor =
-            storyData['user_profiles'] as Map<String, dynamic>?;
+        storyData['user_profiles'] as Map<String, dynamic>?;
 
-        final DateTime createdAt = DateTime.parse(storyData['created_at'] as String);
+        final DateTime createdAt =
+        DateTime.parse(storyData['created_at'] as String);
         final String storyId = storyData['id'] as String;
 
         final String backgroundImage = _storyService.getStoryMediaUrl(storyData);
 
-        final String? avatarUrl = contributor != null ? contributor['avatar_url'] as String? : null;
+        final String? avatarUrl =
+        contributor != null ? contributor['avatar_url'] as String? : null;
         final String profileImage = AvatarHelperService.getAvatarUrl(avatarUrl);
 
         return TimelineStoryItem(
@@ -425,7 +436,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .split(':');
 
       int hour = int.tryParse(timeParts[0]) ?? 0;
-      final int minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final int minute =
+      timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
@@ -453,7 +465,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .split(':');
 
       int hour = int.tryParse(timeParts[0]) ?? 0;
-      final int minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final int minute =
+      timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
@@ -481,80 +494,71 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     };
 
     final String key =
-        month.toLowerCase().substring(0, month.length >= 3 ? 3 : month.length);
+    month.toLowerCase().substring(0, month.length >= 3 ? 3 : month.length);
     return months[key] ?? DateTime.now().month;
   }
 
-  Widget _buildMemoryTimeline() {
-    // Loading: show skeleton
-    if (_isLoadingTimeline) {
-      return _buildTimelineSkeleton();
-    }
+  // ======= TIMELINE (fixed height + centered content) =======
 
-    // Empty: ALWAYS show skeleton preview + then the correct empty messaging/CTAs
-    if (_timelineStories.isEmpty) {
-      final bool hasNoMembers = _memberCount == 0;
-
-      return Padding(
-        padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
-        child: Container(
-          margin: EdgeInsets.symmetric(vertical: 8.h),
-          padding: EdgeInsets.all(16.h),
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_02.withAlpha(128),
-            // borderRadius: BorderRadius.circular(16.h),
-            // border: Border.all(
-            //   color: appTheme.blue_gray_300.withAlpha(51),
-            //   width: 1.0,
-            // ),
+  Widget _buildTimelineSkeletonCompact() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+      child: Column(
+        children: [
+          Container(
+            height: 4.h,
+            decoration: BoxDecoration(
+              color: appTheme.blue_gray_300.withAlpha(51),
+              borderRadius: BorderRadius.circular(999),
+            ),
           ),
-          child: Column(
+          SizedBox(height: 14.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildTimelineSkeleton(),
-              SizedBox(height: 12.h),
-
-              // Owner: show CTAs (Create Story always, Invite optional)
-              if (_isUserCreatedMemory) ...[
-                _buildOwnerEmptyContent(hasNoMembers: hasNoMembers),
-              ] else ...[
-                _buildJoinedEmptyContent(),
-              ],
+              _buildDateMarkerSkeletonCompact(),
+              _buildDateMarkerSkeletonCompact(),
+              _buildDateMarkerSkeletonCompact(),
             ],
           ),
-        ),
-      );
-    }
-
-    // Normal timeline
-    final DateTime start = _memoryStartTime ?? _parseMemoryStartTime();
-    final DateTime end = _memoryEndTime ?? _parseMemoryEndTime();
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
-      child: Container(
-        margin: EdgeInsets.symmetric(vertical: 8.h),
-        child: TimelineWidget(
-          stories: _timelineStories,
-          memoryStartTime: start,
-          memoryEndTime: end,
-          onStoryTap: (String storyId) {
-            if (widget.onTap != null) widget.onTap!();
-          },
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildOwnerEmptyContent({required bool hasNoMembers}) {
+  Widget _buildDateMarkerSkeletonCompact() {
     return Column(
       children: [
-        CustomImageView(
-          imagePath: ImageConstant.imgPlayCircle,
-          height: 48.h,
-          width: 48.h,
-          color: appTheme.blue_gray_300,
+        Container(
+          width: 2,
+          height: 8.h,
+          color: appTheme.blue_gray_300.withAlpha(51),
         ),
-        SizedBox(height: 16.h),
+        SizedBox(height: 6.h),
+        Container(
+          width: 46.h,
+          height: 12.h,
+          decoration: BoxDecoration(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(height: 5.h),
+        Container(
+          width: 38.h,
+          height: 10.h,
+          decoration: BoxDecoration(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOwnerEmptyContentCompact({required bool hasNoMembers}) {
+    return Column(
+      children: [
         Text(
           'No stories yet',
           style: TextStyleHelper.instance.title16BoldPlusJakartaSans
@@ -567,37 +571,21 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
               .copyWith(color: appTheme.blue_gray_300),
           textAlign: TextAlign.center,
         ),
-        SizedBox(height: 20.h),
-
-        // ✅ Create Story ALWAYS for owner when empty
+        SizedBox(height: 12.h),
         CustomButton(
           text: 'Create Story',
           leftIcon: ImageConstant.imgPlayCircle,
           onPressed: _onCreateStoryTap,
           buttonStyle: CustomButtonStyle.fillPrimary,
           buttonTextStyle: CustomButtonTextStyle.bodySmall,
-          height: 40.h,
+          height: 38.h,
           padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
         ),
-
-        // ✅ Invite as secondary if no members yet (excluding creator)
-        if (hasNoMembers) ...[
-          SizedBox(height: 10.h),
-          CustomButton(
-            text: 'Invite',
-            leftIcon: ImageConstant.imgIconWhiteA700,
-            onPressed: _onInviteTap,
-            buttonStyle: CustomButtonStyle.fillPrimary,
-            buttonTextStyle: CustomButtonTextStyle.bodySmall,
-            height: 40.h,
-            padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
-          ),
-        ],
       ],
     );
   }
 
-  Widget _buildJoinedEmptyContent() {
+  Widget _buildJoinedEmptyContentCompact() {
     return Column(
       children: [
         Text(
@@ -616,63 +604,67 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     );
   }
 
-  /// Build timeline skeleton to show what's missing
-  Widget _buildTimelineSkeleton() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 16.h),
-      // height: 90.h,
-      child: Column(
-        children: [
-          Container(
-            height: 4.h,
-            decoration: BoxDecoration(
-              color: appTheme.blue_gray_300.withAlpha(51),
-              // borderRadius: BorderRadius.circular(999),
-            ),
+  Widget _buildMemoryTimeline() {
+    return SizedBox(
+      height: 220.h, // ✅ fixed so cards stay uniform
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
+        child: Container(
+          decoration: BoxDecoration(
+            color: _timelineStories.isEmpty
+                ? appTheme.gray_900_02.withAlpha(128)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16.h),
           ),
-          SizedBox(height: 24.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildDateMarkerSkeleton(),
-              _buildDateMarkerSkeleton(),
-              _buildDateMarkerSkeleton(),
-            ],
-          ),
-        ],
+          child: _buildMemoryTimelineInner(),
+        ),
       ),
     );
   }
 
-  Widget _buildDateMarkerSkeleton() {
-    return Column(
-      children: [
-        Container(
-          width: 2,
-          height: 8.h,
-          color: appTheme.blue_gray_300.withAlpha(51),
-        ),
-        SizedBox(height: 6.h),
-        Container(
-          width: 60.h,
-          height: 14.h,
-          decoration: BoxDecoration(
-            color: appTheme.blue_gray_300.withAlpha(51),
-            borderRadius: BorderRadius.circular(4),
+  Widget _buildMemoryTimelineInner() {
+    if (_isLoadingTimeline) {
+      return Center(child: _buildTimelineSkeletonCompact());
+    }
+
+    if (_timelineStories.isEmpty) {
+      final bool hasNoMembers = _memberCount == 0;
+
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTimelineSkeletonCompact(),
+              SizedBox(height: 10.h),
+              if (_isUserCreatedMemory)
+                _buildOwnerEmptyContentCompact(hasNoMembers: hasNoMembers)
+              else
+                _buildJoinedEmptyContentCompact(),
+            ],
           ),
         ),
-        SizedBox(height: 6.h),
-        Container(
-          width: 50.h,
-          height: 12.h,
-          decoration: BoxDecoration(
-            color: appTheme.blue_gray_300.withAlpha(51),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-      ],
+      );
+    }
+
+    final DateTime start = _memoryStartTime ?? _parseMemoryStartTime();
+    final DateTime end = _memoryEndTime ?? _parseMemoryEndTime();
+
+    // ✅ vertically center the timeline inside the fixed height
+    return Center(
+      child: TimelineWidget(
+        stories: _timelineStories,
+        memoryStartTime: start,
+        memoryEndTime: end,
+        onStoryTap: (String storyId) {
+          if (widget.onTap != null) widget.onTap!();
+        },
+      ),
     );
   }
+
+  // ======= NAV =======
 
   void _onInviteTap() {
     if (widget.memory.id != null) {
@@ -701,21 +693,114 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     }
   }
 
+  // ======= LAYOUT RULES =======
+
+  bool _shouldShowBadges(CustomMemoryItem memory) {
+    // ✅ Only show badges on dashboard variant (your current rule)
+    if (widget.variant != MemoryCardVariant.dashboard) return false;
+
+    final hasState = (memory.state ?? '').trim().isNotEmpty;
+    final hasVisibility = (memory.visibility ?? '').trim().isNotEmpty;
+    return hasState || hasVisibility;
+  }
+
+  // ======= CARD =======
+
   @override
   Widget build(BuildContext context) {
+    final bool isFeed = widget.variant == MemoryCardVariant.feed;
+
+    // ✅ Different overall card height per screen
+    final double cardHeight = isFeed ? 300.h : 330.h;
+
     return GestureDetector(
       onTap: widget.onTap,
-      child: Container(
+      child: SizedBox(
         width: 300.h,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20.h),
+        height: cardHeight,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20.h),
+          ),
+          child: Column(
+            children: [
+              _buildMemoryHeader(context),
+              _buildMemoryTimeline(),
+              _buildMemoryFooter(context),
+            ],
+          ),
         ),
-        child: Column(
-          children: [
-            _buildMemoryHeader(context),
-            _buildMemoryTimeline(),
-            _buildMemoryFooter(context),
-          ],
+      ),
+    );
+  }
+
+  Widget _buildBadgesRowNoWrap(CustomMemoryItem memory) {
+    final hasState = (memory.state ?? '').trim().isNotEmpty;
+    final hasVisibility = (memory.visibility ?? '').trim().isNotEmpty;
+
+    if (!hasState && !hasVisibility) return const SizedBox.shrink();
+
+    return ClipRect(
+      child: Row(
+        children: [
+          if (hasState) _buildStateBadge(memory),
+          if (hasState && hasVisibility) SizedBox(width: 8.h),
+          if (hasVisibility) _buildVisibilityBadge(memory),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVisibilityBadge(CustomMemoryItem memory) {
+    final raw = (memory.visibility ?? '').toLowerCase().trim();
+    if (raw.isEmpty) return const SizedBox.shrink();
+
+    final bool isPublic = raw == 'public';
+    final String label = isPublic ? 'Public' : 'Private';
+
+    final Color fg = isPublic ? appTheme.deep_purple_A100 : appTheme.blue_gray_300;
+    final Color bg = fg.withAlpha(38);
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
+          color: fg,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStateBadge(CustomMemoryItem memory) {
+    final raw = (memory.state ?? '').toLowerCase().trim();
+    if (raw.isEmpty) return const SizedBox.shrink();
+
+    final bool isSealed = raw == 'sealed';
+    final String label = isSealed ? 'Sealed' : (raw == 'open' ? 'Open' : raw);
+
+    final Color bg = isSealed
+        ? appTheme.blue_gray_300.withAlpha(38)
+        : appTheme.deep_purple_A100.withAlpha(38);
+
+    final Color fg = isSealed ? appTheme.blue_gray_300 : appTheme.deep_purple_A100;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
+          color: fg,
+          height: 1.0,
         ),
       ),
     );
@@ -724,51 +809,79 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   Widget _buildMemoryHeader(BuildContext context) {
     final CustomMemoryItem memory = widget.memory;
 
-    return Container(
-      padding: EdgeInsets.all(18.h),
-      decoration: BoxDecoration(
-        color: appTheme.background_transparent,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20.h),
-          topRight: Radius.circular(20.h),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(6.h),
-            decoration: BoxDecoration(
-              color: const Color(0xFF222D3E),
-              borderRadius: BorderRadius.circular(18.h),
-            ),
-            width: 42.h,
-            height: 42.h,
-            child: CustomImageView(
-              imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
-              height: 29.h,
-              width: 29.h,
-            ),
+    final bool showBadges = _shouldShowBadges(memory);
+
+    // ✅ shrink header height when badges aren't shown (feed)
+    final double headerHeight = showBadges ? 110.h : 74.h;
+
+    return SizedBox(
+      height: headerHeight,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(18.h, 16.h, 18.h, 14.h),
+        decoration: BoxDecoration(
+          color: appTheme.background_transparent,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20.h),
+            topRight: Radius.circular(20.h),
           ),
-          SizedBox(width: 12.h),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row 1
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  memory.title ?? 'Nixon Wedding 2025',
-                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
+                Container(
+                  padding: EdgeInsets.all(6.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF222D3E),
+                    borderRadius: BorderRadius.circular(18.h),
+                  ),
+                  width: 42.h,
+                  height: 42.h,
+                  child: CustomImageView(
+                    imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
+                    height: 29.h,
+                    width: 29.h,
+                  ),
                 ),
-                SizedBox(height: 2.h),
-                Text(
-                  memory.location ?? 'Dec 4, 2025',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans,
+                SizedBox(width: 12.h),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        memory.title ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        memory.location ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyleHelper.instance.body12MediumPlusJakartaSans,
+                      ),
+                    ],
+                  ),
                 ),
+                SizedBox(width: 10.h),
+                _buildProfileStack(context, memory.profileImages ?? <String>[]),
               ],
             ),
-          ),
-          _buildProfileStack(context, memory.profileImages ?? <String>[]),
-        ],
+
+            if (showBadges) ...[
+              SizedBox(height: 10.h),
+              SizedBox(
+                height: 26.h,
+                child: _buildBadgesRowNoWrap(memory),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -788,9 +901,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
             child: Container(
               height: 36.h,
               width: 36.h,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-/*                border: Border.all(color: appTheme.whiteCustom, width: 1.h),*/
               ),
               child: ClipOval(
                 child: CustomImageView(
@@ -808,7 +920,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   }
 
   Widget _buildMemoryFooter(BuildContext context) {
-    // keep as-is
     return const SizedBox();
   }
 }

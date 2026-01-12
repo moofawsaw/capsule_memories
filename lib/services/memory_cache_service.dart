@@ -378,6 +378,7 @@ class MemoryCacheService {
               .order('joined_at', ascending: true);
 
           if (contributorsResponse != null) {
+            // Current user's avatar (used only when we need to fill slots)
             final currentUserAvatarData = await SupabaseService.instance.client
                 ?.from('user_profiles')
                 .select('avatar_url')
@@ -388,10 +389,10 @@ class MemoryCacheService {
               currentUserAvatarData?['avatar_url'] as String?,
             );
 
-            final allContributorAvatars = contributorsResponse
+            // Contributor avatars (as returned by join order)
+            final contributorAvatars = contributorsResponse
                 .map((contributor) {
-              final userProfile =
-              contributor['user_profiles'] as Map<String, dynamic>?;
+              final userProfile = contributor['user_profiles'] as Map<String, dynamic>?;
               return AvatarHelperService.getAvatarUrl(
                 userProfile?['avatar_url'] as String?,
               );
@@ -399,14 +400,46 @@ class MemoryCacheService {
                 .where((url) => url.isNotEmpty)
                 .toList();
 
-            participantAvatars = allContributorAvatars
-                .where((avatar) => avatar != currentUserAvatar)
-                .take(3)
-                .toList();
+            // Dedupe while preserving order
+            List<String> _dedupePreserveOrder(List<String> input) {
+              final seen = <String>{};
+              final out = <String>[];
+              for (final a in input) {
+                if (a.isEmpty) continue;
+                if (seen.add(a)) out.add(a);
+              }
+              return out;
+            }
+
+            final uniqueContributors = _dedupePreserveOrder(contributorAvatars);
+
+            // Build "others" list by removing current user avatar (by URL)
+            final others = (currentUserAvatar.isNotEmpty)
+                ? uniqueContributors.where((a) => a != currentUserAvatar).toList()
+                : uniqueContributors;
+
+            // ✅ Rule:
+            // - If 3+ others exist: show 3 others, never show current user
+            // - If 1–2 others: show others + current user to fill to 3 (if available)
+            // - If 0 others: show current user only (if available), otherwise empty
+            if (others.length >= 3) {
+              participantAvatars = others.take(3).toList();
+            } else if (others.isNotEmpty) {
+              final merged = <String>[
+                ...others,
+                if (currentUserAvatar.isNotEmpty) currentUserAvatar,
+              ];
+              participantAvatars = _dedupePreserveOrder(merged).take(3).toList();
+            } else {
+              participantAvatars =
+              currentUserAvatar.isNotEmpty ? <String>[currentUserAvatar] : <String>[];
+            }
           }
         } catch (e) {
           print('❌ CACHE: Error fetching contributor avatars: $e');
         }
+
+
 
         return MemoryItemModel(
           id: memoryData['id'] as String,

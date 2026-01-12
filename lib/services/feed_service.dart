@@ -27,7 +27,7 @@ class FeedService {
     final memory = item['memories'] as Map<String, dynamic>?;
     // UPDATED: Support both user_profiles (authenticated) and user_profiles_public (public)
     final contributor = (item['user_profiles'] ?? item['user_profiles_public'])
-        as Map<String, dynamic>?;
+    as Map<String, dynamic>?;
     final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
     final categoryId = memory?['category_id'] as String?;
@@ -70,6 +70,8 @@ class FeedService {
 
   /// 🛡️ VALIDATION: Validates memory data completeness before rendering
   /// Returns true if all critical data is present, false if validation fails
+  ///
+  /// UPDATED: Allow memories with at least 1 story (previously required 2+)
   bool _validateMemoryData(Map<String, dynamic> memory, String context) {
     final category = memory['memory_categories'] as Map<String, dynamic>?;
     final categoryIconUrl = category?['icon_url'] as String?;
@@ -91,10 +93,9 @@ class FeedService {
       validationErrors.add('Category icon_url is missing for "$categoryName"');
     }
 
-    // CRITICAL FIX: Only show memories with at least 2 stories
-    if (stories.length < 2) {
-      validationErrors
-          .add('Memory has less than 2 stories (found ${stories.length})');
+    // ✅ UPDATED: Only require at least 1 story
+    if (stories.isEmpty) {
+      validationErrors.add('Memory has no stories (found 0)');
     }
 
     if (validationErrors.isNotEmpty) {
@@ -126,23 +127,23 @@ class FeedService {
       _storyViewsChannel = _client!
           .channel('story_views_realtime')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'story_views',
-            callback: (payload) {
-              print('🔄 REALTIME: Story view detected');
-              print('   - Payload: ${payload.newRecord}');
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'story_views',
+        callback: (payload) {
+          print('🔄 REALTIME: Story view detected');
+          print('   - Payload: ${payload.newRecord}');
 
-              final storyId = payload.newRecord['story_id'] as String?;
-              final userId = payload.newRecord['user_id'] as String?;
+          final storyId = payload.newRecord['story_id'] as String?;
+          final userId = payload.newRecord['user_id'] as String?;
 
-              if (storyId != null && userId != null) {
-                print('   - Story ID: $storyId');
-                print('   - User ID: $userId');
-                onStoryViewed(storyId, userId);
-              }
-            },
-          )
+          if (storyId != null && userId != null) {
+            print('   - Story ID: $storyId');
+            print('   - User ID: $userId');
+            onStoryViewed(storyId, userId);
+          }
+        },
+      )
           .subscribe();
 
       print('✅ SUCCESS: Subscribed to real-time story views');
@@ -210,7 +211,7 @@ class FeedService {
           ''')
           .eq('memories.visibility', 'public')
           .gte('created_at',
-              DateTime.now().subtract(Duration(hours: 24)).toIso8601String())
+          DateTime.now().subtract(Duration(hours: 24)).toIso8601String())
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -377,25 +378,25 @@ class FeedService {
 
         final contributorAvatars = (contributorsResponse as List)
             .map((c) {
-              final profile =
-                  c['user_profiles_public'] as Map<String, dynamic>?;
-              return AvatarHelperService.getAvatarUrl(
-                profile?['avatar_url'],
-              );
-            })
+          final profile =
+          c['user_profiles_public'] as Map<String, dynamic>?;
+          return AvatarHelperService.getAvatarUrl(
+            profile?['avatar_url'],
+          );
+        })
             .where((url) => url.isNotEmpty)
             .toList();
 
         final stories = memory['stories'] as List? ?? [];
         final mediaItems = stories
             .where((s) =>
-                s['thumbnail_url'] != null &&
-                s['thumbnail_url'].toString().isNotEmpty)
+        s['thumbnail_url'] != null &&
+            s['thumbnail_url'].toString().isNotEmpty)
             .take(2)
             .map((s) => {
-                  'thumbnail_url': s['thumbnail_url'],
-                  'video_url': s['video_url'],
-                })
+          'thumbnail_url': s['thumbnail_url'],
+          'video_url': s['video_url'],
+        })
             .toList();
 
         // 🛡️ VALIDATION: Skip memory if no valid media items
@@ -473,7 +474,7 @@ class FeedService {
           ''')
           .eq('memories.visibility', 'public')
           .gte('created_at',
-              DateTime.now().subtract(Duration(days: 7)).toIso8601String())
+          DateTime.now().subtract(Duration(days: 7)).toIso8601String())
           .order('view_count', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -583,7 +584,7 @@ class FeedService {
           ''')
           .eq('memories.visibility', 'public')
           .gte('created_at',
-              DateTime.now().subtract(Duration(days: 30)).toIso8601String())
+          DateTime.now().subtract(Duration(days: 30)).toIso8601String())
           .order('user_profiles_public(posting_streak)', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -694,7 +695,7 @@ class FeedService {
           ''')
           .eq('memories.visibility', 'public')
           .gte('created_at',
-              DateTime.now().subtract(Duration(days: 30)).toIso8601String())
+          DateTime.now().subtract(Duration(days: 30)).toIso8601String())
           .order('user_profiles_public(popularity_score)', ascending: false)
           .range(offset, offset + limit - 1);
 
@@ -827,25 +828,25 @@ class FeedService {
 
         final contributorAvatars = (contributorsResponse as List)
             .map((c) {
-              final profile =
-                  c['user_profiles_public'] as Map<String, dynamic>?;
-              return AvatarHelperService.getAvatarUrl(
-                profile?['avatar_url'],
-              );
-            })
+          final profile =
+          c['user_profiles_public'] as Map<String, dynamic>?;
+          return AvatarHelperService.getAvatarUrl(
+            profile?['avatar_url'],
+          );
+        })
             .where((url) => url.isNotEmpty)
             .toList();
 
         final stories = memory['stories'] as List? ?? [];
         final mediaItems = stories
             .where((s) =>
-                s['thumbnail_url'] != null &&
-                s['thumbnail_url'].toString().isNotEmpty)
+        s['thumbnail_url'] != null &&
+            s['thumbnail_url'].toString().isNotEmpty)
             .take(2)
             .map((s) => {
-                  'thumbnail_url': s['thumbnail_url'],
-                  'video_url': s['video_url'],
-                })
+          'thumbnail_url': s['thumbnail_url'],
+          'video_url': s['video_url'],
+        })
             .toList();
 
         // 🛡️ VALIDATION: Skip memory if no valid media items
@@ -936,9 +937,9 @@ class FeedService {
             )
           ''')
           .eq('memories.visibility',
-              'public') // ✅ Only public memories - accessible to everyone
+          'public') // ✅ Only public memories - accessible to everyone
           .order('created_at',
-              ascending: false) // Latest first, no time constraint
+          ascending: false) // Latest first, no time constraint
           .range(offset, offset + limit - 1);
 
       print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -1106,9 +1107,9 @@ class FeedService {
             memories!inner(visibility)
           ''')
           .eq('memories.visibility',
-              'public') // ✅ Only public memories - accessible to everyone
+          'public') // ✅ Only public memories - accessible to everyone
           .order('created_at',
-              ascending: false); // Latest first, no time constraint
+          ascending: false); // Latest first, no time constraint
 
       if (response.isEmpty) {
         print('⚠️ INFO: No public stories found');
@@ -1116,7 +1117,7 @@ class FeedService {
       }
 
       final storyIds =
-          (response as List).map((story) => story['id'] as String).toList();
+      (response as List).map((story) => story['id'] as String).toList();
 
       print(
           '✅ SUCCESS: Fetched ${storyIds.length} public story IDs from latest feed');
@@ -1190,17 +1191,14 @@ class FeedService {
 
       final activeMemories = (response as List).map((memory) {
         final category = memory['memory_categories'] as Map<String, dynamic>?;
-        final creator =
-        memory['user_profiles_public'] as Map<String, dynamic>?;
+        final creator = memory['user_profiles_public'] as Map<String, dynamic>?;
 
         final createdAt = DateTime.parse(memory['created_at']);
         final expiresAt = DateTime.parse(memory['expires_at']);
 
         final creatorName = (creator?['display_name'] as String?)?.trim();
         final safeCreatorName =
-        (creatorName != null && creatorName.isNotEmpty)
-            ? creatorName
-            : null;
+        (creatorName != null && creatorName.isNotEmpty) ? creatorName : null;
 
         return {
           'id': memory['id'] ?? '',
@@ -1308,7 +1306,7 @@ class FeedService {
 
       // CRITICAL: Fetch contributors using user_profiles_public for anonymous access
       final contributorsResponse =
-          await _client!.from('memory_contributors').select('''
+      await _client!.from('memory_contributors').select('''
             id,
             user_id,
             user_profiles_public!inner(
@@ -1395,14 +1393,14 @@ class FeedService {
           ''').eq('id', storyId).single();
 
       final contributor =
-          response['user_profiles_public'] as Map<String, dynamic>?;
+      response['user_profiles_public'] as Map<String, dynamic>?;
       final memory = response['memories'] as Map<String, dynamic>?;
       final textOverlays = response['text_overlays'] as List? ?? [];
 
       // Extract caption from text overlays
       String? caption;
       if (textOverlays.isNotEmpty && textOverlays[0] is Map) {
-        caption = textOverlays[0]['text'] as String?;
+        caption = (textOverlays[0] as Map)['text'] as String?;
       }
 
       // CRITICAL FIX: Properly resolve video/image URLs from Supabase storage

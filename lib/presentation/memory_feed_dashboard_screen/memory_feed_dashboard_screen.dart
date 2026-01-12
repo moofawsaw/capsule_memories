@@ -13,6 +13,8 @@ import './widgets/happening_now_story_card.dart';
 import './widgets/memory_selection_bottom_sheet.dart';
 import './widgets/native_camera_recording_screen.dart';
 import 'notifier/memory_feed_dashboard_notifier.dart';
+import '../../widgets/custom_public_memories.dart' as unified_widget;
+
 
 class MemoryFeedDashboardScreen extends ConsumerStatefulWidget {
   const MemoryFeedDashboardScreen({Key? key}) : super(key: key);
@@ -642,9 +644,10 @@ class _MemoryFeedDashboardScreenState
           );
         }).toList();
 
-        return custom_widget.CustomPublicMemories(
+        return unified_widget.CustomPublicMemories(
           sectionTitle: 'Public Memories',
           sectionIcon: ImageConstant.imgIcon22x22,
+          variant: unified_widget.MemoryCardVariant.feed,
           memories: convertedMemories,
           isLoading: isLoading,
           onMemoryTap: (memory) {

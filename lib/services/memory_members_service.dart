@@ -8,50 +8,50 @@ class MemoryMembersService {
   /// Fetch memory members with their profile information
   Future<List<Map<String, dynamic>>> fetchMemoryMembers(String memoryId) async {
     try {
-      final response =
-          await _supabaseService.client?.from('memory_contributors').select('''
+      final response = await _supabaseService.client
+          ?.from('memory_contributors')
+          .select('''
+          id,
+          user_id,
+          joined_at,
+          user_profiles!inner(
             id,
-            user_id,
-            joined_at,
-            user_profiles!inner(
-              id,
-              display_name,
-              username,
-              avatar_url,
-              is_verified
-            )
-          ''').eq('memory_id', memoryId).order('joined_at', ascending: true);
+            display_name,
+            username,
+            avatar_url,
+            is_verified
+          )
+        ''')
+          .eq('memory_id', memoryId)
+          .order('joined_at', ascending: true);
 
-      // Handle null response
       if (response == null) {
         return [];
       }
 
-      // Process the response to flatten the structure
       final List<Map<String, dynamic>> members = [];
 
-      for (var contributor in response) {
-        final userProfile =
-            contributor['user_profiles'] as Map<String, dynamic>?;
+      for (final contributor in response) {
+        final userProfile = contributor['user_profiles'] as Map<String, dynamic>?;
+        if (userProfile == null) continue;
 
-        if (userProfile != null) {
-          // Get avatar URL with fallback
-          final avatarUrl = AvatarHelperService.getAvatarUrl(
-            userProfile['avatar_url'] as String?,
-          );
+        final avatarUrl = AvatarHelperService.getAvatarUrl(
+          userProfile['avatar_url'] as String?,
+        );
 
-          members.add({
-            'id': contributor['id'],
-            'user_id': userProfile['id'],
-            'display_name': userProfile['display_name'] ??
-                userProfile['username'] ??
-                'Unknown User',
-            'username': userProfile['username'] ?? '',
-            'avatar_url': avatarUrl,
-            'joined_at': contributor['joined_at'],
-            'is_verified': userProfile['is_verified'] ?? false,
-          });
-        }
+        members.add({
+          'id': contributor['id'],
+          // ✅ use the contributor membership user_id as the real user id
+          'user_id': contributor['user_id'],
+          // (optional) keep profile id separately if you ever need it
+          'profile_id': userProfile['id'],
+          'display_name':
+          userProfile['display_name'] ?? userProfile['username'] ?? 'Unknown User',
+          'username': userProfile['username'] ?? '',
+          'avatar_url': avatarUrl,
+          'joined_at': contributor['joined_at'],
+          'is_verified': userProfile['is_verified'] ?? false,
+        });
       }
 
       return members;
@@ -61,11 +61,12 @@ class MemoryMembersService {
     }
   }
 
+
   /// Fetch memory creator information
   Future<Map<String, dynamic>?> fetchMemoryCreator(String memoryId) async {
     try {
       final response =
-          await _supabaseService.client?.from('memories').select('''
+      await _supabaseService.client?.from('memories').select('''
             creator_id,
             user_profiles!inner(
               id,
@@ -76,7 +77,6 @@ class MemoryMembersService {
             )
           ''').eq('id', memoryId).single();
 
-      // Handle null response
       if (response == null) {
         return null;
       }
@@ -84,7 +84,6 @@ class MemoryMembersService {
       final userProfile = response['user_profiles'] as Map<String, dynamic>?;
 
       if (userProfile != null) {
-        // Get avatar URL with fallback
         final avatarUrl = AvatarHelperService.getAvatarUrl(
           userProfile['avatar_url'] as String?,
         );
@@ -108,28 +107,20 @@ class MemoryMembersService {
     }
   }
 
-  /// Get complete members list including creator and group information
-  Future<List<Map<String, dynamic>>> fetchAllMemoryMembers(
-      String memoryId) async {
+  /// Get complete members list including creator and contributors (creator is NOT removed)
+  Future<List<Map<String, dynamic>>> fetchAllMemoryMembers(String memoryId) async {
     try {
       final List<Map<String, dynamic>> allMembers = [];
 
-      // Fetch creator first
+      // Fetch creator first (if available)
       final creator = await fetchMemoryCreator(memoryId);
       if (creator != null) {
         allMembers.add(creator);
       }
 
-      // Fetch contributors (excluding creator if already in list)
+      // Fetch contributors (do NOT filter out creator)
       final contributors = await fetchMemoryMembers(memoryId);
-
-      // Filter out creator from contributors list to avoid duplication
-      final creatorId = creator?['user_id'];
-      final nonCreatorContributors = contributors
-          .where((contributor) => contributor['user_id'] != creatorId)
-          .toList();
-
-      allMembers.addAll(nonCreatorContributors);
+      allMembers.addAll(contributors);
 
       return allMembers;
     } catch (e) {
@@ -142,7 +133,7 @@ class MemoryMembersService {
   Future<Map<String, dynamic>?> fetchMemoryGroupInfo(String memoryId) async {
     try {
       final response =
-          await _supabaseService.client?.from('memories').select('''
+      await _supabaseService.client?.from('memories').select('''
             group_id,
             groups!inner(
               id,
@@ -150,7 +141,6 @@ class MemoryMembersService {
             )
           ''').eq('id', memoryId).maybeSingle();
 
-      // Handle null response or no group
       if (response == null || response['group_id'] == null) {
         return null;
       }

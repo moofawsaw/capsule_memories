@@ -1,3 +1,5 @@
+// lib/presentation/memory_details_view_screen/memory_details_view_screen.dart
+
 import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
@@ -14,6 +16,222 @@ class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
 
   @override
   MemoryDetailsViewScreenState createState() => MemoryDetailsViewScreenState();
+}class _TimelineSkeletonBlock extends StatelessWidget {
+  const _TimelineSkeletonBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(top: 6.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.h),
+      width: double.maxFinite,
+      child: Container(
+        height: 220.h,
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_03,
+          borderRadius: BorderRadius.circular(16.h),
+        ),
+      ),
+    );
+  }
+}
+
+class _StoriesSkeletonRow extends StatelessWidget {
+  const _StoriesSkeletonRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 120.h,
+      child: ListView.separated(
+        padding: EdgeInsets.only(left: 20.h, right: 20.h),
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 4,
+        separatorBuilder: (_, __) => SizedBox(width: 12.h),
+        itemBuilder: (_, __) {
+          return Container(
+            width: 110.h,
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_03,
+              borderRadius: BorderRadius.circular(14.h),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SealedMemoryDetailsSkeleton extends StatelessWidget {
+  const _SealedMemoryDetailsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 12.h),
+
+          // Header skeleton (approx CustomEventCard)
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20.h),
+            child: Container(
+              padding: EdgeInsets.all(16.h),
+              decoration: BoxDecoration(
+                color: appTheme.gray_900_03,
+                borderRadius: BorderRadius.circular(16.h),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44.h,
+                        height: 44.h,
+                        decoration: BoxDecoration(
+                          color: appTheme.blue_gray_900,
+                          borderRadius: BorderRadius.circular(14.h),
+                        ),
+                      ),
+                      SizedBox(width: 12.h),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 14.h,
+                              width: 180.h,
+                              decoration: BoxDecoration(
+                                color: appTheme.blue_gray_900,
+                                borderRadius: BorderRadius.circular(6.h),
+                              ),
+                            ),
+                            SizedBox(height: 10.h),
+                            Container(
+                              height: 12.h,
+                              width: 140.h,
+                              decoration: BoxDecoration(
+                                color: appTheme.blue_gray_900,
+                                borderRadius: BorderRadius.circular(6.h),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: 12.h),
+                      Container(
+                        width: 56.h,
+                        height: 28.h,
+                        decoration: BoxDecoration(
+                          color: appTheme.blue_gray_900,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 14.h),
+                  Container(
+                    height: 12.h,
+                    width: 220.h,
+                    decoration: BoxDecoration(
+                      color: appTheme.blue_gray_900,
+                      borderRadius: BorderRadius.circular(6.h),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          SizedBox(height: 16.h),
+
+          // Timeline skeleton block
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.h),
+            child: Container(
+              height: 220.h,
+              decoration: BoxDecoration(
+                color: appTheme.gray_900_03,
+                borderRadius: BorderRadius.circular(16.h),
+              ),
+            ),
+          ),
+
+          SizedBox(height: 18.h),
+
+          // "Stories" title skeleton
+          Padding(
+            padding: EdgeInsets.only(left: 20.h),
+            child: Container(
+              height: 14.h,
+              width: 120.h,
+              decoration: BoxDecoration(
+                color: appTheme.blue_gray_900,
+                borderRadius: BorderRadius.circular(6.h),
+              ),
+            ),
+          ),
+
+          SizedBox(height: 14.h),
+
+          // Story cards skeleton row
+          SizedBox(
+            height: 140.h,
+            child: ListView.separated(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 4,
+              separatorBuilder: (_, __) => SizedBox(width: 12.h),
+              itemBuilder: (_, __) {
+                return Container(
+                  width: 120.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_03,
+                    borderRadius: BorderRadius.circular(16.h),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          SizedBox(height: 24.h),
+
+          // Buttons skeleton
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.h),
+            child: Column(
+              children: [
+                Container(
+                  height: 48.h,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_03,
+                    borderRadius: BorderRadius.circular(14.h),
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                Container(
+                  height: 48.h,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_03,
+                    borderRadius: BorderRadius.circular(14.h),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          SizedBox(height: 20.h),
+        ],
+      ),
+    );
+  }
 }
 
 class MemoryDetailsViewScreenState
@@ -22,7 +240,6 @@ class MemoryDetailsViewScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Use same navigation contract as timeline screen
       final rawArgs = ModalRoute.of(context)?.settings.arguments;
 
       print('🚨 SEALED SCREEN: Processing navigation arguments');
@@ -37,11 +254,9 @@ class MemoryDetailsViewScreenState
         navArgs = MemoryNavArgs.fromMap(rawArgs);
         print('✅ SEALED SCREEN: Converted Map to MemoryNavArgs');
       } else {
-        print(
-            '❌ SEALED SCREEN: Invalid argument type - expected MemoryNavArgs or Map');
+        print('❌ SEALED SCREEN: Invalid argument type - expected MemoryNavArgs or Map');
       }
 
-      // Validate arguments
       if (navArgs == null || !navArgs.isValid) {
         print('❌ SEALED SCREEN: Missing or invalid memory ID');
         ref.read(memoryDetailsViewNotifier.notifier).setErrorState(
@@ -54,18 +269,33 @@ class MemoryDetailsViewScreenState
       print('   - Memory ID: ${navArgs.memoryId}');
       print('   - Has snapshot: ${navArgs.snapshot != null}');
 
-      // Initialize with same approach as timeline
-      ref
-          .read(memoryDetailsViewNotifier.notifier)
-          .initializeFromMemory(navArgs);
+      ref.read(memoryDetailsViewNotifier.notifier).initializeFromMemory(navArgs);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(memoryDetailsViewNotifier);
+    print('🧪 SEALED UI: isLoading=${state.isLoading} error=${state.errorMessage}');
 
-    // Show error UI if navigation failed
+    // ✅ Trigger options sheet when notifier flips the flag.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final shouldOpen = state.showEventOptions == true;
+
+      if (!shouldOpen) return;
+
+      // Reset FIRST so rebuilds don't re-open
+      ref.read(memoryDetailsViewNotifier.notifier).hideEventOptions();
+
+      // If you want owners only:
+      if (state.isOwner != true) {
+        print('⚠️ SEALED SCREEN: Options requested but user is not owner');
+        return;
+      }
+
+      _showMemoryOptionsSheet(context);
+    });
+
     if (state.errorMessage != null) {
       return Container(
         color: appTheme.gray_900_02,
@@ -111,39 +341,28 @@ class MemoryDetailsViewScreenState
       );
     }
 
-    // Show loading state
-    if (state.isLoading ?? false) {
+    final hasSnapshot = state.memoryDetailsViewModel != null;
+
+// ✅ Only show a full-screen loader/skeleton if we have nothing to render yet
+    if ((state.isLoading ?? false) && !hasSnapshot) {
       return Container(
         color: appTheme.gray_900_02,
-        child: Center(
-          child: CircularProgressIndicator(
-            color: appTheme.deep_purple_A100,
-          ),
-        ),
+        child: _SealedMemoryDetailsSkeleton(), // ✅ your skeleton goes here
       );
     }
 
-    // Display content with dynamic data
+
     return Container(
       color: appTheme.gray_900_02,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           children: [
-            // MATCH OPEN SCREEN: no extra top padding here
             _buildEventHeader(context),
-
-            // MATCH OPEN SCREEN: timeline section spacing
             _buildTimelineSection(context),
-
-            // MATCH OPEN SCREEN: stories section spacing
             _buildStoriesSection(context),
-
             SizedBox(height: 18.h),
-
-            // MATCH OPEN SCREEN: action buttons spacing
             _buildActionButtons(context),
-
             SizedBox(height: 20.h),
           ],
         ),
@@ -151,7 +370,6 @@ class MemoryDetailsViewScreenState
     );
   }
 
-  /// MATCH OPEN SCREEN: Header section (no manual top padding)
   Widget _buildEventHeader(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -169,6 +387,7 @@ class MemoryDetailsViewScreenState
             NavigatorService.goBack();
           },
           onIconButtonTap: () {
+            // ✅ Always fire; sheet will decide owner/non-owner
             ref.read(memoryDetailsViewNotifier.notifier).onEventOptionsTap();
           },
           onAvatarTap: () {
@@ -179,16 +398,43 @@ class MemoryDetailsViewScreenState
     );
   }
 
-  /// MATCH OPEN SCREEN: Timeline section spacing and structure
   Widget _buildTimelineSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsViewNotifier);
-        final timelineDetail = state.memoryDetailsViewModel?.timelineDetail;
 
+        // ✅ SHOW SKELETON while loading, even if snapshot header exists
+        if (state.isLoading == true) {
+          return Container(
+            margin: EdgeInsets.only(top: 6.h),
+            padding: EdgeInsets.symmetric(horizontal: 16.h),
+            width: double.maxFinite,
+            child: Column(
+              children: [
+                SizedBox(height: 44.h),
+                Container(
+                  height: 220.h,
+                  width: double.maxFinite,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_03,
+                    borderRadius: BorderRadius.circular(16.h),
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                Container(
+                  width: double.maxFinite,
+                  height: 1,
+                  color: appTheme.blue_gray_900,
+                ),
+                SizedBox(height: 16.h),
+              ],
+            ),
+          );
+        }
+
+        final timelineDetail = state.memoryDetailsViewModel?.timelineDetail;
         final timelineStories = timelineDetail?.timelineStories ?? [];
 
-        // If there are no stories, render nothing (same behavior as before)
         if (timelineDetail == null || timelineStories.isEmpty) {
           return const SizedBox.shrink();
         }
@@ -201,7 +447,7 @@ class MemoryDetailsViewScreenState
         }
 
         return Container(
-          margin: EdgeInsets.only(top: 6.h), // matches open screen top spacing
+          margin: EdgeInsets.only(top: 6.h),
           child: Stack(
             children: [
               Container(
@@ -238,7 +484,69 @@ class MemoryDetailsViewScreenState
     );
   }
 
-  /// MATCH OPEN SCREEN: Stories section (header + list)
+  Widget _buildStoryList(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryDetailsViewNotifier);
+
+        // ✅ SHOW SKELETON while loading, even if snapshot header exists
+        if (state.isLoading == true) {
+          return SizedBox(
+            height: 120.h,
+            child: ListView.separated(
+              padding: EdgeInsets.only(left: 20.h, right: 20.h),
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 4,
+              separatorBuilder: (_, __) => SizedBox(width: 12.h),
+              itemBuilder: (_, __) {
+                return Container(
+                  width: 110.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_03,
+                    borderRadius: BorderRadius.circular(14.h),
+                  ),
+                );
+              },
+            ),
+          );
+        }
+
+        final dynamic storyItemsDynamic =
+            state.memoryDetailsViewModel?.customStoryItems ?? [];
+
+        final List<CustomStoryItem> storyItems = storyItemsDynamic is List
+            ? storyItemsDynamic.whereType<CustomStoryItem>().toList()
+            : <CustomStoryItem>[];
+
+        if (storyItems.isEmpty) {
+          return Container(
+            margin: EdgeInsets.only(left: 20.h),
+            padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 16.h),
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_03,
+              borderRadius: BorderRadius.circular(12.h),
+            ),
+            child: Center(
+              child: Text(
+                'No stories yet',
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: appTheme.gray_300),
+              ),
+            ),
+          );
+        }
+
+        return CustomStoryList(
+          storyItems: storyItems,
+          onStoryTap: (index) => onTapStoryItem(context, index),
+          itemGap: 8.h,
+        );
+      },
+    );
+  }
+
+
   Widget _buildStoriesSection(BuildContext context) {
     return Container(
       width: double.maxFinite,
@@ -268,53 +576,6 @@ class MemoryDetailsViewScreenState
     );
   }
 
-  /// Story list (same visual behavior as open screen)
-  Widget _buildStoryList(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(memoryDetailsViewNotifier);
-
-        // In your model this is List<TimelineStoryItem>?, but CustomStoryList expects List<CustomStoryItem>.
-        // Your notifier should populate a CustomStoryItem list somewhere else if you want this feed.
-        // Here we follow the same cast pattern you were using earlier (assumes your notifier populates CustomStoryItem).
-        final dynamic storyItemsDynamic =
-            state.memoryDetailsViewModel?.customStoryItems ?? [];
-
-        // If it's not CustomStoryItem list, show empty state to avoid crashes.
-        final List<CustomStoryItem> storyItems = storyItemsDynamic is List
-            ? storyItemsDynamic.whereType<CustomStoryItem>().toList()
-            : <CustomStoryItem>[];
-
-        if (storyItems.isEmpty) {
-          return Container(
-            margin: EdgeInsets.only(left: 20.h),
-            padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 16.h),
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
-              borderRadius: BorderRadius.circular(12.h),
-            ),
-            child: Center(
-              child: Text(
-                'No stories yet',
-                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                    .copyWith(color: appTheme.gray_300),
-              ),
-            ),
-          );
-        }
-
-        return CustomStoryList(
-          storyItems: storyItems,
-          onStoryTap: (index) => onTapStoryItem(context, index),
-          itemGap: 8.h,
-          // Match open screen: don't force extra margin here (open screen commented it out)
-          // margin: EdgeInsets.only(left: 20.h),
-        );
-      },
-    );
-  }
-
-  /// MATCH OPEN SCREEN: Action buttons block spacing
   Widget _buildActionButtons(BuildContext context) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 24.h),
@@ -372,7 +633,6 @@ class MemoryDetailsViewScreenState
     );
   }
 
-  /// ✅ FIX: Timeline story tap should pass FeedStoryContext so story viewer only cycles this memory's stories
   void _handleTimelineStoryTap(BuildContext context, String storyId) {
     final notifier = ref.read(memoryDetailsViewNotifier.notifier);
 
@@ -388,14 +648,11 @@ class MemoryDetailsViewScreenState
     );
   }
 
-  /// ✅ FIX: Story list tap should also pass FeedStoryContext
   void onTapStoryItem(BuildContext context, int index) {
     final notifier = ref.read(memoryDetailsViewNotifier.notifier);
     final ids = notifier.currentMemoryStoryIds;
 
-    if (ids.isEmpty) {
-      return;
-    }
+    if (ids.isEmpty) return;
 
     final initialId = (index >= 0 && index < ids.length) ? ids[index] : ids.first;
 
@@ -427,5 +684,139 @@ class MemoryDetailsViewScreenState
         ),
       );
     }
+  }
+
+  void _showMemoryOptionsSheet(BuildContext context) {
+    final state = ref.read(memoryDetailsViewNotifier);
+    final memoryId = state.memoryDetailsViewModel?.memoryId;
+
+    if (memoryId == null || memoryId.isEmpty) {
+      print('❌ SEALED SCREEN: Cannot open options (missing memoryId)');
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) {
+        return Container(
+          padding: EdgeInsets.fromLTRB(16.h, 14.h, 16.h, 20.h),
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20.h)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44.h,
+                  height: 4.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.blue_gray_900,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                SizedBox(height: 14.h),
+
+                _OptionsRow(
+                  title: 'Edit memory',
+                  icon: Icons.edit,
+                  onTap: () {
+                    Navigator.pop(context);
+                    NavigatorService.pushNamed(
+                      AppRoutes.appBsDetails,
+                      arguments: memoryId,
+                    );
+                  },
+                ),
+
+                SizedBox(height: 10.h),
+
+                _OptionsRow(
+                  title: 'Members',
+                  icon: Icons.group,
+                  onTap: () {
+                    Navigator.pop(context);
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => MemoryMembersScreen(
+                        memoryId: memoryId,
+                        memoryTitle: state.memoryDetailsViewModel?.eventTitle,
+                      ),
+                    );
+                  },
+                ),
+
+                SizedBox(height: 10.h),
+
+                // Placeholder. Hook into your actual delete flow.
+                _OptionsRow(
+                  title: 'Delete memory',
+                  icon: Icons.delete_outline,
+                  isDestructive: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    print('🗑️ TODO: Delete memory: $memoryId');
+                  },
+                ),
+
+                SizedBox(height: 12.h),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OptionsRow extends StatelessWidget {
+  const _OptionsRow({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  final String title;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color fg = isDestructive ? appTheme.red_500 : appTheme.gray_50;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12.h),
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 12.h),
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_03,
+          borderRadius: BorderRadius.circular(12.h),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: fg, size: 20.h),
+            SizedBox(width: 10.h),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: fg),
+              ),
+            ),
+            Icon(Icons.chevron_right, color: appTheme.blue_gray_300, size: 20.h),
+          ],
+        ),
+      ),
+    );
   }
 }

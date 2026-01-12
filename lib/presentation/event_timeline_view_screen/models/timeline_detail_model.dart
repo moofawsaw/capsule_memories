@@ -12,8 +12,8 @@ class TimelineDetailModel extends Equatable {
     this.memoryEndTime,
     this.timelineStories,
   }) {
-    centerLocation = centerLocation ?? "Tillsonburg, ON";
-    centerDistance = centerDistance ?? "21km";
+    centerLocation = centerLocation ?? "Unknown location";
+    centerDistance = centerDistance ?? "NA";
     memoryStartTime =
         memoryStartTime ?? DateTime.now().subtract(Duration(hours: 2));
     memoryEndTime = memoryEndTime ?? DateTime.now();

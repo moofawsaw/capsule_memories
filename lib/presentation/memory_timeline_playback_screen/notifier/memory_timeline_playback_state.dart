@@ -1,3 +1,4 @@
+// lib/presentation/memory_timeline_playback_screen/notifier/memory_timeline_playback_state.dart
 import '../../../core/app_export.dart';
 import '../models/memory_timeline_playback_model.dart';
 
@@ -17,6 +18,11 @@ class MemoryTimelinePlaybackState {
   final double? playbackSpeed;
   final String? activeFilter;
 
+  // ✅ NEW: story progress + countdown
+  final double? storyProgress; // 0..1
+  final Duration? storyRemaining;
+  final Duration? storyTotal;
+
   const MemoryTimelinePlaybackState({
     this.isLoading,
     this.errorMessage,
@@ -31,6 +37,9 @@ class MemoryTimelinePlaybackState {
     this.currentStory,
     this.playbackSpeed,
     this.activeFilter,
+    this.storyProgress,
+    this.storyRemaining,
+    this.storyTotal,
   });
 
   MemoryTimelinePlaybackState copyWith({
@@ -47,6 +56,9 @@ class MemoryTimelinePlaybackState {
     PlaybackStoryModel? currentStory,
     double? playbackSpeed,
     String? activeFilter,
+    double? storyProgress,
+    Duration? storyRemaining,
+    Duration? storyTotal,
   }) {
     return MemoryTimelinePlaybackState(
       isLoading: isLoading ?? this.isLoading,
@@ -58,12 +70,15 @@ class MemoryTimelinePlaybackState {
       totalStories: totalStories ?? this.totalStories,
       isPlaying: isPlaying ?? this.isPlaying,
       isTimelineScrubberExpanded:
-          isTimelineScrubberExpanded ?? this.isTimelineScrubberExpanded,
+      isTimelineScrubberExpanded ?? this.isTimelineScrubberExpanded,
       isChromecastConnected:
-          isChromecastConnected ?? this.isChromecastConnected,
+      isChromecastConnected ?? this.isChromecastConnected,
       currentStory: currentStory ?? this.currentStory,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       activeFilter: activeFilter ?? this.activeFilter,
+      storyProgress: storyProgress ?? this.storyProgress,
+      storyRemaining: storyRemaining ?? this.storyRemaining,
+      storyTotal: storyTotal ?? this.storyTotal,
     );
   }
 }

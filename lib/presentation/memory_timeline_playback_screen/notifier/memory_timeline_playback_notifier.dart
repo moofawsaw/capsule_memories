@@ -1,3 +1,10 @@
+// lib/presentation/memory_timeline_playback_screen/notifier/memory_timeline_playback_notifier.dart
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
+import 'package:video_player/video_player.dart';
+import 'package:intl/intl.dart';
+
 import '../../../core/app_export.dart';
 import '../../../services/memory_service.dart';
 import '../../../services/story_service.dart';
@@ -5,15 +12,13 @@ import '../../../services/supabase_service.dart';
 import '../../../services/chromecast_service.dart';
 import '../models/memory_timeline_playback_model.dart';
 import './memory_timeline_playback_state.dart';
-import 'package:video_player/video_player.dart';
-import 'package:intl/intl.dart';
 
 final memoryServiceProvider = Provider<MemoryService>((ref) => MemoryService());
 final storyServiceProvider = Provider<StoryService>((ref) => StoryService());
 
 final memoryTimelinePlaybackNotifier = StateNotifierProvider<
     MemoryTimelinePlaybackNotifier, MemoryTimelinePlaybackState>(
-  (ref) => MemoryTimelinePlaybackNotifier(
+      (ref) => MemoryTimelinePlaybackNotifier(
     ref.read(memoryServiceProvider),
     ref.read(storyServiceProvider),
   ),
@@ -24,80 +29,185 @@ class MemoryTimelinePlaybackNotifier
   final MemoryService _memoryService;
   final StoryService _storyService;
   final ChromecastService _chromecastService = ChromecastService();
+
   VideoPlayerController? currentVideoController;
 
+  // Keep listener reference so we can remove it safely
+  VoidCallback? _currentControllerListener;
+
+  // Image auto-advance
+  Timer? _imageAutoAdvanceTimer;
+  static const Duration _imageDisplayDuration = Duration(seconds: 4);
+
+  // Prevent async races
+  int _loadToken = 0;
+
+  // Prefetch next TWO videos
+  VideoPlayerController? _nextVideoController1;
+  String? _nextVideoStoryId1;
+
+  VideoPlayerController? _nextVideoController2;
+  String? _nextVideoStoryId2;
+
+  // ✅ Progress ticker (drives countdown + progress bar)
+  Timer? _progressTimer;
+  static const Duration _progressTick = Duration(milliseconds: 50);
+
+  // For images, track elapsed across pause/resume
+  int _imageElapsedMs = 0;
+  DateTime? _imageStartAt;
+
   MemoryTimelinePlaybackNotifier(
-    this._memoryService,
-    this._storyService,
-  ) : super(const MemoryTimelinePlaybackState(
-          isLoading: false,
-          currentStoryIndex: 0,
-          totalStories: 0,
-          isPlaying: false,
-          isTimelineScrubberExpanded: false,
-          isChromecastConnected: false,
-          playbackSpeed: 1.0,
-        )) {
+      this._memoryService,
+      this._storyService,
+      ) : super(const MemoryTimelinePlaybackState(
+    isLoading: false,
+    currentStoryIndex: 0,
+    totalStories: 0,
+    isPlaying: false,
+    isTimelineScrubberExpanded: false,
+    isChromecastConnected: false,
+    playbackSpeed: 1.0,
+    storyProgress: 0.0,
+    storyRemaining: Duration.zero,
+    storyTotal: Duration.zero,
+  )) {
     _initializeChromecast();
   }
 
-  /// Initialize Chromecast service and set up callbacks
   Future<void> _initializeChromecast() async {
-    // Set up connection state callback
     _chromecastService.onConnectionStateChanged = (isConnected) {
       state = state.copyWith(isChromecastConnected: isConnected);
 
       if (isConnected) {
-        debugPrint(
-            '✅ Chromecast connected: ${_chromecastService.connectedDeviceName}');
-
-        // Automatically cast current media when connected
         if (state.currentStory != null) {
           _castCurrentStory();
         }
-      } else {
-        debugPrint('🔌 Chromecast disconnected');
       }
     };
 
-    // Set up error callback
     _chromecastService.onError = (error) {
-      debugPrint('❌ Chromecast error: $error');
-      state = state.copyWith(
-        errorMessage: 'Chromecast: $error',
-      );
+      state = state.copyWith(errorMessage: 'Chromecast: $error');
     };
 
-    // Initialize the service
     await _chromecastService.initialize();
   }
 
-  /// Load memory playback data from database
+  // ------------------------
+  // Progress helpers
+  // ------------------------
+  void _stopProgressTicker() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
+  }
+
+  void _pauseImageProgressTicker() {
+    final start = _imageStartAt;
+    if (start != null) {
+      _imageElapsedMs += DateTime.now().difference(start).inMilliseconds;
+      _imageStartAt = null;
+    }
+    _stopProgressTicker();
+  }
+
+  void _resetStoryProgressForNewStory({required bool isVideo}) {
+    _stopProgressTicker();
+    _imageElapsedMs = 0;
+    _imageStartAt = null;
+
+    if (isVideo) {
+      state = state.copyWith(
+        storyProgress: 0.0,
+        storyRemaining: Duration.zero,
+        storyTotal: Duration.zero,
+      );
+    } else {
+      state = state.copyWith(
+        storyProgress: 0.0,
+        storyRemaining: _imageDisplayDuration,
+        storyTotal: _imageDisplayDuration,
+      );
+    }
+  }
+
+  void _startImageProgressTickerIfPlaying() {
+    _stopProgressTicker();
+    if (!(state.isPlaying ?? false)) return;
+
+    _imageStartAt ??= DateTime.now();
+
+    _progressTimer = Timer.periodic(_progressTick, (_) {
+      if (!(state.isPlaying ?? false)) return;
+
+      final start = _imageStartAt;
+      if (start == null) return;
+
+      final now = DateTime.now();
+      final elapsedMs = _imageElapsedMs + now.difference(start).inMilliseconds;
+      final totalMs = _imageDisplayDuration.inMilliseconds;
+
+      final clampedElapsed = elapsedMs.clamp(0, totalMs);
+      final remainingMs = (totalMs - clampedElapsed).clamp(0, totalMs);
+
+      final progress = totalMs == 0 ? 0.0 : (clampedElapsed / totalMs);
+
+      state = state.copyWith(
+        storyProgress: progress.clamp(0.0, 1.0),
+        storyRemaining: Duration(milliseconds: remainingMs),
+        storyTotal: _imageDisplayDuration,
+      );
+    });
+  }
+
+  void _startVideoProgressTickerIfPlaying(VideoPlayerController controller) {
+    _stopProgressTicker();
+    if (!(state.isPlaying ?? false)) return;
+
+    _progressTimer = Timer.periodic(_progressTick, (_) {
+      final v = controller.value;
+      if (!v.isInitialized) return;
+
+      final dur = v.duration;
+      final pos = v.position;
+
+      final totalMs = dur.inMilliseconds;
+      final posMs = pos.inMilliseconds.clamp(0, totalMs);
+
+      final progress = totalMs == 0 ? 0.0 : (posMs / totalMs);
+      final remaining = dur - Duration(milliseconds: posMs);
+
+      state = state.copyWith(
+        storyProgress: progress.clamp(0.0, 1.0),
+        storyRemaining: remaining.isNegative ? Duration.zero : remaining,
+        storyTotal: dur,
+      );
+    });
+  }
+
+  // ------------------------
+  // Data loading
+  // ------------------------
   Future<void> loadMemoryPlayback(String memoryId) async {
     try {
       state = state.copyWith(isLoading: true);
 
-      // Fetch memory details
       final memoryResponse = await SupabaseService.instance.clientOrThrow
           .from('memories')
           .select('id, title')
           .eq('id', memoryId)
           .single();
 
-      // Fetch all stories for this memory, ordered chronologically
       final storiesResponse = await SupabaseService.instance.clientOrThrow
           .from('stories')
           .select(
-              'id, contributor_id, created_at, media_type, image_url, video_url, thumbnail_url, capture_timestamp, user_profiles!contributor_id(display_name, avatar_url)')
+          'id, contributor_id, created_at, media_type, image_url, video_url, thumbnail_url, capture_timestamp, user_profiles!contributor_id(display_name, avatar_url)')
           .eq('memory_id', memoryId)
           .eq('is_disabled', false)
           .order('capture_timestamp', ascending: true);
 
-      // Transform stories into playback models
       final stories = (storiesResponse as List).map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
 
-        // CRITICAL FIX: Resolve video and image URLs to full Supabase Storage URLs
         final rawVideoUrl = storyData['video_url'] as String?;
         final rawImageUrl = storyData['image_url'] as String?;
         final rawThumbnailUrl = storyData['thumbnail_url'] as String?;
@@ -105,19 +215,20 @@ class MemoryTimelinePlaybackNotifier
         final resolvedVideoUrl = StoryService.resolveStoryMediaUrl(rawVideoUrl);
         final resolvedImageUrl = StoryService.resolveStoryMediaUrl(rawImageUrl);
         final resolvedThumbnailUrl =
-            StoryService.resolveStoryMediaUrl(rawThumbnailUrl);
+        StoryService.resolveStoryMediaUrl(rawThumbnailUrl);
 
-        debugPrint('📹 VIDEO URL RESOLUTION:');
-        debugPrint('   Raw video_url: $rawVideoUrl');
-        debugPrint('   Resolved video_url: $resolvedVideoUrl');
-        debugPrint('   Raw image_url: $rawImageUrl');
-        debugPrint('   Resolved image_url: $resolvedImageUrl');
+        final rawAvatar = contributor?['avatar_url'] as String?;
+        final resolvedAvatar = _resolveAvatarUrl(rawAvatar);
+
+        debugPrint('👤 AVATAR DEBUG');
+        debugPrint('   raw avatar_url: $rawAvatar');
+        debugPrint('   resolved avatar_url: $resolvedAvatar');
 
         return PlaybackStoryModel(
           storyId: storyData['id'],
           contributorId: storyData['contributor_id'],
           contributorName: contributor?['display_name'] ?? 'Unknown',
-          contributorAvatar: contributor?['avatar_url'],
+          contributorAvatar: resolvedAvatar,
           mediaType: storyData['media_type'],
           imageUrl: resolvedImageUrl,
           videoUrl: resolvedVideoUrl,
@@ -133,7 +244,6 @@ class MemoryTimelinePlaybackNotifier
         );
       }).toList();
 
-      // Update state with playback data
       state = state.copyWith(
         isLoading: false,
         memoryTitle: memoryResponse['title'],
@@ -141,14 +251,13 @@ class MemoryTimelinePlaybackNotifier
         totalStories: stories.length,
         currentStoryIndex: 0,
         currentStory: stories.isNotEmpty ? stories[0] : null,
+        errorMessage: null,
       );
 
-      // Initialize first story
       if (stories.isNotEmpty) {
         await _loadStory(0);
       }
     } catch (e) {
-      debugPrint('Error loading memory playback: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Failed to load playback: ${e.toString()}',
@@ -156,94 +265,329 @@ class MemoryTimelinePlaybackNotifier
     }
   }
 
-  /// Load specific story for playback
-  Future<void> _loadStory(int index) async {
-    if (state.stories == null || index >= state.stories!.length) return;
+  // ------------------------
+  // Media helpers
+  // ------------------------
+  bool _isVideoStory(PlaybackStoryModel story) {
+    return story.mediaType == 'video' &&
+        story.videoUrl != null &&
+        story.videoUrl!.isNotEmpty;
+  }
 
-    final story = state.stories![index];
+  bool _isValidHttpUrl(String url) =>
+      url.startsWith('http://') || url.startsWith('https://');
 
-    // Dispose previous video controller if exists
-    await currentVideoController?.dispose();
+  void _stopImageAutoAdvance() {
+    _imageAutoAdvanceTimer?.cancel();
+    _imageAutoAdvanceTimer = null;
+  }
+
+  void _startImageAutoAdvanceIfNeeded(PlaybackStoryModel story) {
+    _stopImageAutoAdvance();
+    if (_isVideoStory(story)) return;
+    if (!(state.isPlaying ?? false)) return;
+
+    _imageAutoAdvanceTimer = Timer(_imageDisplayDuration, () async {
+      if (!(state.isPlaying ?? false)) return;
+      await skipForward();
+    });
+  }
+
+  // ✅ CRITICAL FIX: dispose AFTER next frame so UI detaches VideoPlayer first
+  Future<void> _disposeVideoControllerSafely() async {
+    final old = currentVideoController;
+    if (old == null) return;
+
+    final listener = _currentControllerListener;
+    if (listener != null) {
+      try {
+        old.removeListener(listener);
+      } catch (_) {}
+    }
+    _currentControllerListener = null;
+
+    try {
+      await old.pause();
+    } catch (_) {}
+
+    // Drop reference first
     currentVideoController = null;
 
-    // If connected to Chromecast, cast the new story
-    if (_chromecastService.isConnected) {
-      await _castCurrentStory();
-    }
+    // Stop progress ticker (old controller)
+    _stopProgressTicker();
 
-    // Initialize video player if story is video
-    if (story.mediaType == 'video' &&
-        story.videoUrl != null &&
-        story.videoUrl!.isNotEmpty) {
+    // Force rebuild to detach VideoPlayer from old controller
+    state = state.copyWith(currentStory: state.currentStory);
+
+    // Dispose after next frame
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
-        debugPrint('🎬 INITIALIZING VIDEO PLAYER:');
-        debugPrint('   Story ID: ${story.storyId}');
-        debugPrint('   Video URL: ${story.videoUrl}');
+        await old.dispose();
+      } catch (_) {}
+    });
+  }
 
-        // CRITICAL FIX: Validate URL format before initializing
-        final videoUrl = story.videoUrl!;
-        if (!videoUrl.startsWith('http://') &&
-            !videoUrl.startsWith('https://')) {
-          debugPrint(
-              '❌ ERROR: Invalid video URL format (not HTTP/HTTPS): $videoUrl');
-          state = state.copyWith(
-            errorMessage: 'Invalid video URL format',
-          );
-          return;
-        }
-
-        currentVideoController = VideoPlayerController.networkUrl(
-          Uri.parse(videoUrl),
-        );
-
-        debugPrint('⏳ Initializing video controller...');
-        await currentVideoController!.initialize();
-        debugPrint('✅ Video controller initialized successfully');
-
-        // Auto-play video
-        if (state.isPlaying ?? false) {
-          await currentVideoController!.play();
-          debugPrint('▶️ Video playback started');
-        }
-
-        // Listen for video completion to auto-advance
-        currentVideoController!.addListener(() {
-          if (currentVideoController!.value.position ==
-              currentVideoController!.value.duration) {
-            debugPrint('⏭️ Video completed, skipping to next');
-            skipForward();
-          }
-        });
-      } catch (e, stackTrace) {
-        debugPrint('❌ ERROR INITIALIZING VIDEO PLAYER:');
-        debugPrint('   Error: $e');
-        debugPrint('   Stack trace: $stackTrace');
-        state = state.copyWith(
-          errorMessage: 'Failed to load video: ${e.toString()}',
-        );
-      }
+  Future<void> _disposePrefetchController1() async {
+    final c = _nextVideoController1;
+    if (c != null) {
+      try {
+        await c.pause();
+      } catch (_) {}
+      try {
+        await c.dispose();
+      } catch (_) {}
     }
+    _nextVideoController1 = null;
+    _nextVideoStoryId1 = null;
+  }
+
+  Future<void> _disposePrefetchController2() async {
+    final c = _nextVideoController2;
+    if (c != null) {
+      try {
+        await c.pause();
+      } catch (_) {}
+      try {
+        await c.dispose();
+      } catch (_) {}
+    }
+    _nextVideoController2 = null;
+    _nextVideoStoryId2 = null;
+  }
+
+  Future<VideoPlayerController?> _buildInitializedController(
+      String url, double speed, int token) async {
+    if (!_isValidHttpUrl(url)) return null;
+
+    try {
+      final c = VideoPlayerController.networkUrl(Uri.parse(url));
+      await c.initialize();
+
+      if (token != _loadToken) {
+        try {
+          await c.dispose();
+        } catch (_) {}
+        return null;
+      }
+
+      try {
+        await c.setPlaybackSpeed(speed);
+      } catch (_) {}
+
+      return c;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Prefetch next two videos (call after each story loads)
+  Future<void> prefetchNextTwoVideos() async {
+    final stories = state.stories;
+    if (stories == null || stories.isEmpty) return;
+
+    final currentIndex = state.currentStoryIndex ?? 0;
+    final token = _loadToken;
+    final speed = state.playbackSpeed ?? 1.0;
+
+    // +1
+    final i1 = currentIndex + 1;
+    if (i1 < stories.length && _isVideoStory(stories[i1])) {
+      final story = stories[i1];
+      final id = story.storyId;
+      final url = story.videoUrl;
+
+      if (id != null &&
+          url != null &&
+          _nextVideoStoryId1 == id &&
+          _nextVideoController1 != null &&
+          _nextVideoController1!.value.isInitialized) {
+        // already prefetched
+      } else {
+        await _disposePrefetchController1();
+        final c = await _buildInitializedController(url!, speed, token);
+        if (c != null && token == _loadToken) {
+          _nextVideoController1 = c;
+          _nextVideoStoryId1 = id;
+        } else {
+          await _disposePrefetchController1();
+        }
+      }
+    } else {
+      await _disposePrefetchController1();
+    }
+
+    // +2
+    final i2 = currentIndex + 2;
+    if (i2 < stories.length && _isVideoStory(stories[i2])) {
+      final story = stories[i2];
+      final id = story.storyId;
+      final url = story.videoUrl;
+
+      if (id != null &&
+          url != null &&
+          _nextVideoStoryId2 == id &&
+          _nextVideoController2 != null &&
+          _nextVideoController2!.value.isInitialized) {
+        // already prefetched
+      } else {
+        await _disposePrefetchController2();
+        final c = await _buildInitializedController(url!, speed, token);
+        if (c != null && token == _loadToken) {
+          _nextVideoController2 = c;
+          _nextVideoStoryId2 = id;
+        } else {
+          await _disposePrefetchController2();
+        }
+      }
+    } else {
+      await _disposePrefetchController2();
+    }
+  }
+
+  VideoPlayerController? _takePrefetchedIfMatches(PlaybackStoryModel story) {
+    if (!_isVideoStory(story)) return null;
+    final id = story.storyId;
+    if (id == null) return null;
+
+    if (_nextVideoStoryId1 == id &&
+        _nextVideoController1 != null &&
+        _nextVideoController1!.value.isInitialized) {
+      final c = _nextVideoController1!;
+      _nextVideoController1 = null;
+      _nextVideoStoryId1 = null;
+      return c;
+    }
+
+    if (_nextVideoStoryId2 == id &&
+        _nextVideoController2 != null &&
+        _nextVideoController2!.value.isInitialized) {
+      final c = _nextVideoController2!;
+      _nextVideoController2 = null;
+      _nextVideoStoryId2 = null;
+      return c;
+    }
+
+    return null;
+  }
+
+  // ------------------------
+  // Story loading / playback
+  // ------------------------
+  Future<void> _loadStory(int index) async {
+    final stories = state.stories;
+    if (stories == null || index < 0 || index >= stories.length) return;
+
+    _loadToken++;
+    final token = _loadToken;
+
+    final story = stories[index];
+
+    _stopImageAutoAdvance();
+    _stopProgressTicker();
 
     state = state.copyWith(
       currentStoryIndex: index,
       currentStory: story,
+      errorMessage: null,
     );
+
+    _resetStoryProgressForNewStory(isVideo: _isVideoStory(story));
+
+    // Dispose current controller safely
+    await _disposeVideoControllerSafely();
+
+    // Chromecast cast
+    if (_chromecastService.isConnected) {
+      await _castCurrentStory();
+    }
+
+    // IMAGE
+    if (!_isVideoStory(story)) {
+      _startImageAutoAdvanceIfNeeded(story);
+      _startImageProgressTickerIfPlaying();
+      unawaited(prefetchNextTwoVideos());
+      return;
+    }
+
+    // VIDEO
+    final url = story.videoUrl!;
+    if (!_isValidHttpUrl(url)) {
+      state = state.copyWith(errorMessage: 'Invalid video URL format');
+      unawaited(prefetchNextTwoVideos());
+      return;
+    }
+
+    try {
+      final speed = state.playbackSpeed ?? 1.0;
+
+      final prefetched = _takePrefetchedIfMatches(story);
+      final controller =
+          prefetched ?? VideoPlayerController.networkUrl(Uri.parse(url));
+
+      currentVideoController = controller;
+
+      if (prefetched == null) {
+        await controller.initialize();
+      }
+
+      if (token != _loadToken) {
+        try {
+          await controller.dispose();
+        } catch (_) {}
+        return;
+      }
+
+      try {
+        await controller.setPlaybackSpeed(speed);
+      } catch (_) {}
+
+      if (state.isPlaying ?? false) {
+        await controller.play();
+      } else {
+        await controller.pause();
+      }
+
+      // Start countdown/progress ticker for video
+      _startVideoProgressTickerIfPlaying(controller);
+
+      // Completion listener
+      _currentControllerListener = () {
+        if (token != _loadToken) return;
+        final v = controller.value;
+        if (!v.isInitialized) return;
+
+        final ended = v.duration.inMilliseconds > 0 &&
+            v.position >= v.duration &&
+            !v.isPlaying;
+
+        if (ended) {
+          skipForward();
+        }
+      };
+      controller.addListener(_currentControllerListener!);
+
+      // Force rebuild after controller swap
+      state = state.copyWith(currentStory: story);
+
+      unawaited(prefetchNextTwoVideos());
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to load video: $e');
+      unawaited(prefetchNextTwoVideos());
+    }
   }
 
-  /// Toggle play/pause
   void togglePlayPause() {
     final isPlaying = !(state.isPlaying ?? false);
 
-    // Control local video player
-    if (currentVideoController != null) {
+    final c = currentVideoController;
+    if (c != null) {
       if (isPlaying) {
-        currentVideoController!.play();
+        c.play();
       } else {
-        currentVideoController!.pause();
+        c.pause();
       }
     }
 
-    // Control Chromecast playback
     if (_chromecastService.isConnected) {
       if (isPlaying) {
         _chromecastService.play();
@@ -253,70 +597,81 @@ class MemoryTimelinePlaybackNotifier
     }
 
     state = state.copyWith(isPlaying: isPlaying);
+
+    final story = state.currentStory;
+    if (story == null) return;
+
+    if (_isVideoStory(story)) {
+      final vc = currentVideoController;
+      if (vc != null) {
+        if (isPlaying) {
+          _startVideoProgressTickerIfPlaying(vc);
+        } else {
+          _stopProgressTicker();
+        }
+      }
+    } else {
+      if (isPlaying) {
+        _startImageAutoAdvanceIfNeeded(story);
+        _startImageProgressTickerIfPlaying();
+      } else {
+        _stopImageAutoAdvance();
+        _pauseImageProgressTicker();
+      }
+    }
   }
 
-  /// Skip to next story
-  void skipForward() {
+  Future<void> skipForward() async {
     final nextIndex = (state.currentStoryIndex ?? 0) + 1;
 
     if (nextIndex < (state.totalStories ?? 0)) {
-      _loadStory(nextIndex);
+      await _loadStory(nextIndex);
+    } else {
+      _stopImageAutoAdvance();
+      _stopProgressTicker();
+      state = state.copyWith(isPlaying: false);
     }
   }
 
-  /// Skip to previous story
-  void skipBackward() {
+  Future<void> skipBackward() async {
     final prevIndex = (state.currentStoryIndex ?? 0) - 1;
-
     if (prevIndex >= 0) {
-      _loadStory(prevIndex);
+      await _loadStory(prevIndex);
     }
   }
 
-  /// Jump to specific story
-  void jumpToStory(int index) {
+  Future<void> jumpToStory(int index) async {
     if (index >= 0 && index < (state.totalStories ?? 0)) {
-      _loadStory(index);
+      await _loadStory(index);
     }
   }
 
-  /// Toggle timeline scrubber visibility
   void toggleTimelineScrubber() {
     state = state.copyWith(
       isTimelineScrubberExpanded: !(state.isTimelineScrubberExpanded ?? false),
     );
   }
 
-  /// Toggle Chromecast connection - show device picker if not connected
   Future<void> toggleChromecast() async {
     if (_chromecastService.isConnected) {
-      // Disconnect from current device
       await _chromecastService.disconnect();
       state = state.copyWith(isChromecastConnected: false);
     } else {
-      // Show device picker dialog
-      // In production, this would trigger a native device picker UI
-      // For now, we'll auto-connect to the first available device
-
       final devices = _chromecastService.availableDevices;
 
       if (devices.isEmpty) {
-        debugPrint('⚠️ No Chromecast devices found');
         state = state.copyWith(
           errorMessage: 'No Chromecast devices found on your network',
         );
         return;
       }
 
-      // Connect to first available device
       final firstDevice = devices.first;
       final connected =
-          await _chromecastService.connectToDevice(firstDevice.id);
+      await _chromecastService.connectToDevice(firstDevice.id);
 
       if (connected) {
         state = state.copyWith(isChromecastConnected: true);
-
-        // Cast current media after connection
         if (state.currentStory != null) {
           await _castCurrentStory();
         }
@@ -324,20 +679,16 @@ class MemoryTimelinePlaybackNotifier
     }
   }
 
-  /// Cast the current story to Chromecast device
   Future<void> _castCurrentStory() async {
     final story = state.currentStory;
     if (story == null) return;
 
     final mediaUrl =
-        story.mediaType == 'video' ? story.videoUrl : story.imageUrl;
+    story.mediaType == 'video' ? story.videoUrl : story.imageUrl;
 
-    if (mediaUrl == null || mediaUrl.isEmpty) {
-      debugPrint('⚠️ No media URL available for casting');
-      return;
-    }
+    if (mediaUrl == null || mediaUrl.isEmpty) return;
 
-    final success = await _chromecastService.castMedia(
+    await _chromecastService.castMedia(
       mediaUrl: mediaUrl,
       mediaType: story.mediaType ?? 'image',
       title: state.memoryTitle ?? 'Memory',
@@ -345,50 +696,60 @@ class MemoryTimelinePlaybackNotifier
       thumbnailUrl: story.thumbnailUrl,
     );
 
-    if (success) {
-      debugPrint('✅ Successfully casting to Chromecast');
-
-      // If casting video, sync playback with Chromecast
-      if (story.mediaType == 'video' && state.isPlaying == true) {
-        await _chromecastService.play();
-      }
+    if (story.mediaType == 'video' && state.isPlaying == true) {
+      await _chromecastService.play();
     }
   }
 
-  /// Toggle favorite status
   void toggleFavorite(int index) {
-    if (state.stories == null || index >= state.stories!.length) return;
+    final stories = state.stories;
+    if (stories == null || index < 0 || index >= stories.length) return;
 
-    final updatedStories = List<PlaybackStoryModel>.from(state.stories!);
-    updatedStories[index] = updatedStories[index].copyWith(
-      isFavorite: !(updatedStories[index].isFavorite ?? false),
+    final updated = List<PlaybackStoryModel>.from(stories);
+    updated[index] = updated[index].copyWith(
+      isFavorite: !(updated[index].isFavorite ?? false),
     );
 
-    state = state.copyWith(stories: updatedStories);
+    state = state.copyWith(stories: updated);
   }
 
-  /// Apply filter to stories
   void applyFilter(String filter) {
-    // Implement filtering logic based on filter type
-    // For now, just store the active filter
     state = state.copyWith(activeFilter: filter);
-    debugPrint('Applied filter: $filter');
   }
 
-  /// Replay all stories from the beginning
   void replayAll() {
-    state = state.copyWith(
-      currentStoryIndex: 0,
-      isPlaying: true,
-    );
-
-    // Load the first story
+    state = state.copyWith(currentStoryIndex: 0, isPlaying: true);
     if (state.stories != null && state.stories!.isNotEmpty) {
       _loadStory(0);
     }
   }
 
-  /// Format timestamp for display
+  String? _resolveAvatarUrl(String? rawAvatar) {
+    if (rawAvatar == null) return null;
+    final trimmed = rawAvatar.trim();
+    if (trimmed.isEmpty) return null;
+
+    // Already a full URL
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+
+    // Treat it as a Supabase Storage path
+    // IMPORTANT: set this to your actual avatar bucket name
+    const avatarBucket = 'avatars';
+
+    try {
+      // public URL (works only if bucket is public)
+      final url = SupabaseService.instance.clientOrThrow.storage
+          .from(avatarBucket)
+          .getPublicUrl(trimmed);
+
+      return url;
+    } catch (_) {
+      return null;
+    }
+  }
+
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -396,22 +757,23 @@ class MemoryTimelinePlaybackNotifier
 
     if (storyDate == today) {
       return 'Today at ${DateFormat.jm().format(timestamp)}';
-    } else if (storyDate == today.subtract(Duration(days: 1))) {
+    } else if (storyDate == today.subtract(const Duration(days: 1))) {
       return 'Yesterday at ${DateFormat.jm().format(timestamp)}';
     } else {
       return DateFormat('MMM d at h:mm a').format(timestamp);
     }
   }
 
-  /// Export memory compilation
-  Future<void> exportMemoryCompilation() async {
-    // Implement export functionality
-    debugPrint('Exporting memory compilation...');
-  }
-
   @override
   void dispose() {
-    currentVideoController?.dispose();
+    _stopImageAutoAdvance();
+    _stopProgressTicker();
+    _pauseImageProgressTicker();
+
+    unawaited(_disposeVideoControllerSafely());
+    unawaited(_disposePrefetchController1());
+    unawaited(_disposePrefetchController2());
+
     _chromecastService.dispose();
     super.dispose();
   }
