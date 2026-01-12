@@ -115,9 +115,8 @@ class _MemoryFeedDashboardScreenState
                 child: Column(
                   children: [
                     SizedBox(height: 20.h),
-                    if (_isAuthenticated) _buildActionButton(context),
-                    if (_isAuthenticated) SizedBox(height: 22.h),
-                    if (!_isAuthenticated) SizedBox(height: 2.h),
+                    _buildActionButton(context),
+                    SizedBox(height: 22.h),
                     _buildHappeningNowOrLatestSection(context),
                     _buildPublicMemoriesSection(context),
                     _buildTrendingStoriesSection(context),
@@ -168,6 +167,24 @@ class _MemoryFeedDashboardScreenState
   }
 
   Widget _buildActionButton(BuildContext context) {
+    // ✅ If not authenticated, show login CTA
+    if (!_isAuthenticated) {
+      return Container(
+        margin: EdgeInsets.symmetric(horizontal: 20.h),
+        child: CustomButton(
+          text: 'Log in to Create Memory',
+          width: double.infinity,
+          // leftIcon: ImageConstant.imgIcon20x20,
+          onPressed: () {
+            NavigatorService.pushNamed(AppRoutes.authLogin);
+          },
+          buttonStyle: CustomButtonStyle.fillPrimary,
+          buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+        ),
+      );
+    }
+
+    // ✅ Authenticated: keep existing state-dependent behavior
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
@@ -219,6 +236,7 @@ class _MemoryFeedDashboardScreenState
       },
     );
   }
+
 
   /// Build skeleton loader for action button
   Widget _buildActionButtonSkeleton() {

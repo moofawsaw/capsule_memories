@@ -1,5 +1,3 @@
-// lib/presentation/memory_details_view_screen/notifier/memory_details_view_notifier.dart
-
 import '../../../core/app_export.dart';
 import '../../../core/utils/memory_nav_args.dart';
 import '../../../services/avatar_helper_service.dart';
@@ -11,7 +9,6 @@ import '../models/memory_details_view_model.dart';
 import '../models/timeline_detail_model.dart';
 import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart'
 as timeline_story;
-
 
 part 'memory_details_view_state.dart';
 
@@ -60,17 +57,14 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
       return;
     }
 
-    // Show snapshot immediately (fast UI)
     if (navArgs.snapshot != null) {
       print('✅ SEALED NOTIFIER: Displaying snapshot while loading full data');
       _displaySnapshot(navArgs.snapshot!);
     }
 
-    // Turn on spinner
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      // ✅ Load only what this screen needs first
       await _loadMemoryStories(navArgs.memoryId);
     } catch (e, st) {
       print('❌ SEALED NOTIFIER: initializeFromMemory failed: $e');
@@ -78,12 +72,10 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
       setErrorState('Failed to load memory. Please try again.');
       return;
     } finally {
-      // ✅ ALWAYS turn off spinner even if cache refresh is slow/hangs
       state = state.copyWith(isLoading: false);
       print('✅ SEALED NOTIFIER: isLoading set to false');
     }
 
-    // ✅ Fire-and-forget cache refresh so it cannot keep the spinner alive
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
       if (currentUser != null) {
@@ -101,6 +93,14 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
     }
   }
 
+  Future<void> refreshMemory(String memoryId) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _loadMemoryStories(memoryId);
+    } finally {
+      state = state.copyWith(isLoading: false);
+    }
+  }
 
   void _displaySnapshot(MemorySnapshot snapshot) {
     state = state.copyWith(
@@ -127,12 +127,10 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
     );
   }
 
-  // ✅ Used by UI to open sheet
   void onEventOptionsTap() {
     state = state.copyWith(showEventOptions: true);
   }
 
-  // ✅ UI calls this immediately before opening the sheet
   void hideEventOptions() {
     state = state.copyWith(showEventOptions: false);
   }
@@ -142,7 +140,8 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
       print('🔍 SEALED DEBUG: Loading stories for memory: $memoryId');
 
       final storiesData = await _storyService.fetchMemoryStories(memoryId);
-      print('🔍 SEALED DEBUG: Fetched ${storiesData.length} stories from database');
+      print(
+          '🔍 SEALED DEBUG: Fetched ${storiesData.length} stories from database');
 
       final sortedStories = List<Map<String, dynamic>>.from(storiesData)
         ..sort((a, b) {
@@ -151,12 +150,12 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
           return aTime.compareTo(bTime);
         });
 
-      _currentMemoryStoryIds = sortedStories.map((s) => s['id'] as String).toList();
+      _currentMemoryStoryIds =
+          sortedStories.map((s) => s['id'] as String).toList();
       print('✅ SEALED DEBUG: Story IDs (timeline order): $_currentMemoryStoryIds');
 
       final memoryResponse = await SupabaseService.instance.client
           ?.from('memories')
-      // ✅ IMPORTANT: bring back owner + state + visibility so sealed screen can behave like open
           .select('start_time, end_time, location_name, creator_id, state, visibility')
           .eq('id', memoryId)
           .single();
@@ -174,11 +173,11 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         memoryState = memoryResponse['state'] as String?;
         memoryVisibility = memoryResponse['visibility'] as String?;
 
-        if (memoryResponse['start_time'] != null && memoryResponse['end_time'] != null) {
+        if (memoryResponse['start_time'] != null &&
+            memoryResponse['end_time'] != null) {
           memoryStartTime = _parseUtc(memoryResponse['start_time']);
           memoryEndTime = _parseUtc(memoryResponse['end_time']);
         } else {
-          // fallback below
           memoryStartTime = DateTime.now().toUtc().subtract(const Duration(hours: 2));
           memoryEndTime = DateTime.now().toUtc();
         }
@@ -189,12 +188,12 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         memoryEndTime = DateTime.now().toUtc();
       }
 
-      // Fallback memory window if missing
       if (memoryResponse == null ||
           memoryResponse['start_time'] == null ||
           memoryResponse['end_time'] == null) {
         if (sortedStories.isNotEmpty) {
-          final storyTimes = sortedStories.map((s) => _parseUtc(s['created_at'])).toList()
+          final storyTimes =
+          sortedStories.map((s) => _parseUtc(s['created_at'])).toList()
             ..sort();
           memoryStartTime = storyTimes.first;
           memoryEndTime = storyTimes.last;
@@ -205,14 +204,16 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         }
       }
 
-      final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
-      final isOwner = (currentUserId != null && creatorId != null && currentUserId == creatorId);
+      final currentUserId =
+          SupabaseService.instance.client?.auth.currentUser?.id;
+      final isOwner =
+      (currentUserId != null && creatorId != null && currentUserId == creatorId);
 
       final rawVisibility = (memoryVisibility ?? '').toLowerCase().trim();
       final bool isPrivate = rawVisibility == 'private';
 
-      // Story list items
-      final List<CustomStoryItem> storyFeedItems = sortedStories.map((storyData) {
+      final List<CustomStoryItem> storyFeedItems =
+      sortedStories.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
         final createdAt = _parseUtc(storyData['created_at']);
 
@@ -229,7 +230,6 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         );
       }).toList();
 
-      // Timeline items
       final List<timeline_story.TimelineStoryItem> timelineStories =
       sortedStories.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
@@ -258,7 +258,8 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         memoryVisibility: memoryVisibility,
         memoryDetailsViewModel: (existing ?? MemoryDetailsViewModel()).copyWith(
           memoryId: memoryId,
-          eventLocation: memoryLocation ?? existing?.eventLocation ?? 'Unknown Location',
+          eventLocation:
+          memoryLocation ?? existing?.eventLocation ?? 'Unknown Location',
           isPrivate: isPrivate,
           customStoryItems: storyFeedItems,
           timelineDetail: (existing?.timelineDetail ??
@@ -276,7 +277,8 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         errorMessage: null,
       );
 
-      print('✅ SEALED DEBUG: Ownership + visibility loaded. isOwner=$isOwner state=$memoryState visibility=$memoryVisibility');
+      print(
+          '✅ SEALED DEBUG: Ownership + visibility loaded. isOwner=$isOwner state=$memoryState visibility=$memoryVisibility');
       print('✅ SEALED DEBUG: Timeline + feed updated with sorted story order');
     } catch (e, stackTrace) {
       print('❌ SEALED DEBUG: Error loading memory stories: $e');

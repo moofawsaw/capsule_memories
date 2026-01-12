@@ -6,35 +6,46 @@ class AddMemoryUploadState extends Equatable {
   final bool? uploadSuccess;
   final String? errorMessage;
   final AddMemoryUploadModel? addMemoryUploadModel;
+
   final String? memoryId;
+
+  // ✅ Memory metadata
+  final String? memoryName;
   final DateTime? memoryStartDate;
   final DateTime? memoryEndDate;
-  final DateTime? captureTimestamp;
 
-  AddMemoryUploadState({
+  // ✅ Extracted capture time + eligibility flag
+  final DateTime? captureTimestamp;
+  final bool? isWithinMemoryWindow;
+
+  const AddMemoryUploadState({
     this.selectedFile,
     this.isUploading = false,
     this.uploadSuccess = false,
     this.errorMessage,
     this.addMemoryUploadModel,
     this.memoryId,
+    this.memoryName,
     this.memoryStartDate,
     this.memoryEndDate,
     this.captureTimestamp,
+    this.isWithinMemoryWindow,
   });
 
   @override
   List<Object?> get props => [
-        selectedFile,
-        isUploading,
-        uploadSuccess,
-        errorMessage,
-        addMemoryUploadModel,
-        memoryId,
-        memoryStartDate,
-        memoryEndDate,
-        captureTimestamp,
-      ];
+    selectedFile,
+    isUploading,
+    uploadSuccess,
+    errorMessage,
+    addMemoryUploadModel,
+    memoryId,
+    memoryName,
+    memoryStartDate,
+    memoryEndDate,
+    captureTimestamp,
+    isWithinMemoryWindow,
+  ];
 
   AddMemoryUploadState copyWith({
     PlatformFile? selectedFile,
@@ -43,9 +54,11 @@ class AddMemoryUploadState extends Equatable {
     String? errorMessage,
     AddMemoryUploadModel? addMemoryUploadModel,
     String? memoryId,
+    String? memoryName,
     DateTime? memoryStartDate,
     DateTime? memoryEndDate,
     DateTime? captureTimestamp,
+    bool? isWithinMemoryWindow,
   }) {
     return AddMemoryUploadState(
       selectedFile: selectedFile ?? this.selectedFile,
@@ -54,9 +67,11 @@ class AddMemoryUploadState extends Equatable {
       errorMessage: errorMessage ?? this.errorMessage,
       addMemoryUploadModel: addMemoryUploadModel ?? this.addMemoryUploadModel,
       memoryId: memoryId ?? this.memoryId,
+      memoryName: memoryName ?? this.memoryName,
       memoryStartDate: memoryStartDate ?? this.memoryStartDate,
       memoryEndDate: memoryEndDate ?? this.memoryEndDate,
       captureTimestamp: captureTimestamp ?? this.captureTimestamp,
+      isWithinMemoryWindow: isWithinMemoryWindow ?? this.isWithinMemoryWindow,
     );
   }
 }

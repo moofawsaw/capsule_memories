@@ -1,9 +1,13 @@
+// lib/presentation/add_memory_upload_screen/add_memory_upload_screen.dart
+// Only change here is: DO NOT NAVIGATE unless uploadSuccess == true.
+// If there is an error, bottom sheet stays open automatically.
+
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
@@ -31,16 +35,20 @@ class AddMemoryUploadScreen extends ConsumerStatefulWidget {
 class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
   final ImagePicker _imagePicker = ImagePicker();
 
+  static const int _maxBytes = 50 * 1024 * 1024;
+
+  final DateFormat _readableDate = DateFormat('MMM d, yyyy');
+  final DateFormat _readableDateTime = DateFormat('MMM d, yyyy • h:mm a');
+
   @override
   void initState() {
     super.initState();
-    // Set memory details for date validation
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(addMemoryUploadNotifier.notifier).setMemoryDetails(
-            memoryId: widget.memoryId,
-            startDate: widget.memoryStartDate,
-            endDate: widget.memoryEndDate,
-          );
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(addMemoryUploadNotifier.notifier).setMemoryDetails(
+        memoryId: widget.memoryId,
+        startDate: widget.memoryStartDate,
+        endDate: widget.memoryEndDate,
+      );
     });
   }
 
@@ -61,7 +69,6 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(height: 12.h),
-            // Drag handle indicator
             Container(
               width: 48.h,
               height: 5.h,
@@ -70,7 +77,6 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
                 borderRadius: BorderRadius.circular(2.5),
               ),
             ),
-            SizedBox(height: 20.h),
             Flexible(
               child: SingleChildScrollView(
                 padding: EdgeInsets.symmetric(horizontal: 20.h),
@@ -88,13 +94,55 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
       builder: (context, ref, _) {
         final state = ref.watch(addMemoryUploadNotifier);
 
+        final memoryName =
+        (state.memoryName != null && state.memoryName!.trim().isNotEmpty)
+            ? state.memoryName!.trim()
+            : 'this memory';
+
+        final start = state.memoryStartDate ?? widget.memoryStartDate;
+        final end = state.memoryEndDate ?? widget.memoryEndDate;
+
         return Column(
           children: [
             CustomHeaderSection(
               title: 'Add to Memory',
               description:
-                  'Upload a photo or video from your device to add to "memory name"',
+              'Upload a photo or video from your device to add to "$memoryName"',
               margin: EdgeInsets.only(top: 32.h, left: 42.h, right: 42.h),
+            ),
+            Padding(
+              padding: EdgeInsets.only(top: 10.h, left: 42.h, right: 42.h),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+                decoration: BoxDecoration(
+                  color: appTheme.gray_900,
+                  borderRadius: BorderRadius.circular(12.h),
+                  border: Border.all(color: appTheme.colorFF3A3A, width: 1.h),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Acceptable capture window',
+                      style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      '${_formatReadableDateTime(start)}  →  ${_formatReadableDateTime(end)}',
+                      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                          .copyWith(color: appTheme.blue_gray_300, height: 1.25),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      '(${_formatReadableDate(start)} to ${_formatReadableDate(end)})',
+                      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                          .copyWith(color: appTheme.blue_gray_300, height: 1.25),
+                    ),
+                  ],
+                ),
+              ),
             ),
             _buildUploadSection(context),
             _buildActionButtons(context),
@@ -104,31 +152,25 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
     );
   }
 
-  /// Section Widget
   Widget _buildUploadSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(addMemoryUploadNotifier);
 
-        ref.listen(
-          addMemoryUploadNotifier,
-          (previous, current) {
-            if (current.errorMessage != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(current.errorMessage!)),
-              );
-            }
-          },
-        );
+        final bool isImageSelected = state.selectedFile != null &&
+            (state.selectedFile!.path?.toLowerCase().contains(
+              RegExp(r'\.(jpg|jpeg|png|gif|bmp|webp)$'),
+            ) ==
+                true);
 
         return GestureDetector(
-          onTap: () => _showFilePickerOptions(context),
+          onTap: _pickMediaFromGallery,
           child: Container(
             width: double.infinity,
             margin: EdgeInsets.only(top: 26.h),
             padding: EdgeInsets.symmetric(vertical: 34.h),
             decoration: BoxDecoration(
-              color: appTheme.colorDF0782,
+              color: appTheme.colorF716A8,
               border: Border.all(
                 color: appTheme.deep_purple_A100,
                 width: 2.h,
@@ -137,14 +179,11 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
             ),
             child: Column(
               children: [
-                if (state.selectedFile != null &&
-                    state.selectedFile!.path?.toLowerCase().contains(
-                            RegExp(r'\.(jpg|jpeg|png|gif|bmp|webp)$')) ==
-                        true) // Modified: Added null safety for path
+                if (isImageSelected)
                   Container(
                     height: 120.h,
                     width: 120.h,
-                    margin: EdgeInsets.only(bottom: 20.h),
+                    margin: EdgeInsets.only(bottom: 12.h),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12.h),
                     ),
@@ -152,25 +191,23 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
                       borderRadius: BorderRadius.circular(12.h),
                       child: kIsWeb
                           ? Image.network(
-                              state.selectedFile!.path ??
-                                  '', // Modified: Added null coalescing operator
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _buildUploadIcon(),
-                            )
+                        state.selectedFile!.path ?? '',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildUploadIcon(),
+                      )
                           : Image.file(
-                              File(state.selectedFile!.path ??
-                                  ''), // Modified: Added null coalescing operator
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _buildUploadIcon(),
-                            ),
+                        File(state.selectedFile!.path ?? ''),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildUploadIcon(),
+                      ),
                     ),
                   )
                 else if (state.selectedFile != null)
                   Container(
                     padding: EdgeInsets.all(16.h),
-                    margin: EdgeInsets.only(bottom: 20.h),
+                    margin: EdgeInsets.only(bottom: 12.h),
                     decoration: BoxDecoration(
                       color: appTheme.gray_900,
                       borderRadius: BorderRadius.circular(8.h),
@@ -197,6 +234,46 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
                   )
                 else
                   _buildUploadIcon(),
+
+                if (state.captureTimestamp != null)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 8.h),
+                    child: Text(
+                      'Captured: ${_formatReadableDateTime(state.captureTimestamp!)}',
+                      textAlign: TextAlign.center,
+                      style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                    ),
+                  ),
+
+                if (state.selectedFile != null)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 10.h),
+                    child: Text(
+                      (state.isWithinMemoryWindow == true)
+                          ? 'Ready to upload (within memory window)'
+                          : 'Not eligible to upload (outside memory window)',
+                      textAlign: TextAlign.center,
+                      style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                          .copyWith(
+                        color: (state.isWithinMemoryWindow == true)
+                            ? appTheme.gray_50
+                            : appTheme.red_500,
+                      ),
+                    ),
+                  ),
+
+                if (state.errorMessage != null && state.errorMessage!.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 10.h),
+                    child: Text(
+                      state.errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                          .copyWith(color: appTheme.red_500, height: 1.25),
+                    ),
+                  ),
+
                 Text(
                   state.selectedFile != null ? 'File Selected' : 'Choose file',
                   style: TextStyleHelper.instance.title16BoldPlusJakartaSans
@@ -229,15 +306,18 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
     );
   }
 
-  /// Section Widget
   Widget _buildActionButtons(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(addMemoryUploadNotifier);
 
+        final bool canUpload = state.selectedFile != null &&
+            (state.isWithinMemoryWindow == true) &&
+            (state.isUploading ?? false) == false;
+
         return Container(
           width: double.infinity,
-          margin: EdgeInsets.only(top: 20.h),
+          margin: EdgeInsets.only(top: 20.h, bottom: 12.h),
           child: Row(
             spacing: 12.h,
             children: [
@@ -253,19 +333,14 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
                 child: CustomButton(
                   text: (state.isUploading ?? false)
                       ? 'Uploading...'
-                      : 'Add to Memory', // Modified: Added null safety check
+                      : 'Add to Memory',
                   leftIcon: (state.isUploading ?? false)
                       ? null
-                      : ImageConstant
-                          .imgIconWhiteA700, // Modified: Added null safety check
-                  onPressed: (state.isUploading ?? false)
-                      ? null
-                      : () => _onTapAddToMemory(
-                          context), // Modified: Added null safety check
+                      : ImageConstant.imgIconWhiteA700,
+                  onPressed: canUpload ? () => _onTapAddToMemory(context) : null,
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  isDisabled: state.isUploading ??
-                      false, // Modified: Added null safety check
+                  isDisabled: !canUpload,
                 ),
               ),
             ],
@@ -275,233 +350,36 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
     );
   }
 
-  /// Shows file picker options
-  void _showFilePickerOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: appTheme.gray_900,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.h)),
-      ),
-      builder: (context) => Container(
-        padding: EdgeInsets.all(20.h),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40.h,
-              height: 4.h,
-              decoration: BoxDecoration(
-                color: appTheme.blue_gray_300,
-                borderRadius: BorderRadius.circular(2.h),
-              ),
-            ),
-            SizedBox(height: 20.h),
-            Text(
-              'Select Media',
-              style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
-            ),
-            SizedBox(height: 20.h),
-            ListTile(
-              leading:
-                  Icon(Icons.photo_camera, color: appTheme.deep_purple_A100),
-              title: Text(
-                'Take Photo',
-                style: TextStyleHelper.instance.title16MediumPlusJakartaSans,
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImageFromCamera();
-              },
-            ),
-            ListTile(
-              leading:
-                  Icon(Icons.photo_library, color: appTheme.deep_purple_A100),
-              title: Text(
-                'Choose from Gallery',
-                style: TextStyleHelper.instance.title16MediumPlusJakartaSans,
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImageFromGallery();
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.videocam, color: appTheme.deep_purple_A100),
-              title: Text(
-                'Record Video',
-                style: TextStyleHelper.instance.title16MediumPlusJakartaSans,
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickVideoFromCamera();
-              },
-            ),
-            ListTile(
-              leading:
-                  Icon(Icons.video_library, color: appTheme.deep_purple_A100),
-              title: Text(
-                'Choose Video',
-                style: TextStyleHelper.instance.title16MediumPlusJakartaSans,
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickVideoFromGallery();
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.folder, color: appTheme.deep_purple_A100),
-              title: Text(
-                'Browse Files',
-                style: TextStyleHelper.instance.title16MediumPlusJakartaSans,
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickFileFromDevice();
-              },
-            ),
-            SizedBox(height: 20.h),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Pick image from camera
-  Future<void> _pickImageFromCamera() async {
-    final notifier = ref.read(addMemoryUploadNotifier.notifier);
-
-    // Request camera permission
-    final status = await Permission.camera.request();
-    if (!status.isGranted) {
-      notifier.setError('Camera permission is required to take photos');
-      return;
-    }
-
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        final file = PlatformFile(
-          name: image.name,
-          path: image.path,
-          size: await image.length(),
-        );
-        notifier.setSelectedFile(file);
-        // Validate metadata after selection
-        await notifier.validateFileMetadata();
-      }
-    } catch (e) {
-      notifier.setError('Failed to capture image: ${e.toString()}');
-    }
-  }
-
-  /// Pick image from gallery
-  Future<void> _pickImageFromGallery() async {
+  Future<void> _pickMediaFromGallery() async {
     final notifier = ref.read(addMemoryUploadNotifier.notifier);
 
     try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-      );
+      if (!kIsWeb) {
+        try {
+          final XFile? picked = await (_imagePicker as dynamic).pickMedia();
+          if (picked != null) {
+            final int bytes = await picked.length();
+            if (bytes > _maxBytes) {
+              notifier.setError('File size must be less than 50MB');
+              return;
+            }
 
-      if (image != null) {
-        final file = PlatformFile(
-          name: image.name,
-          path: image.path,
-          size: await image.length(),
-        );
-        notifier.setSelectedFile(file);
-        // Validate metadata after selection
-        await notifier.validateFileMetadata();
-      }
-    } catch (e) {
-      notifier.setError('Failed to select image: ${e.toString()}');
-    }
-  }
+            final file = PlatformFile(
+              name: picked.name,
+              path: picked.path,
+              size: bytes,
+            );
 
-  /// Pick video from camera
-  Future<void> _pickVideoFromCamera() async {
-    final notifier = ref.read(addMemoryUploadNotifier.notifier);
-
-    // Request camera permission
-    final status = await Permission.camera.request();
-    if (!status.isGranted) {
-      notifier.setError('Camera permission is required to record videos');
-      return;
-    }
-
-    try {
-      final XFile? video = await _imagePicker.pickVideo(
-        source: ImageSource.camera,
-        maxDuration: Duration(minutes: 5),
-      );
-
-      if (video != null) {
-        final file = PlatformFile(
-          name: video.name,
-          path: video.path,
-          size: await video.length(),
-        );
-
-        // Check file size (50MB limit)
-        if (file.size > 50 * 1024 * 1024) {
-          notifier.setError('Video file size must be less than 50MB');
-          return;
+            notifier.setSelectedFile(file);
+            await notifier.validateFileMetadata();
+            return;
+          }
+        } catch (_) {
+          // fall through
         }
-
-        notifier.setSelectedFile(file);
-        // Validate metadata after selection
-        await notifier.validateFileMetadata();
       }
-    } catch (e) {
-      notifier.setError('Failed to record video: ${e.toString()}');
-    }
-  }
 
-  /// Pick video from gallery
-  Future<void> _pickVideoFromGallery() async {
-    try {
-      final XFile? video = await _imagePicker.pickVideo(
-        source: ImageSource.gallery,
-      );
-
-      if (video != null) {
-        final file = PlatformFile(
-          name: video.name,
-          path: video.path,
-          size: await video.length(),
-        );
-
-        // Check file size (50MB limit)
-        if (file.size > 50 * 1024 * 1024) {
-          ref
-              .read(addMemoryUploadNotifier.notifier)
-              .setError('Video file size must be less than 50MB');
-          return;
-        }
-
-        ref.read(addMemoryUploadNotifier.notifier).setSelectedFile(file);
-        // Validate metadata after selection
-        await ref.read(addMemoryUploadNotifier.notifier).validateFileMetadata();
-      }
-    } catch (e) {
-      ref
-          .read(addMemoryUploadNotifier.notifier)
-          .setError('Failed to select video: ${e.toString()}');
-    }
-  }
-
-  /// Pick file from device
-  Future<void> _pickFileFromDevice() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      final FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.media,
         allowMultiple: false,
       );
@@ -509,43 +387,56 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
 
-        // Check file size (50MB limit)
-        if (file.size > 50 * 1024 * 1024) {
-          ref
-              .read(addMemoryUploadNotifier.notifier)
-              .setError('File size must be less than 50MB');
+        if (file.size > _maxBytes) {
+          notifier.setError('File size must be less than 50MB');
           return;
         }
 
-        ref.read(addMemoryUploadNotifier.notifier).setSelectedFile(file);
-        // Validate metadata after selection
-        await ref.read(addMemoryUploadNotifier.notifier).validateFileMetadata();
+        notifier.setSelectedFile(file);
+        await notifier.validateFileMetadata();
       }
     } catch (e) {
-      ref
-          .read(addMemoryUploadNotifier.notifier)
-          .setError('Failed to select file: ${e.toString()}');
+      notifier.setError('Failed to select media: ${e.toString()}');
     }
   }
 
-  /// Handles the cancel button tap
   void _onTapCancel(BuildContext context) {
     NavigatorService.goBack();
   }
 
-  /// Handles the add to memory button tap
-  void _onTapAddToMemory(BuildContext context) {
+  /// ✅ Only redirect if story creation was a success.
+  /// If error occurs, bottom sheet stays open.
+  Future<void> _onTapAddToMemory(BuildContext context) async {
     final state = ref.read(addMemoryUploadNotifier);
 
     if (state.selectedFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a file first')),
+      ref.read(addMemoryUploadNotifier.notifier).setError('Please select a file first');
+      return;
+    }
+
+    if (state.isWithinMemoryWindow != true) {
+      ref.read(addMemoryUploadNotifier.notifier).setError(
+        state.errorMessage ??
+            'This media is outside the memory window and cannot be uploaded.',
       );
       return;
     }
 
-    ref.read(addMemoryUploadNotifier.notifier).uploadFile().then((_) {
+    await ref.read(addMemoryUploadNotifier.notifier).uploadFile();
+
+    final after = ref.read(addMemoryUploadNotifier);
+
+    if (after.uploadSuccess == true) {
       NavigatorService.pushNamed(AppRoutes.appHome);
-    });
+    }
+    // else: do nothing; error remains visible and sheet stays open
+  }
+
+  String _formatReadableDate(DateTime dt) {
+    return _readableDate.format(dt.toLocal());
+  }
+
+  String _formatReadableDateTime(DateTime dt) {
+    return _readableDateTime.format(dt.toLocal());
   }
 }

@@ -1,5 +1,3 @@
-// lib/presentation/memory_details_view_screen/memory_details_view_screen.dart
-
 import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
@@ -12,13 +10,14 @@ import '../memory_members_screen/memory_members_screen.dart';
 import 'notifier/memory_details_view_notifier.dart';
 import '../event_timeline_view_screen/widgets/timeline_story_widget.dart';
 
-
 class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
   MemoryDetailsViewScreen({Key? key}) : super(key: key);
 
   @override
   MemoryDetailsViewScreenState createState() => MemoryDetailsViewScreenState();
-}class _TimelineSkeletonBlock extends StatelessWidget {
+}
+
+class _TimelineSkeletonBlock extends StatelessWidget {
   const _TimelineSkeletonBlock();
 
   @override
@@ -256,7 +255,8 @@ class MemoryDetailsViewScreenState
         navArgs = MemoryNavArgs.fromMap(rawArgs);
         print('✅ SEALED SCREEN: Converted Map to MemoryNavArgs');
       } else {
-        print('❌ SEALED SCREEN: Invalid argument type - expected MemoryNavArgs or Map');
+        print(
+            '❌ SEALED SCREEN: Invalid argument type - expected MemoryNavArgs or Map');
       }
 
       if (navArgs == null || !navArgs.isValid) {
@@ -278,7 +278,8 @@ class MemoryDetailsViewScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(memoryDetailsViewNotifier);
-    print('🧪 SEALED UI: isLoading=${state.isLoading} error=${state.errorMessage}');
+    print(
+        '🧪 SEALED UI: isLoading=${state.isLoading} error=${state.errorMessage}');
 
     // ✅ Trigger options sheet when notifier flips the flag.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -345,14 +346,13 @@ class MemoryDetailsViewScreenState
 
     final hasSnapshot = state.memoryDetailsViewModel != null;
 
-// ✅ Only show a full-screen loader/skeleton if we have nothing to render yet
+    // ✅ Only show a full-screen loader/skeleton if we have nothing to render yet
     if ((state.isLoading ?? false) && !hasSnapshot) {
       return Container(
         color: appTheme.gray_900_02,
-        child: _SealedMemoryDetailsSkeleton(), // ✅ your skeleton goes here
+        child: _SealedMemoryDetailsSkeleton(),
       );
     }
-
 
     return Container(
       color: appTheme.gray_900_02,
@@ -389,7 +389,6 @@ class MemoryDetailsViewScreenState
             NavigatorService.goBack();
           },
           onIconButtonTap: () {
-            // ✅ Always fire; sheet will decide owner/non-owner
             ref.read(memoryDetailsViewNotifier.notifier).onEventOptionsTap();
           },
           onAvatarTap: () {
@@ -405,7 +404,6 @@ class MemoryDetailsViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsViewNotifier);
 
-        // ✅ SHOW SKELETON while loading, even if snapshot header exists
         if (state.isLoading == true) {
           return Container(
             margin: EdgeInsets.only(top: 6.h),
@@ -493,7 +491,6 @@ class MemoryDetailsViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsViewNotifier);
 
-        // ✅ SHOW SKELETON while loading, even if snapshot header exists
         if (state.isLoading == true) {
           return SizedBox(
             height: 120.h,
@@ -550,7 +547,6 @@ class MemoryDetailsViewScreenState
     );
   }
 
-
   Widget _buildStoriesSection(BuildContext context) {
     return Container(
       width: double.maxFinite,
@@ -600,14 +596,16 @@ class MemoryDetailsViewScreenState
             width: double.infinity,
             buttonStyle: CustomButtonStyle.fillPrimary,
             buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-            onPressed: () {
+            onPressed: () async {
               final state = ref.read(memoryDetailsViewNotifier);
               final memoryId = state.memoryDetailsViewModel?.memoryId;
-              final startDate = state.memoryDetailsViewModel?.timelineDetail?.memoryStartTime;
-              final endDate = state.memoryDetailsViewModel?.timelineDetail?.memoryEndTime;
+              final startDate =
+                  state.memoryDetailsViewModel?.timelineDetail?.memoryStartTime;
+              final endDate =
+                  state.memoryDetailsViewModel?.timelineDetail?.memoryEndTime;
 
               if (memoryId != null && startDate != null && endDate != null) {
-                showModalBottomSheet(
+                final didUpload = await showModalBottomSheet<bool>(
                   context: context,
                   isScrollControlled: true,
                   backgroundColor: Colors.transparent,
@@ -622,6 +620,12 @@ class MemoryDetailsViewScreenState
                     ),
                   ),
                 );
+
+                if (didUpload == true) {
+                  await ref
+                      .read(memoryDetailsViewNotifier.notifier)
+                      .refreshMemory(memoryId);
+                }
               }
             },
           ),
@@ -658,7 +662,8 @@ class MemoryDetailsViewScreenState
 
     if (ids.isEmpty) return;
 
-    final initialId = (index >= 0 && index < ids.length) ? ids[index] : ids.first;
+    final initialId =
+    (index >= 0 && index < ids.length) ? ids[index] : ids.first;
 
     final feedContext = FeedStoryContext(
       feedType: 'memory_timeline',
@@ -724,7 +729,6 @@ class MemoryDetailsViewScreenState
                   ),
                 ),
                 SizedBox(height: 14.h),
-
                 _OptionsRow(
                   title: 'Edit memory',
                   icon: Icons.edit,
@@ -736,9 +740,7 @@ class MemoryDetailsViewScreenState
                     );
                   },
                 ),
-
                 SizedBox(height: 10.h),
-
                 _OptionsRow(
                   title: 'Members',
                   icon: Icons.group,
@@ -755,10 +757,7 @@ class MemoryDetailsViewScreenState
                     );
                   },
                 ),
-
                 SizedBox(height: 10.h),
-
-                // Placeholder. Hook into your actual delete flow.
                 _OptionsRow(
                   title: 'Delete memory',
                   icon: Icons.delete_outline,
@@ -768,7 +767,6 @@ class MemoryDetailsViewScreenState
                     print('🗑️ TODO: Delete memory: $memoryId');
                   },
                 ),
-
                 SizedBox(height: 12.h),
               ],
             ),

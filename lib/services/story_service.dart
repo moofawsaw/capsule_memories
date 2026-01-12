@@ -1,77 +1,58 @@
+import 'dart:async';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import './avatar_helper_service.dart';
 import './location_service.dart';
 import './supabase_service.dart';
 
 class StoryService {
-  final _supabase = SupabaseService.instance.client;
+  final SupabaseClient? _supabase = SupabaseService.instance.client;
 
-  // Retry configuration
   static const int _maxRetries = 3;
   static const Duration _initialRetryDelay = Duration(milliseconds: 500);
 
-  /// Static helper method to resolve story media URLs from raw database paths
-  /// CRITICAL: This method normalizes paths and resolves them to full Supabase Storage URLs
-  ///
-  /// Returns null for null/empty paths, full URLs unchanged, and resolves relative paths
   static String? resolveStoryMediaUrl(String? path) {
     if (path == null || path.isEmpty) return null;
 
-    // Already a full URL - return as-is
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
 
-    // Normalize: remove leading slash and accidental bucket prefix
     String normalized = path;
     if (normalized.startsWith('/')) normalized = normalized.substring(1);
     if (normalized.startsWith('story-media/')) {
       normalized = normalized.substring(12);
     }
 
-    // Resolve to full Supabase Storage URL
     return SupabaseService.instance.client?.storage
         .from('story-media')
         .getPublicUrl(normalized);
   }
 
-  /// Fetch stories ONLY from memories where user is a participant (creator or contributor)
-  /// Uses explicit memory filtering to ensure user access with automatic retry
   Future<List<Map<String, dynamic>>> fetchUserStories(String userId) async {
     return await _retryOperation(
-      () => _fetchUserStoriesInternal(userId),
+          () => _fetchUserStoriesInternal(userId),
       'fetch user stories',
     );
   }
 
-  /// Internal implementation of fetchUserStories with retry support
   Future<List<Map<String, dynamic>>> _fetchUserStoriesInternal(
-      String userId) async {
+      String userId,
+      ) async {
     try {
-      print('🔍 STORY SERVICE: Fetching stories for userId: $userId');
-
-      // CRITICAL FIX: Get all memory IDs where user is a contributor
-      // This ensures we fetch stories from ALL memories the user is a member of
       final contributorMemoryIds = await _supabase
           ?.from('memory_contributors')
           .select('memory_id')
           .eq('user_id', userId);
 
       final memoryIds = (contributorMemoryIds as List?)
-              ?.map((m) => m['memory_id'] as String)
-              .toList() ??
+          ?.map((m) => m['memory_id'] as String)
+          .toList() ??
           [];
 
-      print(
-          '🔍 STORY SERVICE: User is contributor in ${memoryIds.length} memories');
+      if (memoryIds.isEmpty) return [];
 
-      // If user is not a contributor in any memories, return empty list
-      if (memoryIds.isEmpty) {
-        print('⚠️ STORY SERVICE: User is not a contributor in any memories');
-        return [];
-      }
-
-      // FIXED: Fetch stories from ALL memories where user is a contributor
-      // This replaces the old .eq('contributor_id', userId) filter
       final response = await _supabase
           ?.from('stories')
           .select('''
@@ -106,56 +87,26 @@ class StoryService {
               )
             )
           ''')
-          .inFilter('memory_id',
-              memoryIds) // FIXED: Changed .in_() to .inFilter() for correct postgrest syntax
+          .inFilter('memory_id', memoryIds)
           .order('created_at', ascending: false);
 
-      final stories = List<Map<String, dynamic>>.from(response as List? ?? []);
-
-      print(
-          '✅ STORY SERVICE: Fetched ${stories.length} stories from ${memoryIds.length} memories user is part of');
-
-      // Enhanced logging for debugging thumbnail display and category info
-      for (var story in stories) {
-        final memory = story['memories'] as Map<String, dynamic>?;
-        final category = memory?['memory_categories'] as Map<String, dynamic>?;
-        print('📸 Story ${story['id']}: '
-            'memory_id=${story['memory_id']}, '
-            'memory_title=${memory?['title']}, '
-            'memory_visibility=${memory?['visibility']}, '
-            'category_name=${category?['name']}, '
-            'category_icon=${category?['icon_name']}, '
-            'media_type=${story['media_type']}, '
-            'thumbnail_url=${story['thumbnail_url']}, '
-            'contributor=${story['user_profiles']?['display_name']}');
-      }
-
-      return stories;
+      return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
-      print('❌ Error fetching user stories: $e');
       rethrow;
     }
   }
 
-  /// Fetch stories ONLY authored by a specific user (for user profile pages)
-  /// Filters stories where user is the actual contributor, not just a memory participant
-  /// CRITICAL FIX: Now filters for PUBLIC memories only to show on user profiles
   Future<List<Map<String, dynamic>>> fetchStoriesByAuthor(String userId) async {
     return await _retryOperation(
-      () => _fetchStoriesByAuthorInternal(userId),
+          () => _fetchStoriesByAuthorInternal(userId),
       'fetch stories by author',
     );
   }
 
-  /// Internal implementation of fetchStoriesByAuthor with retry support
   Future<List<Map<String, dynamic>>> _fetchStoriesByAuthorInternal(
-      String userId) async {
+      String userId,
+      ) async {
     try {
-      print(
-          '🔍 STORY SERVICE: Fetching PUBLIC stories authored by userId: $userId');
-
-      // CRITICAL: Filter stories by contributor_id AND public memory visibility
-      // This ensures only stories from public memories are shown on user profiles
       final response = await _supabase
           ?.from('stories')
           .select('''
@@ -191,59 +142,36 @@ class StoryService {
             )
           ''')
           .eq('contributor_id', userId)
-          .eq('memories.visibility',
-              'public') // CRITICAL: Filter for public memories only
+          .eq('memories.visibility', 'public')
           .order('created_at', ascending: false);
 
-      final stories = List<Map<String, dynamic>>.from(response as List? ?? []);
-
-      print(
-          '✅ STORY SERVICE: Fetched ${stories.length} PUBLIC stories authored by user $userId');
-
-      // Enhanced logging for debugging
-      for (var story in stories) {
-        final memory = story['memories'] as Map<String, dynamic>?;
-        final category = memory?['memory_categories'] as Map<String, dynamic>?;
-        print('📸 Story ${story['id']}: '
-            'memory_id=${story['memory_id']}, '
-            'memory_title=${memory?['title']}, '
-            'memory_visibility=${memory?['visibility']}, '
-            'category_name=${category?['name']}, '
-            'media_type=${story['media_type']}, '
-            'contributor=${story['user_profiles']?['display_name']}');
-      }
-
-      return stories;
+      return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
-      print('❌ Error fetching stories by author: $e');
       rethrow;
     }
   }
 
-  /// Fetch timeline cards (memories) where user is associated with automatic retry
   Future<List<Map<String, dynamic>>> fetchUserTimelines(String userId) async {
     return await _retryOperation(
-      () => _fetchUserTimelinesInternal(userId),
+          () => _fetchUserTimelinesInternal(userId),
       'fetch user timelines',
     );
   }
 
-  /// Internal implementation of fetchUserTimelines with retry support
   Future<List<Map<String, dynamic>>> _fetchUserTimelinesInternal(
-      String userId) async {
+      String userId,
+      ) async {
     try {
-      // Step 1: Get memory IDs from memory_contributors
       final contributorMemoryIds = await _supabase
           ?.from('memory_contributors')
           .select('memory_id')
           .eq('user_id', userId);
 
       final contributorIds = (contributorMemoryIds as List?)
-              ?.map((m) => m['memory_id'] as String)
-              .toList() ??
+          ?.map((m) => m['memory_id'] as String)
+          .toList() ??
           [];
 
-      // Step 2: Query memories where user is creator OR in contributor list
       final response = await _supabase?.from('memories').select('''
             id,
             title,
@@ -278,29 +206,27 @@ class StoryService {
               video_url,
               media_type
             )
-          ''').or('creator_id.eq.$userId${contributorIds.isNotEmpty ? ',id.in.(${contributorIds.join(",")})' : ''}');
+          ''').or(
+        'creator_id.eq.$userId${contributorIds.isNotEmpty ? ',id.in.(${contributorIds.join(",")})' : ''}',
+      );
 
       return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
-      print('Error fetching user timelines: $e');
       rethrow;
     }
   }
 
-  /// Fetch stories for a specific memory with automatic retry
   Future<List<Map<String, dynamic>>> fetchMemoryStories(String memoryId) async {
     return await _retryOperation(
-      () => _fetchMemoryStoriesInternal(memoryId),
+          () => _fetchMemoryStoriesInternal(memoryId),
       'fetch memory stories',
     );
   }
 
-  /// Internal implementation of fetchMemoryStories with retry support
   Future<List<Map<String, dynamic>>> _fetchMemoryStoriesInternal(
-      String memoryId) async {
+      String memoryId,
+      ) async {
     try {
-      print('🔍 STORY SERVICE: Fetching stories for memory: $memoryId');
-
       final response = await _supabase?.from('stories').select('''
             id,
             memory_id,
@@ -329,19 +255,12 @@ class StoryService {
             )
           ''').eq('memory_id', memoryId).order('created_at', ascending: false);
 
-      print(
-          '🔍 STORY SERVICE: Fetched ${(response as List).length} stories for memory $memoryId');
-
       return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
-      print('❌ STORY SERVICE: Error fetching memory stories: $e');
       rethrow;
     }
   }
 
-  /// Create a new story with real location data matching memory creation pattern
-  /// Uses LocationService to fetch coordinates and geocode to "City, State" format
-  /// OPTIMIZED: Identical process to MemoryService.createMemory() for consistency
   Future<Map<String, dynamic>?> createStory({
     required String memoryId,
     required String contributorId,
@@ -349,14 +268,15 @@ class StoryService {
     required String mediaType,
     String? thumbnailUrl,
     String? caption,
-    int? durationSeconds,
+    required int durationSeconds,
+    DateTime? captureTimestamp,
+    bool isFromCameraRoll = false,
   }) async {
-    try {
-      print('🚀 STORY CREATION START: Creating story for memory $memoryId');
+    if (_supabase == null) {
+      throw Exception('Supabase client is null (not initialized)');
+    }
 
-      // STEP 1: Fetch location data with proper geocoding using LocationService
-      // If geocoding fails after all retries, location_name will be NULL
-      print('📍 STORY CREATION: Fetching location data...');
+    try {
       final locationData = await LocationService.getLocationData();
 
       double? latitude;
@@ -367,21 +287,12 @@ class StoryService {
         latitude = locationData['latitude'];
         longitude = locationData['longitude'];
         locationName = locationData['location_name'];
-
-        print('✅ STORY LOCATION DATA OBTAINED:');
-        print('   - Latitude: $latitude');
-        print('   - Longitude: $longitude');
-        print(
-            '   - Location Name: ${locationName ?? "NULL (geocoding failed)"}');
-      } else {
-        print('⚠️ STORY CREATION: LocationService returned NULL');
-        print('   Story will be created without location data');
       }
 
-      // STEP 2: Create story with location data
-      print('💾 STORY CREATION: Inserting into database...');
-      final now = DateTime.now().toUtc();
-      final storyData = {
+      final nowUtc = DateTime.now().toUtc();
+      final captureUtc = (captureTimestamp ?? nowUtc).toUtc();
+
+      final storyData = <String, dynamic>{
         'memory_id': memoryId,
         'contributor_id': contributorId,
         'image_url': mediaType == 'image' ? mediaUrl : null,
@@ -391,74 +302,60 @@ class StoryService {
         'location_lat': latitude,
         'location_lng': longitude,
         'location_name': locationName,
-        'created_at': now.toIso8601String(),
-        'capture_timestamp': now.toIso8601String(),
+        'created_at': nowUtc.toIso8601String(),
+        'capture_timestamp': captureUtc.toIso8601String(),
+        'is_from_camera_roll': isFromCameraRoll,
         'duration_seconds': durationSeconds,
-        'text_overlays': caption != null
-            ? [
-                {'text': caption}
-              ]
-            : [],
+        'text_overlays': caption != null ? [{'text': caption}] : [],
       };
 
-      print('📝 STORY DATA TO INSERT:');
-      print('   - memory_id: $memoryId');
-      print('   - contributor_id: $contributorId');
-      print('   - media_type: $mediaType');
-      print('   - latitude: ${latitude ?? "NULL"}');
-      print('   - longitude: ${longitude ?? "NULL"}');
-      print('   - location_name: ${locationName ?? "NULL"}');
-
-      final response =
-          await _supabase?.from('stories').insert(storyData).select('''
+      final response = await _supabase!
+          .from('stories')
+          .insert(storyData)
+          .select('''
             id,
             location_name,
             location_lat,
             location_lng,
-            user_profiles!stories_contributor_id_fkey (
-              id,
-              display_name,
-              avatar_url,
-              username
-            )
-          ''').single();
+            contributor_id,
+            memory_id
+          ''')
+          .single();
 
-      final storyId = response?['id'] as String?;
-      final dbLocationName = response?['location_name'] as String?;
-      final dbLocationLat = response?['location_lat'];
-      final dbLocationLng = response?['location_lng'];
+      return Map<String, dynamic>.from(response);
+    } on PostgrestException catch (e) {
+      final parts = <String>[];
 
-      if (storyId == null) {
-        print('❌ STORY CREATION: Story ID not returned from database');
-        return null;
+      final message = e.message;
+      if (message is String && message.isNotEmpty) {
+        parts.add('message=$message');
       }
 
-      print('✅ STORY CREATION: Story inserted with ID: $storyId');
-      print('🔍 STORY CREATION: Database validation:');
-      print(
-          '   - location_name: ${dbLocationName ?? 'NULL (location unavailable)'}');
-      print('   - location_lat: $dbLocationLat');
-      print('   - location_lng: $dbLocationLng');
+      final details = e.details;
+      if (details is String && details.isNotEmpty) {
+        parts.add('details=$details');
+      }
 
-      print('🎉 STORY CREATION COMPLETE: Story created successfully');
-      print('   Final story ID: $storyId');
-      print(
-          '   Final location_name: ${dbLocationName ?? 'NULL (location unavailable)'}');
+      final hint = e.hint;
+      if (hint is String && hint.isNotEmpty) {
+        parts.add('hint=$hint');
+      }
 
-      return response;
-    } catch (e, stackTrace) {
-      print('❌ STORY CREATION FAILED: Error creating story');
-      print('   Error: $e');
-      print('   Stack trace: $stackTrace');
-      return null;
+      final code = e.code;
+      if (code is String && code.isNotEmpty) {
+        parts.add('code=$code');
+      }
+
+      final errorText = parts.isNotEmpty ? parts.join(' | ') : 'unknown error';
+
+      throw Exception('Create story failed ($errorText)');
     }
   }
 
-  /// Retry operation with exponential backoff for transient Supabase errors
   Future<T> _retryOperation<T>(
-    Future<T> Function() operation,
-    String operationName,
-  ) async {
+      Future<T> Function() operation,
+      String operationName,
+      ) async {
     int attempt = 0;
     Duration delay = _initialRetryDelay;
 
@@ -469,22 +366,15 @@ class StoryService {
         attempt++;
 
         if (attempt >= _maxRetries) {
-          print(
-              '❌ STORY SERVICE: Failed to $operationName after $attempt attempts: $e');
           rethrow;
         }
 
-        print(
-            '⚠️ STORY SERVICE: Attempt $attempt to $operationName failed: $e');
-        print('🔄 STORY SERVICE: Retrying in ${delay.inMilliseconds}ms...');
-
         await Future.delayed(delay);
-        delay *= 2; // Exponential backoff
+        delay *= 2;
       }
     }
   }
 
-  /// Calculate relative time ago string
   String getTimeAgo(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
@@ -506,60 +396,28 @@ class StoryService {
     }
   }
 
-  /// Get story media URL (prioritize video over image)
-  /// FIXED: Now resolves relative paths to full Supabase Storage URLs
   String getStoryMediaUrl(Map<String, dynamic> story) {
-    final supabaseService = SupabaseService.instance;
-
-    // CRITICAL FIX: Prioritize thumbnail for story card previews to match /feed behavior
-    // Story cards should ALWAYS show thumbnails, not full-resolution media
+    // Priority: thumbnail_url > video_url > image_url
     if (story['thumbnail_url'] != null &&
         (story['thumbnail_url'] as String).isNotEmpty) {
-      final thumbnailPath = story['thumbnail_url'] as String;
-
-      // Check if already a full URL (starts with http:// or https://)
-      if (thumbnailPath.startsWith('http://') ||
-          thumbnailPath.startsWith('https://')) {
-        return thumbnailPath;
-      }
-
-      // Otherwise, resolve relative path using Supabase Storage
-      return supabaseService.getStorageUrl(thumbnailPath) ?? thumbnailPath;
+      return resolveStoryMediaUrl(story['thumbnail_url'] as String) ?? '';
     }
 
-    // Fallback to full media URLs only if thumbnail is missing
     if (story['media_type'] == 'video' && story['video_url'] != null) {
-      final videoPath = story['video_url'] as String;
-
-      // Check if already a full URL
-      if (videoPath.startsWith('http://') || videoPath.startsWith('https://')) {
-        return videoPath;
-      }
-
-      // Resolve relative path
-      return supabaseService.getStorageUrl(videoPath) ?? videoPath;
+      return resolveStoryMediaUrl(story['video_url'] as String) ?? '';
     } else if (story['image_url'] != null) {
-      final imagePath = story['image_url'] as String;
-
-      // Check if already a full URL
-      if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-        return imagePath;
-      }
-
-      // Resolve relative path
-      return supabaseService.getStorageUrl(imagePath) ?? imagePath;
+      return resolveStoryMediaUrl(story['image_url'] as String) ?? '';
     }
 
     return '';
   }
 
-  /// Get contributor profile image
+
   String getContributorAvatar(Map<String, dynamic> story) {
     final contributor = story['user_profiles'];
     if (contributor != null && contributor['avatar_url'] != null) {
       final avatarPath = contributor['avatar_url'] as String;
 
-      // Resolve avatar URL if it's a relative path
       if (!avatarPath.startsWith('http://') &&
           !avatarPath.startsWith('https://')) {
         final supabaseService = SupabaseService.instance;
@@ -572,7 +430,6 @@ class StoryService {
     return '';
   }
 
-  /// Get memory thumbnail from latest story
   String getMemoryThumbnail(Map<String, dynamic> memory) {
     final stories = memory['stories'] as List?;
     if (stories != null && stories.isNotEmpty) {
@@ -581,7 +438,6 @@ class StoryService {
       if (latestStory['thumbnail_url'] != null) {
         final thumbnailPath = latestStory['thumbnail_url'] as String;
 
-        // Resolve thumbnail URL if it's a relative path
         if (!thumbnailPath.startsWith('http://') &&
             !thumbnailPath.startsWith('https://')) {
           final supabaseService = SupabaseService.instance;
@@ -592,7 +448,6 @@ class StoryService {
       } else if (latestStory['image_url'] != null) {
         final imagePath = latestStory['image_url'] as String;
 
-        // Resolve image URL if it's a relative path
         if (!imagePath.startsWith('http://') &&
             !imagePath.startsWith('https://')) {
           final supabaseService = SupabaseService.instance;
@@ -605,7 +460,6 @@ class StoryService {
     return '';
   }
 
-  /// Get memory state label
   String getMemoryStateLabel(String state) {
     switch (state) {
       case 'open':
@@ -617,50 +471,35 @@ class StoryService {
     }
   }
 
-  /// Check if memory is sealed
   bool isMemorySealed(Map<String, dynamic> memory) {
     return memory['state'] == 'sealed';
   }
 
-  /// Delete a story from the database
-  /// Returns true if deletion was successful, false otherwise
-  /// CRITICAL: RLS policy ensures only story contributor can delete
   Future<bool> deleteStory(String storyId) async {
-    if (_supabase == null) {
-      print('❌ STORY SERVICE: Supabase client not initialized');
-      return false;
-    }
+    if (_supabase == null) return false;
 
     return await _retryOperation(
-      () => _deleteStoryInternal(storyId),
+          () => _deleteStoryInternal(storyId),
       'delete story',
     );
   }
 
-  /// Internal implementation of deleteStory with retry support
   Future<bool> _deleteStoryInternal(String storyId) async {
     try {
-      print('🗑️ STORY SERVICE: Deleting story: $storyId');
-
       await _supabase?.from('stories').delete().eq('id', storyId);
-
-      print('✅ STORY SERVICE: Successfully deleted story $storyId');
       return true;
     } catch (e) {
-      print('❌ STORY SERVICE: Error deleting story: $e');
       return false;
     }
   }
 
-  /// Fetch individual story details for story viewer
-  /// Returns actual media URLs (video_url or image_url) based on media_type
   Future<Map<String, dynamic>?> fetchStoryDetails(String storyId) async {
     if (_supabase == null) return null;
 
     try {
-      print('🔍 STORY SERVICE: Fetching story details for: $storyId');
-
-      final response = await _supabase.from('stories').select('''
+      final response = await _supabase!
+          .from('stories')
+          .select('''
             id,
             image_url,
             video_url,
@@ -677,29 +516,27 @@ class StoryService {
               avatar_url,
               username
             )
-          ''').eq('id', storyId).eq('is_disabled', false).single();
+          ''')
+          .eq('id', storyId)
+          .eq('is_disabled', false)
+          .single();
 
       final contributor = response['user_profiles'] as Map<String, dynamic>?;
       final textOverlays = response['text_overlays'] as List? ?? [];
 
-      // Extract caption from text overlays
       String? caption;
       if (textOverlays.isNotEmpty && textOverlays[0] is Map) {
-        caption = textOverlays[0]['text'] as String?;
+        caption = (textOverlays[0] as Map)['text'] as String?;
       }
 
-      // CRITICAL: Get the correct FULL-RESOLUTION media URL based on media_type
-      // This is for story VIEWING, not story card thumbnails
       final mediaType = response['media_type'] as String? ?? 'image';
       final supabaseService = SupabaseService.instance;
       String mediaUrl = '';
 
       if (mediaType == 'video') {
-        // For video viewing, use actual video_url, fallback to thumbnail_url
         final videoPath =
-            response['video_url'] ?? response['thumbnail_url'] ?? '';
+        (response['video_url'] ?? response['thumbnail_url'] ?? '') as String;
 
-        // Resolve relative path to full URL
         if (videoPath.isNotEmpty &&
             !videoPath.startsWith('http://') &&
             !videoPath.startsWith('https://')) {
@@ -707,14 +544,10 @@ class StoryService {
         } else {
           mediaUrl = videoPath;
         }
-
-        print('🎬 STORY SERVICE: Video story - using video_url: $mediaUrl');
       } else {
-        // For image viewing, use actual image_url, fallback to thumbnail_url
         final imagePath =
-            response['image_url'] ?? response['thumbnail_url'] ?? '';
+        (response['image_url'] ?? response['thumbnail_url'] ?? '') as String;
 
-        // Resolve relative path to full URL
         if (imagePath.isNotEmpty &&
             !imagePath.startsWith('http://') &&
             !imagePath.startsWith('https://')) {
@@ -722,11 +555,9 @@ class StoryService {
         } else {
           mediaUrl = imagePath;
         }
-
-        print('📸 STORY SERVICE: Image story - using image_url: $mediaUrl');
       }
 
-      final storyDetails = {
+      return {
         'media_url': mediaUrl,
         'media_type': mediaType,
         'user_name': contributor?['display_name'] ?? 'Unknown User',
@@ -738,16 +569,11 @@ class StoryService {
         'caption': caption,
         'view_count': response['view_count'] ?? 0,
       };
-
-      print('✅ STORY SERVICE: Successfully fetched story details');
-      return storyDetails;
     } catch (e) {
-      print('❌ STORY SERVICE: Error fetching story details: $e');
       return null;
     }
   }
 
-  /// Calculate expiration time based on duration
   DateTime _calculateExpirationTime(String duration) {
     final now = DateTime.now();
     switch (duration) {

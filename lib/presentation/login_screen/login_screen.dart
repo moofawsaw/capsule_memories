@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
@@ -15,6 +16,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class LoginScreenState extends ConsumerState<LoginScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  // ✅ IMPORTANT:
+  // Replace these with your real SVG asset paths (and add them to pubspec.yaml).
+  // Use official, flat marks (no circle badge for Facebook).
+  static final String _googleIconAsset = ImageConstant.imgImage5;
+  static final String _facebookIconAsset = ImageConstant.imgSocialMedia;
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +95,7 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
         // Listen for state changes
         ref.listen(
           loginNotifier,
-          (previous, current) {
+              (previous, current) {
             if (current.isSuccess ?? false) {
               TextInput.finishAutofillContext();
               _clearForm();
@@ -136,22 +143,20 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
             SizedBox(height: 36.h),
             _buildOrDivider(),
             SizedBox(height: 32.h),
-            CustomButton(
+
+            // ✅ REPLACED: Use normalized SVG icons with proper sizing
+            _SocialAuthButton(
               text: 'Log in with Google',
-              width: double.infinity,
-              leftIcon: ImageConstant.imgImage5,
-              onPressed: () => _onGoogleLoginTap(),
-              buttonStyle: CustomButtonStyle.outlineDark,
-              buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
+              iconAssetPath: _googleIconAsset,
+              onPressed: state.isLoading ?? false ? null : () => _onGoogleLoginTap(),
+              isDisabled: state.isLoading ?? false,
             ),
             SizedBox(height: 20.h),
-            CustomButton(
+            _SocialAuthButton(
               text: 'Log in with Facebook',
-              width: double.infinity,
-              leftIcon: ImageConstant.imgSocialMedia,
-              onPressed: () => _onFacebookLoginTap(),
-              buttonStyle: CustomButtonStyle.outlineDark,
-              buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
+              iconAssetPath: _facebookIconAsset,
+              onPressed: state.isLoading ?? false ? null : () => _onFacebookLoginTap(),
+              isDisabled: state.isLoading ?? false,
             ),
           ],
         );
@@ -254,5 +259,123 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
     final state = ref.read(loginNotifier);
     state.emailController?.clear();
     state.passwordController?.clear();
+  }
+}
+
+///
+/// Social auth button that matches your existing outline style
+/// while using normalized SVG icons (same visual size).
+///
+class _SocialAuthButton extends StatelessWidget {
+  final String text;
+  final String iconAssetPath;
+  final VoidCallback? onPressed;
+  final bool isDisabled;
+
+  const _SocialAuthButton({
+    required this.text,
+    required this.iconAssetPath,
+    required this.onPressed,
+    required this.isDisabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final double height = 48.h;
+    final BorderRadius radius = BorderRadius.circular(12.h);
+
+    final Color borderColor = appTheme.blue_gray_300.withAlpha(70);
+    final Color bgColor = Colors.transparent;
+
+    final TextStyle textStyle = TextStyleHelper.instance
+        .body14MediumPlusJakartaSans
+        .copyWith(color: appTheme.blue_gray_300);
+
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1.0,
+      child: InkWell(
+        onTap: isDisabled ? null : onPressed,
+        borderRadius: radius,
+        child: Container(
+          height: height,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: radius,
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          padding: EdgeInsets.symmetric(horizontal: 16.h),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _NormalizedProviderIcon(assetPath: iconAssetPath),
+              SizedBox(width: 12.h),
+              Text(text, style: textStyle),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NormalizedProviderIcon extends StatelessWidget {
+  final String assetPath;
+
+  const _NormalizedProviderIcon({required this.assetPath});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isSvg = assetPath.toLowerCase().endsWith('.svg');
+
+    return SizedBox(
+      width: 24.h,
+      height: 24.h,
+      child: Center(
+        child: isSvg
+            ? SvgPicture.asset(
+          assetPath,
+          width: 18.h,
+          height: 18.h,
+          fit: BoxFit.contain,
+        )
+            : Image.asset(
+          assetPath,
+          width: 18.h,
+          height: 18.h,
+          fit: BoxFit.contain,
+        ),
+      ),
+    );
+  }
+}
+
+
+///
+/// Forces all provider icons into the same visual box so they match.
+/// - Outer box: 24x24
+/// - Inner icon: 18x18 (centered)
+///
+class _NormalizedSvgIcon extends StatelessWidget {
+  final String svgAssetPath;
+
+  const _NormalizedSvgIcon({
+    required this.svgAssetPath,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 24.h,
+      height: 24.h,
+      child: Center(
+        child: SvgPicture.asset(
+          svgAssetPath,
+          width: 18.h,
+          height: 18.h,
+          fit: BoxFit.contain,
+        ),
+      ),
+    );
   }
 }
