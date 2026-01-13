@@ -460,8 +460,9 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       return;
     }
 
-    final storyIds = storyItems
-        .where((item) => item.storyId != null && item.storyId!.isNotEmpty)
+    // ✅ Force correct type: List<String>
+    final List<String> storyIds = storyItems
+        .where((item) => (item.storyId ?? '').isNotEmpty)
         .map((item) => item.storyId!)
         .toList();
 
@@ -492,6 +493,7 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       arguments: feedContext,
     );
   }
+
 
   void _showBlockConfirmationDialog(
       BuildContext context, bool isBlocked, VoidCallback onConfirm) {
