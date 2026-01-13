@@ -10,7 +10,7 @@ class MemoriesDashboardState extends Equatable {
     this.selectedTabIndex,
     this.selectedOwnership,
     this.selectedState,
-    this.showOpenMemories = true, // ✅ Open ON by default
+    this.showOnlyOpen = false, // ✅ default: show ALL memories
   });
 
   final MemoriesDashboardModel? memoriesDashboardModel;
@@ -24,8 +24,8 @@ class MemoriesDashboardState extends Equatable {
   /// Legacy (if used elsewhere)
   final String? selectedState;
 
-  /// ✅ ONE toggle: true=open, false=sealed
-  final bool showOpenMemories;
+  /// ✅ Quick filter: true = only OPEN, false = show ALL (open + sealed)
+  final bool showOnlyOpen;
 
   MemoriesDashboardState copyWith({
     MemoriesDashboardModel? memoriesDashboardModel,
@@ -34,7 +34,7 @@ class MemoriesDashboardState extends Equatable {
     int? selectedTabIndex,
     String? selectedOwnership,
     String? selectedState,
-    bool? showOpenMemories,
+    bool? showOnlyOpen,
   }) {
     return MemoriesDashboardState(
       memoriesDashboardModel:
@@ -44,7 +44,7 @@ class MemoriesDashboardState extends Equatable {
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
       selectedOwnership: selectedOwnership ?? this.selectedOwnership,
       selectedState: selectedState ?? this.selectedState,
-      showOpenMemories: showOpenMemories ?? this.showOpenMemories,
+      showOnlyOpen: showOnlyOpen ?? this.showOnlyOpen,
     );
   }
 
@@ -56,6 +56,6 @@ class MemoriesDashboardState extends Equatable {
     selectedTabIndex,
     selectedOwnership,
     selectedState,
-    showOpenMemories,
+    showOnlyOpen,
   ];
 }

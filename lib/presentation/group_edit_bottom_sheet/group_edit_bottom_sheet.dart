@@ -409,7 +409,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
                   text: state.isSaving ? 'Saving...' : 'Save Changes',
                   onPressed:
                       state.isSaving ? null : () => _handleSaveChanges(context),
-                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonStyle: CustomButtonStyle.fillSuccess,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 ),
               ),

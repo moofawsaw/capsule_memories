@@ -211,7 +211,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                   borderRadius: BorderRadius.circular(22.h),
                 ),
                 child: IconButton(
-                  onPressed: () async => await _handlePlusButtonTap(context),
+                  onPressed: () => _handlePlusButtonTap(context),
                   padding: EdgeInsets.all(6.h),
                   icon: AnimatedBuilder(
                     animation: _plusSpinController,
@@ -522,21 +522,23 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
   }
 
   /// Handles plus button tap - always opens memory_create bottom sheet
-  Future<void> _handlePlusButtonTap(BuildContext context) async {
-    // Spin first (restart if tapped repeatedly)
-    if (mounted) {
-      await _plusSpinController.forward(from: 0);
-    }
+  void _handlePlusButtonTap(BuildContext context) {
+    // Start spin immediately
+    _plusSpinController.forward(from: 0);
 
-    if (!mounted) return;
+    // Open bottom sheet on the next frame so the first rotation frame paints
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => CreateMemoryScreen(),
-    );
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => CreateMemoryScreen(),
+      );
+    });
   }
+
 
 
   /// Handles action icon tap - identifies and navigates accordingly

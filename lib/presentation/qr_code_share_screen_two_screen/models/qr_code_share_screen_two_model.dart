@@ -4,6 +4,7 @@ class QRCodeShareScreenTwoModel {
   String? qrCodeData;
   String? shareUrl;
   String? qrCodeUrl;
+  String? avatarUrl;
 
   QRCodeShareScreenTwoModel({
     this.friendCode,

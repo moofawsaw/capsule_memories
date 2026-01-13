@@ -2,6 +2,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/app_export.dart';
 import '../../../services/avatar_helper_service.dart';
+import '../../../services/avatar_state_service.dart';
 import '../../../services/blocked_users_service.dart';
 import '../../../services/follows_service.dart';
 import '../../../services/friends_service.dart';
@@ -16,6 +17,7 @@ part 'user_profile_screen_two_state.dart';
 final userProfileScreenTwoNotifier = StateNotifierProvider.autoDispose<
     UserProfileScreenTwoNotifier, UserProfileScreenTwoState>(
       (ref) => UserProfileScreenTwoNotifier(
+    ref,
     UserProfileScreenTwoState(
       userProfileScreenTwoModel: UserProfileScreenTwoModel(),
     ),
@@ -23,15 +25,18 @@ final userProfileScreenTwoNotifier = StateNotifierProvider.autoDispose<
 );
 
 class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoState> {
+  UserProfileScreenTwoNotifier(this.ref, UserProfileScreenTwoState state) : super(state);
+
+  final Ref ref;
+
   final FollowsService _followsService = FollowsService();
   final FriendsService _friendsService = FriendsService();
   final BlockedUsersService _blockedUsersService = BlockedUsersService();
   final StoryService _storyService = StoryService();
 
-  UserProfileScreenTwoNotifier(UserProfileScreenTwoState state) : super(state);
-
   // ✅ Helper: get authed user id once
   String? get _currentUserId => SupabaseService.instance.client?.auth.currentUser?.id;
+
 
   Future<void> initialize({String? userId}) async {
     try {
@@ -308,24 +313,36 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
       final imageBytes = await image.readAsBytes();
       final fileName = image.name;
 
-      final filePath = await UserProfileService.instance.uploadAvatar(imageBytes, fileName);
+      final filePath =
+      await UserProfileService.instance.uploadAvatar(imageBytes, fileName);
 
-      if (filePath != null) {
-        final success = await UserProfileService.instance.updateUserProfile(avatarUrl: filePath);
-
-        if (success) {
-          final signedUrl = await UserProfileService.instance.getAvatarUrl(filePath);
-
-          if (signedUrl != null) {
-            state = state.copyWith(
-              userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
-                avatarImagePath: signedUrl,
-              ),
-              isUploading: false,
-            );
-          }
-        }
+      if (filePath == null) {
+        state = state.copyWith(isUploading: false);
+        return;
       }
+
+      final success =
+      await UserProfileService.instance.updateUserProfile(avatarUrl: filePath);
+
+      if (!success) {
+        state = state.copyWith(isUploading: false);
+        return;
+      }
+
+      final signedUrl = await UserProfileService.instance.getAvatarUrl(filePath);
+
+      if (signedUrl != null && signedUrl.isNotEmpty) {
+// ✅ use stable URL; cache eviction happens inside updateAvatar()
+        state = state.copyWith(
+          userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
+            avatarImagePath: signedUrl,
+          ),
+        );
+
+        ref.read(avatarStateProvider.notifier).updateAvatar(signedUrl);
+
+      }
+
 
       state = state.copyWith(isUploading: false);
     } catch (e) {
@@ -333,6 +350,7 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
       state = state.copyWith(isUploading: false);
     }
   }
+
 
   Future<void> updateUsername(String newUsername) async {
     try {

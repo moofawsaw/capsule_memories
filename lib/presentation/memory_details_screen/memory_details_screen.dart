@@ -1099,10 +1099,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       decoration: BoxDecoration(
                         color: appTheme.gray_900,
                         borderRadius: BorderRadius.circular(8.h),
-                        border: Border.all(
-                          color: appTheme.blue_gray_300.withAlpha(77),
-                          width: 1,
-                        ),
                       ),
                       child: Row(
                         children: [
@@ -1206,7 +1202,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 onPressed: () {
                   Navigator.pop(context);
                 },
-                buttonStyle: CustomButtonStyle.fillDark,
+                buttonStyle: CustomButtonStyle.fillDeepPurpleA,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
               ),
             ),

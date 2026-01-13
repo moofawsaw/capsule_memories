@@ -60,12 +60,17 @@ class CustomStoryCard extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // Background story image
-              CustomImageView(
-                imagePath: backgroundImage,
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.cover,
+// Background story image (FULL CARD)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8.h),
+                  child: CustomImageView(
+                    imagePath: backgroundImage,
+                    fit: BoxFit.cover,
+                    // ✅ do NOT pass infinity; Positioned.fill gives size via constraints
+                    // width/height intentionally omitted
+                  ),
+                ),
               ),
 
               // ✅ Delete button overlay (top-right)
@@ -126,18 +131,19 @@ class CustomStoryCard extends StatelessWidget {
           color: appTheme.deep_purple_A100,
           width: 2,
         ),
-        borderRadius: BorderRadius.circular(16.h),
+        shape: BoxShape.circle, // ✅ circle border
       ),
-      child: Center(
+      child: ClipOval( // ✅ actually clips the image
         child: CustomImageView(
           imagePath: userAvatar,
-          width: 26.h,
-          height: 26.h,
+          width: 32.h,
+          height: 32.h,
           fit: BoxFit.cover,
         ),
       ),
     );
   }
+
 
   Widget _buildUserInfo(BuildContext context, MemoryCategory category) {
     return Column(

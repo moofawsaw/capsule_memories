@@ -3,7 +3,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_notification_card.dart';
+import '../../services/avatar_state_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'notifier/qr_code_share_screen_two_notifier.dart';
 
 class QRCodeShareScreenTwoScreen extends ConsumerStatefulWidget {
@@ -16,13 +17,21 @@ class QRCodeShareScreenTwoScreen extends ConsumerStatefulWidget {
 
 class QRCodeShareScreenTwoScreenState
     extends ConsumerState<QRCodeShareScreenTwoScreen> {
+
+  // ✅ Needed for RepaintBoundary (download/share/export QR)
+  final GlobalKey _qrKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(qrCodeShareScreenTwoNotifier.notifier).loadUserFriendCode();
+
+      // ✅ Ensure global avatar is loaded for this bottom sheet
+      ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -103,19 +112,26 @@ class QRCodeShareScreenTwoScreenState
           );
         }
 
+        final displayName =
+            state.qrCodeShareScreenTwoModel?.displayName ?? 'Add Friend';
+
+        // ✅ Use the user's avatar instead of the mail/icon asset.
+        // Assumes your model exposes avatarUrl (common pattern in your codebase).
+        final avatarState = ref.watch(avatarStateProvider);
+
+// ✅ Prefer global cached avatar (already converted to signed URL / oauth URL)
+        final avatarUrl = avatarState.avatarUrl?.trim().isNotEmpty == true
+            ? avatarState.avatarUrl
+            : state.qrCodeShareScreenTwoModel?.avatarUrl;
+
+
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CustomNotificationCard(
-              iconPath: ImageConstant.imgFrameDeepPurpleA100,
-              title:
-                  state.qrCodeShareScreenTwoModel?.displayName ?? 'Add Friend',
-              description: 'Scan to add me as friend',
-              isRead: true,
-              onToggleRead: () {},
-              titleFontSize: 20.0,
-              descriptionAlignment: TextAlign.center,
-              margin: EdgeInsets.zero,
+            _buildHeaderCard(
+              context,
+              displayName: displayName,
+              avatarUrl: avatarUrl,
             ),
             SizedBox(height: 16.h),
             _buildQRCodeSection(context),
@@ -125,9 +141,100 @@ class QRCodeShareScreenTwoScreenState
             _buildActionButtons(context),
             SizedBox(height: 20.h),
             _buildInfoText(context),
+            SizedBox(height: 20.h),
           ],
         );
       },
+    );
+  }
+
+  /// Replaces CustomNotificationCard so we can render a circular avatar.
+  Widget _buildHeaderCard(
+      BuildContext context, {
+        required String displayName,
+        required String? avatarUrl,
+      }) {
+    final initial = (displayName.trim().isNotEmpty)
+        ? displayName.trim().characters.first.toUpperCase()
+        : '?';
+
+    return Container(
+      width: double.maxFinite,
+      padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
+      decoration: BoxDecoration(
+        color: appTheme.gray_900,
+        borderRadius: BorderRadius.circular(12.h),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Avatar (replaces mail icon)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999.h),
+            child: Container(
+              height: 54.h,
+              width: 54.h,
+              color: appTheme.gray_900_02,
+              child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                  ? Image.network(
+                avatarUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return _buildAvatarFallback(initial);
+                },
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: SizedBox(
+                      height: 18.h,
+                      width: 18.h,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: appTheme.colorFF52D1,
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    ),
+                  );
+                },
+              )
+                  : _buildAvatarFallback(initial),
+            ),
+          ),
+          SizedBox(height: 12.h),
+          Text(
+            displayName,
+            textAlign: TextAlign.center,
+    style: TextStyleHelper.instance.title16RegularPlusJakartaSans.copyWith(
+    color: appTheme.gray_50,
+    fontSize: 20.0,
+    fontWeight: FontWeight.w600,
+    ),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            'Scan to add me as friend',
+            textAlign: TextAlign.center,
+            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300, height: 1.2),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarFallback(String initial) {
+    return Center(
+      child: Text(
+        initial,
+        style: TextStyleHelper.instance.title16RegularPlusJakartaSans.copyWith(
+          color: appTheme.gray_50,
+          fontSize: 20.0,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -135,56 +242,27 @@ class QRCodeShareScreenTwoScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(qrCodeShareScreenTwoNotifier);
-        final qrCodeUrl = state.qrCodeShareScreenTwoModel?.qrCodeUrl;
+        final qrData = state.qrCodeShareScreenTwoModel?.qrCodeData ?? '';
 
-        // If qr_code_url exists, display it directly using Image.network
-        if (qrCodeUrl != null && qrCodeUrl.isNotEmpty) {
-          return Container(
-            margin: EdgeInsets.symmetric(horizontal: 68.h),
-            child: Image.network(
-              qrCodeUrl,
-              width: 254.h,
-              height: 254.h,
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return SizedBox(
-                  width: 254.h,
-                  height: 254.h,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: appTheme.colorFF52D1,
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                // Fallback to generated QR code if image fails to load
-                return QrImageView(
-                  data: state.qrCodeShareScreenTwoModel?.qrCodeData ?? '',
-                  version: QrVersions.auto,
-                  size: 254.h,
-                  backgroundColor: appTheme.whiteCustom,
-                  foregroundColor: appTheme.blackCustom,
-                );
-              },
-            ),
-          );
-        }
-
-        // Fallback to generated QR code if URL is not available
         return Container(
           margin: EdgeInsets.symmetric(horizontal: 68.h),
-          child: QrImageView(
-            data: state.qrCodeShareScreenTwoModel?.qrCodeData ?? '',
-            version: QrVersions.auto,
-            size: 254.h,
-            backgroundColor: appTheme.whiteCustom,
-            foregroundColor: appTheme.blackCustom,
+          child: RepaintBoundary(
+            key: _qrKey,
+            child: Container(
+              padding: EdgeInsets.all(16.h),
+              decoration: BoxDecoration(
+                color: appTheme.whiteCustom,
+                borderRadius: BorderRadius.circular(12.h),
+              ),
+              child: QrImageView(
+                data: qrData,
+                version: QrVersions.auto,
+                size: 200.h,
+                padding: EdgeInsets.zero, // ✅ KEY FIX (removes default padding)
+                backgroundColor: appTheme.whiteCustom,
+                foregroundColor: appTheme.blackCustom,
+              ),
+            ),
           ),
         );
       },
@@ -198,7 +276,7 @@ class QRCodeShareScreenTwoScreenState
 
         ref.listen(
           qrCodeShareScreenTwoNotifier,
-          (previous, current) {
+              (previous, current) {
             if (current.isUrlCopied ?? false) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -257,7 +335,7 @@ class QRCodeShareScreenTwoScreenState
 
         ref.listen(
           qrCodeShareScreenTwoNotifier,
-          (previous, current) {
+              (previous, current) {
             if (current.isDownloadSuccess ?? false) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(

@@ -57,7 +57,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
           selectedTabIndex: 0,
           selectedOwnership: 'all',
           selectedState: 'all', // legacy if used elsewhere
-          showOpenMemories: true, // ✅ default: Open ON
+          showOnlyOpen: false, // ✅ default: show ALL (open + sealed)
         ),
       );
 
@@ -73,8 +73,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       String userId, {
         bool forceRefresh = false,
       }) async {
-    print(
-        '🔍 MEMORIES DEBUG: Loading from cache (forceRefresh: $forceRefresh)');
+    print('🔍 MEMORIES DEBUG: Loading from cache (forceRefresh: $forceRefresh)');
 
     try {
       final results = await Future.wait([
@@ -89,8 +88,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
           '✅ MEMORIES DEBUG: Loaded ${stories.length} stories and ${memories.length} memories');
 
       final liveMemories = memories.where((m) => m.state == 'open').toList();
-      final sealedMemories =
-      memories.where((m) => m.state == 'sealed').toList();
+      final sealedMemories = memories.where((m) => m.state == 'sealed').toList();
 
       final updatedModel =
       (state.memoriesDashboardModel ?? MemoriesDashboardModel()).copyWith(
@@ -124,47 +122,76 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     _safeSetState(state.copyWith(selectedState: stateFilter));
   }
 
-  /// ✅ ONE toggle: Open ON/OFF (OFF = sealed)
-  void toggleOpenMemories() {
-    final next = !state.showOpenMemories;
-    print('🔍 MEMORIES DEBUG: Toggling open memories -> $next');
-    _safeSetState(state.copyWith(showOpenMemories: next));
+  // ============================================================
+  // ✅ QUICK FILTER: "Open" ON/OFF
+  // OFF = show ALL memories
+  // ON  = show only OPEN memories
+  // ============================================================
+
+  void toggleOpenFilter() {
+    final next = !state.showOnlyOpen;
+    print('🔍 MEMORIES DEBUG: Toggling Open filter -> $next');
+    _safeSetState(state.copyWith(showOnlyOpen: next));
   }
 
   bool _passesOpenFilter(MemoryItemModel m) {
-    return state.showOpenMemories ? (m.state == 'open') : (m.state == 'sealed');
+    if (!state.showOnlyOpen) return true; // show everything
+    return m.state == 'open';
   }
+
+  // ============================================================
+  // Filtering
+  // ============================================================
 
   List<MemoryItemModel> getFilteredMemories(String userId) {
     final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
     final ownership = state.selectedOwnership ?? 'all';
 
-    // 1) Open/Sealed toggle filter
-    final filteredByState = allMemories.where(_passesOpenFilter).toList();
+    // 1) Open filter (if enabled)
+    final filtered = allMemories.where(_passesOpenFilter).toList();
 
-    // 2) Ownership filter
-    if (ownership == 'all') {
-      return filteredByState;
-    }
+    // 2) Ownership tabs
+    if (ownership == 'all') return filtered;
 
     if (ownership == 'created') {
-      return filteredByState.where((m) => m.creatorId == userId).toList();
+      return filtered.where((m) => m.creatorId == userId).toList();
     }
 
     // joined
-    return filteredByState.where((m) => m.creatorId != userId).toList();
+    return filtered.where((m) => m.creatorId != userId).toList();
   }
 
-  /// ✅ Used by UI for: All (x) / Created (y) / Joined (z)
+  /// Count of OPEN memories after ownership filter (used for badge)
+  int getOpenCountAfterOwnership(String userId) {
+    final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
+    final ownership = state.selectedOwnership ?? 'all';
+
+    Iterable<MemoryItemModel> base;
+    if (ownership == 'all') {
+      base = allMemories;
+    } else if (ownership == 'created') {
+      base = allMemories.where((m) => m.creatorId == userId);
+    } else {
+      base = allMemories.where((m) => m.creatorId != userId);
+    }
+
+    return base.where((m) => m.state == 'open').length;
+  }
+
+  int getVisibleCount(String userId) {
+    return getFilteredMemories(userId).length;
+  }
+
+  /// Optional: If you still need ownership counts (respecting open filter)
   Map<String, int> getOwnershipCounts({required String userId}) {
     final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
-    final filteredByState = allMemories.where(_passesOpenFilter).toList();
+    final filtered = allMemories.where(_passesOpenFilter).toList();
 
-    final created = filteredByState.where((m) => m.creatorId == userId).length;
-    final joined = filteredByState.where((m) => m.creatorId != userId).length;
+    final created = filtered.where((m) => m.creatorId == userId).length;
+    final joined = filtered.where((m) => m.creatorId != userId).length;
 
     return {
-      'all': filteredByState.length,
+      'all': filtered.length,
       'created': created,
       'joined': joined,
     };
@@ -174,6 +201,10 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     final counts = getOwnershipCounts(userId: userId);
     return counts[ownership] ?? 0;
   }
+
+  // ============================================================
+  // Stories
+  // ============================================================
 
   Future<void> loadAllStories() async {
     _safeSetState(state.copyWith(isLoading: true));
@@ -214,7 +245,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       }
 
       await _loadFromCache(currentUser.id, forceRefresh: true);
-
       _cacheService.refreshMemoryCache(currentUser.id);
 
       _safeSetState(state.copyWith(isLoading: false, isSuccess: true));
@@ -634,7 +664,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       if (!found) return;
 
-      // ✅ keep split lists + counts correct
       final liveMemories =
       updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
@@ -679,7 +708,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
         sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
         allCount: updatedMemories.length,
-        liveCount: liveMemories.length,
+        liveCount: updatedMemories.length,
         sealedCount: sealedMemories.length,
       );
 

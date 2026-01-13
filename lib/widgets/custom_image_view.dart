@@ -9,14 +9,12 @@ import '../core/app_export.dart';
 
 extension ImageTypeExtension on String {
   ImageType get imageType {
-    if (this.startsWith('http') || this.startsWith('https')) {
-      if (this.endsWith('.svg')) {
-        return ImageType.networkSvg;
-      }
+    if (startsWith('http') || startsWith('https')) {
+      if (endsWith('.svg')) return ImageType.networkSvg;
       return ImageType.network;
-    } else if (this.endsWith('.svg')) {
+    } else if (endsWith('.svg')) {
       return ImageType.svg;
-    } else if (this.startsWith('file://')) {
+    } else if (startsWith('file://')) {
       return ImageType.file;
     } else {
       return ImageType.png;
@@ -50,23 +48,18 @@ class CustomImageView extends StatefulWidget {
   late String? imagePath;
 
   final double? height;
-
   final double? width;
 
   final Color? color;
-
   final BoxFit? fit;
 
   final String? placeHolder;
 
   final Alignment? alignment;
-
   final VoidCallback? onTap;
 
   final EdgeInsetsGeometry? margin;
-
   final BorderRadius? radius;
-
   final BoxBorder? border;
 
   @override
@@ -77,16 +70,15 @@ class _CustomImageViewState extends State<CustomImageView>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+
   String? _previousImagePath;
-  bool _hasAnimationCompleted =
-      false; // Track if animation finished for current URL
+  bool _hasAnimationCompleted = false;
 
   @override
   void initState() {
     super.initState();
     _previousImagePath = widget.imagePath;
 
-    // Initialize animation controller
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -99,18 +91,15 @@ class _CustomImageViewState extends State<CustomImageView>
       ),
     );
 
-    // Listen for animation completion to prevent retriggering on rebuilds
     _animationController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         _hasAnimationCompleted = true;
       }
     });
 
-    // Only animate if this is a network image (avatar images are network images)
     if (_isNetworkImage(widget.imagePath)) {
       _animationController.forward();
     } else {
-      // For non-network images, skip animation
       _animationController.value = 1.0;
       _hasAnimationCompleted = true;
     }
@@ -120,16 +109,13 @@ class _CustomImageViewState extends State<CustomImageView>
   void didUpdateWidget(CustomImageView oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Check if the image path ACTUALLY changed (not just widget rebuilt)
     final bool urlChanged =
-        _hasImagePathChanged(oldWidget.imagePath, widget.imagePath);
+    _hasImagePathChanged(oldWidget.imagePath, widget.imagePath);
 
     if (urlChanged) {
-      // URL genuinely changed - reset animation state
       _previousImagePath = widget.imagePath;
       _hasAnimationCompleted = false;
 
-      // Only animate network images (avatars)
       if (_isNetworkImage(widget.imagePath)) {
         _animationController.reset();
         _animationController.forward();
@@ -138,12 +124,10 @@ class _CustomImageViewState extends State<CustomImageView>
         _hasAnimationCompleted = true;
       }
     } else if (!_hasAnimationCompleted && _isNetworkImage(widget.imagePath)) {
-      // Same URL but animation was interrupted - continue/restart animation
       if (_animationController.status == AnimationStatus.dismissed) {
         _animationController.forward();
       }
     }
-    // If URL is same and animation completed, do nothing (prevents retrigger on rebuild)
   }
 
   @override
@@ -152,21 +136,31 @@ class _CustomImageViewState extends State<CustomImageView>
     super.dispose();
   }
 
-  /// Check if image path actually changed (not just rebuilt with same path)
   bool _hasImagePathChanged(String? oldPath, String? newPath) {
-    // Handle null cases
     if (oldPath == null && newPath == null) return false;
     if (oldPath == null || newPath == null) return true;
-
-    // CRITICAL: String comparison to detect actual URL changes
-    // This prevents animation retrigger when widget rebuilds with same URL
     return oldPath != newPath;
   }
 
-  /// Check if this is a network image (avatars are network images)
   bool _isNetworkImage(String? path) {
     if (path == null || path.isEmpty) return false;
     return path.startsWith('http://') || path.startsWith('https://');
+  }
+
+  // ✅ Prevent Infinity/NaN toInt crashes
+  int _safeCacheDim(double? v, {int fallback = 200}) {
+    if (v == null) return fallback;
+    if (!v.isFinite) return fallback;
+    if (v <= 0) return fallback;
+    final rounded = v.round();
+    return rounded <= 0 ? fallback : rounded;
+  }
+
+  double? _safeFiniteDouble(double? v) {
+    if (v == null) return null;
+    if (!v.isFinite) return null;
+    if (v <= 0) return null;
+    return v;
   }
 
   @override
@@ -177,7 +171,6 @@ class _CustomImageViewState extends State<CustomImageView>
   }
 
   Widget _buildWidget() {
-    // Only wrap with animation if this is a network image
     Widget imageContent = Padding(
       padding: widget.margin ?? EdgeInsets.zero,
       child: InkWell(
@@ -186,7 +179,6 @@ class _CustomImageViewState extends State<CustomImageView>
       ),
     );
 
-    // Apply scale animation ONLY for network images
     if (_isNetworkImage(widget.imagePath)) {
       return ScaleTransition(
         scale: _scaleAnimation,
@@ -197,8 +189,7 @@ class _CustomImageViewState extends State<CustomImageView>
     return imageContent;
   }
 
-  ///build the image with border radius
-  _buildCircleImage() {
+  Widget _buildCircleImage() {
     if (widget.radius != null) {
       return ClipRRect(
         borderRadius: widget.radius ?? BorderRadius.zero,
@@ -209,8 +200,7 @@ class _CustomImageViewState extends State<CustomImageView>
     }
   }
 
-  ///build the image with border and border radius style
-  _buildImageWithBorder() {
+  Widget _buildImageWithBorder() {
     if (widget.border != null) {
       return Container(
         decoration: BoxDecoration(
@@ -225,49 +215,57 @@ class _CustomImageViewState extends State<CustomImageView>
   }
 
   Widget _buildImageView() {
+    final safeH = _safeFiniteDouble(widget.height);
+    final safeW = _safeFiniteDouble(widget.width);
+
     switch (widget.imagePath!.imageType) {
       case ImageType.svg:
-        return Container(
-          height: widget.height,
-          width: widget.width,
+        return SizedBox(
+          height: safeH,
+          width: safeW,
           child: SvgPicture.asset(
             widget.imagePath!,
-            height: widget.height,
-            width: widget.width,
+            height: safeH,
+            width: safeW,
             fit: widget.fit ?? BoxFit.contain,
             colorFilter: widget.color != null
                 ? ColorFilter.mode(
-                    widget.color ?? appTheme.transparentCustom, BlendMode.srcIn)
+                widget.color ?? appTheme.transparentCustom, BlendMode.srcIn)
                 : null,
           ),
         );
+
       case ImageType.file:
         return Image.file(
           File(widget.imagePath!),
-          height: widget.height,
-          width: widget.width,
+          height: safeH,
+          width: safeW,
           fit: widget.fit ?? BoxFit.cover,
           color: widget.color,
         );
+
       case ImageType.networkSvg:
         return SvgPicture.network(
           widget.imagePath!,
-          height: widget.height,
-          width: widget.width,
+          height: safeH,
+          width: safeW,
           fit: widget.fit ?? BoxFit.contain,
           colorFilter: widget.color != null
               ? ColorFilter.mode(
-                  widget.color ?? appTheme.transparentCustom, BlendMode.srcIn)
+              widget.color ?? appTheme.transparentCustom, BlendMode.srcIn)
               : null,
         );
+
       case ImageType.network:
+        final cacheH = _safeCacheDim(widget.height, fallback: 200) * 2;
+        final cacheW = _safeCacheDim(widget.width, fallback: 200) * 2;
+
         return CachedNetworkImage(
-          height: widget.height,
-          width: widget.width,
+          height: safeH,
+          width: safeW,
           fit: widget.fit,
           imageUrl: widget.imagePath!,
           color: widget.color,
-          // CRITICAL FIX: Optimize cache configuration for thumbnail stability
           cacheManager: CacheManager(
             Config(
               'customCacheKey',
@@ -280,8 +278,8 @@ class _CustomImageViewState extends State<CustomImageView>
             ),
           ),
           placeholder: (context, url) => Container(
-            height: widget.height,
-            width: widget.width,
+            height: safeH,
+            width: safeW,
             color: appTheme.grey100,
             child: Center(
               child: SizedBox(
@@ -295,82 +293,75 @@ class _CustomImageViewState extends State<CustomImageView>
             ),
           ),
           errorWidget: (context, url, error) {
-            // CRITICAL FIX: Gracefully handle network errors without showing broken thumbnails
             final isInvalidUrl = url.isEmpty ||
                 url == 'null' ||
                 url == 'undefined' ||
                 !url.startsWith('http');
 
             if (isInvalidUrl) {
-              // Database returned invalid thumbnail URL
               return Image.asset(
                 widget.placeHolder ?? ImageConstant.imgImageNotFound,
-                height: widget.height,
-                width: widget.width,
+                height: safeH,
+                width: safeW,
                 fit: widget.fit ?? BoxFit.cover,
               );
-            } else {
-              // Valid URL but network/cache error - show loading state instead of broken image
-              // This prevents "crash" appearance when returning from story viewer
-              return Container(
-                height: widget.height,
-                width: widget.width,
-                decoration: BoxDecoration(
-                  color: appTheme.grey100,
-                  borderRadius: widget.radius,
-                ),
-                child: Stack(
-                  children: [
-                    // CRITICAL: Show shimmer effect instead of broken image
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              appTheme.gray_300.withAlpha(51),
-                              appTheme.gray_300.withAlpha(128),
-                              appTheme.gray_300.withAlpha(51),
-                            ],
-                            stops: [0.0, 0.5, 1.0],
-                          ),
-                          borderRadius: widget.radius,
-                        ),
-                      ),
-                    ),
-                    // Small loading indicator
-                    Center(
-                      child: SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: appTheme.gray_300,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
             }
+
+            return Container(
+              height: safeH,
+              width: safeW,
+              decoration: BoxDecoration(
+                color: appTheme.grey100,
+                borderRadius: widget.radius,
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            appTheme.gray_300.withAlpha(51),
+                            appTheme.gray_300.withAlpha(128),
+                            appTheme.gray_300.withAlpha(51),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                        borderRadius: widget.radius,
+                      ),
+                    ),
+                  ),
+                  Center(
+                    child: SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: appTheme.gray_300,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
           },
-          // CRITICAL FIX: Add fadeInDuration to smooth appearance when loading from cache
           fadeInDuration: const Duration(milliseconds: 200),
-          // CRITICAL FIX: Add memCacheHeight/Width for better memory management
-          memCacheHeight: (widget.height?.toInt() ?? 200) * 2,
-          memCacheWidth: (widget.width?.toInt() ?? 200) * 2,
+          // ✅ SAFE: never toInt() Infinity/NaN
+          memCacheHeight: cacheH,
+          memCacheWidth: cacheW,
         );
+
       case ImageType.png:
       default:
         return Image.asset(
           widget.imagePath!,
-          height: widget.height,
-          width: widget.width,
+          height: safeH,
+          width: safeW,
           fit: widget.fit ?? BoxFit.cover,
           color: widget.color,
           errorBuilder: (context, error, stackTrace) {
-            // CRITICAL: Enhanced error logging for asset load failures
             print('❌ ASSET LOAD FAILED:');
             print('   Asset Path: ${widget.imagePath}');
             print('   Error: $error');
@@ -378,8 +369,8 @@ class _CustomImageViewState extends State<CustomImageView>
 
             return Image.asset(
               widget.placeHolder ?? ImageConstant.imgImageNotFound,
-              height: widget.height,
-              width: widget.width,
+              height: safeH,
+              width: safeW,
               fit: widget.fit ?? BoxFit.cover,
             );
           },

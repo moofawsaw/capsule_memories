@@ -1,6 +1,9 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import './user_profile_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import './supabase_service.dart';
+import './user_profile_service.dart';
 
 /// Global avatar state notifier that broadcasts avatar changes across the app
 /// All widgets displaying user avatars should listen to this provider
@@ -35,10 +38,89 @@ class AvatarState {
 class AvatarStateNotifier extends StateNotifier<AvatarState> {
   AvatarStateNotifier() : super(AvatarState());
 
+  RealtimeChannel? _channel;
+
+  @override
+  void dispose() {
+    _unsubscribeRealtime();
+    super.dispose();
+  }
+
+  void _unsubscribeRealtime() {
+    final client = SupabaseService.instance.client;
+    if (client == null) return;
+
+    try {
+      if (_channel != null) {
+        client.removeChannel(_channel!);
+        _channel = null;
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  /// Start listening for avatar changes for the current user
+  Future<void> _subscribeToAvatarChanges(String userId) async {
+    final client = SupabaseService.instance.client;
+    if (client == null) return;
+
+    // avoid duplicate subscriptions
+    if (_channel != null) return;
+
+    _channel = client.channel('avatar_changes_$userId');
+
+    _channel!
+        .onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'user_profiles',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'id',
+        value: userId,
+      ),
+      callback: (payload) async {
+        try {
+          final newRow = payload.newRecord;
+          final oldRow = payload.oldRecord;
+
+          final newPath = newRow['avatar_url'] as String?;
+          final oldPath = oldRow['avatar_url'] as String?;
+
+          // avatar removed
+          if (newPath == null || newPath.isEmpty) {
+            state = state.copyWith(avatarUrl: null);
+            return;
+          }
+
+          // ✅ Ignore updates that didn't actually change avatar_url (e.g., updated_at)
+          if (oldPath != null && oldPath == newPath) return;
+
+          String? displayReadyUrl;
+
+          // If already a full URL (e.g., Google OAuth), use directly
+          if (newPath.startsWith('http://') || newPath.startsWith('https://')) {
+            displayReadyUrl = newPath;
+          } else {
+            // Supabase storage key -> signed URL
+            displayReadyUrl = await UserProfileService.instance.getAvatarUrl(newPath);
+          }
+
+          if (displayReadyUrl != null && displayReadyUrl.isNotEmpty) {
+            // ✅ Stable URL; cache eviction happens inside updateAvatar()
+            updateAvatar(displayReadyUrl);
+          }
+        } catch (e) {
+          print('❌ Avatar realtime update error: $e');
+        }
+      },
+    )
+        .subscribe();
+  }
+
   /// Load current user's avatar from database
   /// 🎯 HANDLES BOTH GOOGLE OAUTH URLS AND SUPABASE STORAGE KEYS
-  /// - Google OAuth URLs (start with http/https) are used directly
-  /// - Supabase Storage keys (like userId/file.png) are converted to signed URLs
   Future<void> loadCurrentUserAvatar() async {
     state = state.copyWith(isLoading: true);
 
@@ -52,28 +134,23 @@ class AvatarStateNotifier extends StateNotifier<AvatarState> {
       final user = client.auth.currentUser;
       if (user == null) {
         state = AvatarState(isLoading: false);
+        _unsubscribeRealtime();
         return;
       }
 
-      final userProfile =
-          await UserProfileService.instance.getCurrentUserProfile();
+      final userProfile = await UserProfileService.instance.getCurrentUserProfile();
 
       if (userProfile != null) {
         final avatarStoragePath = userProfile['avatar_url'] as String?;
         String? displayReadyUrl;
 
         if (avatarStoragePath != null && avatarStoragePath.isNotEmpty) {
-          // 🎯 CRITICAL: Check if avatar_url is already a full URL (Google OAuth)
           if (avatarStoragePath.startsWith('http://') ||
               avatarStoragePath.startsWith('https://')) {
-            // ✅ Google OAuth URL - use directly
             displayReadyUrl = avatarStoragePath;
-            print('✅ Using Google OAuth avatar URL directly');
           } else {
-            // ✅ Supabase Storage key - convert to signed URL
-            displayReadyUrl = await UserProfileService.instance
-                .getAvatarUrl(avatarStoragePath);
-            print('✅ Converted Supabase Storage key to signed URL');
+            displayReadyUrl =
+            await UserProfileService.instance.getAvatarUrl(avatarStoragePath);
           }
         }
 
@@ -84,10 +161,11 @@ class AvatarStateNotifier extends StateNotifier<AvatarState> {
           userId: user.id,
         );
 
-        print(
-            '✅ Avatar loaded and cached: ${displayReadyUrl != null ? "URL available" : "No avatar"}');
+        // ✅ Start realtime listening for cross-device changes
+        await _subscribeToAvatarChanges(user.id);
       } else {
-        state = AvatarState(isLoading: false);
+        state = AvatarState(isLoading: false, userId: user.id);
+        await _subscribeToAvatarChanges(user.id);
       }
     } catch (e) {
       print('❌ Error loading avatar: $e');
@@ -95,35 +173,44 @@ class AvatarStateNotifier extends StateNotifier<AvatarState> {
     }
   }
 
-  /// Update avatar URL after successful upload
-  /// This will trigger all listening widgets to refresh
+  /// Update avatar URL after successful upload (local immediate broadcast)
   void updateAvatar(String newAvatarUrl, {String? userEmail}) {
+    final oldUrl = state.avatarUrl;
+
+    // ✅ Evict old image from Flutter image cache so UI reloads immediately
+    if (oldUrl != null && oldUrl.isNotEmpty) {
+      final oldBase = oldUrl.split('?').first;
+      PaintingBinding.instance.imageCache.evict(NetworkImage(oldUrl));
+      PaintingBinding.instance.imageCache.evict(NetworkImage(oldBase));
+    }
+
+    final newBase = newAvatarUrl.split('?').first;
+    PaintingBinding.instance.imageCache.evict(NetworkImage(newAvatarUrl));
+    PaintingBinding.instance.imageCache.evict(NetworkImage(newBase));
+
     state = state.copyWith(
-      avatarUrl: newAvatarUrl,
+      avatarUrl: newAvatarUrl, // ✅ keep stable, no ?t=
       userEmail: userEmail ?? state.userEmail,
       isLoading: false,
     );
-    print('✅ Avatar updated in cache');
   }
 
   /// Clear avatar state on logout
   void clearAvatar() {
+    _unsubscribeRealtime();
     state = AvatarState();
-    print('✅ Avatar cache cleared');
   }
 
-  /// Refresh avatar from database - ONLY call this after user updates avatar in /profile
+  /// Refresh avatar from database - call when needed
   Future<void> refreshAvatar() async {
-    print('🔄 Force refreshing avatar from database...');
-    // Clear current state to force reload
+    _unsubscribeRealtime();
     state = AvatarState();
     await loadCurrentUserAvatar();
   }
 }
 
 /// Global avatar state provider
-/// Use this in any widget that displays user avatars
 final avatarStateProvider =
-    StateNotifierProvider<AvatarStateNotifier, AvatarState>(
-  (ref) => AvatarStateNotifier(),
+StateNotifierProvider<AvatarStateNotifier, AvatarState>(
+      (ref) => AvatarStateNotifier(),
 );
