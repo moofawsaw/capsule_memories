@@ -1,103 +1,27 @@
 import '../../../core/app_export.dart';
-import '../../../services/supabase_service.dart';
 
-/// This class is used for story items in the [memories_dashboard_screen] screen.
+// lib/presentation/memories_dashboard_screen/models/story_item_model.dart
 
-// ignore_for_file: must_be_immutable
 class StoryItemModel extends Equatable {
-  StoryItemModel({
+  const StoryItemModel({
     this.id,
     this.backgroundImage,
     this.profileImage,
     this.timestamp,
     this.navigateTo,
     this.memoryId,
-    this.contributorId,
-    this.mediaType,
-    this.videoUrl,
-    this.imageUrl,
-    this.contributorName,
-    this.thumbnailUrl,
-    this.isRead,
-  }) {
-    id = id ?? "";
-    backgroundImage = backgroundImage ?? "";
-    profileImage = profileImage ?? "";
-    timestamp = timestamp ?? "2 mins ago";
-    navigateTo = navigateTo ?? "";
-    memoryId = memoryId ?? "";
-    contributorId = contributorId ?? "";
-    mediaType = mediaType ?? "video";
-    videoUrl = videoUrl ?? "";
-    imageUrl = imageUrl ?? "";
-    contributorName = contributorName ?? "";
-    thumbnailUrl = thumbnailUrl ?? "";
-    isRead = isRead ?? false;
-  }
+    this.memoryTitle,
+    this.isRead = false,
+  });
 
-  String? id;
-  String? backgroundImage;
-  String? profileImage;
-  String? timestamp;
-  String? navigateTo;
-  String? memoryId;
-  String? contributorId;
-  String? mediaType;
-  String? videoUrl;
-  String? imageUrl;
-  String? contributorName;
-  String? thumbnailUrl;
-  bool? isRead;
-
-  /// Computed getter for resolved thumbnail URL
-  /// Returns full Supabase Storage URL for thumbnails
-  String get resolvedThumbnailUrl {
-    final supabaseService = SupabaseService.instance;
-
-    if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty) {
-      // Check if already a full URL
-      if (thumbnailUrl!.startsWith('http://') ||
-          thumbnailUrl!.startsWith('https://')) {
-        return thumbnailUrl!;
-      }
-
-      // Resolve relative path to full Supabase Storage URL
-      return supabaseService.getStorageUrl(thumbnailUrl!) ?? thumbnailUrl!;
-    }
-
-    return '';
-  }
-
-  /// Computed getter for resolved media URL
-  /// Returns resolved videoUrl if mediaType is 'video', otherwise returns resolved imageUrl or thumbnailUrl
-  String get resolvedMediaUrl {
-    final supabaseService = SupabaseService.instance;
-
-    if (mediaType == 'video' && videoUrl != null && videoUrl!.isNotEmpty) {
-      // Check if already a full URL
-      if (videoUrl!.startsWith('http://') || videoUrl!.startsWith('https://')) {
-        return videoUrl!;
-      }
-
-      // Resolve relative path to full Supabase Storage URL
-      return supabaseService.getStorageUrl(videoUrl!) ?? videoUrl!;
-    } else {
-      // For images, prioritize imageUrl, fallback to thumbnailUrl
-      final path = imageUrl ?? thumbnailUrl;
-
-      if (path != null && path.isNotEmpty) {
-        // Check if already a full URL
-        if (path.startsWith('http://') || path.startsWith('https://')) {
-          return path;
-        }
-
-        // Resolve relative path to full Supabase Storage URL
-        return supabaseService.getStorageUrl(path) ?? path;
-      }
-    }
-
-    return '';
-  }
+  final String? id;
+  final String? backgroundImage;
+  final String? profileImage;
+  final String? timestamp;
+  final String? navigateTo;
+  final String? memoryId;
+  final String? memoryTitle; // ADDED: Memory title for story viewer display
+  final bool isRead;
 
   StoryItemModel copyWith({
     String? id,
@@ -106,12 +30,7 @@ class StoryItemModel extends Equatable {
     String? timestamp,
     String? navigateTo,
     String? memoryId,
-    String? contributorId,
-    String? mediaType,
-    String? videoUrl,
-    String? imageUrl,
-    String? contributorName,
-    String? thumbnailUrl,
+    String? memoryTitle,
     bool? isRead,
   }) {
     return StoryItemModel(
@@ -121,12 +40,7 @@ class StoryItemModel extends Equatable {
       timestamp: timestamp ?? this.timestamp,
       navigateTo: navigateTo ?? this.navigateTo,
       memoryId: memoryId ?? this.memoryId,
-      contributorId: contributorId ?? this.contributorId,
-      mediaType: mediaType ?? this.mediaType,
-      videoUrl: videoUrl ?? this.videoUrl,
-      imageUrl: imageUrl ?? this.imageUrl,
-      contributorName: contributorName ?? this.contributorName,
-      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      memoryTitle: memoryTitle ?? this.memoryTitle,
       isRead: isRead ?? this.isRead,
     );
   }
@@ -139,12 +53,7 @@ class StoryItemModel extends Equatable {
         timestamp,
         navigateTo,
         memoryId,
-        contributorId,
-        mediaType,
-        videoUrl,
-        imageUrl,
-        contributorName,
-        thumbnailUrl,
+        memoryTitle,
         isRead,
       ];
 }

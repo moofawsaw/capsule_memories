@@ -267,14 +267,12 @@ class _CustomImageViewState extends State<CustomImageView>
           fit: widget.fit,
           imageUrl: widget.imagePath!,
           color: widget.color,
-          // CRITICAL FIX: Extended timeout from default 60 seconds to 90 seconds
-          // This gives database-fetched thumbnails enough time to load without timing out too quickly
+          // CRITICAL FIX: Optimize cache configuration for thumbnail stability
           cacheManager: CacheManager(
             Config(
               'customCacheKey',
               stalePeriod: const Duration(days: 7),
               maxNrOfCacheObjects: 200,
-              // CRITICAL: Prevent premature timeout that causes broken thumbnails on refresh
               repo: JsonCacheInfoRepository(databaseName: 'customCacheKey'),
               fileService: HttpFileService(
                 httpClient: http.Client(),
@@ -297,18 +295,14 @@ class _CustomImageViewState extends State<CustomImageView>
             ),
           ),
           errorWidget: (context, url, error) {
-            // CRITICAL FIX: Only show error placeholder if database returned invalid/null URL
-            // Check if URL is actually invalid (null or empty) from database
+            // CRITICAL FIX: Gracefully handle network errors without showing broken thumbnails
             final isInvalidUrl = url.isEmpty ||
                 url == 'null' ||
                 url == 'undefined' ||
                 !url.startsWith('http');
 
             if (isInvalidUrl) {
-              // Database returned invalid thumbnail - show placeholder
-              print('❌ IMAGE LOAD FAILED - Invalid URL from database:');
-              print('   URL: $url');
-
+              // Database returned invalid thumbnail URL
               return Image.asset(
                 widget.placeHolder ?? ImageConstant.imgImageNotFound,
                 height: widget.height,
@@ -316,30 +310,44 @@ class _CustomImageViewState extends State<CustomImageView>
                 fit: widget.fit ?? BoxFit.cover,
               );
             } else {
-              // Valid URL from database but network error - retry with progressive loading
-              print('⚠️ NETWORK ERROR - Valid URL, retrying:');
-              print('   URL: $url');
-              print('   Error: $error');
-
-              // Show retry indicator instead of immediate failure
+              // Valid URL but network/cache error - show loading state instead of broken image
+              // This prevents "crash" appearance when returning from story viewer
               return Container(
                 height: widget.height,
                 width: widget.width,
-                color: appTheme.grey100,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                decoration: BoxDecoration(
+                  color: appTheme.grey100,
+                  borderRadius: widget.radius,
+                ),
+                child: Stack(
                   children: [
-                    Icon(
-                      Icons.refresh,
-                      color: appTheme.gray_300,
-                      size: 24,
+                    // CRITICAL: Show shimmer effect instead of broken image
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              appTheme.gray_300.withAlpha(51),
+                              appTheme.gray_300.withAlpha(128),
+                              appTheme.gray_300.withAlpha(51),
+                            ],
+                            stops: [0.0, 0.5, 1.0],
+                          ),
+                          borderRadius: widget.radius,
+                        ),
+                      ),
                     ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Loading...',
-                      style: TextStyle(
-                        color: appTheme.gray_300,
-                        fontSize: 12,
+                    // Small loading indicator
+                    Center(
+                      child: SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: appTheme.gray_300,
+                        ),
                       ),
                     ),
                   ],
@@ -347,6 +355,11 @@ class _CustomImageViewState extends State<CustomImageView>
               );
             }
           },
+          // CRITICAL FIX: Add fadeInDuration to smooth appearance when loading from cache
+          fadeInDuration: const Duration(milliseconds: 200),
+          // CRITICAL FIX: Add memCacheHeight/Width for better memory management
+          memCacheHeight: (widget.height?.toInt() ?? 200) * 2,
+          memCacheWidth: (widget.width?.toInt() ?? 200) * 2,
         );
       case ImageType.png:
       default:

@@ -42,9 +42,9 @@ class MemoryCacheService {
 
   // Stream controllers for cache updates
   final _memoriesStreamController =
-  StreamController<List<MemoryItemModel>>.broadcast();
+      StreamController<List<MemoryItemModel>>.broadcast();
   final _storiesStreamController =
-  StreamController<List<StoryItemModel>>.broadcast();
+      StreamController<List<StoryItemModel>>.broadcast();
 
   Stream<List<MemoryItemModel>> get memoriesStream =>
       _memoriesStreamController.stream;
@@ -62,14 +62,16 @@ class MemoryCacheService {
 
   /// Public: get memories with cache + deduped fetch
   Future<List<MemoryItemModel>> getMemories(
-      String userId, {
-        bool forceRefresh = false,
-      }) async {
-    print('🔍 CACHE: getMemories called for userId: $userId (forceRefresh=$forceRefresh)');
+    String userId, {
+    bool forceRefresh = false,
+  }) async {
+    print(
+        '🔍 CACHE: getMemories called for userId: $userId (forceRefresh=$forceRefresh)');
 
     // If switching users, hard reset cache and in-flight
     if (_cachedUserId != null && _cachedUserId != userId) {
-      print('🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
+      print(
+          '🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
       clearCache();
       _cachedUserId = userId;
     }
@@ -88,7 +90,7 @@ class MemoryCacheService {
 
     // Start a new fetch
     _memoriesInFlight = _retryOperation(
-          () => _loadUserMemories(userId),
+      () => _loadUserMemories(userId),
       'load memories',
     ).then((memories) {
       _cachedUserId = userId;
@@ -110,14 +112,16 @@ class MemoryCacheService {
 
   /// Public: get stories with cache + deduped fetch
   Future<List<StoryItemModel>> getStories(
-      String userId, {
-        bool forceRefresh = false,
-      }) async {
-    print('🔍 CACHE: getStories called for userId: $userId (forceRefresh=$forceRefresh)');
+    String userId, {
+    bool forceRefresh = false,
+  }) async {
+    print(
+        '🔍 CACHE: getStories called for userId: $userId (forceRefresh=$forceRefresh)');
 
     // If switching users, hard reset cache and in-flight
     if (_cachedUserId != null && _cachedUserId != userId) {
-      print('🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
+      print(
+          '🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
       clearCache();
       _cachedUserId = userId;
     }
@@ -136,7 +140,7 @@ class MemoryCacheService {
 
     // Start a new fetch
     _storiesInFlight = _retryOperation(
-          () => _loadUserStories(userId),
+      () => _loadUserStories(userId),
       'load stories',
     ).then((stories) {
       _cachedUserId = userId;
@@ -157,9 +161,9 @@ class MemoryCacheService {
 
   /// Retry operation with exponential backoff
   Future<T> _retryOperation<T>(
-      Future<T> Function() operation,
-      String operationName,
-      ) async {
+    Future<T> Function() operation,
+    String operationName,
+  ) async {
     int attempt = 0;
     Duration delay = _initialRetryDelay;
 
@@ -170,7 +174,8 @@ class MemoryCacheService {
         attempt++;
 
         if (attempt >= _maxRetries) {
-          print('❌ CACHE: Failed to $operationName after $attempt attempts: $e');
+          print(
+              '❌ CACHE: Failed to $operationName after $attempt attempts: $e');
           rethrow;
         }
 
@@ -261,12 +266,15 @@ class MemoryCacheService {
         if (viewsResponse != null) {
           viewedStoryIds =
               viewsResponse.map((view) => view['story_id'] as String).toSet();
-          print('🔍 CACHE: Found ${viewedStoryIds.length} viewed stories for user');
+          print(
+              '🔍 CACHE: Found ${viewedStoryIds.length} viewed stories for user');
         }
       }
 
       return storiesData.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final memory = storyData['memories']
+            as Map<String, dynamic>?; // ✅ ADDED: Get memory data
         final createdAt = DateTime.parse(storyData['created_at'] as String);
         final storyId = storyData['id'] as String;
 
@@ -279,6 +287,9 @@ class MemoryCacheService {
             contributor?['username'] as String? ??
             'Unknown';
 
+        final memoryTitle = memory?['title'] as String? ??
+            'Unknown Memory'; // ✅ ADDED: Extract memory title
+
         final isRead = viewedStoryIds.contains(storyId);
 
         return StoryItemModel(
@@ -288,11 +299,7 @@ class MemoryCacheService {
           timestamp: _storyService.getTimeAgo(createdAt),
           navigateTo: '/story/view',
           memoryId: storyData['memory_id'] as String,
-          contributorId: storyData['contributor_id'] as String,
-          mediaType: storyData['media_type'] as String? ?? 'video',
-          videoUrl: storyData['video_url'] as String? ?? '',
-          imageUrl: storyData['image_url'] as String? ?? '',
-          contributorName: contributorName,
+          memoryTitle: memoryTitle, // ✅ ADDED: Include memory title in model
           isRead: isRead,
         );
       }).toList();
@@ -308,10 +315,10 @@ class MemoryCacheService {
       final memoriesData = await _storyService.fetchUserTimelines(userId);
 
       final allMemories =
-      await Future.wait(memoriesData.map((memoryData) async {
+          await Future.wait(memoriesData.map((memoryData) async {
         final creator = memoryData['user_profiles'] as Map<String, dynamic>?;
         final category =
-        memoryData['memory_categories'] as Map<String, dynamic>?;
+            memoryData['memory_categories'] as Map<String, dynamic>?;
         final stories = memoryData['stories'] as List?;
 
         DateTime createdAt;
@@ -359,12 +366,12 @@ class MemoryCacheService {
         }
 
         final memoryThumbnails = stories
-            ?.map((story) {
-          return (story['thumbnail_url'] ?? story['image_url'] ?? '')
-          as String;
-        })
-            .where((url) => url.isNotEmpty)
-            .toList() ??
+                ?.map((story) {
+                  return (story['thumbnail_url'] ?? story['image_url'] ?? '')
+                      as String;
+                })
+                .where((url) => url.isNotEmpty)
+                .toList() ??
             [];
 
         final memoryId = memoryData['id'] as String;
@@ -392,11 +399,12 @@ class MemoryCacheService {
             // Contributor avatars (as returned by join order)
             final contributorAvatars = contributorsResponse
                 .map((contributor) {
-              final userProfile = contributor['user_profiles'] as Map<String, dynamic>?;
-              return AvatarHelperService.getAvatarUrl(
-                userProfile?['avatar_url'] as String?,
-              );
-            })
+                  final userProfile =
+                      contributor['user_profiles'] as Map<String, dynamic>?;
+                  return AvatarHelperService.getAvatarUrl(
+                    userProfile?['avatar_url'] as String?,
+                  );
+                })
                 .where((url) => url.isNotEmpty)
                 .toList();
 
@@ -415,7 +423,9 @@ class MemoryCacheService {
 
             // Build "others" list by removing current user avatar (by URL)
             final others = (currentUserAvatar.isNotEmpty)
-                ? uniqueContributors.where((a) => a != currentUserAvatar).toList()
+                ? uniqueContributors
+                    .where((a) => a != currentUserAvatar)
+                    .toList()
                 : uniqueContributors;
 
             // ✅ Rule:
@@ -429,17 +439,17 @@ class MemoryCacheService {
                 ...others,
                 if (currentUserAvatar.isNotEmpty) currentUserAvatar,
               ];
-              participantAvatars = _dedupePreserveOrder(merged).take(3).toList();
-            } else {
               participantAvatars =
-              currentUserAvatar.isNotEmpty ? <String>[currentUserAvatar] : <String>[];
+                  _dedupePreserveOrder(merged).take(3).toList();
+            } else {
+              participantAvatars = currentUserAvatar.isNotEmpty
+                  ? <String>[currentUserAvatar]
+                  : <String>[];
             }
           }
         } catch (e) {
           print('❌ CACHE: Error fetching contributor avatars: $e');
         }
-
-
 
         return MemoryItemModel(
           id: memoryData['id'] as String,
@@ -488,8 +498,18 @@ class MemoryCacheService {
 
   String _formatDate(DateTime dateTime) {
     const months = [
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${months[dateTime.month - 1]} ${dateTime.day}';
   }

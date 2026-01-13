@@ -1,5 +1,3 @@
-// lib/presentation/memories_dashboard_screen/memories_dashboard_screen.dart
-
 import '../../core/app_export.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
 import '../../services/supabase_service.dart';
@@ -12,6 +10,8 @@ import '../../widgets/custom_story_skeleton.dart';
 import '../create_memory_screen/create_memory_screen.dart';
 import '../friends_management_screen/widgets/qr_scanner_overlay.dart';
 import './notifier/memories_dashboard_notifier.dart';
+
+// lib/presentation/memories_dashboard_screen/memories_dashboard_screen.dart
 
 class MemoriesDashboardScreen extends ConsumerStatefulWidget {
   const MemoriesDashboardScreen({Key? key}) : super(key: key);
@@ -138,43 +138,46 @@ class _MemoriesDashboardScreenState
             height: 130.h,
             child: isLoading
                 ? ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.only(left: 20.h),
-              itemCount: 3,
-              itemBuilder: (_, __) => Container(
-                width: 120.h,
-                margin: EdgeInsets.only(right: 10.h),
-                child: CustomStorySkeleton(isCompact: true),
-              ),
-            )
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.only(left: 20.h),
+                    itemCount: 3,
+                    itemBuilder: (_, __) => Container(
+                      width: 120.h,
+                      margin: EdgeInsets.only(right: 10.h),
+                      child: CustomStorySkeleton(isCompact: true),
+                    ),
+                  )
                 : items.isEmpty
-                ? Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20.h),
-                child: Text(
-                  'No stories yet',
-                  style: TextStyleHelper
-                      .instance.body14RegularPlusJakartaSans
-                      .copyWith(
-                      color: appTheme.gray_50.withAlpha(128)),
-                ),
-              ),
-            )
-                : CustomStoryList(
-              storyItems: items
-                  .map(
-                    (e) => CustomStoryItem(
-                  backgroundImage: e.backgroundImage ?? '',
-                  profileImage: e.profileImage ?? '',
-                  timestamp: e.timestamp ?? '',
-                  navigateTo: e.navigateTo,
-                  storyId: e.id,
-                  isRead: e.isRead ?? false,
-                ),
-              )
-                  .toList(),
-              onStoryTap: (i) => _onStoryTap(context, i),
-            ),
+                    ? Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20.h),
+                          child: Text(
+                            'No stories yet',
+                            style: TextStyleHelper
+                                .instance.body14RegularPlusJakartaSans
+                                .copyWith(
+                                    color: appTheme.gray_50.withAlpha(128)),
+                          ),
+                        ),
+                      )
+                    : CustomStoryList(
+                        // CRITICAL FIX: Add unique key to prevent widget recycling issues
+                        key: ValueKey(
+                            'story_list_${items.length}_${items.first.id ?? ""}'),
+                        storyItems: items
+                            .map(
+                              (e) => CustomStoryItem(
+                                backgroundImage: e.backgroundImage ?? '',
+                                profileImage: e.profileImage ?? '',
+                                timestamp: e.timestamp ?? '',
+                                navigateTo: e.navigateTo,
+                                storyId: e.id,
+                                isRead: e.isRead ?? false,
+                              ),
+                            )
+                            .toList(),
+                        onStoryTap: (i) => _onStoryTap(context, i),
+                      ),
           ),
         ],
       );
@@ -214,17 +217,17 @@ class _MemoriesDashboardScreenState
                     _tab(
                       'All ($allCount)',
                       ownership == 'all',
-                          () => notifier.updateOwnershipFilter('all'),
+                      () => notifier.updateOwnershipFilter('all'),
                     ),
                     _tab(
                       'Created ($createdCount)',
                       ownership == 'created',
-                          () => notifier.updateOwnershipFilter('created'),
+                      () => notifier.updateOwnershipFilter('created'),
                     ),
                     _tab(
                       'Joined ($joinedCount)',
                       ownership == 'joined',
-                          () => notifier.updateOwnershipFilter('joined'),
+                      () => notifier.updateOwnershipFilter('joined'),
                     ),
                   ],
                 ),
@@ -253,9 +256,9 @@ class _MemoriesDashboardScreenState
             textAlign: TextAlign.center,
             style: active
                 ? TextStyleHelper.instance.body14BoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_900_02)
+                    .copyWith(color: appTheme.gray_900_02)
                 : TextStyleHelper.instance.body14RegularPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
+                    .copyWith(color: appTheme.gray_50),
           ),
         ),
       ),

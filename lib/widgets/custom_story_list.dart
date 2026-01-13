@@ -81,13 +81,18 @@ class CustomStoryList extends StatelessWidget {
       BuildContext context, CustomStoryItem item, int index) {
     return GestureDetector(
       onTap: () => onStoryTap?.call(index),
-      child: SizedBox(
+      child: Container(
+        // CRITICAL FIX: Add unique key per story to prevent thumbnail crashes
+        // This ensures each story card maintains its own state and image cache
+        key: ValueKey('story_${item.storyId ?? index}_${item.backgroundImage}'),
         width: 90.h,
         height: 120.h,
         child: Stack(
           children: [
-            // Background image
+            // Background image with optimized caching
             CustomImageView(
+              // CRITICAL: Pass unique key to image widget for stable caching
+              key: ValueKey('story_bg_${item.storyId ?? index}'),
               imagePath: item.backgroundImage,
               width: 90.h,
               height: 120.h,
@@ -106,13 +111,11 @@ class CustomStoryList extends StatelessWidget {
                   Container(
                     width: 32.h,
                     height: 32.h,
-                    padding: EdgeInsets.all(2.h), // Gap between ring and avatar
+                    padding: EdgeInsets.all(2.h),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      // Solid primary color for unread, gray for read
-                      color: item.isRead
-                          ? Color(0xFF9CA3AF) // Gray for read
-                          : Color(0xFF8B5CF6), // Primary purple for unread
+                      color:
+                          item.isRead ? Color(0xFF9CA3AF) : Color(0xFF8B5CF6),
                       border: item.isRead
                           ? Border.all(color: Color(0xFF9CA3AF), width: 2.h)
                           : null,
@@ -122,12 +125,14 @@ class CustomStoryList extends StatelessWidget {
                       height: 28.h,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color:
-                            appTheme.gray_900, // Background color for padding
+                        color: appTheme.gray_900,
                       ),
                       padding: EdgeInsets.all(1.h),
                       child: ClipOval(
                         child: CustomImageView(
+                          // CRITICAL: Pass unique key to profile image for stable caching
+                          key: ValueKey(
+                              'story_profile_${item.storyId ?? index}'),
                           imagePath: item.profileImage,
                           width: 26.h,
                           height: 26.h,
