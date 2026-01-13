@@ -15,15 +15,14 @@ part 'user_profile_screen_two_state.dart';
 
 final userProfileScreenTwoNotifier = StateNotifierProvider.autoDispose<
     UserProfileScreenTwoNotifier, UserProfileScreenTwoState>(
-  (ref) => UserProfileScreenTwoNotifier(
+      (ref) => UserProfileScreenTwoNotifier(
     UserProfileScreenTwoState(
       userProfileScreenTwoModel: UserProfileScreenTwoModel(),
     ),
   ),
 );
 
-class UserProfileScreenTwoNotifier
-    extends StateNotifier<UserProfileScreenTwoState> {
+class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoState> {
   final FollowsService _followsService = FollowsService();
   final FriendsService _friendsService = FriendsService();
   final BlockedUsersService _blockedUsersService = BlockedUsersService();
@@ -31,101 +30,36 @@ class UserProfileScreenTwoNotifier
 
   UserProfileScreenTwoNotifier(UserProfileScreenTwoState state) : super(state);
 
+  // ✅ Helper: get authed user id once
+  String? get _currentUserId => SupabaseService.instance.client?.auth.currentUser?.id;
+
   Future<void> initialize({String? userId}) async {
     try {
       state = state.copyWith(isLoading: true, targetUserId: userId);
 
+      final currentUserId = _currentUserId;
+      final isCurrentUserProfile =
+          (userId == null) || (currentUserId != null && userId == currentUserId);
+
+      final resolvedTargetUserId =
+      isCurrentUserProfile ? (currentUserId ?? '') : (userId ?? '');
+
       Map<String, dynamic>? profile;
 
-      if (userId != null) {
-        profile = await UserProfileService.instance.getUserProfileById(userId);
-      } else {
+      // current user -> user_profiles (private, contains email)
+      // other user  -> user_profiles_public (no email)
+      if (isCurrentUserProfile) {
         profile = await UserProfileService.instance.getCurrentUserProfile();
+      } else {
+        profile = await UserProfileService.instance.getPublicUserProfileById(resolvedTargetUserId);
       }
 
-      if (profile != null) {
-        String? avatarUrl;
-        if (profile['avatar_url'] != null &&
-            profile['avatar_url'].toString().isNotEmpty) {
-          avatarUrl = await UserProfileService.instance
-              .getAvatarUrl(profile['avatar_url']);
-        }
-
-        final profileUserId = profile['id'] as String;
-        final stats =
-            await UserProfileService.instance.getUserStats(profileUserId);
-
-        // Check relationship status if viewing another user's profile
-        if (userId != null) {
-          await _loadRelationshipStatus(userId);
-        }
-
-        // Set stories loading state before fetching
-        state = state.copyWith(isLoadingStories: true);
-
-        // CRITICAL FIX: Use fetchStoriesByAuthor to get only stories created by this user from public memories
-        // This replaces fetchUserStories which returned stories from ALL memories where user is a contributor
-        final stories = await _storyService.fetchStoriesByAuthor(
-          userId ?? SupabaseService.instance.client?.auth.currentUser?.id ?? '',
-        );
-
-        // Transform database stories into StoryItemModel instances with ACTUAL category data
-        final storyItems = stories.map((story) {
-          final contributor = story['user_profiles'] as Map<String, dynamic>?;
-          final memory = story['memories'] as Map<String, dynamic>?;
-          final category =
-              memory?['memory_categories'] as Map<String, dynamic>?;
-
-          // Extract actual category information from database
-          final categoryName = category?['name'] ?? 'Memory';
-          final categoryIconUrl = category?['icon_url'] as String?;
-
-          return StoryItemModel(
-            storyId: story['id'] as String?,
-            userName: contributor?['display_name'] ??
-                contributor?['username'] ??
-                'Unknown User',
-            userAvatar: AvatarHelperService.getAvatarUrl(
-              contributor?['avatar_url'],
-            ),
-            backgroundImage: StoryService.resolveStoryMediaUrl(
-                story['thumbnail_url'] as String?),
-            categoryText:
-                categoryName, // Use actual category name from database
-            categoryIcon: categoryIconUrl ??
-                ImageConstant.imgVector, // Use actual category icon URL
-            timestamp: _storyService.getTimeAgo(
-              DateTime.parse(
-                  story['created_at'] ?? DateTime.now().toIso8601String()),
-            ),
-          );
-        }).toList();
-
-        state = state.copyWith(
-          userProfileScreenTwoModel: UserProfileScreenTwoModel(
-            avatarImagePath: avatarUrl ?? '',
-            userName: profile['display_name'] ??
-                profile['username'] ??
-                profile['email']?.split('@')[0] ??
-                'User',
-            email: profile['email'] ?? '',
-            followersCount: stats['followers'].toString(),
-            followingCount: stats['following'].toString(),
-            storyItems: storyItems,
-          ),
-          isUploading: false,
-          isLoading: false,
-          isLoadingStories: false,
-        );
-      } else {
-        // User not found or not authenticated - show empty state
+      if (profile == null) {
         state = state.copyWith(
           userProfileScreenTwoModel: UserProfileScreenTwoModel(
             avatarImagePath: ImageConstant.imgEllipse896x96,
             userName: 'User Not Found',
-            email: userId != null
-                ? 'Unable to load user data'
-                : 'Please login to see your profile',
+            email: null, // ✅ never show email on missing profile
             followersCount: '0',
             followingCount: '0',
             storyItems: [],
@@ -134,7 +68,73 @@ class UserProfileScreenTwoNotifier
           isLoading: false,
           isLoadingStories: false,
         );
+        return;
       }
+
+      String? avatarUrl;
+      final avatarPath = profile['avatar_url'];
+      if (avatarPath != null && avatarPath.toString().isNotEmpty) {
+        avatarUrl = await UserProfileService.instance.getAvatarUrl(avatarPath.toString());
+      }
+
+      final profileUserId = (profile['id'] as String?) ?? resolvedTargetUserId;
+
+      // ✅ Uses public table now (per your UserProfileService updates)
+      final stats = await UserProfileService.instance.getUserStats(profileUserId);
+
+      // Only load relationship status if viewing someone else
+      if (!isCurrentUserProfile && resolvedTargetUserId.isNotEmpty) {
+        await _loadRelationshipStatus(resolvedTargetUserId);
+      }
+
+      state = state.copyWith(isLoadingStories: true);
+
+      final stories = await _storyService.fetchStoriesByAuthor(profileUserId);
+
+      final storyItems = stories.map((story) {
+        final contributor =
+            (story['user_profiles_public'] as Map<String, dynamic>?) ??
+                (story['user_profiles'] as Map<String, dynamic>?);
+
+        final memory = story['memories'] as Map<String, dynamic>?;
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
+
+        final categoryName = category?['name'] ?? 'Memory';
+        final categoryIconUrl = category?['icon_url'] as String?;
+
+        return StoryItemModel(
+          storyId: story['id'] as String?,
+          contributorId: story['contributor_id'] as String?,
+          userName: contributor?['display_name'] ?? contributor?['username'] ?? 'Unknown User',
+          userAvatar: AvatarHelperService.getAvatarUrl(contributor?['avatar_url']),
+          backgroundImage: StoryService.resolveStoryMediaUrl(story['thumbnail_url'] as String?),
+          categoryText: categoryName,
+          categoryIcon: categoryIconUrl ?? ImageConstant.imgVector,
+          timestamp: _storyService.getTimeAgo(
+            DateTime.parse(story['created_at'] ?? DateTime.now().toIso8601String()),
+          ),
+        );
+      }).toList();
+
+      // ✅ current user only
+      final safeEmail = isCurrentUserProfile ? (profile['email'] as String?) : null;
+
+      state = state.copyWith(
+        userProfileScreenTwoModel: UserProfileScreenTwoModel(
+          avatarImagePath: avatarUrl ?? '',
+          userName: profile['display_name'] ??
+              profile['username'] ??
+              (isCurrentUserProfile ? (safeEmail?.split('@').first) : null) ??
+              'User',
+          email: safeEmail, // ✅ NULL for other users
+          followersCount: stats['followers'].toString(),
+          followingCount: stats['following'].toString(),
+          storyItems: storyItems,
+        ),
+        isUploading: false,
+        isLoading: false,
+        isLoadingStories: false,
+      );
     } catch (e) {
       print('❌ ERROR initializing user profile: $e');
       state = state.copyWith(
@@ -144,20 +144,15 @@ class UserProfileScreenTwoNotifier
     }
   }
 
+
   Future<void> _loadRelationshipStatus(String targetUserId) async {
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
       if (currentUser == null) return;
 
-      final isFollowing =
-          await _followsService.isFollowing(currentUser.id, targetUserId);
-
-      final isFriend =
-          await _friendsService.areFriends(currentUser.id, targetUserId);
-
-      final hasPendingRequest =
-          await _friendsService.hasPendingRequest(currentUser.id, targetUserId);
-
+      final isFollowing = await _followsService.isFollowing(currentUser.id, targetUserId);
+      final isFriend = await _friendsService.areFriends(currentUser.id, targetUserId);
+      final hasPendingRequest = await _friendsService.hasPendingRequest(currentUser.id, targetUserId);
       final isBlocked = await _blockedUsersService.isUserBlocked(targetUserId);
 
       state = state.copyWith(
@@ -171,6 +166,30 @@ class UserProfileScreenTwoNotifier
     }
   }
 
+  /// ✅ NEW: Delete story from DB + remove from UI list
+  Future<bool> deleteStory(String storyId) async {
+    try {
+      if (storyId.trim().isEmpty) return false;
+
+      final success = await _storyService.deleteStory(storyId);
+      if (!success) return false;
+
+      final currentItems = state.userProfileScreenTwoModel?.storyItems ?? <StoryItemModel>[];
+      final updatedItems = currentItems.where((item) => item.storyId != storyId).toList();
+
+      state = state.copyWith(
+        userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
+          storyItems: updatedItems,
+        ),
+      );
+
+      return true;
+    } catch (e) {
+      print('❌ Error deleting story: $e');
+      return false;
+    }
+  }
+
   Future<void> toggleFollow() async {
     final targetUserId = state.targetUserId;
     if (targetUserId == null) return;
@@ -179,14 +198,12 @@ class UserProfileScreenTwoNotifier
     if (currentUser == null) return;
 
     if (state.isFollowing) {
-      final success =
-          await _followsService.unfollowUser(currentUser.id, targetUserId);
+      final success = await _followsService.unfollowUser(currentUser.id, targetUserId);
       if (success) {
         state = state.copyWith(isFollowing: false);
       }
     } else {
-      final success =
-          await _followsService.followUser(currentUser.id, targetUserId);
+      final success = await _followsService.followUser(currentUser.id, targetUserId);
       if (success) {
         state = state.copyWith(isFollowing: true);
       }
@@ -200,14 +217,12 @@ class UserProfileScreenTwoNotifier
     final currentUser = SupabaseService.instance.client?.auth.currentUser;
     if (currentUser == null) return;
 
-    final success =
-        await _friendsService.sendFriendRequest(currentUser.id, targetUserId);
+    final success = await _friendsService.sendFriendRequest(currentUser.id, targetUserId);
     if (success) {
       state = state.copyWith(hasPendingFriendRequest: true);
     }
   }
 
-  /// Unfriends the target user
   Future<void> unfriendUser() async {
     final targetUserId = state.targetUserId;
     if (targetUserId == null) return;
@@ -215,11 +230,33 @@ class UserProfileScreenTwoNotifier
     final currentUser = SupabaseService.instance.client?.auth.currentUser;
     if (currentUser == null) return;
 
-    final success =
-        await _friendsService.unfriendUser(currentUser.id, targetUserId);
+    final success = await _friendsService.unfriendUser(currentUser.id, targetUserId);
     if (success) {
       state = state.copyWith(isFriend: false);
     }
+  }
+
+  Future<bool> deleteStoryFromProfile(String storyId) async {
+    if (storyId.isEmpty) return false;
+
+    // Optimistic UI removal
+    final currentItems = state.userProfileScreenTwoModel?.storyItems ?? <StoryItemModel>[];
+    final updatedItems = currentItems.where((s) => s.storyId != storyId).toList();
+
+    state = state.copyWith(
+      userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(storyItems: updatedItems),
+    );
+
+    final success = await _storyService.deleteStory(storyId);
+
+    if (!success) {
+      // Revert if delete failed
+      state = state.copyWith(
+        userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(storyItems: currentItems),
+      );
+    }
+
+    return success;
   }
 
   Future<void> toggleBlock() async {
@@ -248,10 +285,7 @@ class UserProfileScreenTwoNotifier
     final currentUser = SupabaseService.instance.client?.auth.currentUser;
     if (currentUser == null) return;
 
-    // Follow user - database trigger will create notification automatically
-    final success =
-        await _followsService.followUser(currentUser.id, targetUserId);
-    // Note: isFollowing property is not available in UserProfileScreenTwoState
+    await _followsService.followUser(currentUser.id, targetUserId);
   }
 
   Future<void> uploadAvatar() async {
@@ -271,38 +305,24 @@ class UserProfileScreenTwoNotifier
         return;
       }
 
-      // Read image bytes - works on both web and mobile
       final imageBytes = await image.readAsBytes();
       final fileName = image.name;
 
-      // Upload to Supabase Storage using bytes
-      final filePath = await UserProfileService.instance.uploadAvatar(
-        imageBytes,
-        fileName,
-      );
+      final filePath = await UserProfileService.instance.uploadAvatar(imageBytes, fileName);
 
       if (filePath != null) {
-        // Update user profile in database
-        final success = await UserProfileService.instance.updateUserProfile(
-          avatarUrl: filePath,
-        );
+        final success = await UserProfileService.instance.updateUserProfile(avatarUrl: filePath);
 
         if (success) {
-          // Get signed URL for immediate display
-          final signedUrl =
-              await UserProfileService.instance.getAvatarUrl(filePath);
+          final signedUrl = await UserProfileService.instance.getAvatarUrl(filePath);
 
           if (signedUrl != null) {
-            // Update local state
             state = state.copyWith(
-              userProfileScreenTwoModel:
-                  state.userProfileScreenTwoModel?.copyWith(
+              userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
                 avatarImagePath: signedUrl,
               ),
               isUploading: false,
             );
-
-            print('✅ Avatar updated successfully');
           }
         }
       }
@@ -314,33 +334,20 @@ class UserProfileScreenTwoNotifier
     }
   }
 
-  /// Update username in Supabase and local state
   Future<void> updateUsername(String newUsername) async {
     try {
-      // Validate username
-      if (newUsername.trim().isEmpty) {
-        print('⚠️ Username cannot be empty');
-        return;
-      }
+      if (newUsername.trim().isEmpty) return;
 
       final trimmedUsername = newUsername.trim();
 
-      // Update in database
-      final success = await UserProfileService.instance.updateUserProfile(
-        displayName: trimmedUsername,
-      );
+      final success = await UserProfileService.instance.updateUserProfile(displayName: trimmedUsername);
 
       if (success) {
-        // Update local state
         state = state.copyWith(
           userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
             userName: trimmedUsername,
           ),
         );
-
-        print('✅ Username updated successfully to: $trimmedUsername');
-      } else {
-        print('❌ Failed to update username in database');
       }
     } catch (e) {
       print('❌ Error updating username: $e');

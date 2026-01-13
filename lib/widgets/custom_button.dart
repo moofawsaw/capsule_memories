@@ -1,23 +1,6 @@
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
-/**
- * CustomButton - A versatile button component that supports multiple styles and configurations
- *
- * @param text - The text content displayed on the button
- * @param onPressed - Callback function when button is pressed
- * @param width - Button width, can be specific value or null for auto-sizing
- * @param height - Button height
- * @param buttonStyle - The style variant of the button
- * @param buttonTextStyle - Text style configuration for the button text
- * @param isDisabled - Whether the button is disabled
- * @param isLoading - Whether the button should show a loading spinner and block taps
- * @param alignment - Button alignment within its parent
- * @param leftIcon - Icon to display on the left side of the text
- * @param rightIcon - Icon to display on the right side of the text
- * @param margin - External spacing around the button
- * @param padding - Internal spacing within the button
- */
 class CustomButton extends StatelessWidget {
   const CustomButton({
     Key? key,
@@ -28,7 +11,7 @@ class CustomButton extends StatelessWidget {
     this.buttonStyle,
     this.buttonTextStyle,
     this.isDisabled,
-    this.isLoading, // ✅ NEW
+    this.isLoading,
     this.alignment,
     this.leftIcon,
     this.rightIcon,
@@ -36,43 +19,27 @@ class CustomButton extends StatelessWidget {
     this.padding,
   }) : super(key: key);
 
-  /// The text content displayed on the button
   final String? text;
-
-  /// Callback function when button is pressed
   final VoidCallback? onPressed;
 
-  /// Button width - can be specific value or null for auto-sizing
   final double? width;
-
-  /// Button height
   final double? height;
 
-  /// The style variant of the button
   final CustomButtonStyle? buttonStyle;
-
-  /// Text style configuration for the button text
   final CustomButtonTextStyle? buttonTextStyle;
 
-  /// Whether the button is disabled
   final bool? isDisabled;
+  final bool? isLoading;
 
-  /// Whether the button is loading (shows spinner and blocks taps)
-  final bool? isLoading; // ✅ NEW
-
-  /// Button alignment within its parent
   final Alignment? alignment;
 
-  /// Icon to display on the left side of the text
-  final String? leftIcon;
+  /// ✅ Can be String (asset path) OR IconData (Material icon)
+  final Object? leftIcon;
 
-  /// Icon to display on the right side of the text
-  final String? rightIcon;
+  /// ✅ Can be String (asset path) OR IconData (Material icon)
+  final Object? rightIcon;
 
-  /// External spacing around the button
   final EdgeInsetsGeometry? margin;
-
-  /// Internal spacing within the button
   final EdgeInsetsGeometry? padding;
 
   @override
@@ -90,7 +57,6 @@ class CustomButton extends StatelessWidget {
     final style = buttonStyle ?? CustomButtonStyle.fillPrimary;
     final textStyle = buttonTextStyle ?? CustomButtonTextStyle.bodyMedium;
 
-    // ✅ loading should also disable taps
     final disabled = (isDisabled ?? false) || (isLoading ?? false);
 
     switch (style.variant) {
@@ -131,7 +97,6 @@ class CustomButton extends StatelessWidget {
     );
   }
 
-  /// outline buttons must render an OutlinedButton
   Widget _buildOutlinedButton(
       CustomButtonStyle style,
       CustomButtonTextStyle textStyle,
@@ -188,7 +153,6 @@ class CustomButton extends StatelessWidget {
   }
 
   Widget _buildButtonContent(CustomButtonTextStyle textStyle) {
-    // ✅ NEW: loading state replaces content with a spinner
     if (isLoading ?? false) {
       return SizedBox(
         height: 20.h,
@@ -202,8 +166,8 @@ class CustomButton extends StatelessWidget {
       );
     }
 
-    final hasLeftIcon = leftIcon != null && leftIcon!.isNotEmpty;
-    final hasRightIcon = rightIcon != null && rightIcon!.isNotEmpty;
+    final hasLeftIcon = leftIcon != null;
+    final hasRightIcon = rightIcon != null;
     final hasText = text != null && text!.isNotEmpty;
 
     if (!hasLeftIcon && !hasRightIcon && hasText) {
@@ -217,20 +181,12 @@ class CustomButton extends StatelessWidget {
       );
     }
 
-    // ✅ CRITICAL FIX:
-    // Row(mainAxisSize: max) can request infinite width in unbounded parents
-    // (common inside horizontal scroll + Row).
-    // Use min + no Flexible so the button content always shrink-wraps.
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (hasLeftIcon) ...[
-          CustomImageView(
-            imagePath: leftIcon!,
-            height: textStyle.iconSize ?? 20.h,
-            width: textStyle.iconSize ?? 20.h,
-          ),
+          _buildAnyIcon(leftIcon!, textStyle),
           if (hasText) SizedBox(width: 8.h),
         ],
         if (hasText)
@@ -244,18 +200,30 @@ class CustomButton extends StatelessWidget {
           ),
         if (hasRightIcon) ...[
           if (hasText) SizedBox(width: 8.h),
-          CustomImageView(
-            imagePath: rightIcon!,
-            height: textStyle.iconSize ?? 20.h,
-            width: textStyle.iconSize ?? 20.h,
-          ),
+          _buildAnyIcon(rightIcon!, textStyle),
         ],
       ],
     );
   }
+
+  Widget _buildAnyIcon(Object iconValue, CustomButtonTextStyle textStyle) {
+    final size = textStyle.iconSize ?? 20.h;
+    final color = textStyle.color ?? appTheme.whiteCustom;
+
+    if (iconValue is IconData) {
+      return Icon(iconValue, size: size, color: color);
+    }
+
+    // Treat anything else as asset path
+    final path = iconValue.toString();
+    return CustomImageView(
+      imagePath: path,
+      height: size,
+      width: size,
+    );
+  }
 }
 
-/// Button style configuration
 class CustomButtonStyle {
   CustomButtonStyle({
     this.backgroundColor,
@@ -330,7 +298,6 @@ class CustomButtonStyle {
   );
 }
 
-/// Button text style configuration
 class CustomButtonTextStyle {
   CustomButtonTextStyle({
     this.color,
@@ -375,7 +342,6 @@ class CustomButtonTextStyle {
   );
 }
 
-/// Button variant enumeration
 enum CustomButtonVariant {
   fill,
   outline,

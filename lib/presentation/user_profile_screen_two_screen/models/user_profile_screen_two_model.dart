@@ -1,7 +1,8 @@
 import '../../../core/app_export.dart';
 import './story_item_model.dart';
 
-/// This class is used in the [UserProfileScreenTwo] screen.
+/// Used in [UserProfileScreenTwo]
+/// Email is OPTIONAL and must only be set for the current user
 
 // ignore_for_file: must_be_immutable
 class UserProfileScreenTwoModel extends Equatable {
@@ -14,18 +15,21 @@ class UserProfileScreenTwoModel extends Equatable {
     this.storyItems,
     this.id,
   }) {
-    avatarImagePath = avatarImagePath ?? ImageConstant.imgEllipse896x96;
-    userName = userName ?? 'Joe Kool';
-    email = email ?? 'karl_martin67@hotmail.com';
-    followersCount = followersCount ?? '29';
-    followingCount = followingCount ?? '6';
-    storyItems = storyItems ?? [];
-    id = id ?? '';
+    avatarImagePath ??= ImageConstant.imgEllipse896x96;
+    userName ??= 'User';
+    followersCount ??= '0';
+    followingCount ??= '0';
+    storyItems ??= [];
+    id ??= '';
+    // 🚫 DO NOT default email
   }
 
   String? avatarImagePath;
   String? userName;
+
+  /// ⚠️ PRIVATE FIELD — ONLY for current user
   String? email;
+
   String? followersCount;
   String? followingCount;
   List<StoryItemModel>? storyItems;
@@ -35,6 +39,7 @@ class UserProfileScreenTwoModel extends Equatable {
     String? avatarImagePath,
     String? userName,
     String? email,
+    bool clearEmail = false, // 🔒 explicit control
     String? followersCount,
     String? followingCount,
     List<StoryItemModel>? storyItems,
@@ -43,7 +48,7 @@ class UserProfileScreenTwoModel extends Equatable {
     return UserProfileScreenTwoModel(
       avatarImagePath: avatarImagePath ?? this.avatarImagePath,
       userName: userName ?? this.userName,
-      email: email ?? this.email,
+      email: clearEmail ? null : (email ?? this.email),
       followersCount: followersCount ?? this.followersCount,
       followingCount: followingCount ?? this.followingCount,
       storyItems: storyItems ?? this.storyItems,
@@ -53,12 +58,12 @@ class UserProfileScreenTwoModel extends Equatable {
 
   @override
   List<Object?> get props => [
-        avatarImagePath,
-        userName,
-        email,
-        followersCount,
-        followingCount,
-        storyItems,
-        id,
-      ];
+    avatarImagePath,
+    userName,
+    email,
+    followersCount,
+    followingCount,
+    storyItems,
+    id,
+  ];
 }

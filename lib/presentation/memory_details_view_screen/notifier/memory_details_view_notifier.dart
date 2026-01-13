@@ -214,7 +214,10 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
 
       final List<CustomStoryItem> storyFeedItems =
       sortedStories.map((storyData) {
-        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final contributor =
+            (storyData['user_profiles_public'] as Map<String, dynamic>?) ??
+                (storyData['user_profiles'] as Map<String, dynamic>?);
+
         final createdAt = _parseUtc(storyData['created_at']);
 
         final backgroundImage = _storyService.getStoryMediaUrl(storyData);
@@ -232,7 +235,10 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
 
       final List<timeline_story.TimelineStoryItem> timelineStories =
       sortedStories.map((storyData) {
-        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final contributor =
+            (storyData['user_profiles_public'] as Map<String, dynamic>?) ??
+                (storyData['user_profiles'] as Map<String, dynamic>?);
+
         final createdAt = _parseUtc(storyData['created_at']);
         final storyId = storyData['id'] as String;
 

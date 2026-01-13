@@ -166,7 +166,10 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
       final storyItems = storiesData.map((story) {
         final memory = story['memories'] as Map<String, dynamic>?;
         final category = memory?['memory_categories'] as Map<String, dynamic>?;
-        final contributor = story['user_profiles'] as Map<String, dynamic>?;
+        final contributor =
+            (story['user_profiles_public'] as Map<String, dynamic>?) ??
+                (story['user_profiles'] as Map<String, dynamic>?);
+
 
         // CRITICAL FIX: Resolve category icon URL from category-icons bucket
         String? categoryIconUrl;

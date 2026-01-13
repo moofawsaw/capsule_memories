@@ -399,6 +399,8 @@ class FriendsService {
   }
 
   /// Checks if two users are friends
+  /// NOTE: Since we store friendships bidirectionally (two rows),
+  /// we must NOT use an OR + maybeSingle() (it can return 2 rows and throw).
   Future<bool> areFriends(String userId1, String userId2) async {
     try {
       if (_supabase == null) return false;
@@ -406,7 +408,8 @@ class FriendsService {
       final response = await _supabase!
           .from('friends')
           .select('id')
-          .or('and(user_id.eq.$userId1,friend_id.eq.$userId2),and(user_id.eq.$userId2,friend_id.eq.$userId1)')
+          .eq('user_id', userId1)
+          .eq('friend_id', userId2)
           .maybeSingle();
 
       return response != null;
@@ -416,25 +419,28 @@ class FriendsService {
     }
   }
 
-  /// Checks if there's a pending friend request
-  Future<bool> hasPendingRequest(String senderId, String receiverId) async {
+
+  /// Checks if there's a pending friend request in either direction
+  Future<bool> hasPendingRequest(String userId1, String userId2) async {
     try {
       if (_supabase == null) return false;
 
       final response = await _supabase!
           .from('friend_requests')
           .select('id')
-          .eq('sender_id', senderId)
-          .eq('receiver_id', receiverId)
+          .or(
+        'and(sender_id.eq.$userId1,receiver_id.eq.$userId2),and(sender_id.eq.$userId2,receiver_id.eq.$userId1)',
+      )
           .eq('status', 'pending')
-          .maybeSingle();
+          .limit(1);
 
-      return response != null;
+      return (response as List).isNotEmpty;
     } catch (e) {
       debugPrint('Error checking pending request: $e');
       return false;
     }
   }
+
 
   /// Sends a friend request
   Future<bool> sendFriendRequest(String senderId, String receiverId) async {
@@ -526,14 +532,16 @@ class FriendsService {
 
       if (currentUserId == null) return 'none';
 
-      // Check if already friends
+// Check if already friends (directional check, because friends table is bidirectional)
       final friendCheck = await _supabase!
           .from('friends')
           .select('id')
-          .or('and(user_id.eq.$currentUserId,friend_id.eq.$otherUserId),and(user_id.eq.$otherUserId,friend_id.eq.$currentUserId)')
+          .eq('user_id', currentUserId)
+          .eq('friend_id', otherUserId)
           .maybeSingle();
 
       if (friendCheck != null) return 'friends';
+
 
       // Check if pending request sent
       final sentRequestCheck = await _supabase!

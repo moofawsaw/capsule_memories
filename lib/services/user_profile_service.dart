@@ -71,6 +71,30 @@ class UserProfileService {
       return false;
     }
   }
+  /// ✅ PUBLIC profile by ID (for viewing other users) - NO email
+  Future<Map<String, dynamic>?> getPublicUserProfileById(String userId) async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) return null;
+
+      final response = await client
+          .from('user_profiles_public')
+          .select('id, username, display_name, avatar_url, follower_count, following_count, is_verified')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (response == null) {
+        debugPrint('⚠️ No PUBLIC profile found for user: $userId');
+        return null;
+      }
+
+      debugPrint('✅ Public user profile fetched successfully for: $userId');
+      return response;
+    } catch (e) {
+      debugPrint('❌ Error fetching PUBLIC user profile by ID: $e');
+      return null;
+    }
+  }
 
   /// Get current authenticated user profile
   Future<Map<String, dynamic>?> getCurrentUserProfile() async {
@@ -182,14 +206,14 @@ class UserProfileService {
     }
   }
 
-  /// Search users by username or display name
+  /// ✅ Search users (PUBLIC) by username or display name
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     try {
       final client = SupabaseService.instance.client;
       if (client == null) return [];
 
       final response = await client
-          .from('user_profiles')
+          .from('user_profiles_public')
           .select('id, username, display_name, avatar_url, is_verified')
           .or('username.ilike.%$query%,display_name.ilike.%$query%')
           .limit(20);
@@ -201,7 +225,8 @@ class UserProfileService {
     }
   }
 
-  /// Get user stats (followers, following, posts)
+
+  /// ✅ Get user stats (PUBLIC-safe): followers, following, posts
   Future<Map<String, int>> getUserStats(String userId) async {
     try {
       final client = SupabaseService.instance.client;
@@ -209,8 +234,9 @@ class UserProfileService {
         return {'followers': 0, 'following': 0, 'posts': 0};
       }
 
+      // Use public table so we never touch private profile data for others
       final profile = await client
-          .from('user_profiles')
+          .from('user_profiles_public')
           .select('follower_count, following_count')
           .eq('id', userId)
           .maybeSingle();
@@ -222,8 +248,8 @@ class UserProfileService {
           .count(CountOption.exact);
 
       return {
-        'followers': profile?['follower_count'] ?? 0,
-        'following': profile?['following_count'] ?? 0,
+        'followers': (profile?['follower_count'] as int?) ?? 0,
+        'following': (profile?['following_count'] as int?) ?? 0,
         'posts': storiesCount.count ?? 0,
       };
     } catch (e) {
@@ -231,4 +257,5 @@ class UserProfileService {
       return {'followers': 0, 'following': 0, 'posts': 0};
     }
   }
+
 }

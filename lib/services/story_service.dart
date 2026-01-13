@@ -110,37 +110,37 @@ class StoryService {
       final response = await _supabase
           ?.from('stories')
           .select('''
+          id,
+          memory_id,
+          contributor_id,
+          image_url,
+          video_url,
+          thumbnail_url,
+          media_type,
+          created_at,
+          capture_timestamp,
+          duration_seconds,
+          location_name,
+          user_profiles_public!stories_contributor_id_fkey (
             id,
-            memory_id,
-            contributor_id,
-            image_url,
-            video_url,
-            thumbnail_url,
-            media_type,
-            created_at,
-            capture_timestamp,
-            duration_seconds,
-            location_name,
-            user_profiles!stories_contributor_id_fkey (
-              id,
-              display_name,
-              avatar_url,
-              username
-            ),
-            memories!inner (
-              id,
-              title,
-              visibility,
-              state,
-              creator_id,
-              category_id,
-              memory_categories (
-                name,
-                icon_name,
-                icon_url
-              )
+            display_name,
+            avatar_url,
+            username
+          ),
+          memories!inner (
+            id,
+            title,
+            visibility,
+            state,
+            creator_id,
+            category_id,
+            memory_categories (
+              name,
+              icon_name,
+              icon_url
             )
-          ''')
+          )
+        ''')
           .eq('contributor_id', userId)
           .eq('memories.visibility', 'public')
           .order('created_at', ascending: false);
@@ -150,6 +150,7 @@ class StoryService {
       rethrow;
     }
   }
+
 
   Future<List<Map<String, dynamic>>> fetchUserTimelines(String userId) async {
     return await _retryOperation(
@@ -521,7 +522,10 @@ class StoryService {
           .eq('is_disabled', false)
           .single();
 
-      final contributor = response['user_profiles'] as Map<String, dynamic>?;
+      final contributor =
+          (response['user_profiles_public'] as Map<String, dynamic>?) ??
+              (response['user_profiles'] as Map<String, dynamic>?);
+
       final textOverlays = response['text_overlays'] as List? ?? [];
 
       String? caption;

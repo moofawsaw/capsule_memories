@@ -2,18 +2,6 @@ import '../core/app_export.dart';
 import '../core/utils/memory_categories.dart';
 import './custom_image_view.dart';
 
-/**
- * CustomStoryCard - A story card component that displays user stories with background images,
- * profile avatars, usernames, category badges, and timestamps in a social media story format.
- * 
- * Features:
- * - Background story image with overlay content
- * - Circular profile avatar with decorative border
- * - Category badge with emoji icon from database
- * - Responsive design with consistent styling
- * - Optional navigation callback support
- * - Dark theme optimized design
- */
 class CustomStoryCard extends StatelessWidget {
   CustomStoryCard({
     Key? key,
@@ -27,43 +15,31 @@ class CustomStoryCard extends StatelessWidget {
     this.width,
     this.height,
     this.margin,
+    this.showDelete = false,
+    this.onDelete,
   }) : super(key: key);
 
-  /// The name of the story creator
   final String userName;
-
-  /// Path to the user's profile avatar image
   final String userAvatar;
-
-  /// Path to the background story image
   final String backgroundImage;
 
-  /// Text label for the category badge
   final String? categoryText;
-
-  /// Icon path for the category badge (will be resolved from MemoryCategories)
   final String? categoryIcon;
-
-  /// Timestamp text (e.g., "2 mins ago")
   final String? timestamp;
 
-  /// Callback function when the story card is tapped
   final VoidCallback? onTap;
 
-  /// Width of the story card
   final double? width;
-
-  /// Height of the story card
   final double? height;
-
-  /// External margin for the card
   final EdgeInsetsGeometry? margin;
+
+  // ✅ Delete support (UI only)
+  final bool showDelete;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
-    // CRITICAL FIX: Only use MemoryCategories as fallback when NO database icon is available
-    // If categoryIcon is provided from database, use it directly
-    final category = categoryText != null && categoryIcon == null
+    final category = categoryText != null && (categoryIcon == null)
         ? MemoryCategories.getByName(categoryText!)
         : MemoryCategories.custom;
 
@@ -92,6 +68,32 @@ class CustomStoryCard extends StatelessWidget {
                 fit: BoxFit.cover,
               ),
 
+              // ✅ Delete button overlay (top-right)
+              if (showDelete)
+                Positioned(
+                  top: 8.h,
+                  right: 8.h,
+                  child: GestureDetector(
+                    onTap: onDelete,
+                    child: Container(
+                      padding: EdgeInsets.all(6.h),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(140),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withAlpha(40),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.delete_outline,
+                        size: 18.h,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+
               // Overlay content
               Positioned(
                 left: 6.h,
@@ -114,7 +116,6 @@ class CustomStoryCard extends StatelessWidget {
     );
   }
 
-  /// Builds the circular profile avatar with decorative border
   Widget _buildProfileAvatar(BuildContext context) {
     return Container(
       width: 32.h,
@@ -138,24 +139,20 @@ class CustomStoryCard extends StatelessWidget {
     );
   }
 
-  /// Builds the user information section (name, category, timestamp)
   Widget _buildUserInfo(BuildContext context, MemoryCategory category) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Username
         Text(
           userName,
           style: TextStyleHelper.instance.body14RegularPlusJakartaSans
               .copyWith(color: appTheme.white_A700, height: 1.29),
         ),
-
         if (categoryText != null) ...[
           SizedBox(height: 18.h),
           _buildCategoryBadge(context, category),
         ],
-
         if (timestamp != null) ...[
           SizedBox(height: 4.h),
           Text(
@@ -168,13 +165,9 @@ class CustomStoryCard extends StatelessWidget {
     );
   }
 
-  /// Builds the category badge with emoji icon and text
   Widget _buildCategoryBadge(BuildContext context, MemoryCategory category) {
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: 2.h,
-        vertical: 2.h,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 2.h, vertical: 2.h),
       decoration: BoxDecoration(
         color: appTheme.gray_900_02,
         borderRadius: BorderRadius.circular(12.h),
@@ -182,9 +175,7 @@ class CustomStoryCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // CRITICAL FIX: Use database icon URL first, fallback to emoji from MemoryCategories
           if (categoryIcon != null && categoryIcon!.isNotEmpty)
-            // Database icon URL exists - display it
             CustomImageView(
               imagePath: categoryIcon!,
               width: 20.h,
@@ -192,7 +183,6 @@ class CustomStoryCard extends StatelessWidget {
               fit: BoxFit.contain,
             )
           else
-            // No database icon - fallback to static emoji from MemoryCategories
             Text(
               category.emoji,
               style: TextStyle(fontSize: 20.h),

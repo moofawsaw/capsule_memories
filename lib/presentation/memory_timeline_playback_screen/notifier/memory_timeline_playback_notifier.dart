@@ -205,7 +205,10 @@ class MemoryTimelinePlaybackNotifier
           .order('capture_timestamp', ascending: true);
 
       final stories = (storiesResponse as List).map((storyData) {
-        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final contributor =
+            (storyData['user_profiles_public'] as Map<String, dynamic>?) ??
+                (storyData['user_profiles'] as Map<String, dynamic>?);
+
 
         final rawVideoUrl = storyData['video_url'] as String?;
         final rawImageUrl = storyData['image_url'] as String?;

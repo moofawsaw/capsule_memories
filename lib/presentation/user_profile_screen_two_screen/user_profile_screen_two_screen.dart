@@ -6,6 +6,7 @@ import '../../widgets/custom_stat_card.dart';
 import '../../widgets/custom_story_card.dart';
 import '../../widgets/custom_story_skeleton.dart';
 import 'notifier/user_profile_screen_two_notifier.dart';
+import '../../core/models/feed_story_context.dart';
 
 class UserProfileScreenTwo extends ConsumerStatefulWidget {
   UserProfileScreenTwo({Key? key}) : super(key: key);
@@ -21,17 +22,14 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Extract userId from navigation arguments
       final args =
-          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _userId = args?['userId'] as String?;
 
-      // Initialize with userId (if null, will load current user's profile)
       ref
           .read(userProfileScreenTwoNotifier.notifier)
           .initialize(userId: _userId);
 
-      // Load avatar into global state for app-wide access (only for current user)
       if (_userId == null) {
         ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
       }
@@ -91,7 +89,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
         final model = state.userProfileScreenTwoModel;
         final isCurrentUser = _userId == null;
 
-        // 🔥 Watch global avatar state for real-time updates (only for current user)
         final avatarState = ref.watch(avatarStateProvider);
 
         return Stack(
@@ -99,34 +96,35 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             GestureDetector(
               onTap: isCurrentUser
                   ? () {
-                      ref
-                          .read(userProfileScreenTwoNotifier.notifier)
-                          .uploadAvatar();
-                    }
+                ref
+                    .read(userProfileScreenTwoNotifier.notifier)
+                    .uploadAvatar();
+              }
                   : null,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   CustomProfileHeader(
-                    // Use avatar from global state if current user, otherwise use model avatar
                     avatarImagePath:
-                        (isCurrentUser ? avatarState.avatarUrl : null) ??
-                            model?.avatarImagePath ??
-                            ImageConstant.imgEllipse896x96,
+                    (isCurrentUser ? avatarState.avatarUrl : null) ??
+                        model?.avatarImagePath ??
+                        ImageConstant.imgEllipse896x96,
                     userName: model?.userName ?? 'Loading...',
-                    email: model?.email ?? 'Fetching data...',
+                    // ✅ Do NOT show anything for non-current users
+                    //    (CustomProfileHeader will hide the row if empty)
+                    email: isCurrentUser ? (model?.email ?? '') : '',
                     onEditTap: isCurrentUser
                         ? () {
-                            onTapEditProfile(context);
-                          }
+                      onTapEditProfile(context);
+                    }
                         : null,
                     allowUsernameEdit: isCurrentUser,
                     onUserNameChanged: isCurrentUser
                         ? (newUsername) {
-                            ref
-                                .read(userProfileScreenTwoNotifier.notifier)
-                                .updateUsername(newUsername);
-                          }
+                      ref
+                          .read(userProfileScreenTwoNotifier.notifier)
+                          .updateUsername(newUsername);
+                    }
                         : null,
                     margin: EdgeInsets.symmetric(horizontal: 68.h),
                   ),
@@ -149,7 +147,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
                 ],
               ),
             ),
-            // Block icon button positioned in top right (only for other users)
             if (!isCurrentUser)
               Positioned(
                 top: 0,
@@ -157,7 +154,7 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
                 child: GestureDetector(
                   onTap: () {
                     final notifier =
-                        ref.read(userProfileScreenTwoNotifier.notifier);
+                    ref.read(userProfileScreenTwoNotifier.notifier);
                     _showBlockConfirmationDialog(context, state.isBlocked, () {
                       notifier.toggleBlock();
                     });
@@ -192,6 +189,7 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     );
   }
 
+
   /// Stats Section
   Widget _buildStatsSection(BuildContext context) {
     return Consumer(
@@ -203,12 +201,12 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CustomStatCard(
-              count: model?.followersCount ?? '29',
+              count: model?.followersCount ?? '0',
               label: 'followers',
             ),
             SizedBox(width: 12.h),
             CustomStatCard(
-              count: model?.followingCount ?? '6',
+              count: model?.followingCount ?? '0',
               label: 'following',
             ),
           ],
@@ -230,11 +228,9 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             Expanded(
               child: CustomButton(
                 text: state.isFollowing ? 'Unfollow' : 'Follow',
-                leftIcon: state.isFollowing
-                    ? 'https://img.icons8.com/ios-filled/50/FFFFFF/checked-user-male.png'
-                    : 'https://img.icons8.com/ios-filled/50/FFFFFF/add-user-male.png',
+                leftIcon: state.isFollowing ? Icons.person_remove : Icons.person_add,
                 buttonStyle: state.isFollowing
-                    ? CustomButtonStyle.fillGray
+                    ? CustomButtonStyle.fillPrimary
                     : CustomButtonStyle.fillDeepPurpleA,
                 onPressed: () {
                   notifier.toggleFollow();
@@ -247,32 +243,253 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
                 text: state.isFriend
                     ? 'Unfriend'
                     : state.hasPendingFriendRequest
-                        ? 'Pending'
-                        : 'Add Friend',
+                    ? 'Pending'
+                    : 'Add Friend',
                 leftIcon: state.isFriend
-                    ? 'https://img.icons8.com/ios-filled/50/FFFFFF/remove-user-male.png'
+                    ? Icons.person_remove_alt_1
                     : state.hasPendingFriendRequest
-                        ? 'https://img.icons8.com/ios-filled/50/FFFFFF/clock.png'
-                        : 'https://img.icons8.com/ios-filled/50/FFFFFF/add-user-group-man-man.png',
+                    ? Icons.schedule
+                    : Icons.group_add,
                 buttonStyle: state.hasPendingFriendRequest
                     ? CustomButtonStyle.fillGray
                     : CustomButtonStyle.fillDeepPurpleA,
                 onPressed: state.hasPendingFriendRequest
                     ? null
                     : () {
-                        if (state.isFriend) {
-                          _showUnfriendConfirmationDialog(context, () {
-                            notifier.unfriendUser();
-                          });
-                        } else {
-                          notifier.sendFriendRequest();
-                        }
-                      },
+                  if (state.isFriend) {
+                    _showUnfriendConfirmationDialog(context, notifier.unfriendUser);
+                  } else {
+                    notifier.sendFriendRequest();
+                  }
+                },
+              ),
+
+            ),
+
+          ],
+        );
+      },
+    );
+  }
+
+  /// Stories Grid Section (uses CustomStoryCard built-in delete overlay)
+  Widget _buildStoriesGrid(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(userProfileScreenTwoNotifier);
+        final stories = state.userProfileScreenTwoModel?.storyItems ?? [];
+
+        final isCurrentUserProfile = _userId == null;
+
+        if (state.isLoadingStories) {
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 1.h,
+              mainAxisSpacing: 1.h,
+              childAspectRatio: 0.45,
+            ),
+            itemCount: 3,
+            itemBuilder: (context, index) {
+              return CustomStorySkeleton();
+            },
+          );
+        }
+
+        if (stories.isEmpty) {
+          return _buildEmptyStoriesState(context);
+        }
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 1.h,
+            mainAxisSpacing: 1.h,
+            childAspectRatio: 0.65,
+          ),
+          itemCount: stories.length,
+          itemBuilder: (context, index) {
+            final story = stories[index];
+
+            final storyId = (story.storyId ?? '').toString();
+
+            return CustomStoryCard(
+              userName: story.userName ?? 'User',
+              userAvatar: story.userAvatar ?? ImageConstant.imgEllipse896x96,
+              backgroundImage: story.backgroundImage ?? ImageConstant.imgImg,
+              categoryText: story.categoryText ?? 'Memory',
+              categoryIcon: story.categoryIcon ?? ImageConstant.imgVector,
+              timestamp: story.timestamp ?? 'Just now',
+              onTap: () {
+                onTapStoryCard(context, index);
+              },
+
+              // ✅ only show delete on YOUR profile + only if ID exists
+              showDelete:
+              isCurrentUserProfile && storyId.isNotEmpty ? true : false,
+              onDelete: (isCurrentUserProfile && storyId.isNotEmpty)
+                  ? () => _confirmDeleteStory(context, storyId)
+                  : null,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteStory(BuildContext context, String storyId) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: appTheme.gray_900_02,
+          title: Text(
+            'Delete story?',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          content: Text(
+            'This can’t be undone.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[300],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey[300]),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                'Delete',
+                style: TextStyle(color: appTheme.red_500),
               ),
             ),
           ],
         );
       },
+    );
+
+    if (shouldDelete != true) return;
+
+    // ✅ Use the notifier method we added: deleteStoryFromProfile(storyId)
+    final notifier = ref.read(userProfileScreenTwoNotifier.notifier);
+    final success = await notifier.deleteStoryFromProfile(storyId);
+
+    if (!success && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to delete story')),
+      );
+    }
+  }
+
+  /// Empty State for Stories
+  Widget _buildEmptyStoriesState(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 32.h, horizontal: 24.h),
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_01,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.photo_library_outlined,
+            size: 48.h,
+            color: appTheme.blue_gray_300,
+          ),
+          SizedBox(height: 16.h),
+          Text(
+            'No Public Stories',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: appTheme.white_A700,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            _userId == null
+                ? 'Share your first memory to get started'
+                : 'This user hasn\'t shared any public stories yet',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: appTheme.blue_gray_300,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Navigate to notifications screen
+  void onTapNotificationIcon(BuildContext context) {
+    NavigatorService.pushNamed(AppRoutes.appNotifications);
+  }
+
+  /// Navigate to edit profile
+  void onTapEditProfile(BuildContext context) {
+    // Edit profile functionality
+  }
+
+  /// Navigate to story viewer when story is tapped
+  void onTapStoryCard(BuildContext context, int index) {
+    final storyItems = ref
+        .read(userProfileScreenTwoNotifier)
+        .userProfileScreenTwoModel
+        ?.storyItems ??
+        [];
+
+    if (storyItems.isEmpty || index < 0 || index >= storyItems.length) {
+      print('⚠️ WARNING: No stories available or invalid index for navigation');
+      return;
+    }
+
+    final storyIds = storyItems
+        .where((item) => item.storyId != null && item.storyId!.isNotEmpty)
+        .map((item) => item.storyId!)
+        .toList();
+
+    final clickedStoryId = storyItems[index].storyId;
+
+    if (clickedStoryId == null || clickedStoryId.isEmpty) {
+      print('⚠️ WARNING: Clicked story has no ID - cannot navigate');
+      return;
+    }
+
+    if (storyIds.isEmpty) {
+      print('⚠️ WARNING: No valid story IDs found in user profile');
+      return;
+    }
+
+    final feedContext = FeedStoryContext(
+      feedType: 'user_profile',
+      storyIds: storyIds,
+      initialStoryId: clickedStoryId,
+    );
+
+    print('🚀 DEBUG: Navigating to story viewer with ${storyIds.length} stories');
+    print('   Initial story ID: $clickedStoryId');
+    print('   Story index: $index');
+
+    NavigatorService.pushNamed(
+      AppRoutes.appStoryView,
+      arguments: feedContext,
     );
   }
 
@@ -341,7 +558,7 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: appTheme.gray_900_02,
+          backgroundColor: appTheme.blue_gray_900_02,
           title: Text(
             'Unfriend User?',
             style: TextStyle(
@@ -389,174 +606,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
           ],
         );
       },
-    );
-  }
-
-  /// Stories Grid Section
-  Widget _buildStoriesGrid(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(userProfileScreenTwoNotifier);
-        final stories = state.userProfileScreenTwoModel?.storyItems ?? [];
-
-        // Show loading placeholders while stories are fetching
-        if (state.isLoadingStories) {
-          return GridView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 1.h,
-              mainAxisSpacing: 1.h,
-              childAspectRatio: 0.45,
-            ),
-            itemCount: 3,
-            itemBuilder: (context, index) {
-              return CustomStorySkeleton();
-            },
-          );
-        }
-
-        // Show empty state if no stories
-        if (stories.isEmpty) {
-          return _buildEmptyStoriesState(context);
-        }
-
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 1.h,
-            mainAxisSpacing: 1.h,
-            childAspectRatio: 0.75,
-          ),
-          itemCount: stories.length,
-          itemBuilder: (context, index) {
-            final story = stories[index];
-            return CustomStoryCard(
-              userName: story.userName ?? 'User',
-              userAvatar: story.userAvatar ?? ImageConstant.imgEllipse896x96,
-              backgroundImage: story.backgroundImage ?? ImageConstant.imgImg,
-              categoryText: story.categoryText ?? 'Memory',
-              categoryIcon: story.categoryIcon ?? ImageConstant.imgVector,
-              timestamp: story.timestamp ?? 'Just now',
-              onTap: () {
-                onTapStoryCard(context, index);
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  /// Empty State for Stories
-  Widget _buildEmptyStoriesState(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 32.h, horizontal: 24.h),
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_01,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: appTheme.blue_gray_300.withAlpha(51),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.photo_library_outlined,
-            size: 48.h,
-            color: appTheme.blue_gray_300,
-          ),
-          SizedBox(height: 16.h),
-          Text(
-            'No Public Stories',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: appTheme.white_A700,
-            ),
-          ),
-          SizedBox(height: 8.h),
-          Text(
-            _userId == null
-                ? 'Share your first memory to get started'
-                : 'This user hasn\'t shared any public stories yet',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: appTheme.blue_gray_300,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Navigate to notifications screen
-  void onTapNotificationIcon(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.appNotifications);
-  }
-
-  /// Navigate to edit profile
-  void onTapEditProfile(BuildContext context) {
-    // Edit profile functionality
-  }
-
-  /// Navigate to story viewer when story is tapped
-  void onTapStoryCard(BuildContext context, int index) {
-    // Get all story items from the current model
-    final storyItems = ref
-            .read(userProfileScreenTwoNotifier)
-            .userProfileScreenTwoModel
-            ?.storyItems ??
-        [];
-
-    // Ensure we have stories and valid index
-    if (storyItems.isEmpty || index >= storyItems.length) {
-      print('⚠️ WARNING: No stories available or invalid index for navigation');
-      return;
-    }
-
-    // Extract all story IDs from story items
-    final storyIds = storyItems
-        .where((item) => item.storyId != null && item.storyId!.isNotEmpty)
-        .map((item) => item.storyId!)
-        .toList();
-
-    // Get the clicked story ID
-    final clickedStoryId = storyItems[index].storyId;
-
-    if (clickedStoryId == null || clickedStoryId.isEmpty) {
-      print('⚠️ WARNING: Clicked story has no ID - cannot navigate');
-      return;
-    }
-
-    if (storyIds.isEmpty) {
-      print('⚠️ WARNING: No valid story IDs found in user profile');
-      return;
-    }
-
-    // Create feed context map with all user stories for cycling
-    final feedContext = {
-      'feedType': 'user_profile',
-      'storyIds': storyIds,
-      'initialStoryId': clickedStoryId,
-    };
-
-    print(
-        '🚀 DEBUG: Navigating to story viewer with ${storyIds.length} stories');
-    print('   Initial story ID: $clickedStoryId');
-    print('   Story index: $index');
-
-    // Navigate to story viewer with complete story array
-    NavigatorService.pushNamed(
-      AppRoutes.appStoryView,
-      arguments: feedContext,
     );
   }
 }
