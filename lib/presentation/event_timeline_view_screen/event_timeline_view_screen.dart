@@ -4,7 +4,6 @@ import '../../core/utils/memory_nav_args.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_button_skeleton.dart';
 import '../../widgets/custom_event_card.dart';
-import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/custom_story_skeleton.dart';
@@ -57,14 +56,13 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         print('❌ TIMELINE SCREEN: Missing or invalid memory ID');
         print('   - Redirecting to memories list...');
 
-        // Redirect to memories list if no memory ID provided
-        // This handles cases where user navigates directly to /app/timeline
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) {
             NavigatorService.popAndPushNamed(AppRoutes.appMemories);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Please select a memory to view its timeline'),
+                content:
+                const Text('Please select a memory to view its timeline'),
                 backgroundColor: appTheme.deep_purple_A100,
                 duration: const Duration(seconds: 3),
               ),
@@ -93,8 +91,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
 
         if (!isValid) {
           print('⚠️ TIMELINE: Data validation detected mismatches');
-          // REMOVED: Toast message that was showing when clicking memory card
-          // User requested to remove "Memory data refreshed from database" toast
         }
       });
     });
@@ -115,8 +111,11 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       final memoryId =
           ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
       if (memoryId != null) {
-        print('🔄 TIMELINE: Screen resumed - refreshing data for memory: $memoryId');
-        ref.read(eventTimelineViewNotifier.notifier).validateMemoryData(memoryId);
+        print(
+            '🔄 TIMELINE: Screen resumed - refreshing data for memory: $memoryId');
+        ref
+            .read(eventTimelineViewNotifier.notifier)
+            .validateMemoryData(memoryId);
       }
     }
   }
@@ -129,14 +128,14 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     final results = validation['results'] as Map<String, dynamic>;
     final summary = validation['summary'] as String;
 
-    // Build detailed message
     final detailsBuffer = StringBuffer();
     detailsBuffer.writeln('🔍 TIMELINE DATA VALIDATION');
     detailsBuffer.writeln('─' * 30);
 
     results.forEach((field, isValid) {
       final icon = isValid ? '✅' : '❌';
-      detailsBuffer.writeln('$icon $field: ${isValid ? "REAL DATA" : "STATIC/EMPTY"}');
+      detailsBuffer
+          .writeln('$icon $field: ${isValid ? "REAL DATA" : "STATIC/EMPTY"}');
     });
 
     detailsBuffer.writeln('─' * 30);
@@ -158,7 +157,9 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
             final state = ref.read(eventTimelineViewNotifier);
             final memoryId = state.eventTimelineViewModel?.memoryId;
             if (memoryId != null) {
-              await ref.read(eventTimelineViewNotifier.notifier).validateMemoryData(memoryId);
+              await ref
+                  .read(eventTimelineViewNotifier.notifier)
+                  .validateMemoryData(memoryId);
             }
           },
           color: appTheme.deep_purple_A100,
@@ -167,18 +168,10 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
-                // Header section with its own skeleton
                 _buildEventHeader(context),
-
-                // Timeline section with its own skeleton
                 _buildTimelineSection(context),
-
-                // Stories section with skeleton
                 _buildStoriesSection(context),
-
                 SizedBox(height: 18.h),
-
-                // Action buttons skeleton or actual content
                 isLoading
                     ? Container(
                   margin: EdgeInsets.symmetric(horizontal: 24.h),
@@ -191,7 +184,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                   ),
                 )
                     : _buildActionButtons(context),
-
                 SizedBox(height: 20.h),
               ],
             ),
@@ -208,7 +200,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         final state = ref.watch(eventTimelineViewNotifier);
         final isLoading = state.isLoading ?? false;
 
-        // Show skeleton during loading
         if (isLoading) {
           return CustomTimelineHeaderSkeleton();
         }
@@ -216,10 +207,12 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         return CustomEventCard(
           eventTitle: state.eventTimelineViewModel?.eventTitle,
           eventDate: state.eventTimelineViewModel?.eventDate,
-          eventLocation: state.eventTimelineViewModel?.timelineDetail?.centerLocation,
+          eventLocation:
+          state.eventTimelineViewModel?.timelineDetail?.centerLocation,
           isPrivate: state.eventTimelineViewModel?.isPrivate,
           iconButtonImagePath:
-          state.eventTimelineViewModel?.categoryIcon ?? ImageConstant.imgFrame13,
+          state.eventTimelineViewModel?.categoryIcon ??
+              ImageConstant.imgFrame13,
           participantImages: state.eventTimelineViewModel?.participantImages,
           onBackTap: () {
             onTapBackButton(context);
@@ -235,7 +228,7 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     );
   }
 
-  /// Section Widget - Timeline section with QR and Edit buttons
+  /// Section Widget - Timeline section with inline icon buttons (matches MemoryDetailsView)
   Widget _buildTimelineSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -244,7 +237,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         final isCurrentUserMember = state.isCurrentUserMember ?? false;
         final isCurrentUserCreator = state.isCurrentUserCreator ?? false;
 
-        // Show skeleton during loading
         if (isLoading) {
           return CustomTimelineWidgetSkeleton();
         }
@@ -277,7 +269,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                   ],
                 ),
               ),
-              // CONDITIONAL BUTTONS: Show based on user permissions
+
+              // INLINE BUTTONS (same simple pattern as sealed view)
               if (isCurrentUserMember)
                 Align(
                   alignment: Alignment.topRight,
@@ -285,45 +278,25 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                     margin: EdgeInsets.only(right: 16.h),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      spacing: 8.h,
                       children: [
-                        // DELETE BUTTON: Only show if current user is creator
                         if (isCurrentUserCreator)
-                          CustomIconButton(
-                            iconPath: ImageConstant.imgIconRed50026x26,
-                            backgroundColor: appTheme.gray_900_03,
-                            borderRadius: 24.h,
-                            height: 48.h,
-                            width: 48.h,
-                            padding: EdgeInsets.all(12.h),
-                            onTap: () {
-                              onTapDeleteMemory(context);
-                            },
+                          _CircleIconButton(
+                            icon: Icons.delete_outline,
+                            isDestructive: true,
+                            onTap: () => onTapDeleteMemory(context),
                           ),
-                        // EDIT BUTTON: Only show if current user is creator
+                        if (isCurrentUserCreator) SizedBox(width: 8.h),
                         if (isCurrentUserCreator)
-                          CustomIconButton(
-                            iconPath: ImageConstant.imgEdit,
-                            backgroundColor: appTheme.gray_900_03,
-                            borderRadius: 24.h,
-                            height: 48.h,
-                            width: 48.h,
-                            padding: EdgeInsets.all(12.h),
-                            onTap: () {
-                              onTapEditMemory(context);
-                            },
+                          _CircleIconButton(
+                            icon: Icons.edit,
+                            onTap: () => onTapEditMemory(context),
                           ),
-                        // QR BUTTON: Show for all members
-                        CustomIconButton(
-                          iconPath: ImageConstant.imgButtons,
-                          backgroundColor: appTheme.gray_900_03,
-                          borderRadius: 24.h,
-                          height: 48.h,
-                          width: 48.h,
-                          padding: EdgeInsets.all(12.h),
-                          onTap: () {
-                            onTapTimelineOptions(context);
-                          },
+                        if (isCurrentUserCreator) SizedBox(width: 8.h),
+
+                        // QR button for all members
+                        _CircleIconButton(
+                          icon: Icons.qr_code,
+                          onTap: () => onTapTimelineOptions(context),
                         ),
                       ],
                     ),
@@ -344,17 +317,18 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Extract timeline stories from state ONCE (fixes "already defined" error)
     final List<TimelineStoryItem> timelineStories =
-        state.eventTimelineViewModel?.timelineDetail?.timelineStories ?? <TimelineStoryItem>[];
+        state.eventTimelineViewModel?.timelineDetail?.timelineStories ??
+            <TimelineStoryItem>[];
 
-    // Get memory window times from state
-    final memoryStartTime = state.eventTimelineViewModel?.timelineDetail?.memoryStartTime;
-    final memoryEndTime = state.eventTimelineViewModel?.timelineDetail?.memoryEndTime;
+    final memoryStartTime =
+        state.eventTimelineViewModel?.timelineDetail?.memoryStartTime;
+    final memoryEndTime =
+        state.eventTimelineViewModel?.timelineDetail?.memoryEndTime;
 
-    // If memory times are null, don't render timeline
     if (memoryStartTime == null || memoryEndTime == null) {
-      debugPrint('⚠️ TIMELINE: Memory time window not available, showing loading state');
+      debugPrint(
+          '⚠️ TIMELINE: Memory time window not available, showing loading state');
       return Center(
         child: Padding(
           padding: EdgeInsets.symmetric(vertical: 20.h),
@@ -376,15 +350,15 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       );
     }
 
-    // Show empty state when no stories
     if (timelineStories.isEmpty) {
       return _buildTimelineEmptyState(context);
     }
 
-    // Debug logging for timeline window
-    debugPrint('🔍 TIMELINE WIDGET: Rendering ${timelineStories.length} stories');
+    debugPrint(
+        '🔍 TIMELINE WIDGET: Rendering ${timelineStories.length} stories');
     debugPrint('   - Memory window: $memoryStartTime to $memoryEndTime');
-    debugPrint('   - Duration: ${memoryEndTime.difference(memoryStartTime).inMinutes} minutes');
+    debugPrint(
+        '   - Duration: ${memoryEndTime.difference(memoryStartTime).inMinutes} minutes');
 
     return TimelineWidget(
       stories: timelineStories,
@@ -465,7 +439,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
               builder: (context, ref, _) {
                 final state = ref.watch(eventTimelineViewNotifier);
                 final isLoading = state.isLoading ?? false;
-                final storyCount = state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
+                final storyCount =
+                    state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
 
                 return isLoading
                     ? Container(
@@ -499,7 +474,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         final isLoading = state.isLoading ?? false;
         final storyItems = state.eventTimelineViewModel?.customStoryItems ?? [];
 
-        // Show skeleton loaders during loading
         if (isLoading) {
           return Container(
             margin: EdgeInsets.only(left: 20.h),
@@ -515,7 +489,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
           );
         }
 
-        // Show empty state when no stories
         if (storyItems.isEmpty) {
           return Container(
             margin: EdgeInsets.only(left: 20.h),
@@ -534,7 +507,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
           );
         }
 
-        // Show actual story list
         return CustomStoryList(
           storyItems: (storyItems as List).cast<CustomStoryItem>(),
           onStoryTap: (index) {
@@ -568,7 +540,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                 },
               ),
               SizedBox(height: 12.h),
-              // CONDITIONAL BUTTON: Show Create Story if member, else Join Memory button
               if (isCurrentUserMember)
                 CustomButton(
                   text: 'Create Story',
@@ -603,7 +574,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     try {
       final notifier = ref.read(eventTimelineViewNotifier.notifier);
 
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -614,13 +584,10 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         ),
       );
 
-      // Add user as contributor
       await notifier.joinMemory(memoryId);
 
-      // Close loading indicator
       if (context.mounted) Navigator.pop(context);
 
-      // Show success message
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -631,13 +598,10 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         );
       }
 
-      // Reload timeline to show create story button
       await notifier.loadMemoryStories(memoryId);
     } catch (e) {
-      // Close loading indicator
       if (context.mounted) Navigator.pop(context);
 
-      // Show error message
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -671,27 +635,22 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     );
   }
 
-  /// Navigates back to the previous screen
   void onTapBackButton(BuildContext context) {
     NavigatorService.goBack();
   }
 
-  /// Handles icon button tap
   void onTapIconButton(BuildContext context) {
     // Handle icon button action
   }
 
-  /// Handles profile tap
   void onTapProfile(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.appProfile);
   }
 
-  /// Handles event options tap
   void onTapEventOptions(BuildContext context) {
     // Handle event options
   }
 
-  /// Handles timeline options tap
   void onTapTimelineOptions(BuildContext context) {
     final state = ref.read(eventTimelineViewNotifier);
     final memoryId = state.eventTimelineViewModel?.memoryId;
@@ -709,12 +668,10 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     }
   }
 
-  /// Navigates to hangout call
   void onTapHangoutCall(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.appHome);
   }
 
-  /// Handles story item tap
   void onTapStoryItem(BuildContext context, int index) {
     final notifier = ref.read(eventTimelineViewNotifier.notifier);
     final state = ref.read(eventTimelineViewNotifier);
@@ -736,7 +693,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     }
   }
 
-  /// Handles view all tap
   void onTapViewAll(BuildContext context) {
     final state = ref.read(eventTimelineViewNotifier);
     final memoryId = state.eventTimelineViewModel?.memoryId;
@@ -751,17 +707,14 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     }
   }
 
-  /// Navigates to create story
   void onTapCreateStory(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.appVideoCall);
   }
 
-  /// Handles notification tap
   void onTapNotification(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.appNotifications);
   }
 
-  /// Handles avatar cluster tap - opens members bottom sheet
   void onTapAvatars(BuildContext context) {
     final state = ref.read(eventTimelineViewNotifier);
     final memoryId = state.eventTimelineViewModel?.memoryId;
@@ -780,7 +733,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     }
   }
 
-  /// Handles edit memory button tap - opens Memory Details bottom sheet
   void onTapEditMemory(BuildContext context) {
     final state = ref.read(eventTimelineViewNotifier);
     final memoryId = state.eventTimelineViewModel?.memoryId;
@@ -801,7 +753,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     }
   }
 
-  /// Handles delete memory button tap - shows confirmation dialog
   void onTapDeleteMemory(BuildContext context) {
     final state = ref.read(eventTimelineViewNotifier);
     final memoryId = state.eventTimelineViewModel?.memoryId;
@@ -840,10 +791,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
             ),
             TextButton(
               onPressed: () async {
-                // Close confirmation dialog first
                 Navigator.pop(dialogContext);
 
-                // Show loading indicator
                 showDialog(
                   context: context,
                   barrierDismissible: false,
@@ -855,13 +804,12 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                 );
 
                 try {
-                  // Call delete method from notifier
-                  await ref.read(eventTimelineViewNotifier.notifier).deleteMemory(memoryId);
+                  await ref
+                      .read(eventTimelineViewNotifier.notifier)
+                      .deleteMemory(memoryId);
 
-                  // Close loading indicator
                   if (context.mounted) Navigator.pop(context);
 
-                  // Show success toast
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -872,18 +820,14 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                     );
                   }
 
-                  // Wait briefly for toast to appear, then navigate
                   await Future.delayed(const Duration(milliseconds: 300));
 
-                  // Navigate back to memories list
                   if (context.mounted) {
                     NavigatorService.popAndPushNamed(AppRoutes.appMemories);
                   }
                 } catch (e) {
-                  // Close loading indicator
                   if (context.mounted) Navigator.pop(context);
 
-                  // Show error message
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -905,5 +849,42 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         ),
       );
     }
+  }
+}
+
+/// Inline circle icon button (matches MemoryDetailsViewScreen snippet)
+class _CircleIconButton extends StatelessWidget {
+  const _CircleIconButton({
+    required this.icon,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = isDestructive ? appTheme.red_500 : appTheme.gray_50;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24.h),
+      child: Container(
+        height: 48.h,
+        width: 48.h,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24.h),
+        ),
+        child: Center(
+          child: Icon(
+            icon,
+            color: fg,
+            size: 22.h,
+          ),
+        ),
+      ),
+    );
   }
 }

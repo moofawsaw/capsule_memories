@@ -21,7 +21,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    // Load memory data when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(memoryDetailsNotifier.notifier).loadMemoryData(widget.memoryId);
     });
@@ -43,7 +42,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(height: 12.h),
-            // Drag handle indicator
             Container(
               width: 48.h,
               height: 5.h,
@@ -62,7 +60,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                     return Center(
                       child: CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation<Color>(
-                            appTheme.deep_purple_A100),
+                          appTheme.deep_purple_A100,
+                        ),
                       ),
                     );
                   }
@@ -99,14 +98,17 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                         SizedBox(height: 24.h),
                         _buildLocationSection(context),
                         SizedBox(height: 24.h),
-                        // NEW: Category selection section
                         _buildCategorySection(context),
                         SizedBox(height: 24.h),
-                        // NEW: Duration selection section
                         _buildDurationSection(context),
                         SizedBox(height: 24.h),
-                        _buildMemoryInfo(context),
-                        SizedBox(height: 24.h),
+
+                        // ✅ Invite section removed for sealed
+                        if (!state.isSealed) ...[
+                          _buildMemoryInfo(context),
+                          SizedBox(height: 24.h),
+                        ],
+
                         _buildMembersList(context),
                         SizedBox(height: 24.h),
                         if (state.isCreator) _buildActionButtons(context),
@@ -123,11 +125,13 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// Section Widget
   Widget _buildHeader(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsNotifier);
+
+        final canEditTitle = state.isCreator; // allowed even if sealed
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -158,18 +162,25 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
             CustomEditText(
               controller: state.titleController,
               hintText: 'Memory Title',
-              suffixIcon:
-                  state.isCreator ? ImageConstant.imgIconGray5018x20 : null,
+              suffixIcon: canEditTitle ? ImageConstant.imgIconGray5018x20 : null,
               fillColor: appTheme.gray_900,
               borderRadius: 8.h,
               textStyle: TextStyleHelper.instance.title16RegularPlusJakartaSans
                   .copyWith(color: appTheme.gray_50),
-              readOnly: !state.isCreator,
+              readOnly: !canEditTitle,
             ),
             if (!state.isCreator) ...[
               SizedBox(height: 12.h),
               Text(
                 'View-only mode - Only the creator can edit this memory',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+            if (state.isCreator && state.isSealed) ...[
+              SizedBox(height: 12.h),
+              Text(
+                'This memory is sealed. Only Title, Location, and Category can be changed.',
                 style: TextStyleHelper.instance.body12MediumPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
@@ -180,13 +191,13 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// NEW: Location Section Widget
   Widget _buildLocationSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsNotifier);
         final notifier = ref.read(memoryDetailsNotifier.notifier);
-        final isCreator = state.isCreator;
+
+        final canEditLocation = state.isCreator; // allowed even if sealed
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,11 +218,13 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       style: TextStyleHelper
                           .instance.title16RegularPlusJakartaSans
                           .copyWith(
-                              color: appTheme.blue_gray_300, height: 1.31),
+                        color: appTheme.blue_gray_300,
+                        height: 1.31,
+                      ),
                     ),
                   ],
                 ),
-                if (isCreator && !state.isFetchingLocation)
+                if (canEditLocation && !state.isFetchingLocation)
                   GestureDetector(
                     onTap: () {
                       notifier.fetchCurrentLocation();
@@ -242,15 +255,12 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                             'Get Current',
                             style: TextStyleHelper
                                 .instance.body12BoldPlusJakartaSans
-                                .copyWith(
-                              color: appTheme.deep_purple_A100,
-                            ),
+                                .copyWith(color: appTheme.deep_purple_A100),
                           ),
                         ],
                       ),
                     ),
                   ),
-
                 if (state.isFetchingLocation)
                   SizedBox(
                     width: 20.h,
@@ -267,17 +277,18 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
             SizedBox(height: 12.h),
             CustomEditText(
               controller: state.locationController,
-              hintText: isCreator
+              hintText: canEditLocation
                   ? 'Enter location or use Get Current'
                   : 'No location set',
-              suffixIcon: isCreator ? ImageConstant.imgIconGray5018x20 : null,
+              suffixIcon:
+              canEditLocation ? ImageConstant.imgIconGray5018x20 : null,
               fillColor: appTheme.gray_900,
               borderRadius: 8.h,
               textStyle: TextStyleHelper.instance.title16RegularPlusJakartaSans
                   .copyWith(color: appTheme.gray_50),
-              readOnly: !isCreator,
+              readOnly: !canEditLocation,
             ),
-            if (!isCreator) ...[
+            if (!state.isCreator) ...[
               SizedBox(height: 8.h),
               Text(
                 'Location can only be edited by the creator',
@@ -291,13 +302,13 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// NEW: Category Section Widget
   Widget _buildCategorySection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsNotifier);
         final notifier = ref.read(memoryDetailsNotifier.notifier);
-        final isCreator = state.isCreator;
+
+        final canEditCategory = state.isCreator; // allowed even if sealed
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,9 +329,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
               ],
             ),
             SizedBox(height: 12.h),
-
-            // Category Selection
-            if (isCreator)
+            if (canEditCategory)
               GestureDetector(
                 onTap: () {
                   _showCategorySelectionBottomSheet(context, notifier, state);
@@ -333,10 +342,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                   decoration: BoxDecoration(
                     color: appTheme.gray_900,
                     borderRadius: BorderRadius.circular(8.h),
-                    border: Border.all(
-                      color: appTheme.blue_gray_300.withAlpha(77),
-                      width: 1,
-                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -372,10 +377,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 decoration: BoxDecoration(
                   color: appTheme.gray_900,
                   borderRadius: BorderRadius.circular(8.h),
-                  border: Border.all(
-                    color: appTheme.blue_gray_300.withAlpha(77),
-                    width: 1,
-                  ),
                 ),
                 child: Text(
                   state.selectedCategoryName ?? 'No category set',
@@ -383,8 +384,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       .copyWith(color: appTheme.gray_50),
                 ),
               ),
-
-            if (!isCreator) ...[
+            if (!state.isCreator) ...[
               SizedBox(height: 8.h),
               Text(
                 'Category can only be changed by the creator',
@@ -398,14 +398,14 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// NEW: Show category selection bottom sheet
   void _showCategorySelectionBottomSheet(
-    BuildContext context,
-    dynamic notifier,
-    dynamic state,
-  ) {
+      BuildContext context,
+      dynamic notifier,
+      dynamic state,
+      ) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true, // ✅ allow taller sheet
       backgroundColor: appTheme.gray_900_02,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
@@ -413,180 +413,194 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
           topRight: Radius.circular(20.h),
         ),
       ),
-      builder: (modalContext) => Container(
-        padding: EdgeInsets.all(20.h),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Select Category',
-                  style: TextStyleHelper.instance.title20BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(modalContext),
-                  child: Icon(
-                    Icons.close,
-                    color: appTheme.gray_50,
-                    size: 24.h,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20.h),
+      builder: (modalContext) {
+        final maxH = MediaQuery.of(modalContext).size.height * 0.8;
 
-            // Categories List
-            if (state.isLoadingCategories)
-              Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20.h),
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                        appTheme.deep_purple_A100),
-                  ),
-                ),
-              )
-            else if (state.categories.isEmpty)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 20.h),
-                child: Center(
-                  child: Text(
-                    'No categories available',
-                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemCount: state.categories.length,
-                separatorBuilder: (context, index) => SizedBox(height: 12.h),
-                itemBuilder: (context, index) {
-                  final category = state.categories[index];
-                  final categoryId = category['id'] as String;
-                  final categoryName = category['name'] as String;
-                  final isSelected = categoryId == state.selectedCategoryId;
-
-                  return GestureDetector(
-                    onTap: () {
-                      notifier.updateCategory(categoryId, categoryName);
-                      Navigator.pop(modalContext);
-                    },
-                    child: Container(
-                      padding: EdgeInsets.all(16.h),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? appTheme.deep_purple_A100.withAlpha(26)
-                            : appTheme.gray_900,
-                        borderRadius: BorderRadius.circular(8.h),
-                        border: Border.all(
-                          color: isSelected
-                              ? appTheme.deep_purple_A100
-                              : appTheme.blue_gray_300.withAlpha(77),
-                          width: isSelected ? 2 : 1,
+        return SafeArea(
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20.h,
+                right: 20.h,
+                top: 20.h,
+                bottom: 20.h + MediaQuery.of(modalContext).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.max,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Select Category',
+                        style: TextStyleHelper.instance.title20BoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(modalContext),
+                        child: Icon(
+                          Icons.close,
+                          color: appTheme.gray_50,
+                          size: 24.h,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          // Category Icon
-                          if (category['icon_url'] != null)
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8.h),
-                              child: CustomImageView(
-                                imagePath: category['icon_url'] as String,
-                                height: 40.h,
-                                width: 40.h,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          else
-                            Container(
-                              height: 40.h,
-                              width: 40.h,
-                              decoration: BoxDecoration(
-                                color: appTheme.deep_purple_A100.withAlpha(51),
-                                borderRadius: BorderRadius.circular(8.h),
-                              ),
-                              child: Icon(
-                                Icons.category,
-                                color: appTheme.deep_purple_A100,
-                                size: 24.h,
-                              ),
-                            ),
-                          SizedBox(width: 12.h),
+                    ],
+                  ),
+                  SizedBox(height: 16.h),
 
-                          // Category Details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  categoryName,
-                                  style: TextStyleHelper
-                                      .instance.body16BoldPlusJakartaSans
-                                      .copyWith(
-                                    color: appTheme.gray_50,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (category['tagline'] != null) ...[
-                                  SizedBox(height: 4.h),
-                                  Text(
-                                    category['tagline'] as String,
-                                    style: TextStyleHelper
-                                        .instance.body12MediumPlusJakartaSans
-                                        .copyWith(
-                                      color: appTheme.blue_gray_300,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ],
-                            ),
+                  // Body
+                  if (state.isLoadingCategories)
+                    Expanded(
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            appTheme.deep_purple_A100,
                           ),
+                        ),
+                      ),
+                    )
+                  else if (state.categories.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'No categories available',
+                          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                              .copyWith(color: appTheme.blue_gray_300),
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        padding: EdgeInsets.only(bottom: 8.h),
+                        itemCount: state.categories.length,
+                        separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                        itemBuilder: (context, index) {
+                          final category = state.categories[index];
+                          final categoryId = category['id'] as String;
+                          final categoryName = category['name'] as String;
+                          final isSelected = categoryId == state.selectedCategoryId;
 
-                          // Selection Indicator
-                          if (isSelected)
-                            Icon(
-                              Icons.check_circle,
-                              color: appTheme.deep_purple_A100,
-                              size: 24.h,
+                          return GestureDetector(
+                            onTap: () {
+                              notifier.updateCategory(categoryId, categoryName);
+                              Navigator.pop(modalContext);
+                            },
+                            child: Container(
+                              padding: EdgeInsets.all(16.h),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? appTheme.deep_purple_A100.withAlpha(26)
+                                    : appTheme.gray_900,
+                                borderRadius: BorderRadius.circular(8.h),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? appTheme.deep_purple_A100
+                                      : appTheme.blue_gray_300.withAlpha(77),
+                                  width: isSelected ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  if (category['icon_url'] != null)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8.h),
+                                      child: CustomImageView(
+                                        imagePath: category['icon_url'] as String,
+                                        height: 40.h,
+                                        width: 40.h,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      height: 40.h,
+                                      width: 40.h,
+                                      decoration: BoxDecoration(
+                                        color: appTheme.deep_purple_A100.withAlpha(51),
+                                        borderRadius: BorderRadius.circular(8.h),
+                                      ),
+                                      child: Icon(
+                                        Icons.category,
+                                        color: appTheme.deep_purple_A100,
+                                        size: 24.h,
+                                      ),
+                                    ),
+                                  SizedBox(width: 12.h),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          categoryName,
+                                          style: TextStyleHelper
+                                              .instance.body16BoldPlusJakartaSans
+                                              .copyWith(color: appTheme.gray_50),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (category['tagline'] != null) ...[
+                                          SizedBox(height: 4.h),
+                                          Text(
+                                            category['tagline'] as String,
+                                            style: TextStyleHelper
+                                                .instance.body12MediumPlusJakartaSans
+                                                .copyWith(color: appTheme.blue_gray_300),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: appTheme.deep_purple_A100,
+                                      size: 24.h,
+                                    ),
+                                ],
+                              ),
                             ),
-                        ],
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
+                ],
               ),
-            SizedBox(height: 20.h),
-          ],
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  /// NEW: Duration Section Widget
+
   Widget _buildDurationSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsNotifier);
         final notifier = ref.read(memoryDetailsNotifier.notifier);
-        final isCreator = state.isCreator;
 
-        // Duration options with human-readable labels
         final durationOptions = [
           {'value': '12_hours', 'label': '12 Hours'},
           {'value': '24_hours', 'label': '24 Hours'},
           {'value': '3_days', 'label': '3 Days'},
         ];
+
+        final canEditDuration = state.isCreator && !state.isSealed;
+
+        final selectedLabel = state.selectedDuration != null
+            ? durationOptions
+            .firstWhere(
+              (opt) => opt['value'] == state.selectedDuration,
+          orElse: () => durationOptions[0],
+        )['label']
+            .toString()
+            : 'No duration set';
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -608,8 +622,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
             ),
             SizedBox(height: 12.h),
 
-            // Duration Selection
-            if (isCreator)
+            // Editable only when open
+            if (canEditDuration)
               GestureDetector(
                 onTap: () {
                   _showDurationSelectionBottomSheet(
@@ -623,10 +637,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                   decoration: BoxDecoration(
                     color: appTheme.gray_900,
                     borderRadius: BorderRadius.circular(8.h),
-                    border: Border.all(
-                      color: appTheme.blue_gray_300.withAlpha(77),
-                      width: 1,
-                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -634,13 +644,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       Expanded(
                         child: Text(
                           state.selectedDuration != null
-                              ? durationOptions
-                                  .firstWhere(
-                                    (opt) =>
-                                        opt['value'] == state.selectedDuration,
-                                    orElse: () => durationOptions[0],
-                                  )['label']
-                                  .toString()
+                              ? selectedLabel
                               : 'Select Duration',
                           style: TextStyleHelper
                               .instance.title16RegularPlusJakartaSans
@@ -670,27 +674,24 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 decoration: BoxDecoration(
                   color: appTheme.gray_900,
                   borderRadius: BorderRadius.circular(8.h),
-                  border: Border.all(
-                    color: appTheme.blue_gray_300.withAlpha(77),
-                    width: 1,
-                  ),
                 ),
                 child: Text(
-                  state.selectedDuration != null
-                      ? durationOptions
-                          .firstWhere(
-                            (opt) => opt['value'] == state.selectedDuration,
-                            orElse: () => durationOptions[0],
-                          )['label']
-                          .toString()
-                      : 'No duration set',
+                  selectedLabel,
                   style: TextStyleHelper.instance.title16RegularPlusJakartaSans
                       .copyWith(color: appTheme.gray_50),
                 ),
               ),
 
-            // Show end time if available
-            if (state.endTime != null) ...[
+            if (state.isSealed) ...[
+              SizedBox(height: 8.h),
+              Text(
+                'Duration is locked after sealing',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+
+            if (!state.isSealed && state.endTime != null) ...[
               SizedBox(height: 8.h),
               Row(
                 children: [
@@ -708,28 +709,18 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 ],
               ),
             ],
-
-            if (!isCreator) ...[
-              SizedBox(height: 8.h),
-              Text(
-                'Duration can only be changed by the creator',
-                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-            ],
           ],
         );
       },
     );
   }
 
-  /// NEW: Show duration selection bottom sheet
   void _showDurationSelectionBottomSheet(
-    BuildContext context,
-    dynamic notifier,
-    dynamic state,
-    List<Map<String, String>> durationOptions,
-  ) {
+      BuildContext context,
+      dynamic notifier,
+      dynamic state,
+      List<Map<String, String>> durationOptions,
+      ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: appTheme.gray_900_02,
@@ -745,7 +736,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -765,8 +755,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
               ],
             ),
             SizedBox(height: 20.h),
-
-            // Duration options list
             ListView.separated(
               shrinkWrap: true,
               physics: NeverScrollableScrollPhysics(),
@@ -814,9 +802,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                               durationLabel,
                               style: TextStyleHelper
                                   .instance.body16BoldPlusJakartaSans
-                                  .copyWith(
-                                color: appTheme.gray_50,
-                              ),
+                                  .copyWith(color: appTheme.gray_50),
                             ),
                           ],
                         ),
@@ -839,7 +825,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// Helper method to format DateTime
   String _formatDateTime(DateTime dateTime) {
     final now = DateTime.now();
     final difference = dateTime.difference(now);
@@ -853,13 +838,13 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     }
   }
 
-  /// Section Widget
   Widget _buildMemoryInfo(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsNotifier);
         final notifier = ref.read(memoryDetailsNotifier.notifier);
 
+        // This entire section is hidden when sealed (handled in build())
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -897,7 +882,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       readOnly: true,
                     ),
                   ),
-                  // Copy button
                   GestureDetector(
                     onTap: () {
                       notifier.copyInviteLink();
@@ -908,7 +892,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       width: 24.h,
                     ),
                   ),
-                  // QR Code button
                   GestureDetector(
                     onTap: () {
                       notifier.showQRCodeBottomSheet(context);
@@ -919,29 +902,28 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       size: 24.h,
                     ),
                   ),
-                  // Native Share button with loading state
                   GestureDetector(
                     onTap: state.isSharing
                         ? null
                         : () {
-                            notifier.shareMemoryNative();
-                          },
+                      notifier.shareMemoryNative();
+                    },
                     child: state.isSharing
                         ? SizedBox(
-                            width: 24.h,
-                            height: 24.h,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                appTheme.gray_50,
-                              ),
-                            ),
-                          )
+                      width: 24.h,
+                      height: 24.h,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          appTheme.gray_50,
+                        ),
+                      ),
+                    )
                         : Icon(
-                            Icons.share,
-                            color: appTheme.gray_50,
-                            size: 24.h,
-                          ),
+                      Icons.share,
+                      color: appTheme.gray_50,
+                      size: 24.h,
+                    ),
                   ),
                 ],
               ),
@@ -952,12 +934,13 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// Section Widget - UPDATED to show actual members and search/invite
   Widget _buildMembersList(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsNotifier);
         final notifier = ref.read(memoryDetailsNotifier.notifier);
+
+        final canEditMembers = state.isCreator && !state.isSealed;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -977,8 +960,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       'Members (${state.memoryDetailsModel?.members?.length ?? 0})',
                       style: TextStyleHelper
                           .instance.title16RegularPlusJakartaSans
-                          .copyWith(
-                              color: appTheme.blue_gray_300, height: 1.31),
+                          .copyWith(color: appTheme.blue_gray_300, height: 1.31),
                     ),
                   ],
                 ),
@@ -986,7 +968,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
             ),
             SizedBox(height: 12.h),
 
-            // Show actual members list
             if (state.memoryDetailsModel?.members?.isNotEmpty ?? false) ...[
               ListView.separated(
                 shrinkWrap: true,
@@ -995,11 +976,14 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 separatorBuilder: (context, index) => SizedBox(height: 6.h),
                 itemBuilder: (context, index) {
                   final member = state.memoryDetailsModel!.members![index];
+
                   return MemberItemWidget(
                     member: member,
-                    isCreator: state.isCreator,
-                    onRemove: () {
-                      // Show confirmation dialog
+                    // Pass "isCreator" only when member edits are allowed
+                    isCreator: canEditMembers,
+                    onRemove: !canEditMembers
+                        ? null
+                        : () {
                       showDialog(
                         context: context,
                         builder: (dialogContext) => AlertDialog(
@@ -1021,12 +1005,14 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                           ),
                           actions: [
                             TextButton(
-                              onPressed: () => Navigator.pop(dialogContext),
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext),
                               child: Text(
                                 'Cancel',
                                 style: TextStyleHelper
                                     .instance.body14BoldPlusJakartaSans
-                                    .copyWith(color: appTheme.blue_gray_300),
+                                    .copyWith(
+                                    color: appTheme.blue_gray_300),
                               ),
                             ),
                             TextButton(
@@ -1053,8 +1039,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
               SizedBox(height: 16.h),
             ],
 
-            // Search and invite section (only for creator)
-            if (state.isCreator) ...[
+            // ✅ Sealed: no invite/search section
+            if (canEditMembers) ...[
               Divider(color: appTheme.blue_gray_300.withAlpha(51)),
               SizedBox(height: 16.h),
               Text(
@@ -1063,8 +1049,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                     .copyWith(color: appTheme.blue_gray_300, height: 1.31),
               ),
               SizedBox(height: 12.h),
-
-              // Search bar
               CustomSearchView(
                 controller: state.searchController,
                 placeholder: 'Search friends...',
@@ -1073,15 +1057,14 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 },
               ),
               SizedBox(height: 12.h),
-
-              // Friends list for inviting
               if (state.isLoadingFriends)
                 Center(
                   child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 20.h),
                     child: CircularProgressIndicator(
                       valueColor: AlwaysStoppedAnimation<Color>(
-                          appTheme.deep_purple_A100),
+                        appTheme.deep_purple_A100,
+                      ),
                     ),
                   ),
                 )
@@ -1109,7 +1092,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                     final friend = state.filteredFriendsList[index];
                     final friendId = friend['id'] as String;
                     final isAlreadyMember =
-                        state.memberUserIds.contains(friendId);
+                    state.memberUserIds.contains(friendId);
 
                     return Container(
                       padding: EdgeInsets.all(12.h),
@@ -1123,7 +1106,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       ),
                       child: Row(
                         children: [
-                          // Avatar
                           ClipRRect(
                             borderRadius: BorderRadius.circular(20.h),
                             child: CustomImageView(
@@ -1134,8 +1116,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                             ),
                           ),
                           SizedBox(width: 12.h),
-
-                          // Name
                           Expanded(
                             child: Text(
                               friend['display_name'] as String? ??
@@ -1147,8 +1127,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-
-                          // Invite button
                           if (isAlreadyMember)
                             Container(
                               padding: EdgeInsets.symmetric(
@@ -1171,8 +1149,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                               onTap: state.isInviting
                                   ? null
                                   : () {
-                                      notifier.inviteFriendToMemory(friendId);
-                                    },
+                                notifier.inviteFriendToMemory(friendId);
+                              },
                               child: Container(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: 12.h,
@@ -1180,7 +1158,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color:
-                                      appTheme.deep_purple_A100.withAlpha(26),
+                                  appTheme.deep_purple_A100.withAlpha(26),
                                   borderRadius: BorderRadius.circular(6.h),
                                   border: Border.all(
                                     color: appTheme.deep_purple_A100,
@@ -1191,9 +1169,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                   'Invite',
                                   style: TextStyleHelper
                                       .instance.body12BoldPlusJakartaSans
-                                      .copyWith(
-                                    color: appTheme.deep_purple_A100,
-                                  ),
+                                      .copyWith(color: appTheme.deep_purple_A100),
                                 ),
                               ),
                             ),
@@ -1202,6 +1178,13 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                     );
                   },
                 ),
+            ] else if (state.isCreator && state.isSealed) ...[
+              SizedBox(height: 8.h),
+              Text(
+                'Members are locked after sealing',
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
             ],
           ],
         );
@@ -1209,7 +1192,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// Section Widget
   Widget _buildActionButtons(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -1222,7 +1204,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
               child: CustomButton(
                 text: 'Cancel',
                 onPressed: () {
-                  // Close bottom sheet without saving
                   Navigator.pop(context);
                 },
                 buttonStyle: CustomButtonStyle.fillDark,
@@ -1236,22 +1217,18 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 onPressed: state.isSaving
                     ? null
                     : () async {
-                        final success = await notifier.saveMemory();
-
-                        if (success && context.mounted) {
-                          // Close bottom sheet
-                          Navigator.pop(context);
-
-                          // Show success snackbar
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Memory updated successfully'),
-                              backgroundColor: appTheme.colorFF52D1,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                      },
+                  final success = await notifier.saveMemory();
+                  if (success && context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Memory updated successfully'),
+                        backgroundColor: appTheme.colorFF52D1,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
                 isDisabled: state.isSaving,
                 buttonStyle: CustomButtonStyle.fillSuccess,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
@@ -1263,7 +1240,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// Navigates to search and add people screen
   void onTapSearchAddPeople(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1273,8 +1249,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     );
   }
 
-  /// Handles member action tap
-  void onTapMemberAction(BuildContext context) {
-    // Handle member action
-  }
+  void onTapMemberAction(BuildContext context) {}
+
 }

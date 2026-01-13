@@ -20,7 +20,7 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
     super.initState();
     _shimmerController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1500),
     )..repeat();
   }
 
@@ -32,23 +32,34 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
 
   @override
   Widget build(BuildContext context) {
-    // Use compact dimensions for smaller story cards (160.h) or default (202.h)
-    final double containerHeight = widget.isCompact ? 160.h : 202.h;
-    final double imageHeight = widget.isCompact ? 100.h : 140.h;
-    final double bottomPadding = widget.isCompact ? 6.h : 8.h;
+    // IMPORTANT:
+    // MemoriesDashboardScreen compact skeleton wrapper uses:
+    // - item width: 120.h
+    // - available height: 140.h
+    //
+    // So compact MUST be 120.h x 140.h to match the real cards and avoid overflow/mismatch.
+    final double containerWidth = widget.isCompact ? 120.h : 140.h;
+    final double containerHeight = widget.isCompact ? 140.h : 202.h;
+
+    // Tune the internal blocks to fit within the container.
+    final double imageHeight = widget.isCompact ? 92.h : 140.h;
+    final double padding = widget.isCompact ? 6.h : 8.h;
+
     final double avatarSize = widget.isCompact ? 16.h : 20.h;
-    final double textWidth = widget.isCompact ? 40.h : 50.h;
+    final double textWidth = widget.isCompact ? 44.h : 50.h;
     final double textHeight = widget.isCompact ? 8.h : 10.h;
-    final double badgeWidth = widget.isCompact ? 60.h : 70.h;
+
+    final double badgeWidth = widget.isCompact ? 56.h : 70.h;
     final double badgeHeight = widget.isCompact ? 14.h : 16.h;
-    final double spacingBetweenElements = widget.isCompact ? 4.h : 6.h;
+
+    final double spacing = widget.isCompact ? 4.h : 6.h;
 
     return AnimatedBuilder(
       animation: _shimmerController,
       builder: (context, child) {
         return Container(
           height: containerHeight,
-          width: 140.h,
+          width: containerWidth,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
             gradient: LinearGradient(
@@ -64,21 +75,23 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Skeleton image area - compact or default
+              // Skeleton image area
               Container(
                 height: imageHeight,
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                  borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(8)),
                   color: appTheme.blue_gray_300.withAlpha(51),
                 ),
               ),
-              // Skeleton text area - compact or default
+
+              // Skeleton meta/text area
               Padding(
-                padding: EdgeInsets.all(bottomPadding),
+                padding: EdgeInsets.all(padding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // User info skeleton
                     Row(
                       children: [
                         Container(
@@ -89,7 +102,7 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
                             color: appTheme.blue_gray_300.withAlpha(77),
                           ),
                         ),
-                        SizedBox(width: spacingBetweenElements),
+                        SizedBox(width: spacing),
                         Container(
                           width: textWidth,
                           height: textHeight,
@@ -100,8 +113,7 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
                         ),
                       ],
                     ),
-                    SizedBox(height: spacingBetweenElements),
-                    // Category badge skeleton
+                    SizedBox(height: spacing),
                     Container(
                       width: badgeWidth,
                       height: badgeHeight,

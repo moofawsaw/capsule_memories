@@ -1,3 +1,5 @@
+// lib/presentation/memories_dashboard_screen/memories_dashboard_screen.dart
+
 import '../../core/app_export.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
 import '../../services/supabase_service.dart';
@@ -51,7 +53,7 @@ class _MemoriesDashboardScreenState
             slivers: [
               SliverToBoxAdapter(child: _buildMemoriesHeader(context)),
               SliverToBoxAdapter(child: _buildLatestStoriesSection(context)),
-              SliverToBoxAdapter(child: _buildTabSection(context)),
+              SliverToBoxAdapter(child: _buildFilterRow(context)),
               SliverToBoxAdapter(child: SizedBox(height: 6.h)),
               SliverToBoxAdapter(child: _buildMemoriesContent(context)),
               SliverToBoxAdapter(child: SizedBox(height: 24.h)),
@@ -125,7 +127,7 @@ class _MemoriesDashboardScreenState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(20.h, 14.h, 20.h, 0),
+            padding: EdgeInsets.fromLTRB(20.h, 16.h, 20.h, 0),
             child: Text(
               'Latest Stories (${items.length})',
               style: TextStyleHelper.instance.body14BoldPlusJakartaSans
@@ -134,79 +136,104 @@ class _MemoriesDashboardScreenState
           ),
           SizedBox(height: 12.h),
           SizedBox(
-            height: 140.h,
+            height: 130.h,
             child: isLoading
                 ? ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.only(left: 20.h),
-                    itemCount: 3,
-                    itemBuilder: (_, __) => Container(
-                      width: 120.h,
-                      margin: EdgeInsets.only(right: 10.h),
-                      child: CustomStorySkeleton(isCompact: true),
-                    ),
-                  )
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.only(left: 20.h),
+              itemCount: 3,
+              itemBuilder: (_, __) => Container(
+                width: 120.h,
+                margin: EdgeInsets.only(right: 10.h),
+                child: CustomStorySkeleton(isCompact: true),
+              ),
+            )
                 : items.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20.h),
-                          child: Text(
-                            'No stories yet',
-                            style: TextStyleHelper
-                                .instance.body14RegularPlusJakartaSans
-                                .copyWith(
-                                    color: appTheme.gray_50.withAlpha(128)),
-                          ),
-                        ),
-                      )
-                    : CustomStoryList(
-                        storyItems: items
-                            .map(
-                              (e) => CustomStoryItem(
-                                backgroundImage: e.backgroundImage ?? '',
-                                profileImage: e.profileImage ?? '',
-                                timestamp: e.timestamp ?? '',
-                                navigateTo: e.navigateTo,
-                                storyId: e.id,
-                                isRead: e.isRead ?? false,
-                              ),
-                            )
-                            .toList(),
-                        onStoryTap: (i) => _onStoryTap(context, i),
-                      ),
+                ? Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.h),
+                child: Text(
+                  'No stories yet',
+                  style: TextStyleHelper
+                      .instance.body14RegularPlusJakartaSans
+                      .copyWith(
+                      color: appTheme.gray_50.withAlpha(128)),
+                ),
+              ),
+            )
+                : CustomStoryList(
+              storyItems: items
+                  .map(
+                    (e) => CustomStoryItem(
+                  backgroundImage: e.backgroundImage ?? '',
+                  profileImage: e.profileImage ?? '',
+                  timestamp: e.timestamp ?? '',
+                  navigateTo: e.navigateTo,
+                  storyId: e.id,
+                  isRead: e.isRead ?? false,
+                ),
+              )
+                  .toList(),
+              onStoryTap: (i) => _onStoryTap(context, i),
+            ),
           ),
         ],
       );
     });
   }
 
-  // ================= FILTER TABS =================
+  // ================= FILTER ROW (Tabs + ONE toggle) =================
 
-  Widget _buildTabSection(BuildContext context) {
+  Widget _buildFilterRow(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(memoriesDashboardNotifier);
       final notifier = ref.read(memoriesDashboardNotifier.notifier);
 
+      final user = SupabaseService.instance.client?.auth.currentUser;
+      if (user == null) return const SizedBox.shrink();
+
       final ownership = state.selectedOwnership ?? 'all';
+      final counts = notifier.getOwnershipCounts(userId: user.id);
+
+      final allCount = counts['all'] ?? 0;
+      final createdCount = counts['created'] ?? 0;
+      final joinedCount = counts['joined'] ?? 0;
 
       return Container(
         margin: EdgeInsets.fromLTRB(16.h, 14.h, 16.h, 0),
-        child: Container(
-          padding: EdgeInsets.all(3.h),
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_02.withAlpha(128),
-            borderRadius: BorderRadius.circular(22.h),
-          ),
-          child: Row(
-            children: [
-              _tab('All', ownership == 'all',
-                  () => notifier.updateOwnershipFilter('all')),
-              _tab('Created', ownership == 'created',
-                  () => notifier.updateOwnershipFilter('created')),
-              _tab('Joined', ownership == 'joined',
-                  () => notifier.updateOwnershipFilter('joined')),
-            ],
-          ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: EdgeInsets.all(3.h),
+                decoration: BoxDecoration(
+                  color: appTheme.gray_900_02.withAlpha(128),
+                  borderRadius: BorderRadius.circular(22.h),
+                ),
+                child: Row(
+                  children: [
+                    _tab(
+                      'All ($allCount)',
+                      ownership == 'all',
+                          () => notifier.updateOwnershipFilter('all'),
+                    ),
+                    _tab(
+                      'Created ($createdCount)',
+                      ownership == 'created',
+                          () => notifier.updateOwnershipFilter('created'),
+                    ),
+                    _tab(
+                      'Joined ($joinedCount)',
+                      ownership == 'joined',
+                          () => notifier.updateOwnershipFilter('joined'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 10.h),
+            _openToggle(context),
+          ],
         ),
       );
     });
@@ -227,13 +254,47 @@ class _MemoriesDashboardScreenState
             textAlign: TextAlign.center,
             style: active
                 ? TextStyleHelper.instance.body14BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_900_02)
+                .copyWith(color: appTheme.gray_900_02)
                 : TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
+                .copyWith(color: appTheme.gray_50),
           ),
         ),
       ),
     );
+  }
+
+  Widget _openToggle(BuildContext context) {
+    return Consumer(builder: (context, ref, _) {
+      final state = ref.watch(memoriesDashboardNotifier);
+      final notifier = ref.read(memoriesDashboardNotifier.notifier);
+
+      return GestureDetector(
+        onTap: notifier.toggleOpenMemories,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02.withAlpha(128),
+            borderRadius: BorderRadius.circular(18.h),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                state.showOpenMemories ? Icons.lock_open : Icons.lock,
+                size: 16.h,
+                color: appTheme.gray_50,
+              ),
+              SizedBox(width: 6.h),
+              Text(
+                state.showOpenMemories ? 'Open' : 'Sealed',
+                style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                    .copyWith(color: appTheme.gray_50),
+              ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 
   // ================= MEMORIES =================
@@ -256,6 +317,7 @@ class _MemoriesDashboardScreenState
       if (user == null) return const SizedBox.shrink();
 
       final memories = notifier.getFilteredMemories(user.id);
+
       if (memories.isEmpty) {
         return Center(
           child: Padding(
@@ -269,43 +331,37 @@ class _MemoriesDashboardScreenState
         );
       }
 
+      // ✅ Render ONCE (your prior code accidentally rendered this list inside a loop)
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: Row(
-          children: memories.map((m) {
-            return unified_widget.CustomPublicMemories(
-              variant: unified_widget.MemoryCardVariant.dashboard,
-              memories: memories.map((m) {
-                return unified_widget.CustomMemoryItem(
-                  id: m.id,
-                  userId: m.creatorId,
-                  title: m.title,
-                  date: m.date,
-                  iconPath: m.categoryIconUrl,
-                  profileImages: m.participantAvatars,
-                  startDate: m.eventDate,
-                  startTime: m.eventTime,
-                  endDate: m.endDate,
-                  endTime: m.endTime,
-                  location: m.location,
-                  distance: m.distance,
-                  isLiked: false,
-                  state: m.state,
-                  visibility: m.visibility,
-                );
-              }).toList(),
-              onMemoryTap: (memoryItem) {
-                // You currently navigate using your `m` object; update to match your expected type.
-                // If MemoryNavigationWrapper expects your domain model, map back by id or change wrapper to accept CustomMemoryItem.
-                final found = memories.firstWhere((x) => x.id == memoryItem.id);
-                MemoryNavigationWrapper.navigateFromMemoryItem(
-                  context: context,
-                  memoryItem: found,
-                );
-              },
+        child: unified_widget.CustomPublicMemories(
+          variant: unified_widget.MemoryCardVariant.dashboard,
+          memories: memories.map((m) {
+            return unified_widget.CustomMemoryItem(
+              id: m.id,
+              userId: m.creatorId,
+              title: m.title,
+              date: m.date,
+              iconPath: m.categoryIconUrl,
+              profileImages: m.participantAvatars,
+              startDate: m.eventDate,
+              startTime: m.eventTime,
+              endDate: m.endDate,
+              endTime: m.endTime,
+              location: m.location,
+              distance: m.distance,
+              isLiked: false,
+              state: m.state,
+              visibility: m.visibility,
             );
-
           }).toList(),
+          onMemoryTap: (memoryItem) {
+            final found = memories.firstWhere((x) => x.id == memoryItem.id);
+            MemoryNavigationWrapper.navigateFromMemoryItem(
+              context: context,
+              memoryItem: found,
+            );
+          },
         ),
       );
     });
@@ -348,19 +404,6 @@ class _MemoriesDashboardScreenState
           arguments: story.id,
         );
       }
-    }
-  }
-
-  void _showStateDropdown(BuildContext context) {}
-
-  String _getStateLabel(String state) {
-    switch (state) {
-      case 'live':
-        return 'Live';
-      case 'sealed':
-        return 'Sealed';
-      default:
-        return 'All';
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
 import '../../../services/avatar_helper_service.dart';
@@ -13,7 +14,7 @@ part 'memory_details_state.dart';
 
 final memoryDetailsNotifier = StateNotifierProvider.autoDispose<
     MemoryDetailsNotifier, MemoryDetailsState>(
-  (ref) => MemoryDetailsNotifier(
+      (ref) => MemoryDetailsNotifier(
     MemoryDetailsState(
       memoryDetailsModel: MemoryDetailsModel(),
     ),
@@ -29,8 +30,26 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
   MemoryDetailsNotifier(MemoryDetailsState state, {required this.ref})
       : super(state);
 
-  /// Load memory data from Supabase
+  bool _isValidUuid(String? value) {
+    if (value == null) return false;
+    final v = value.trim();
+    if (v.isEmpty) return false;
+    final uuidRegex = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    );
+    return uuidRegex.hasMatch(v);
+  }
+
   Future<void> loadMemoryData(String memoryId) async {
+    if (!_isValidUuid(memoryId)) {
+      print('❌ loadMemoryData blocked: invalid memoryId="$memoryId"');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Failed to load memory data: invalid memory id',
+      );
+      return;
+    }
+
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
@@ -43,7 +62,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         return;
       }
 
-      // Get current user ID
       final currentUserId = client.auth.currentUser?.id;
       if (currentUserId == null) {
         state = state.copyWith(
@@ -53,29 +71,27 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         return;
       }
 
-      // Fetch memory data with creator info, location, AND category
       final memoryResponse = await client
           .from('memories')
           .select(
-              'id, title, invite_code, visibility, creator_id, state, location_name, location_lat, location_lng, category_id, duration, start_time, end_time')
+          'id, title, invite_code, visibility, creator_id, state, location_name, location_lat, location_lng, category_id, duration, start_time, end_time')
           .eq('id', memoryId)
           .single();
 
-      // Check if current user is the creator
       final creatorId = memoryResponse['creator_id'] as String;
       final isCreator = creatorId == currentUserId;
 
-      // Fetch memory contributors with user profiles
+      final rawState = (memoryResponse['state'] as String?) ?? 'open';
+      final memoryState = rawState.toLowerCase().trim(); // 'open' / 'sealed'
+
       final contributorsResponse = await client
           .from('memory_contributors')
           .select(
-              'id, user_id, joined_at, user_profiles(id, display_name, username, avatar_url)')
+          'id, user_id, joined_at, user_profiles(id, display_name, username, avatar_url)')
           .eq('memory_id', memoryId);
 
-      // Convert contributors to MemberModel list
       final members = (contributorsResponse as List).map((contributor) {
-        final userProfile =
-            contributor['user_profiles'] as Map<String, dynamic>;
+        final userProfile = contributor['user_profiles'] as Map<String, dynamic>;
         final userId = userProfile['id'] as String;
 
         return MemberModel(
@@ -91,25 +107,20 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         );
       }).toList();
 
-      // Get member user IDs
       final memberUserIds = (contributorsResponse)
           .map((c) =>
-              (c['user_profiles'] as Map<String, dynamic>)['id'] as String)
+      (c['user_profiles'] as Map<String, dynamic>)['id'] as String)
           .toSet();
 
-      // Initialize controllers
       final titleController = TextEditingController();
       final inviteLinkController = TextEditingController();
       final searchController = TextEditingController();
       final locationController = TextEditingController();
 
       titleController.text = memoryResponse['title'] as String? ?? '';
-      inviteLinkController.text =
-          memoryResponse['invite_code'] as String? ?? '';
-      locationController.text =
-          memoryResponse['location_name'] as String? ?? '';
+      inviteLinkController.text = memoryResponse['invite_code'] as String? ?? '';
+      locationController.text = memoryResponse['location_name'] as String? ?? '';
 
-      // NEW: Get current category info
       final currentCategoryId = memoryResponse['category_id'] as String?;
       String? currentCategoryName;
 
@@ -126,7 +137,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         }
       }
 
-      // NEW: Load duration data
       final duration = memoryResponse['duration'] as String?;
       final startTimeStr = memoryResponse['start_time'] as String?;
       final endTimeStr = memoryResponse['end_time'] as String?;
@@ -134,12 +144,8 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
       DateTime? parsedStartTime;
       DateTime? parsedEndTime;
 
-      if (startTimeStr != null) {
-        parsedStartTime = DateTime.parse(startTimeStr);
-      }
-      if (endTimeStr != null) {
-        parsedEndTime = DateTime.parse(endTimeStr);
-      }
+      if (startTimeStr != null) parsedStartTime = DateTime.parse(startTimeStr);
+      if (endTimeStr != null) parsedEndTime = DateTime.parse(endTimeStr);
 
       state = state.copyWith(
         titleController: titleController,
@@ -150,13 +156,12 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         isCreator: isCreator,
         memoryId: memoryId,
         isLoading: false,
+        memoryState: memoryState,
         locationName: memoryResponse['location_name'] as String?,
         locationLat: memoryResponse['location_lat'] as double?,
         locationLng: memoryResponse['location_lng'] as double?,
-        // NEW: Set current category
         selectedCategoryId: currentCategoryId,
         selectedCategoryName: currentCategoryName,
-        // NEW: Set duration data
         selectedDuration: duration,
         startTime: parsedStartTime,
         endTime: parsedEndTime,
@@ -169,10 +174,11 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         ),
       );
 
-      // Load friends list for inviting
-      await _loadFriendsList();
+      // Only load friends/invite data if NOT sealed (sealed = view-only members)
+      if (!state.isSealed) {
+        await _loadFriendsList();
+      }
 
-      // NEW: Load categories for selection
       await _loadCategories();
     } catch (e) {
       print('❌ Error loading memory data: $e');
@@ -183,7 +189,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     }
   }
 
-  /// NEW: Load available memory categories
   Future<void> _loadCategories() async {
     state = state.copyWith(isLoadingCategories: true);
 
@@ -191,7 +196,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
       final client = SupabaseService.instance.client;
       if (client == null) throw Exception('Database connection not available');
 
-      // Fetch all active categories ordered by display_order
       final categoriesResponse = await client
           .from('memory_categories')
           .select('id, name, icon_name, icon_url, tagline')
@@ -208,7 +212,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     }
   }
 
-  /// Load current user's friends list
   Future<void> _loadFriendsList() async {
     state = state.copyWith(isLoadingFriends: true);
 
@@ -225,8 +228,10 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     }
   }
 
-  /// Filter friends based on search query
   void filterFriends(String query) {
+    // Sealed = no invites
+    if (state.isSealed) return;
+
     if (query.isEmpty) {
       state = state.copyWith(filteredFriendsList: state.friendsList);
       return;
@@ -234,16 +239,17 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
 
     final filtered = state.friendsList.where((friend) {
       final name =
-          (friend['display_name'] ?? friend['username'] ?? '').toLowerCase();
+      (friend['display_name'] ?? friend['username'] ?? '').toLowerCase();
       return name.contains(query.toLowerCase());
     }).toList();
 
     state = state.copyWith(filteredFriendsList: filtered);
   }
 
-  /// Invite a friend to the memory
   Future<void> inviteFriendToMemory(String friendUserId) async {
+    if (state.isSealed) return;
     if (state.memoryId == null) return;
+    if (!state.isCreator) return;
 
     state = state.copyWith(isInviting: true);
 
@@ -251,13 +257,11 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
       final client = SupabaseService.instance.client;
       if (client == null) throw Exception('Database connection not available');
 
-      // Add friend as memory contributor
       await client.from('memory_contributors').insert({
         'memory_id': state.memoryId,
         'user_id': friendUserId,
       });
 
-      // Update member user IDs
       final updatedMemberIds = Set<String>.from(state.memberUserIds)
         ..add(friendUserId);
 
@@ -268,17 +272,13 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Friend invited successfully',
       );
 
-      // Reset success message
-      Future.delayed(Duration(milliseconds: 2000), () {
+      Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
 
-      // Reload memory data to refresh members list
       if (state.memoryId != null) {
         await loadMemoryData(state.memoryId!);
       }
@@ -292,11 +292,11 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     }
   }
 
-  /// NEW: Remove a member from the memory
   Future<void> removeMember(String memberUserId) async {
+    // Sealed = no member changes
+    if (state.isSealed) return;
     if (!state.isCreator || state.memoryId == null) return;
 
-    // Prevent removing the creator
     final client = SupabaseService.instance.client;
     if (client == null) return;
 
@@ -312,12 +312,10 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
           showSuccessMessage: true,
           successMessage: 'Cannot remove the creator',
         );
-        Future.delayed(Duration(milliseconds: 2000), () {
+        Future.delayed(const Duration(milliseconds: 2000), () {
           if (mounted) {
-            state = state.copyWith(
-              showSuccessMessage: false,
-              successMessage: null,
-            );
+            state =
+                state.copyWith(showSuccessMessage: false, successMessage: null);
           }
         });
         return;
@@ -327,14 +325,12 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     }
 
     try {
-      // Delete from memory_contributors table
       await client
           .from('memory_contributors')
           .delete()
           .eq('memory_id', state.memoryId!)
           .eq('user_id', memberUserId);
 
-      // Update member user IDs
       final updatedMemberIds = Set<String>.from(state.memberUserIds)
         ..remove(memberUserId);
 
@@ -344,17 +340,13 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Member removed successfully',
       );
 
-      // Reset success message
-      Future.delayed(Duration(milliseconds: 2000), () {
+      Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
 
-      // Reload memory data to refresh members list
       if (state.memoryId != null) {
         await loadMemoryData(state.memoryId!);
       }
@@ -365,37 +357,34 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Failed to remove member',
       );
 
-      Future.delayed(Duration(milliseconds: 2000), () {
+      Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
     }
   }
 
-  /// NEW: Update memory duration
   void updateMemoryDuration(String newDuration) {
     if (!state.isCreator) return;
+    if (state.isSealed) return;
 
-    // Calculate new end_time based on duration
     final now = DateTime.now();
     DateTime newEndTime;
 
     switch (newDuration) {
       case '12_hours':
-        newEndTime = now.add(Duration(hours: 12));
+        newEndTime = now.add(const Duration(hours: 12));
         break;
       case '24_hours':
-        newEndTime = now.add(Duration(hours: 24));
+        newEndTime = now.add(const Duration(hours: 24));
         break;
       case '3_days':
-        newEndTime = now.add(Duration(days: 3));
+        newEndTime = now.add(const Duration(days: 3));
         break;
       default:
-        newEndTime = now.add(Duration(hours: 12));
+        newEndTime = now.add(const Duration(hours: 12));
     }
 
     state = state.copyWith(
@@ -404,10 +393,9 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     );
   }
 
-  /// NEW: Update selected category
   void updateCategory(String categoryId, String categoryName) {
     if (!state.isCreator) return;
-
+    // Category allowed even when sealed
     state = state.copyWith(
       selectedCategoryId: categoryId,
       selectedCategoryName: categoryName,
@@ -416,16 +404,18 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
 
   void updateVisibility(bool isPublic) {
     if (!state.isCreator) return;
+    if (state.isSealed) return;
 
     state = state.copyWith(
       isPublic: isPublic,
-      memoryDetailsModel: state.memoryDetailsModel?.copyWith(
-        isPublic: isPublic,
-      ),
+      memoryDetailsModel: state.memoryDetailsModel?.copyWith(isPublic: isPublic),
     );
   }
 
   void copyInviteLink() {
+    // Invite link UI is removed when sealed, but keep guard anyway.
+    if (state.isSealed) return;
+
     final inviteLink = state.inviteLinkController?.text ?? '';
     if (inviteLink.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: inviteLink));
@@ -434,13 +424,10 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Invite link copied to clipboard',
       );
 
-      // Reset success message after showing
-      Future.delayed(Duration(milliseconds: 100), () {
+      Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
     }
@@ -448,39 +435,25 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
 
   void updateTitle(String title) {
     if (!state.isCreator) return;
-
     state = state.copyWith(
-      memoryDetailsModel: state.memoryDetailsModel?.copyWith(
-        title: title,
-      ),
+      memoryDetailsModel: state.memoryDetailsModel?.copyWith(title: title),
     );
   }
 
-  /// NEW: Fetch current location using MemoryService
-  /// This ensures location handling is consistent with memory creation
   Future<void> fetchCurrentLocation() async {
+    // Location allowed even when sealed
     if (!state.isCreator) return;
 
     state = state.copyWith(isFetchingLocation: true);
 
     try {
-      // Use MemoryService to update location with proper geocoding
-      // This ensures location_name is formatted as "City, State" format
       final locationData = await Future.any([
         _memoryService.updateMemoryLocation(state.memoryId ?? ''),
-        Future.delayed(
-          const Duration(seconds: 15),
-          () => null,
-        ),
+        Future.delayed(const Duration(seconds: 15), () => null),
       ]);
 
       if (locationData != null) {
-        // CRITICAL: LocationService.getLocationData() already returns properly formatted location_name
-        // Format: "City, State" (e.g., "Toronto, ON" or "Dallas, TX")
-        // This matches the exact same process used during memory and story creation
         final newLocationName = locationData['location_name'] as String?;
-
-        // Update both state and controller
         state.locationController?.text = newLocationName ?? '';
 
         state = state.copyWith(
@@ -492,52 +465,39 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
           successMessage: 'Location updated',
         );
       } else {
-        // Handle null response (timeout or permission denied)
         state = state.copyWith(
           isFetchingLocation: false,
           showSuccessMessage: true,
-          successMessage:
-              'Could not get location. Check permissions or try again.',
+          successMessage: 'Could not get location. Check permissions or try again.',
         );
       }
 
-      // Reset success message after showing
       Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
     } catch (e) {
       print('❌ Error fetching location: $e');
-      // CRITICAL: Always clear loading state on error
       state = state.copyWith(
         isFetchingLocation: false,
         showSuccessMessage: true,
         successMessage: 'Failed to get location',
       );
 
-      // Reset success message
       Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
     }
   }
 
-  /// NEW: Update location manually
   void updateLocationManually(String locationText) {
     if (!state.isCreator) return;
-
-    state = state.copyWith(
-      locationName: locationText,
-    );
+    state = state.copyWith(locationName: locationText);
   }
 
   Future<bool> saveMemory() async {
@@ -551,19 +511,28 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         throw Exception('Database connection not available');
       }
 
-      // Update memory in database including location and category
-      await client.from('memories').update({
-        'title': state.titleController?.text ?? '',
-        'visibility': state.isPublic ? 'public' : 'private',
-        'location_name': state.locationController?.text ?? state.locationName,
-        'location_lat': state.locationLat,
-        'location_lng': state.locationLng,
-        // NEW: Update category
-        'category_id': state.selectedCategoryId,
-        // NEW: Update duration and end_time
-        'duration': state.selectedDuration,
-        'end_time': state.endTime?.toIso8601String(),
-      }).eq('id', state.memoryId!);
+      // ✅ Sealed: ONLY allow title, location, category
+      if (state.isSealed) {
+        await client.from('memories').update({
+          'title': state.titleController?.text ?? '',
+          'location_name': state.locationController?.text ?? state.locationName,
+          'location_lat': state.locationLat,
+          'location_lng': state.locationLng,
+          'category_id': state.selectedCategoryId,
+        }).eq('id', state.memoryId!);
+      } else {
+        // Open: existing behavior
+        await client.from('memories').update({
+          'title': state.titleController?.text ?? '',
+          'visibility': state.isPublic ? 'public' : 'private',
+          'location_name': state.locationController?.text ?? state.locationName,
+          'location_lat': state.locationLat,
+          'location_lng': state.locationLng,
+          'category_id': state.selectedCategoryId,
+          'duration': state.selectedDuration,
+          'end_time': state.endTime?.toIso8601String(),
+        }).eq('id', state.memoryId!);
+      }
 
       state = state.copyWith(
         isSaving: false,
@@ -571,17 +540,13 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Memory saved successfully',
       );
 
-      // Reset success message after showing
-      Future.delayed(Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
 
-      // Return success to trigger bottom sheet close and dashboard refresh
       return true;
     } catch (e) {
       print('❌ Error saving memory: $e');
@@ -598,8 +563,7 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     state = state.copyWith(isSharing: true);
 
     try {
-      // Simulate share operation
-      await Future.delayed(Duration(seconds: 1));
+      await Future.delayed(const Duration(seconds: 1));
 
       state = state.copyWith(
         isSharing: false,
@@ -607,13 +571,10 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Memory shared successfully',
       );
 
-      // Reset success message after showing
-      Future.delayed(Duration(milliseconds: 2000), () {
+      Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
     } catch (e) {
@@ -625,19 +586,17 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     }
   }
 
-  /// NEW: Show QR Code bottom sheet for memory sharing
   Future<void> showQRCodeBottomSheet(BuildContext context) async {
-    if (state.memoryId == null) return;
+    if (!_isValidUuid(state.memoryId)) return;
 
     try {
       final client = SupabaseService.instance.client;
       if (client == null) return;
 
-      // CRITICAL FIX: Fetch memory with explicit qr_code_url field to match timeline approach
       final memoryResponse = await client
           .from('memories')
           .select(
-              'id, title, invite_code, qr_code_url, created_at, location_name, contributor_count, category_id, memory_categories(name)')
+          'id, title, invite_code, qr_code_url, created_at, location_name, contributor_count, category_id, memory_categories(name)')
           .eq('id', state.memoryId!)
           .single();
 
@@ -648,25 +607,11 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
       final locationName = memoryResponse['location_name'] as String?;
       final contributorCount = memoryResponse['contributor_count'] as int? ?? 0;
       final categoryData =
-          memoryResponse['memory_categories'] as Map<String, dynamic>?;
+      memoryResponse['memory_categories'] as Map<String, dynamic>?;
       final categoryName = categoryData?['name'] as String? ?? 'Uncategorized';
 
-      // CRITICAL FIX: Enhanced debug logging matching timeline approach
-      print('🔍 QR MODAL DEBUG: Memory details fetched');
-      print('   - Memory ID: ${state.memoryId}');
-      print('   - Title: $memoryTitle');
-      print('   - Invite Code: $inviteCode');
-      print('   - QR Code URL: $qrCodeUrl');
-      print('   - QR Code URL Type: ${qrCodeUrl.runtimeType}');
-      print('   - Is QR URL null: ${qrCodeUrl == null}');
-      print('   - Is QR URL empty: ${qrCodeUrl == ""}');
+      if (inviteCode == null || memoryTitle == null) return;
 
-      if (inviteCode == null || memoryTitle == null) {
-        print('❌ Missing invite code or title');
-        return;
-      }
-
-      // Show QR code modal with memory details
       if (context.mounted) {
         showDialog(
           context: context,
@@ -684,7 +629,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Close button
                     Align(
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
@@ -697,8 +641,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
                       ),
                     ),
                     SizedBox(height: 8.h),
-
-                    // Memory Title
                     Text(
                       memoryTitle,
                       style: TextStyleHelper.instance.title20BoldPlusJakartaSans
@@ -711,8 +653,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     SizedBox(height: 20.h),
-
-                    // CRITICAL FIX: QR Code with proper null handling matching timeline approach
                     Container(
                       padding: EdgeInsets.all(16.h),
                       decoration: BoxDecoration(
@@ -721,86 +661,52 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
                       ),
                       child: (qrCodeUrl != null && qrCodeUrl.isNotEmpty)
                           ? Image.network(
-                              qrCodeUrl,
-                              width: 200.fSize,
-                              height: 200.fSize,
-                              fit: BoxFit.contain,
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                if (loadingProgress == null) {
-                                  print(
-                                      '✅ QR Code image loaded successfully in modal');
-                                  return child;
-                                }
-                                print(
-                                    '⏳ QR Code loading in modal: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
-                                return SizedBox(
-                                  width: 200.fSize,
-                                  height: 200.fSize,
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          appTheme.deep_purple_A100),
-                                    ),
-                                  ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                print(
-                                    '❌ QR Code image failed to load in modal: $error');
-                                print('❌ Stack trace: $stackTrace');
-                                return Container(
-                                  width: 200.fSize,
-                                  height: 200.fSize,
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.error_outline,
-                                        size: 48.h,
-                                        color: Colors.red.shade400,
-                                      ),
-                                      SizedBox(height: 8.h),
-                                      Text(
-                                        'QR Code\nUnavailable',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: appTheme.gray_900,
-                                          fontSize: 12.fSize,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            )
-                          : Container(
-                              width: 200.fSize,
-                              height: 200.fSize,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.qr_code,
-                                    size: 80.h,
-                                    color: appTheme.gray_900.withAlpha(128),
-                                  ),
-                                  SizedBox(height: 8.h),
-                                  Text(
-                                    'QR Code\nNot Generated',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: appTheme.gray_900,
-                                      fontSize: 12.fSize,
-                                    ),
-                                  ),
-                                ],
+                        qrCodeUrl,
+                        width: 200.fSize,
+                        height: 200.fSize,
+                        fit: BoxFit.contain,
+                        loadingBuilder:
+                            (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return SizedBox(
+                            width: 200.fSize,
+                            height: 200.fSize,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  appTheme.deep_purple_A100,
+                                ),
                               ),
                             ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return SizedBox(
+                            width: 200.fSize,
+                            height: 200.fSize,
+                            child: Center(
+                              child: Icon(
+                                Icons.error_outline,
+                                size: 48.h,
+                                color: Colors.red.shade400,
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                          : SizedBox(
+                        width: 200.fSize,
+                        height: 200.fSize,
+                        child: Center(
+                          child: Icon(
+                            Icons.qr_code,
+                            size: 80.h,
+                            color: appTheme.gray_900.withAlpha(128),
+                          ),
+                        ),
+                      ),
                     ),
                     SizedBox(height: 16.h),
-
-                    // Invite Code
                     Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 16.h,
@@ -825,8 +731,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
                       ),
                     ),
                     SizedBox(height: 20.h),
-
-                    // Memory Details Section
                     Container(
                       width: double.infinity,
                       padding: EdgeInsets.all(16.h),
@@ -841,32 +745,25 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Category
                           _buildDetailRow(
                             icon: Icons.category_outlined,
                             label: 'Category',
                             value: categoryName,
                           ),
                           SizedBox(height: 12.h),
-
-                          // Location
                           _buildDetailRow(
                             icon: Icons.location_on_outlined,
                             label: 'Location',
                             value: locationName ?? 'No location set',
                           ),
                           SizedBox(height: 12.h),
-
-                          // Members Count
                           _buildDetailRow(
                             icon: Icons.group_outlined,
                             label: 'Members',
                             value:
-                                '$contributorCount ${contributorCount == 1 ? 'member' : 'members'}',
+                            '$contributorCount ${contributorCount == 1 ? 'member' : 'members'}',
                           ),
                           SizedBox(height: 12.h),
-
-                          // Date Created
                           _buildDetailRow(
                             icon: Icons.calendar_today_outlined,
                             label: 'Created',
@@ -878,8 +775,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
                       ),
                     ),
                     SizedBox(height: 20.h),
-
-                    // Share Button
                     SizedBox(
                       width: double.infinity,
                       child: CustomButton(
@@ -906,18 +801,15 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Failed to load QR code',
       );
 
-      Future.delayed(Duration(milliseconds: 2000), () {
+      Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
     }
   }
 
-  /// Helper method to build detail rows
   Widget _buildDetailRow({
     required IconData icon,
     required String label,
@@ -926,11 +818,7 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(
-          icon,
-          color: appTheme.blue_gray_300,
-          size: 18.h,
-        ),
+        Icon(icon, color: appTheme.blue_gray_300, size: 18.h),
         SizedBox(width: 8.h),
         Expanded(
           child: Column(
@@ -939,9 +827,7 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
               Text(
                 label,
                 style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                    .copyWith(
-                  color: appTheme.blue_gray_300,
-                ),
+                    .copyWith(color: appTheme.blue_gray_300),
               ),
               SizedBox(height: 2.h),
               Text(
@@ -961,27 +847,19 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
     );
   }
 
-  /// Helper method to format date
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
 
-    if (difference.inDays == 0) {
-      return 'Today';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      return '${date.month}/${date.day}/${date.year}';
-    }
+    if (difference.inDays == 0) return 'Today';
+    if (difference.inDays == 1) return 'Yesterday';
+    if (difference.inDays < 7) return '${difference.inDays} days ago';
+    return '${date.month}/${date.day}/${date.year}';
   }
 
-  /// NEW: Share memory using native share dialog
   Future<void> shareMemoryNative() async {
-    if (state.memoryId == null || state.isSharing) return;
+    if (!_isValidUuid(state.memoryId) || state.isSharing) return;
 
-    // Set loading state to prevent double clicking
     state = state.copyWith(isSharing: true);
 
     try {
@@ -991,7 +869,6 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         return;
       }
 
-      // Fetch memory details for sharing
       final memoryResponse = await client
           .from('memories')
           .select('id, title, invite_code')
@@ -1006,10 +883,8 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         return;
       }
 
-      // Build join URL
       final joinUrl = 'https://capapp.co/join/memory/$inviteCode';
 
-      // Share using native share dialog
       await Share.share(
         'Join my Capsule memory: $memoryTitle\n\n$joinUrl',
         subject: 'Join $memoryTitle on Capsule',
@@ -1021,12 +896,10 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Share dialog opened',
       );
 
-      Future.delayed(Duration(milliseconds: 1500), () {
+      Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
     } catch (e) {
@@ -1037,12 +910,10 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         successMessage: 'Failed to share memory',
       );
 
-      Future.delayed(Duration(milliseconds: 2000), () {
+      Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          state = state.copyWith(
-            showSuccessMessage: false,
-            successMessage: null,
-          );
+          state =
+              state.copyWith(showSuccessMessage: false, successMessage: null);
         }
       });
     }

@@ -297,6 +297,75 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
     }
   }
 
+  // ============================
+// DELETE MEMORY (SEALED SCREEN)
+// ============================
+
+  bool _isValidUuid(String? value) {
+    if (value == null) return false;
+    final v = value.trim();
+    if (v.isEmpty) return false;
+    final uuidRegex = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    );
+    return uuidRegex.hasMatch(v);
+  }
+
+  /// HARD DELETE
+  /// Deletes: reactions (via story ids) -> stories -> memory_contributors -> memories
+  Future<void> deleteMemory(String memoryId) async {
+    final safeId = memoryId.trim();
+
+    if (!_isValidUuid(safeId)) {
+      throw Exception('Invalid memory id');
+    }
+
+    final client = SupabaseService.instance.client;
+    if (client == null) {
+      throw Exception('Database connection not available');
+    }
+
+    print('🗑️ SEALED deleteMemory: starting id=$safeId');
+
+    // 1) Get story ids for this memory
+    List<String> storyIds = [];
+    try {
+      final storiesResp =
+      await client.from('stories').select('id').eq('memory_id', safeId);
+
+      storyIds = (storiesResp as List)
+          .map((r) => r['id'] as String?)
+          .whereType<String>()
+          .toList();
+
+      print('🗑️ SEALED deleteMemory: found ${storyIds.length} stories');
+    } catch (e) {
+      print('⚠️ SEALED deleteMemory: fetch stories failed (continuing): $e');
+    }
+
+    // 2) Delete reactions for those stories (if reactions.story_id exists)
+    if (storyIds.isNotEmpty) {
+      try {
+        await client.from('reactions').delete().inFilter('story_id', storyIds);
+        print('🗑️ SEALED deleteMemory: reactions deleted');
+      } catch (e) {
+        print('⚠️ SEALED deleteMemory: reactions delete failed (continuing): $e');
+      }
+    }
+
+    // 3) Delete stories
+    await client.from('stories').delete().eq('memory_id', safeId);
+    print('🗑️ SEALED deleteMemory: stories deleted');
+
+    // 4) Delete contributors
+    await client.from('memory_contributors').delete().eq('memory_id', safeId);
+    print('🗑️ SEALED deleteMemory: contributors deleted');
+
+    // 5) Delete memory row
+    await client.from('memories').delete().eq('id', safeId);
+    print('✅ SEALED deleteMemory: memory deleted');
+  }
+
   void onAddContentTap() {
     state = state.copyWith(isLoading: true);
     state = state.copyWith(isLoading: false);

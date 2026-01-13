@@ -1,3 +1,5 @@
+// lib/presentation/memories_dashboard_screen/notifier/memories_dashboard_notifier.dart
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
@@ -12,7 +14,7 @@ part 'memories_dashboard_state.dart';
 
 final memoriesDashboardNotifier = StateNotifierProvider.autoDispose<
     MemoriesDashboardNotifier, MemoriesDashboardState>(
-  (ref) => MemoriesDashboardNotifier(),
+      (ref) => MemoriesDashboardNotifier(),
 );
 
 class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
@@ -26,8 +28,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
   MemoriesDashboardNotifier()
       : super(MemoriesDashboardState(
-          memoriesDashboardModel: MemoriesDashboardModel(),
-        )) {
+    memoriesDashboardModel: MemoriesDashboardModel(),
+  )) {
     _setupRealtimeSubscriptions();
   }
 
@@ -35,7 +37,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   Future<void> initialize() async {
     print('🔍 MEMORIES DEBUG: Initializing memories dashboard');
 
-    // Always set loading true at start
     _safeSetState(state.copyWith(isLoading: true));
 
     try {
@@ -48,7 +49,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         return;
       }
 
-      // Force refresh on first entry to avoid stale / stuck states
       await _loadFromCache(currentUser.id, forceRefresh: true);
 
       _safeSetState(
@@ -56,7 +56,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
           isLoading: false,
           selectedTabIndex: 0,
           selectedOwnership: 'all',
-          selectedState: 'all',
+          selectedState: 'all', // legacy if used elsewhere
+          showOpenMemories: true, // ✅ default: Open ON
         ),
       );
 
@@ -69,14 +70,13 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
   /// Centralized cache load -> updates dashboard model + counts
   Future<void> _loadFromCache(
-    String userId, {
-    bool forceRefresh = false,
-  }) async {
+      String userId, {
+        bool forceRefresh = false,
+      }) async {
     print(
         '🔍 MEMORIES DEBUG: Loading from cache (forceRefresh: $forceRefresh)');
 
     try {
-      // IMPORTANT: fetch stories+memories in parallel
       final results = await Future.wait([
         _cacheService.getStories(userId, forceRefresh: forceRefresh),
         _cacheService.getMemories(userId, forceRefresh: forceRefresh),
@@ -90,10 +90,10 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       final liveMemories = memories.where((m) => m.state == 'open').toList();
       final sealedMemories =
-          memories.where((m) => m.state == 'sealed').toList();
+      memories.where((m) => m.state == 'sealed').toList();
 
       final updatedModel =
-          (state.memoriesDashboardModel ?? MemoriesDashboardModel()).copyWith(
+      (state.memoriesDashboardModel ?? MemoriesDashboardModel()).copyWith(
         storyItems: stories,
         memoryItems: memories,
         liveMemoryItems: liveMemories,
@@ -106,7 +106,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
     } catch (e) {
       print('❌ MEMORIES DEBUG: Error loading from cache: $e');
-      // Do not throw; just leave previous data and stop loading
     }
   }
 
@@ -119,45 +118,61 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     _safeSetState(state.copyWith(selectedOwnership: ownership));
   }
 
+  /// Legacy filter (keep if other screens still use it)
   void updateStateFilter(String stateFilter) {
     print('🔍 MEMORIES DEBUG: Updating state filter to: $stateFilter');
     _safeSetState(state.copyWith(selectedState: stateFilter));
+  }
+
+  /// ✅ ONE toggle: Open ON/OFF (OFF = sealed)
+  void toggleOpenMemories() {
+    final next = !state.showOpenMemories;
+    print('🔍 MEMORIES DEBUG: Toggling open memories -> $next');
+    _safeSetState(state.copyWith(showOpenMemories: next));
+  }
+
+  bool _passesOpenFilter(MemoryItemModel m) {
+    return state.showOpenMemories ? (m.state == 'open') : (m.state == 'sealed');
   }
 
   List<MemoryItemModel> getFilteredMemories(String userId) {
     final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
     final ownership = state.selectedOwnership ?? 'all';
 
-    // Handle "All" tab - show all memories regardless of ownership
+    // 1) Open/Sealed toggle filter
+    final filteredByState = allMemories.where(_passesOpenFilter).toList();
+
+    // 2) Ownership filter
     if (ownership == 'all') {
-      return allMemories;
+      return filteredByState;
     }
 
-    // Filter by ownership (created or joined)
-    List<MemoryItemModel> filteredByOwnership;
     if (ownership == 'created') {
-      filteredByOwnership =
-          allMemories.where((m) => m.creatorId == userId).toList();
-    } else {
-      filteredByOwnership =
-          allMemories.where((m) => m.creatorId != userId).toList();
+      return filteredByState.where((m) => m.creatorId == userId).toList();
     }
 
-    return filteredByOwnership;
+    // joined
+    return filteredByState.where((m) => m.creatorId != userId).toList();
+  }
+
+  /// ✅ Used by UI for: All (x) / Created (y) / Joined (z)
+  Map<String, int> getOwnershipCounts({required String userId}) {
+    final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
+    final filteredByState = allMemories.where(_passesOpenFilter).toList();
+
+    final created = filteredByState.where((m) => m.creatorId == userId).length;
+    final joined = filteredByState.where((m) => m.creatorId != userId).length;
+
+    return {
+      'all': filteredByState.length,
+      'created': created,
+      'joined': joined,
+    };
   }
 
   int getOwnershipCount(String userId, String ownership) {
-    final allMemories = state.memoriesDashboardModel?.memoryItems ?? [];
-
-    // Handle "All" tab count
-    if (ownership == 'all') {
-      return allMemories.length;
-    }
-
-    if (ownership == 'created') {
-      return allMemories.where((m) => m.creatorId == userId).length;
-    }
-    return allMemories.where((m) => m.creatorId != userId).length;
+    final counts = getOwnershipCounts(userId: userId);
+    return counts[ownership] ?? 0;
   }
 
   Future<void> loadAllStories() async {
@@ -167,10 +182,10 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
       if (currentUser != null) {
         final stories =
-            await _cacheService.getStories(currentUser.id, forceRefresh: true);
+        await _cacheService.getStories(currentUser.id, forceRefresh: true);
         final updatedModel =
-            (state.memoriesDashboardModel ?? MemoriesDashboardModel())
-                .copyWith(storyItems: stories);
+        (state.memoriesDashboardModel ?? MemoriesDashboardModel())
+            .copyWith(storyItems: stories);
         _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
       }
 
@@ -186,7 +201,6 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   }
 
   /// Call this from RefreshIndicator
-  /// FIX: forceRefresh true + always stop loading
   Future<void> refreshMemories() async {
     print('🔄 MEMORIES DEBUG: Pull-to-refresh triggered');
 
@@ -199,10 +213,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         return;
       }
 
-      // Force refresh immediately
       await _loadFromCache(currentUser.id, forceRefresh: true);
 
-      // Optional: debounced background refresh to catch any concurrent realtime updates
       _cacheService.refreshMemoryCache(currentUser.id);
 
       _safeSetState(state.copyWith(isLoading: false, isSuccess: true));
@@ -231,49 +243,49 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       _storiesChannel = client
           .channel('memories_dashboard:stories')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'stories',
-            callback: _handleNewStory,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'stories',
+        callback: _handleNewStory,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'stories',
-            callback: _handleStoryUpdate,
-          )
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'stories',
+        callback: _handleStoryUpdate,
+      )
           .subscribe();
 
       _memoriesChannel = client
           .channel('memories_dashboard:memories')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleNewMemory,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleNewMemory,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleMemoryUpdate,
-          )
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleMemoryUpdate,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.delete,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleMemoryDelete,
-          )
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleMemoryDelete,
+      )
           .subscribe();
 
       _contributorsChannel = client
           .channel('memories_dashboard:contributors')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'memory_contributors',
-            callback: _handleContributorJoin,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'memory_contributors',
+        callback: _handleContributorJoin,
+      )
           .subscribe();
 
       print('✅ REALTIME: Subscriptions setup complete for memories dashboard');
@@ -323,7 +335,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       if (!isUserMemory && !isContributor) return;
 
       final resolvedThumbnailUrl =
-          StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
+      StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
 
       final profileResponse = await client
           .from('user_profiles')
@@ -349,8 +361,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final updatedStories = [newStoryItem, ...currentStories];
 
       final updatedModel =
-          (state.memoriesDashboardModel ?? MemoriesDashboardModel())
-              .copyWith(storyItems: updatedStories.cast<StoryItemModel>());
+      (state.memoriesDashboardModel ?? MemoriesDashboardModel())
+          .copyWith(storyItems: updatedStories.cast<StoryItemModel>());
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
     } catch (e) {
@@ -474,12 +486,12 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final updatedMemories = [newMemoryItem, ...currentMemories];
 
       final liveMemories =
-          updatedMemories.where((m) => m.state == 'open').toList();
+      updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
-          updatedMemories.where((m) => m.state == 'sealed').toList();
+      updatedMemories.where((m) => m.state == 'sealed').toList();
 
       final updatedModel =
-          (state.memoriesDashboardModel ?? MemoriesDashboardModel()).copyWith(
+      (state.memoriesDashboardModel ?? MemoriesDashboardModel()).copyWith(
         memoryItems: updatedMemories.cast<MemoryItemModel>(),
         liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
         sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
@@ -577,12 +589,12 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final updatedMemories = [newMemoryItem, ...currentMemories];
 
       final liveMemories =
-          updatedMemories.where((m) => m.state == 'open').toList();
+      updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
-          updatedMemories.where((m) => m.state == 'sealed').toList();
+      updatedMemories.where((m) => m.state == 'sealed').toList();
 
       final updatedModel =
-          (state.memoriesDashboardModel ?? MemoriesDashboardModel()).copyWith(
+      (state.memoriesDashboardModel ?? MemoriesDashboardModel()).copyWith(
         memoryItems: updatedMemories.cast<MemoryItemModel>(),
         liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
         sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
@@ -622,8 +634,19 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       if (!found) return;
 
+      // ✅ keep split lists + counts correct
+      final liveMemories =
+      updatedMemories.where((m) => m.state == 'open').toList();
+      final sealedMemories =
+      updatedMemories.where((m) => m.state == 'sealed').toList();
+
       final updatedModel = currentModel.copyWith(
         memoryItems: updatedMemories.cast<MemoryItemModel>(),
+        liveMemoryItems: liveMemories.cast<MemoryItemModel>(),
+        sealedMemoryItems: sealedMemories.cast<MemoryItemModel>(),
+        allCount: updatedMemories.length,
+        liveCount: liveMemories.length,
+        sealedCount: sealedMemories.length,
       );
 
       _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
@@ -644,12 +667,12 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       if (memoryItems == null || memoryItems.isEmpty) return;
 
       final updatedMemories =
-          memoryItems.where((memory) => memory.id != memoryId).toList();
+      memoryItems.where((memory) => memory.id != memoryId).toList();
 
       final liveMemories =
-          updatedMemories.where((m) => m.state == 'open').toList();
+      updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
-          updatedMemories.where((m) => m.state == 'sealed').toList();
+      updatedMemories.where((m) => m.state == 'sealed').toList();
 
       final updatedModel = currentModel.copyWith(
         memoryItems: updatedMemories.cast<MemoryItemModel>(),

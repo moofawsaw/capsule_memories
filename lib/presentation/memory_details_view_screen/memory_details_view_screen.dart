@@ -1,3 +1,5 @@
+// lib/presentation/memory_details_view_screen/memory_details_view_screen.dart
+
 import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
@@ -6,6 +8,7 @@ import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/timeline_widget.dart';
 import '../add_memory_upload_screen/add_memory_upload_screen.dart';
+import '../memory_details_screen/memory_details_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import 'notifier/memory_details_view_notifier.dart';
 import '../event_timeline_view_screen/widgets/timeline_story_widget.dart';
@@ -76,7 +79,7 @@ class _SealedMemoryDetailsSkeleton extends StatelessWidget {
         children: [
           SizedBox(height: 12.h),
 
-          // Header skeleton (approx CustomEventCard)
+          // Header skeleton
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.h),
             child: Container(
@@ -150,7 +153,7 @@ class _SealedMemoryDetailsSkeleton extends StatelessWidget {
 
           SizedBox(height: 16.h),
 
-          // Timeline skeleton block
+          // Timeline skeleton
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.h),
             child: Container(
@@ -164,7 +167,7 @@ class _SealedMemoryDetailsSkeleton extends StatelessWidget {
 
           SizedBox(height: 18.h),
 
-          // "Stories" title skeleton
+          // Stories title skeleton
           Padding(
             padding: EdgeInsets.only(left: 20.h),
             child: Container(
@@ -235,8 +238,52 @@ class _SealedMemoryDetailsSkeleton extends StatelessWidget {
   }
 }
 
+/// Inline circle icon button (same layout concept as Open timeline buttons)
+class _CircleIconButton extends StatelessWidget {
+  const _CircleIconButton({
+    required this.icon,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = isDestructive ? appTheme.red_500 : appTheme.gray_50;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24.h),
+      child: Container(
+        height: 48.h,
+        width: 48.h,
+        decoration: BoxDecoration(
+          // color: appTheme.gray_900_03,
+          borderRadius: BorderRadius.circular(24.h),
+        ),
+        child: Center(
+          child: Icon(icon, color: fg, size: 22.h),
+        ),
+      ),
+    );
+  }
+}
+
 class MemoryDetailsViewScreenState
     extends ConsumerState<MemoryDetailsViewScreen> {
+  bool _isValidUuid(String? value) {
+    if (value == null) return false;
+    final v = value.trim();
+    if (v.isEmpty) return false;
+    final uuidRegex = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    );
+    return uuidRegex.hasMatch(v);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -256,7 +303,8 @@ class MemoryDetailsViewScreenState
         print('✅ SEALED SCREEN: Converted Map to MemoryNavArgs');
       } else {
         print(
-            '❌ SEALED SCREEN: Invalid argument type - expected MemoryNavArgs or Map');
+          '❌ SEALED SCREEN: Invalid argument type - expected MemoryNavArgs or Map',
+        );
       }
 
       if (navArgs == null || !navArgs.isValid) {
@@ -278,66 +326,52 @@ class MemoryDetailsViewScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(memoryDetailsViewNotifier);
+
     print(
-        '🧪 SEALED UI: isLoading=${state.isLoading} error=${state.errorMessage}');
-
-    // ✅ Trigger options sheet when notifier flips the flag.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final shouldOpen = state.showEventOptions == true;
-
-      if (!shouldOpen) return;
-
-      // Reset FIRST so rebuilds don't re-open
-      ref.read(memoryDetailsViewNotifier.notifier).hideEventOptions();
-
-      // If you want owners only:
-      if (state.isOwner != true) {
-        print('⚠️ SEALED SCREEN: Options requested but user is not owner');
-        return;
-      }
-
-      _showMemoryOptionsSheet(context);
-    });
+      '🧪 SEALED UI: isLoading=${state.isLoading} error=${state.errorMessage}',
+    );
 
     if (state.errorMessage != null) {
-      return Container(
-        color: appTheme.gray_900_02,
-        child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24.h),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64.h,
-                  color: appTheme.red_500,
-                ),
-                SizedBox(height: 16.h),
-                Text(
-                  'Failed to Load Memory',
-                  style: TextStyleHelper.instance.body16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 8.h),
-                Text(
-                  state.errorMessage!,
-                  style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                      .copyWith(color: appTheme.gray_300),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 24.h),
-                CustomButton(
-                  text: 'Go Back',
-                  width: double.infinity,
-                  buttonStyle: CustomButtonStyle.fillPrimary,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  onPressed: () {
-                    NavigatorService.goBack();
-                  },
-                ),
-              ],
+      return SafeArea(
+        child: Scaffold(
+          backgroundColor: appTheme.gray_900_02,
+          body: Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.h),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64.h,
+                    color: appTheme.red_500,
+                  ),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'Failed to Load Memory',
+                    style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    state.errorMessage!,
+                    style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                        .copyWith(color: appTheme.gray_300),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 24.h),
+                  CustomButton(
+                    text: 'Go Back',
+                    width: double.infinity,
+                    buttonStyle: CustomButtonStyle.fillPrimary,
+                    buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                    onPressed: () {
+                      NavigatorService.goBack();
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -346,27 +380,30 @@ class MemoryDetailsViewScreenState
 
     final hasSnapshot = state.memoryDetailsViewModel != null;
 
-    // ✅ Only show a full-screen loader/skeleton if we have nothing to render yet
     if ((state.isLoading ?? false) && !hasSnapshot) {
-      return Container(
-        color: appTheme.gray_900_02,
-        child: _SealedMemoryDetailsSkeleton(),
+      return SafeArea(
+        child: Scaffold(
+          backgroundColor: appTheme.gray_900_02,
+          body: const _SealedMemoryDetailsSkeleton(),
+        ),
       );
     }
 
-    return Container(
-      color: appTheme.gray_900_02,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          children: [
-            _buildEventHeader(context),
-            _buildTimelineSection(context),
-            _buildStoriesSection(context),
-            SizedBox(height: 18.h),
-            _buildActionButtons(context),
-            SizedBox(height: 20.h),
-          ],
+    return SafeArea(
+      child: Scaffold(
+        backgroundColor: appTheme.gray_900_02,
+        body: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildEventHeader(context),
+              _buildTimelineSection(context),
+              _buildStoriesSection(context),
+              SizedBox(height: 18.h),
+              _buildActionButtons(context),
+              SizedBox(height: 20.h),
+            ],
+          ),
         ),
       ),
     );
@@ -382,14 +419,14 @@ class MemoryDetailsViewScreenState
           eventDate: state.memoryDetailsViewModel?.eventDate,
           eventLocation: state.memoryDetailsViewModel?.eventLocation,
           isPrivate: state.memoryDetailsViewModel?.isPrivate,
-          iconButtonImagePath:
-          state.memoryDetailsViewModel?.categoryIcon ?? ImageConstant.imgFrame13,
+          iconButtonImagePath: state.memoryDetailsViewModel?.categoryIcon ??
+              ImageConstant.imgFrame13,
           participantImages: state.memoryDetailsViewModel?.participantImages,
           onBackTap: () {
             NavigatorService.goBack();
           },
           onIconButtonTap: () {
-            ref.read(memoryDetailsViewNotifier.notifier).onEventOptionsTap();
+            print('ℹ️ SEALED: Header icon tapped (inline controls used)');
           },
           onAvatarTap: () {
             onTapAvatars(context);
@@ -434,12 +471,9 @@ class MemoryDetailsViewScreenState
 
         final timelineDetail = state.memoryDetailsViewModel?.timelineDetail;
         final List<TimelineStoryItem> timelineStories =
-            state.memoryDetailsViewModel?.timelineDetail?.timelineStories ??
-                <TimelineStoryItem>[];
+            timelineDetail?.timelineStories ?? <TimelineStoryItem>[];
 
-        if (timelineDetail == null || timelineStories.isEmpty) {
-          return const SizedBox.shrink();
-        }
+        if (timelineDetail == null) return const SizedBox.shrink();
 
         final memoryStartTime = timelineDetail.memoryStartTime;
         final memoryEndTime = timelineDetail.memoryEndTime;
@@ -447,6 +481,8 @@ class MemoryDetailsViewScreenState
         if (memoryStartTime == null || memoryEndTime == null) {
           return const SizedBox.shrink();
         }
+
+        final isOwner = state.isOwner == true;
 
         return Container(
           margin: EdgeInsets.only(top: 6.h),
@@ -479,6 +515,31 @@ class MemoryDetailsViewScreenState
                   ],
                 ),
               ),
+
+              // INLINE BUTTONS
+              Align(
+                alignment: Alignment.topRight,
+                child: Container(
+                  margin: EdgeInsets.only(right: 16.h),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isOwner)
+                        _CircleIconButton(
+                          icon: Icons.delete_outline,
+                          isDestructive: true,
+                          onTap: () => _onTapDeleteMemory(context),
+                        ),
+                      if (isOwner) SizedBox(width: 8.h),
+                      if (isOwner)
+                        _CircleIconButton(
+                          icon: Icons.edit,
+                          onTap: () => _onTapEditMemory(context),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -492,25 +553,7 @@ class MemoryDetailsViewScreenState
         final state = ref.watch(memoryDetailsViewNotifier);
 
         if (state.isLoading == true) {
-          return SizedBox(
-            height: 120.h,
-            child: ListView.separated(
-              padding: EdgeInsets.only(left: 20.h, right: 20.h),
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 4,
-              separatorBuilder: (_, __) => SizedBox(width: 12.h),
-              itemBuilder: (_, __) {
-                return Container(
-                  width: 110.h,
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_900_03,
-                    borderRadius: BorderRadius.circular(14.h),
-                  ),
-                );
-              },
-            ),
-          );
+          return const _StoriesSkeletonRow();
         }
 
         final dynamic storyItemsDynamic =
@@ -695,129 +738,148 @@ class MemoryDetailsViewScreenState
     }
   }
 
-  void _showMemoryOptionsSheet(BuildContext context) {
+  // ============================
+  // EDIT + DELETE (Open parity)
+  // ============================
+
+  void _onTapEditMemory(BuildContext context) {
     final state = ref.read(memoryDetailsViewNotifier);
     final memoryId = state.memoryDetailsViewModel?.memoryId;
 
-    if (memoryId == null || memoryId.isEmpty) {
-      print('❌ SEALED SCREEN: Cannot open options (missing memoryId)');
+    if (!_isValidUuid(memoryId)) {
+      print('❌ SEALED: Edit blocked (invalid memoryId="$memoryId")');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Invalid memory id'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
       return;
     }
 
+    final safeId = memoryId!.trim();
+
+    print('🔍 SEALED: Opening Memory Details bottom sheet for editing');
+    print('   - Memory ID: $safeId');
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) {
-        return Container(
-          padding: EdgeInsets.fromLTRB(16.h, 14.h, 16.h, 20.h),
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_02,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20.h)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 44.h,
-                  height: 4.h,
-                  decoration: BoxDecoration(
-                    color: appTheme.blue_gray_900,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-                SizedBox(height: 14.h),
-                _OptionsRow(
-                  title: 'Edit memory',
-                  icon: Icons.edit,
-                  onTap: () {
-                    Navigator.pop(context);
-                    NavigatorService.pushNamed(
-                      AppRoutes.appBsDetails,
-                      arguments: memoryId,
-                    );
-                  },
-                ),
-                SizedBox(height: 10.h),
-                _OptionsRow(
-                  title: 'Members',
-                  icon: Icons.group,
-                  onTap: () {
-                    Navigator.pop(context);
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => MemoryMembersScreen(
-                        memoryId: memoryId,
-                        memoryTitle: state.memoryDetailsViewModel?.eventTitle,
-                      ),
-                    );
-                  },
-                ),
-                SizedBox(height: 10.h),
-                _OptionsRow(
-                  title: 'Delete memory',
-                  icon: Icons.delete_outline,
-                  isDestructive: true,
-                  onTap: () {
-                    Navigator.pop(context);
-                    print('🗑️ TODO: Delete memory: $memoryId');
-                  },
-                ),
-                SizedBox(height: 12.h),
-              ],
-            ),
-          ),
-        );
-      },
+      backgroundColor: Colors.transparent,
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.9,
+        child: MemoryDetailsScreen(memoryId: safeId),
+      ),
     );
   }
-}
 
-class _OptionsRow extends StatelessWidget {
-  const _OptionsRow({
-    required this.title,
-    required this.icon,
-    required this.onTap,
-    this.isDestructive = false,
-  });
+  void _onTapDeleteMemory(BuildContext context) {
+    final state = ref.read(memoryDetailsViewNotifier);
+    final memoryId = state.memoryDetailsViewModel?.memoryId;
+    final memoryTitle = state.memoryDetailsViewModel?.eventTitle;
 
-  final String title;
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool isDestructive;
+    if (!_isValidUuid(memoryId)) {
+      print('❌ SEALED: Delete blocked (invalid memoryId="$memoryId")');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Invalid memory id'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    final Color fg = isDestructive ? appTheme.red_500 : appTheme.gray_50;
+    final safeId = memoryId!.trim();
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(12.h),
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 12.h),
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_03,
-          borderRadius: BorderRadius.circular(12.h),
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: appTheme.gray_900_01,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.h),
         ),
-        child: Row(
-          children: [
-            Icon(icon, color: fg, size: 20.h),
-            SizedBox(width: 10.h),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                    .copyWith(color: fg),
-              ),
+        title: Text(
+          'Delete Memory?',
+          style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${memoryTitle ?? 'this memory'}"? This action cannot be undone.',
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Cancel',
+              style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
             ),
-            Icon(Icons.chevron_right, color: appTheme.blue_gray_300, size: 20.h),
-          ],
-        ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => Center(
+                  child: CircularProgressIndicator(
+                    color: appTheme.deep_purple_A100,
+                  ),
+                ),
+              );
+
+              try {
+                await ref
+                    .read(memoryDetailsViewNotifier.notifier)
+                    .deleteMemory(safeId);
+
+                if (context.mounted) Navigator.pop(context);
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Memory deleted successfully'),
+                      backgroundColor: appTheme.deep_purple_A100,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+
+                await Future.delayed(const Duration(milliseconds: 300));
+
+                if (context.mounted) {
+                  NavigatorService.popAndPushNamed(AppRoutes.appMemories);
+                }
+              } catch (e) {
+                if (context.mounted) Navigator.pop(context);
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete memory: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              }
+            },
+            child: Text(
+              'Delete',
+              style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                  .copyWith(color: Colors.red),
+            ),
+          ),
+        ],
       ),
     );
   }

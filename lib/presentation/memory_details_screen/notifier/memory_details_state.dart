@@ -7,33 +7,44 @@ class MemoryDetailsState {
   final TextEditingController? inviteLinkController;
   final TextEditingController? searchController;
   final TextEditingController? locationController;
+
   final bool isLoading;
   final bool isSaving;
   final bool isSharing;
   final bool isCreator;
   final bool isPublic;
+
   final bool isFetchingLocation;
   final bool isLoadingFriends;
   final bool isInviting;
   final bool isLoadingCategories;
+
   final String? memoryId;
   final String? errorMessage;
+
   final bool? showSuccessMessage;
   final String? successMessage;
+
   final String? locationName;
   final double? locationLat;
   final double? locationLng;
+
   final String? selectedCategoryId;
   final String? selectedCategoryName;
+
   final List<Map<String, dynamic>> categories;
   final List<Map<String, dynamic>> friendsList;
   final List<Map<String, dynamic>> filteredFriendsList;
   final Set<String> memberUserIds;
+
   final String? selectedDuration; // '12_hours', '24_hours', '3_days'
   final DateTime? startTime;
   final DateTime? endTime;
 
-  MemoryDetailsState({
+  /// ✅ NEW: memory state from DB ('open' / 'sealed')
+  final String? memoryState;
+
+  const MemoryDetailsState({
     this.memoryDetailsModel,
     this.titleController,
     this.inviteLinkController,
@@ -64,7 +75,11 @@ class MemoryDetailsState {
     this.selectedDuration,
     this.startTime,
     this.endTime,
+    this.memoryState,
   });
+
+  /// ✅ Computed: locked if sealed
+  bool get isSealed => (memoryState ?? '').toLowerCase().trim() == 'sealed';
 
   MemoryDetailsState copyWith({
     MemoryDetailsModel? memoryDetailsModel,
@@ -97,6 +112,7 @@ class MemoryDetailsState {
     String? selectedDuration,
     DateTime? startTime,
     DateTime? endTime,
+    String? memoryState,
   }) {
     return MemoryDetailsState(
       memoryDetailsModel: memoryDetailsModel ?? this.memoryDetailsModel,
@@ -129,6 +145,7 @@ class MemoryDetailsState {
       selectedDuration: selectedDuration ?? this.selectedDuration,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+      memoryState: memoryState ?? this.memoryState,
     );
   }
 }
