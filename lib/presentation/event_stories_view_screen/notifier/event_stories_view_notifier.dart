@@ -1,6 +1,25 @@
-import '../models/event_stories_view_model.dart';
 import '../../../services/feed_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class EventStoriesViewModel {
+  final bool isLoading;
+  final String? errorMessage;
+
+  EventStoriesViewModel({
+    required this.isLoading,
+    this.errorMessage,
+  });
+
+  EventStoriesViewModel copyWith({
+    bool? isLoading,
+    String? errorMessage,
+  }) {
+    return EventStoriesViewModel(
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage ?? this.errorMessage,
+    );
+  }
+}
 
 final eventStoriesViewNotifier = StateNotifierProvider.autoDispose<
     EventStoriesViewNotifier, EventStoriesViewModel>(

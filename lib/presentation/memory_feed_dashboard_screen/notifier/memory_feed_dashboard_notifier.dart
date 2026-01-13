@@ -457,6 +457,25 @@ class MemoryFeedDashboardNotifier
       final client = SupabaseService.instance.client;
       if (client == null) return;
 
+      // ✅ CRITICAL FIX: Check memory visibility BEFORE proceeding with real-time update
+      final memoryVisibilityCheck = await client
+          .from('memories')
+          .select('visibility')
+          .eq('id', memoryId)
+          .single();
+
+      if (_isDisposed) return;
+
+      final memoryVisibility =
+          _normVisibility(memoryVisibilityCheck['visibility']);
+
+      // ⛔ STOP: If memory is private, do NOT add story to "Happening Now" feed
+      if (memoryVisibility != 'public') {
+        print(
+            '🔒 REALTIME: Skipped private memory story from appearing in real-time feed (memory_id: $memoryId, visibility: $memoryVisibility)');
+        return;
+      }
+
       final resolvedThumbnailUrl =
           StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
 
@@ -1367,11 +1386,11 @@ class MemoryFeedDashboardNotifier
   String _formatDate(DateTime dateTime) {
     final now = DateTime.now();
     final difference = now.difference(dateTime);
-    
+
     if (difference.inDays == 0) return 'Today';
     if (difference.inDays == 1) return 'Yesterday';
     if (difference.inDays < 7) return '${difference.inDays} days ago';
-    
+
     return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
   }
 
@@ -1379,12 +1398,14 @@ class MemoryFeedDashboardNotifier
   String _formatExpirationTime(DateTime expiresAt) {
     final now = DateTime.now();
     final difference = expiresAt.difference(now);
-    
+
     if (difference.isNegative) return 'Expired';
-    if (difference.inMinutes < 60) return 'Expires in ${difference.inMinutes} mins';
-    if (difference.inHours < 24) return 'Expires in ${difference.inHours} hours';
+    if (difference.inMinutes < 60)
+      return 'Expires in ${difference.inMinutes} mins';
+    if (difference.inHours < 24)
+      return 'Expires in ${difference.inHours} hours';
     if (difference.inDays == 1) return 'Expires tomorrow';
-    
+
     return 'Expires in ${difference.inDays} days';
   }
 
