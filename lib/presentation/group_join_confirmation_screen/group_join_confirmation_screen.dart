@@ -137,7 +137,6 @@ class GroupJoinConfirmationScreenState
                     state.errorMessage!,
                     style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                         .copyWith(color: appTheme.gray_50),
-                    textAlign: TextAlign.center,
                   ),
                   SizedBox(height: 24.h),
                   CustomButton(
@@ -174,7 +173,6 @@ class GroupJoinConfirmationScreenState
   Widget _buildConfirmationHeader(BuildContext context) {
     return CustomHeaderRow(
       title: "Memory Invitation",
-      textAlignment: TextAlign.left,
       margin: EdgeInsets.symmetric(horizontal: 12.h, vertical: 18.h),
       onIconTap: () {
         onTapDecline(context);

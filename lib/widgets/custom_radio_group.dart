@@ -53,7 +53,7 @@ class CustomRadioGroup<T> extends StatelessWidget {
 
         return Column(
           children: [
-            if (!isFirst) SizedBox(height: spacing ?? 14.h),
+            if (!isFirst) SizedBox(height: spacing ?? 0.h),
             RadioListTile<T>(
               value: option.value,
               groupValue: selectedValue,

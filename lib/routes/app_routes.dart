@@ -172,8 +172,6 @@ class AppRoutes {
         return MemoryDetailsViewScreen();
       case appReels:
         return VideoCallInterfaceScreen();
-      case appReport:
-        return ReportStoryScreen();
       case appStickers:
         return VibeSelectionScreen();
       case appJoin:

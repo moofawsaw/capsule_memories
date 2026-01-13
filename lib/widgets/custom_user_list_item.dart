@@ -1,16 +1,11 @@
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
-/** 
+/**
  * CustomUserListItem - A reusable user profile list item component
- * 
- * This component displays a user profile with circular image and name text in a horizontal row layout.
- * Features consistent styling, responsive design, and optional tap interaction.
- * 
- * @param imagePath - Path to the user's profile image
- * @param name - Display name of the user
- * @param onTap - Optional callback function when the item is tapped
- * @param margin - Custom margin for the entire component
+ *
+ * Displays a circular user avatar and name in a horizontal row.
+ * Avatar size is configurable while preserving backward compatibility.
  */
 class CustomUserListItem extends StatelessWidget {
   CustomUserListItem({
@@ -19,6 +14,7 @@ class CustomUserListItem extends StatelessWidget {
     required this.name,
     this.onTap,
     this.margin,
+    this.avatarSize = 52, // default keeps existing behavior
   }) : super(key: key);
 
   /// Path to the user's profile image
@@ -27,11 +23,14 @@ class CustomUserListItem extends StatelessWidget {
   /// Display name of the user
   final String name;
 
-  /// Optional callback function when the item is tapped
+  /// Optional callback when the item is tapped
   final VoidCallback? onTap;
 
   /// Custom margin for the entire component
   final EdgeInsetsGeometry? margin;
+
+  /// Avatar size in logical pixels
+  final double avatarSize;
 
   @override
   Widget build(BuildContext context) {
@@ -58,17 +57,17 @@ class CustomUserListItem extends StatelessWidget {
   /// Builds the circular profile image
   Widget _buildProfileImage() {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(26.h),
+      borderRadius: BorderRadius.circular(avatarSize.h / 2),
       child: CustomImageView(
         imagePath: imagePath,
-        height: 52.h,
-        width: 52.h,
+        height: avatarSize.h,
+        width: avatarSize.h,
         fit: BoxFit.cover,
       ),
     );
   }
 
-  /// Builds the name text with proper styling
+  /// Builds the name text
   Widget _buildNameText() {
     return Expanded(
       child: Text(

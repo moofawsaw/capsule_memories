@@ -62,7 +62,6 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     return CustomHeaderRow(
       title: 'Feature Request',
       onIconTap: () => onTapCloseButton(context),
-      textAlignment: TextAlign.center,
       margin: EdgeInsets.only(top: 10.h, right: 12.h, left: 16.h),
     );
   }

@@ -1,3 +1,4 @@
+// lib/presentation/event_stories_view_screen/event_stories_view_screen.dart
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -18,6 +19,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/story_reactions.dart';
+import '../report_story_screen/report_story_screen.dart';
 
 /// Enum for different haptic feedback types
 enum HapticFeedbackType {
@@ -81,6 +83,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   // Prefetching state
   bool _isPrefetching = false;
 
+  // ✅ Prevent tap-through when any modal/sheet is open
+  bool _isAnyModalOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -104,7 +109,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     _timerController?.addStatusListener((status) {
       if (status == AnimationStatus.completed &&
           !_isPaused &&
-          !_isTransitioning) {
+          !_isTransitioning &&
+          !_isAnyModalOpen) {
         _triggerHapticFeedback(HapticFeedbackType.light);
         _goToNextStory();
       }
@@ -369,7 +375,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       }
 
       // DUAL-SLOT CROSSFADE TRANSITION
-      // Move prefetched data to next slot if not already there
       _nextStoryData = storyData;
       _nextVideoController = videoController;
       _isNextVideoInitialized = isVideoInitialized;
@@ -411,7 +416,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     try {
       _isTransitioning = true;
 
-      // Reset crossfade controller
       _crossfadeController?.reset();
 
       setState(() {
@@ -419,15 +423,12 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _initialStoryId = storyId;
       });
 
-      // Start crossfade animation (120ms)
       await _crossfadeController?.forward();
 
-      // After fade completes, swap slots and dispose old media
       await _swapMediaSlots();
 
       _isTransitioning = false;
 
-      // Mark as viewed
       await _markStoryAsViewed();
 
       // Start playback on new current story
@@ -447,7 +448,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _timerController?.forward();
       }
 
-      // Prefetch next story
       _prefetchNextStory(newIndex);
 
       print('✅ DEBUG: Crossfade transition completed');
@@ -459,18 +459,15 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
   /// Swaps next media slot to current and disposes old current
   Future<void> _swapMediaSlots() async {
-    // Dispose old current video controller
     if (_currentVideoController != null) {
       await _currentVideoController!.pause();
       await _currentVideoController!.dispose();
     }
 
-    // Move next to current
     _currentStoryData = _nextStoryData;
     _currentVideoController = _nextVideoController;
     _isCurrentVideoInitialized = _isNextVideoInitialized;
 
-    // Clear next slot
     _nextStoryData = null;
     _nextVideoController = null;
     _isNextVideoInitialized = false;
@@ -494,7 +491,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       print(
           '🔄 DEBUG: Prefetching next story at index $nextIndex (ID: $nextStoryId)');
 
-      // Fetch next story data
       final nextStoryData = await _feedService.fetchStoryDetails(nextStoryId);
 
       if (nextStoryData == null) {
@@ -509,7 +505,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
         print('📹 DEBUG: Prefetching video controller');
         final prefetchController =
-            VideoPlayerController.networkUrl(Uri.parse(mediaUrl));
+        VideoPlayerController.networkUrl(Uri.parse(mediaUrl));
         await prefetchController.initialize();
         prefetchController.setLooping(false);
 
@@ -541,7 +537,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       final client = SupabaseService.instance.client;
       if (client == null) return;
 
-      // ENHANCED: Join with memories table to get full memory context for timeline navigation
       final response = await client.from('memories').select('''
             id, 
             name,
@@ -558,19 +553,17 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       setState(() {
         _memoryId = memoryId;
         _memoryCategoryName = categoryData?['name'] as String?;
-        // CRITICAL FIX: Use StorageUtils to generate database icon URL
         _memoryCategoryIcon = iconName != null
             ? StorageUtils.resolveMemoryCategoryIconUrl(iconName)
             : null;
       });
 
-      // CRITICAL: Store memory data in _storyData for category badge navigation
       if (_currentStoryData != null) {
         _currentStoryData!['memory_title'] = response['name'] as String?;
         _currentStoryData!['memory_date'] = response['created_at'] as String?;
         _currentStoryData!['memory_location'] = response['location'] as String?;
         _currentStoryData!['memory_visibility'] =
-            response['visibility'] as String?;
+        response['visibility'] as String?;
       }
 
       print('✅ DEBUG: Fetched memory category - Name: $_memoryCategoryName');
@@ -579,7 +572,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       print('   - Memory Title: ${response['name']}');
     } catch (e) {
       print('⚠️ WARNING: Failed to fetch memory category: $e');
-      // Don't block story loading if category fetch fails
     }
   }
 
@@ -596,18 +588,15 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _currentVideoController = controller;
         _isCurrentVideoInitialized = true;
 
-        // Set timer duration
         final videoDuration = controller.value.duration;
         _timerController?.duration = videoDuration;
 
-        // Start playback
         controller.play();
         _timerController?.forward();
 
-        // Listen for completion
         controller.addListener(() {
           if (controller.value.position >= controller.value.duration) {
-            if (!_isPaused && !_isTransitioning) {
+            if (!_isPaused && !_isTransitioning && !_isAnyModalOpen) {
               _goToNextStory();
             }
           }
@@ -630,8 +619,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   }
 
   void _goToNextStory() {
+    if (_isAnyModalOpen) return;
+
     if (_currentIndex < _storyIds.length - 1) {
-      // Trigger vibration on swipe/navigation
       _triggerHapticFeedback(HapticFeedbackType.medium);
 
       _pageController?.nextPage(
@@ -639,8 +629,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         curve: Curves.easeInOut,
       );
     } else {
-      // Last story reached - stop timer and keep viewer open
-      // User must manually close via back button
       _timerController?.stop();
       _currentVideoController?.pause();
       setState(() {
@@ -650,8 +638,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   }
 
   void _goToPreviousStory() {
+    if (_isAnyModalOpen) return;
+
     if (_currentIndex > 0) {
-      // Trigger vibration on swipe/navigation
       _triggerHapticFeedback(HapticFeedbackType.medium);
 
       _pageController?.previousPage(
@@ -670,13 +659,17 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _currentVideoController?.pause();
       } else {
         _timerController?.forward();
-        _currentVideoController?.play();
+        final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+        if (mediaType == 'video' &&
+            _currentVideoController != null &&
+            _isCurrentVideoInitialized) {
+          _currentVideoController?.play();
+        }
       }
     });
   }
 
   void _toggleMute() {
-    // Trigger vibration on volume toggle
     _triggerHapticFeedback(HapticFeedbackType.selection);
 
     setState(() {
@@ -693,20 +686,16 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
       switch (type) {
         case HapticFeedbackType.light:
-          // Light vibration for subtle feedback (progress transitions)
           await Vibration.vibrate(duration: 10);
           break;
         case HapticFeedbackType.medium:
-          // Medium vibration for navigation (swipe gestures)
           await Vibration.vibrate(duration: 20);
           break;
         case HapticFeedbackType.selection:
-          // Selection vibration for toggles (volume button)
           await Vibration.vibrate(duration: 15);
           break;
       }
     } catch (e) {
-      // Silently fail if vibration is not supported or permission denied
       print('Vibration error: $e');
     }
   }
@@ -725,7 +714,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       final memoryId = _currentStoryData?['memory_id'] as String?;
       final caption = _currentStoryData?['caption'] as String? ?? '';
 
-      // Fetch memory name
       String memoryName = 'Memory';
       if (memoryId != null) {
         try {
@@ -742,7 +730,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         }
       }
 
-      // Prepare share text
       final shareText = '''
 Check out this story by $userName from "$memoryName"!
 
@@ -751,10 +738,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 #CapsuleMemories #$memoryName
 ''';
 
-      // Share with thumbnail if available
       if (mediaUrl != null && mediaUrl.isNotEmpty) {
         try {
-          // Download thumbnail to temporary directory
           final response = await http.get(Uri.parse(mediaUrl));
 
           if (response.statusCode == 200) {
@@ -765,7 +750,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
             await file.writeAsBytes(response.bodyBytes);
 
-            // Share with thumbnail
             await Share.shareXFiles(
               [XFile(file.path)],
               text: shareText,
@@ -777,11 +761,9 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
           }
         } catch (e) {
           print('⚠️ WARNING: Failed to share with thumbnail: $e');
-          // Fall through to share without thumbnail
         }
       }
 
-      // Fallback: Share without thumbnail
       await Share.share(
         shareText,
         subject: 'Check out $userName\'s story on Capsule',
@@ -790,7 +772,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       print('✅ DEBUG: Story shared successfully (text only)');
     } catch (e) {
       print('❌ ERROR sharing story: $e');
-      // Show error feedback to user
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -821,7 +802,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       _crossfadeController?.stop();
       _crossfadeController?.reset();
 
-      // Dispose current video controller
       if (_currentVideoController != null) {
         _currentVideoController!.pause();
         _currentVideoController!.setVolume(0.0);
@@ -832,7 +812,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         _isCurrentVideoInitialized = false;
       }
 
-      // Dispose next video controller
       if (_nextVideoController != null) {
         _nextVideoController!.pause();
         _nextVideoController!.setVolume(0.0);
@@ -854,13 +833,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     }
   }
 
-  /// NEW METHOD: Properly stops and disposes video controller
-  /// DEPRECATED: Use _performHardMediaReset() instead for guaranteed synchronous cleanup
-  Future<void> _stopAndDisposeVideo() async {
-    // Redirect to synchronous hard reset method
-    _performHardMediaReset();
-  }
-
   /// Mark the current story as viewed in the database
   Future<void> _markStoryAsViewed() async {
     try {
@@ -873,7 +845,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         return;
       }
 
-      // Use _initialStoryId which is updated in _loadStoryAtIndex
       final currentStoryId = _initialStoryId;
 
       if (currentStoryId == null) {
@@ -881,19 +852,75 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         return;
       }
 
-      // Upsert into story_views (will insert if not exists, do nothing if exists due to unique constraint)
       await client.from('story_views').upsert({
         'story_id': currentStoryId,
         'user_id': currentUserId,
         'viewed_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'story_id,user_id'); // Prevent duplicate entries
+      }, onConflict: 'story_id,user_id');
 
       print('✅ SUCCESS: Marked story "$currentStoryId" as viewed');
     } catch (e) {
       print('❌ ERROR marking story as viewed: $e');
-      // Don't block UI if view tracking fails
     }
   }
+
+  // =========================
+  // ✅ Modal helpers (pause/resume + prevent tap-through)
+  // =========================
+
+  void _pausePlaybackForModal() {
+    _timerController?.stop();
+    _currentVideoController?.pause();
+  }
+
+  void _resumePlaybackAfterModal({required bool wasPausedBefore}) {
+    if (!mounted) return;
+    if (wasPausedBefore) return;
+    if (_isTransitioning) return;
+
+    final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+
+    _timerController?.forward();
+
+    if (mediaType == 'video' &&
+        _currentVideoController != null &&
+        _isCurrentVideoInitialized) {
+      _currentVideoController!.play();
+    }
+  }
+
+  Future<void> _openReportStoryModal({required bool wasPausedBefore}) async {
+    final storyId = _initialStoryId ?? '';
+    final reportedUserName =
+        _currentStoryData?['user_name'] as String? ?? 'Unknown User';
+    final reportedUserId = _currentStoryData?['user_id'] as String? ?? '';
+    final reportedUserAvatar = _currentStoryData?['user_avatar'] as String?;
+
+    _isAnyModalOpen = true;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // allows the sheet to grow and handle keyboard
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withAlpha(180),
+      builder: (sheetContext) {
+        return ReportStoryScreen(
+          storyId: storyId,
+          reportedUserName: reportedUserName,
+          reportedUserId: reportedUserId,
+          reportedUserAvatar: reportedUserAvatar,
+        );
+      },
+    );
+
+    _isAnyModalOpen = false;
+    _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
+  }
+
+
+  // =========================
+  // UI
+  // =========================
 
   @override
   Widget build(BuildContext context) {
@@ -943,6 +970,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       extendBodyBehindAppBar: true,
       body: GestureDetector(
         onVerticalDragStart: (details) {
+          if (_isAnyModalOpen) return;
           setState(() {
             _dragStartY = details.globalPosition.dy;
             _dragCurrentY = details.globalPosition.dy;
@@ -950,11 +978,14 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
           });
         },
         onVerticalDragUpdate: (details) {
+          if (_isAnyModalOpen) return;
           setState(() {
             _dragCurrentY = details.globalPosition.dy;
           });
         },
         onVerticalDragEnd: (details) async {
+          if (_isAnyModalOpen) return;
+
           final dragDistance = _dragCurrentY - _dragStartY;
           final velocity = details.primaryVelocity ?? 0;
 
@@ -990,7 +1021,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  // DUAL MEDIA LAYER RENDERING
                   _buildDualMediaLayers(),
                   _buildGradientOverlays(),
                   _buildTapZones(),
@@ -1019,12 +1049,9 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Current story (bottom layer)
         if (_currentStoryData != null)
           _buildMediaLayer(_currentStoryData!, _currentVideoController,
               _isCurrentVideoInitialized),
-
-        // Next story (top layer with crossfade)
         if (_isTransitioning && _nextStoryData != null)
           FadeTransition(
             opacity: _crossfadeAnimation!,
@@ -1108,14 +1135,11 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     return SafeArea(
       child: Column(
         children: [
-          // Reserve space for header (timer bars + top bar) - no tap detection here
-          SizedBox(
-              height: 120.h), // Increased from 100.h to fully clear header area
-          // Tap zones only cover content area below header
+          SizedBox(height: 120.h),
           Expanded(
             child: GestureDetector(
               onLongPressStart: (_) {
-                // Long press to pause
+                if (_isAnyModalOpen) return;
                 setState(() {
                   _isPaused = true;
                   _timerController?.stop();
@@ -1123,35 +1147,54 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 });
               },
               onLongPressEnd: (_) {
-                // Release to resume
+                if (_isAnyModalOpen) return;
                 setState(() {
                   _isPaused = false;
                   _timerController?.forward();
-                  _currentVideoController?.play();
+
+                  final mediaType =
+                      _currentStoryData?['media_type'] as String? ?? 'image';
+                  if (mediaType == 'video' &&
+                      _currentVideoController != null &&
+                      _isCurrentVideoInitialized) {
+                    _currentVideoController?.play();
+                  }
                 });
               },
               child: Row(
                 children: [
-                  // Left tap zone - previous story
                   Expanded(
-                    flex: 1,
+                    flex: 35,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTap: _goToPreviousStory,
-                      child: Container(
-                        color: appTheme.transparentCustom,
-                      ),
+                      onTap: () {
+                        if (_isAnyModalOpen) return;
+                        _goToPreviousStory();
+                      },
+                      child: Container(color: appTheme.transparentCustom),
                     ),
                   ),
-                  // Right tap zone - next story
                   Expanded(
-                    flex: 1,
+                    flex: 30,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTap: _goToNextStory,
-                      child: Container(
-                        color: appTheme.transparentCustom,
-                      ),
+                      onTap: () {
+                        if (_isAnyModalOpen) return;
+                        _triggerHapticFeedback(HapticFeedbackType.selection);
+                        _togglePauseResume();
+                      },
+                      child: Container(color: appTheme.transparentCustom),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 35,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        if (_isAnyModalOpen) return;
+                        _goToNextStory();
+                      },
+                      child: Container(color: appTheme.transparentCustom),
                     ),
                   ),
                 ],
@@ -1169,7 +1212,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       child: Row(
         children: List.generate(
           _storyIds.length,
-          (index) {
+              (index) {
             return Expanded(
               child: Container(
                 height: 3.h,
@@ -1179,15 +1222,11 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                   builder: (context, child) {
                     double progress = 0.0;
 
-                    // Simple progress logic - stories before current are filled, current shows timer, rest empty
                     if (index < _currentIndex) {
-                      // Stories already viewed - filled completely
                       progress = 1.0;
                     } else if (index == _currentIndex) {
-                      // Current story - show animated progress
                       progress = _timerController!.value;
                     } else {
-                      // Future stories - empty
                       progress = 0.0;
                     }
 
@@ -1195,7 +1234,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                       value: progress,
                       backgroundColor: appTheme.whiteCustom.withAlpha(77),
                       valueColor:
-                          AlwaysStoppedAnimation<Color>(appTheme.whiteCustom),
+                      AlwaysStoppedAnimation<Color>(appTheme.whiteCustom),
                       minHeight: 3.h,
                     );
                   },
@@ -1205,110 +1244,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
           },
         ),
       ),
-    );
-  }
-
-  Widget _buildStoryIndicators() {
-    return Positioned(
-      top: 50.h,
-      left: 16.h,
-      right: 16.h,
-      child: Row(
-        children: List.generate(
-          _storyIds.length,
-          (index) => Expanded(
-            child: Container(
-              height: 3.h,
-              margin: EdgeInsets.symmetric(horizontal: 2.h),
-              decoration: BoxDecoration(
-                color: index <= _currentIndex
-                    ? appTheme.whiteCustom
-                    : appTheme.whiteCustom.withAlpha(77),
-                borderRadius: BorderRadius.circular(2.h),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStoryBackground() {
-    final mediaUrl = _currentStoryData?['media_url'] as String?;
-    final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
-
-    print('🔍 DEBUG Story Media - URL: $mediaUrl, Type: $mediaType');
-
-    if (mediaUrl == null || mediaUrl.isEmpty) {
-      return Container(
-        color: appTheme.gray_900_02,
-        child: Center(
-          child: Icon(
-            Icons.image_not_supported,
-            size: 64.h,
-            color: appTheme.blue_gray_300,
-          ),
-        ),
-      );
-    }
-
-    if (mediaType == 'video') {
-      if (_currentVideoController != null && _isCurrentVideoInitialized) {
-        return SizedBox.expand(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: _currentVideoController!.value.size.width,
-              height: _currentVideoController!.value.size.height,
-              child: VideoPlayer(_currentVideoController!),
-            ),
-          ),
-        );
-      } else {
-        return Container(
-          color: appTheme.gray_900_02,
-          child: Center(
-            child: CircularProgressIndicator(color: appTheme.colorFF3A3A),
-          ),
-        );
-      }
-    }
-
-    return CachedNetworkImage(
-      imageUrl: mediaUrl,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      placeholder: (context, url) => Container(
-        color: appTheme.gray_900_02,
-        child: Center(
-          child: CircularProgressIndicator(color: appTheme.colorFF3A3A),
-        ),
-      ),
-      errorWidget: (context, url, error) {
-        print('❌ ERROR loading image: $error');
-        return Container(
-          color: appTheme.gray_900_02,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.broken_image_outlined,
-                  size: 64.h,
-                  color: appTheme.blue_gray_300,
-                ),
-                SizedBox(height: 12.h),
-                Text(
-                  'Failed to load image',
-                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -1357,19 +1292,17 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     final memoryTitle = _currentStoryData?['memory_title'] as String?;
 
     return Positioned(
-      top: MediaQuery.of(context).padding.top +
-          20.h, // Position below timer bars
-      left: 16
-          .h, // Position after back button (40.h width + 16.h padding + 12.h gap)
+      top: MediaQuery.of(context).padding.top + 20.h,
+      left: 16.h,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 4.h, vertical: 4.h),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ONLY avatar is tappable for profile navigation
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
+                if (_isAnyModalOpen) return;
                 print('🔍 DEBUG: User avatar tapped - userId: $userId');
                 if (userId != null && userId.isNotEmpty) {
                   Navigator.pushNamed(
@@ -1403,7 +1336,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // User name is NOT tappable (no GestureDetector)
                   Text(
                     userName,
                     style: TextStyleHelper.instance.body16BoldPlusJakartaSans
@@ -1411,31 +1343,27 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  // ONLY memory title is tappable for timeline navigation
                   if (memoryTitle != null && memoryTitle.isNotEmpty)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {
+                        if (_isAnyModalOpen) return;
                         if (_memoryId != null && _currentStoryData != null) {
-                          print('🔍 MEMORY TITLE: Navigating to timeline');
-                          print('   - Memory ID: $_memoryId');
-                          print('   - Memory Title: $memoryTitle');
-
                           final navArgs = MemoryNavArgs(
                             memoryId: _memoryId!,
                             snapshot: MemorySnapshot(
                               title: memoryTitle,
                               date: _currentStoryData?['memory_date']
-                                      as String? ??
+                              as String? ??
                                   _formatDate(_currentStoryData?['created_at']
-                                      as String?),
+                                  as String?),
                               location: _currentStoryData?['memory_location']
-                                  as String?,
+                              as String?,
                               categoryIcon: _memoryCategoryIcon,
                               participantAvatars: null,
                               isPrivate:
-                                  _currentStoryData?['memory_visibility'] ==
-                                      'private',
+                              _currentStoryData?['memory_visibility'] ==
+                                  'private',
                             ),
                           );
 
@@ -1452,15 +1380,13 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                         style: TextStyleHelper
                             .instance.body14RegularPlusJakartaSans
                             .copyWith(
-                          color: appTheme.whiteCustom
-                              .withAlpha(204), // 80% opacity
+                          color: appTheme.whiteCustom.withAlpha(204),
                           decoration: TextDecoration.none,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  // Time ago is NOT tappable (no GestureDetector)
                   Text(
                     _formatTimeAgo(
                         _currentStoryData?['created_at'] as String? ?? ''),
@@ -1477,12 +1403,10 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   }
 
   Widget _buildTopBar() {
-    // Determine if category badge should be shown
     final hasCategoryBadge = _memoryCategoryName != null &&
         _memoryCategoryIcon != null &&
         _memoryId != null;
 
-    // Get location from story data
     final location = _currentStoryData?['location'] as String?;
 
     return Padding(
@@ -1490,7 +1414,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
       child: Row(
         children: [
           Spacer(),
-          // Location display in top right (before category badge)
           if (location != null && location.isNotEmpty)
             Container(
               padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
@@ -1522,16 +1445,12 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 ],
               ),
             ),
-          // NEW: Category badge positioned in header top right
           if (hasCategoryBadge)
             GestureDetector(
               onTap: () async {
-                // CRITICAL FIX: Pass proper MemoryNavArgs with current story data
-                if (_memoryId != null && _currentStoryData != null) {
-                  print('🔍 CATEGORY BADGE: Navigating to timeline');
-                  print('   - Memory ID: $_memoryId');
+                if (_isAnyModalOpen) return;
 
-                  // Create MemoryNavArgs with snapshot from current story data
+                if (_memoryId != null && _currentStoryData != null) {
                   final navArgs = MemoryNavArgs(
                     memoryId: _memoryId!,
                     snapshot: MemorySnapshot(
@@ -1541,21 +1460,16 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                           _formatDate(
                               _currentStoryData?['created_at'] as String?),
                       location:
-                          _currentStoryData?['memory_location'] as String?,
+                      _currentStoryData?['memory_location'] as String?,
                       categoryIcon: _memoryCategoryIcon,
-                      participantAvatars:
-                          null, // Will be fetched by timeline notifier
+                      participantAvatars: null,
                       isPrivate:
-                          _currentStoryData?['memory_visibility'] == 'private',
+                      _currentStoryData?['memory_visibility'] == 'private',
                     ),
                   );
 
-                  print('   - Navigation args created with snapshot');
-
-                  // CRITICAL FIX: Hard reset before timeline navigation
                   _performHardMediaReset();
 
-                  // Navigate with typed arguments
                   NavigatorService.pushNamed(
                     AppRoutes.appTimeline,
                     arguments: navArgs,
@@ -1575,7 +1489,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Category icon from database storage bucket
                     if (_memoryCategoryIcon != null)
                       CachedNetworkImage(
                         imageUrl: _memoryCategoryIcon!,
@@ -1597,7 +1510,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                         ),
                       ),
                     SizedBox(width: 6.h),
-                    // Category name
                     Text(
                       _memoryCategoryName!,
                       style: TextStyleHelper
@@ -1618,20 +1530,14 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   Widget _buildBottomInfo() {
     final caption = _currentStoryData?['caption'] as String?;
     final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : null;
-
-    // Check if user is authenticated
     final isAuthenticated = Supabase.instance.client.auth.currentUser != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // NEW: Bottom right vertical control stack (category badge + volume button)
         if (storyId != null) _buildBottomRightControls(),
-
         SizedBox(height: 12.h),
-
-        // Full-width reaction widget container - ONLY show if user is authenticated
         if (storyId != null && isAuthenticated)
           Container(
             width: double.infinity,
@@ -1653,8 +1559,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
               },
             ),
           ),
-
-        // Caption section only (location moved to header)
         if (caption != null && caption.isNotEmpty)
           Container(
             width: double.infinity,
@@ -1706,18 +1610,23 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
   }
 
   Widget _buildVolumeControl() {
-    // This method is now replaced by _buildBottomRightControls
-    // Return empty widget to avoid duplicate rendering
     return SizedBox.shrink();
   }
 
-  /// NEW METHOD: Bottom right vertical control stack (TikTok-style)
-  /// Contains lock icon button and volume button only (category badge moved to header)
+  /// Bottom right vertical control stack (TikTok-style)
+  /// Delete (only if owner) -> Ellipsis -> Volume (video only)
   Widget _buildBottomRightControls() {
     final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
     final showVolumeButton = mediaType == 'video' &&
         _currentVideoController != null &&
         _isCurrentVideoInitialized;
+
+    final client = Supabase.instance.client;
+    final currentUserId = client.auth.currentUser?.id;
+    final storyOwnerId = _currentStoryData?['user_id'] as String?;
+    final canDelete = currentUserId != null &&
+        storyOwnerId != null &&
+        currentUserId == storyOwnerId;
 
     return Align(
       alignment: Alignment.centerRight,
@@ -1726,20 +1635,41 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Lock icon button (top position in vertical stack)
-            CustomIconButton(
-              iconPath: ImageConstant.imgIcon,
-              backgroundColor: appTheme.blackCustom.withAlpha(128),
-              borderRadius: 20.h,
-              height: 40.h,
-              width: 40.h,
-              padding: EdgeInsets.all(10.h),
-              onTap: () => _showMoreOptions(),
+            if (canDelete)
+              GestureDetector(
+                onTap: _confirmAndDeleteCurrentStory,
+                child: Container(
+                  width: 44.h,
+                  height: 44.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.blackCustom.withAlpha(128),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.delete_outline,
+                    color: Colors.white,
+                    size: 24.h,
+                  ),
+                ),
+              ),
+            if (canDelete) SizedBox(height: 12.h),
+            GestureDetector(
+              onTap: _showMoreOptions,
+              child: Container(
+                width: 44.h,
+                height: 44.h,
+                decoration: BoxDecoration(
+                  color: appTheme.blackCustom.withAlpha(128),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.more_vert,
+                  color: Colors.white,
+                  size: 26.h,
+                ),
+              ),
             ),
-
-            SizedBox(height: 12.h), // Spacing between controls
-
-            // Volume button (bottom position)
+            SizedBox(height: 12.h),
             if (showVolumeButton)
               GestureDetector(
                 onTap: _toggleMute,
@@ -1763,27 +1693,231 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     );
   }
 
+  Future<void> _confirmAndDeleteCurrentStory() async {
+    final storyId = _initialStoryId;
+    if (storyId == null || storyId.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: appTheme.gray_900_02,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.h),
+          ),
+          title: Text(
+            'Delete story?',
+            style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                .copyWith(color: appTheme.whiteCustom),
+          ),
+          content: Text(
+            'This will permanently delete this story.',
+            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                .copyWith(color: appTheme.whiteCustom.withAlpha(204)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: appTheme.whiteCustom.withAlpha(204)),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Delete',
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: appTheme.colorFF3A3A),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    _timerController?.stop();
+    _currentVideoController?.pause();
+
+    final ok = await _deleteStoryById(storyId);
+
+    if (!mounted) return;
+
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to delete story',
+            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                .copyWith(color: appTheme.whiteCustom),
+          ),
+          backgroundColor: appTheme.colorFF3A3A,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      if (!_isPaused) {
+        _timerController?.forward();
+        final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+        if (mediaType == 'video' &&
+            _currentVideoController != null &&
+            _isCurrentVideoInitialized) {
+          _currentVideoController?.play();
+        }
+      }
+      return;
+    }
+
+    final deletedIndex = _currentIndex;
+
+    setState(() {
+      _storyIds.removeWhere((id) => id == storyId);
+    });
+
+    if (_storyIds.isEmpty) {
+      _performHardMediaReset();
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final newIndex = deletedIndex.clamp(0, _storyIds.length - 1);
+
+    _performHardMediaReset();
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _currentIndex = newIndex;
+      _startingIndex = newIndex;
+    });
+
+    _pageController?.jumpToPage(newIndex);
+    await _loadStoryAtIndex(newIndex);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Story deleted',
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+              .copyWith(color: appTheme.whiteCustom),
+        ),
+        backgroundColor: appTheme.blackCustom.withAlpha(220),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<bool> _deleteStoryById(String storyId) async {
+    try {
+      final client = Supabase.instance.client;
+
+      final currentUserId = client.auth.currentUser?.id;
+      final storyOwnerId = _currentStoryData?['user_id'] as String?;
+      if (currentUserId == null ||
+          storyOwnerId == null ||
+          currentUserId != storyOwnerId) {
+        print('⚠️ WARNING: User is not owner - blocking delete');
+        return false;
+      }
+
+      final mediaUrl = _currentStoryData?['media_url'] as String?;
+
+      try {
+        await client.from('story_views').delete().eq('story_id', storyId);
+      } catch (_) {}
+      try {
+        await client.from('story_reactions').delete().eq('story_id', storyId);
+      } catch (_) {}
+
+      await client.from('stories').delete().eq('id', storyId);
+
+      if (mediaUrl != null && mediaUrl.isNotEmpty) {
+        await _tryDeleteMediaFromStorage(mediaUrl);
+      }
+
+      print('✅ SUCCESS: Deleted story $storyId');
+      return true;
+    } catch (e) {
+      print('❌ ERROR deleting story $storyId: $e');
+      return false;
+    }
+  }
+
+  Future<void> _tryDeleteMediaFromStorage(String mediaUrl) async {
+    try {
+      final client = Supabase.instance.client;
+      final uri = Uri.tryParse(mediaUrl);
+      if (uri == null) return;
+
+      final segments = uri.pathSegments;
+
+      final objectIndex = segments.indexOf('object');
+      if (objectIndex == -1 || objectIndex + 2 >= segments.length) return;
+
+      final mode = segments[objectIndex + 1]; // public | sign
+      if (mode != 'public' && mode != 'sign') return;
+
+      final bucket = segments[objectIndex + 2];
+      if (bucket.isEmpty) return;
+
+      final objectPathSegments = segments.sublist(objectIndex + 3);
+      if (objectPathSegments.isEmpty) return;
+
+      final objectPath = objectPathSegments.join('/');
+
+      await client.storage.from(bucket).remove([objectPath]);
+      print('✅ SUCCESS: Deleted storage object $bucket/$objectPath');
+    } catch (e) {
+      print('⚠️ WARNING: Failed to delete storage media: $e');
+    }
+  }
+
+  // ✅ Updated: opens options sheet, pauses immediately, resumes on close,
+  // ✅ and opens Report as its own modal sheet (not route navigation).
   void _showMoreOptions() {
+    final wasPausedBefore = _isPaused;
+
+    _pausePlaybackForModal();
+    setState(() {
+      _isAnyModalOpen = true;
+    });
+
     showModalBottomSheet(
       context: context,
       backgroundColor: appTheme.gray_900_02,
+      barrierColor: Colors.black.withAlpha(180),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20.h)),
       ),
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         padding: EdgeInsets.all(20.h),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.report_outlined, color: appTheme.colorFF3A3A),
+              leading: Icon(Icons.report_outlined, color: appTheme.whiteCustom),
               title: Text(
                 'Report Story',
                 style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                    .copyWith(color: Colors.white),
+                    .copyWith(color: appTheme.whiteCustom),
               ),
-              onTap: () {
-                Navigator.pop(context);
+              onTap: () async {
+                // Close options sheet first
+                Navigator.pop(sheetContext);
+
+                // Open report modal after sheet closes
+                await Future.delayed(const Duration(milliseconds: 80));
+                if (!mounted) return;
+
+                // Keep paused while report modal is up
+                _pausePlaybackForModal();
+                await _openReportStoryModal(wasPausedBefore: wasPausedBefore);
               },
             ),
             ListTile(
@@ -1793,18 +1927,26 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                     .copyWith(color: appTheme.whiteCustom),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                _shareStory(); // Trigger native share functionality
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                await Future.delayed(const Duration(milliseconds: 40));
+                if (!mounted) return;
+                await _shareStory();
               },
             ),
           ],
         ),
       ),
-    );
+    ).whenComplete(() {
+      if (!mounted) return;
+      setState(() {
+        _isAnyModalOpen = false;
+      });
+      _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
+    });
   }
 
-  /// NEW METHOD: Format date for snapshot if memory_date not available
+  /// Format date for snapshot if memory_date not available
   String _formatDate(String? timestamp) {
     if (timestamp == null || timestamp.isEmpty) {
       return DateTime.now().toString().split(' ')[0];

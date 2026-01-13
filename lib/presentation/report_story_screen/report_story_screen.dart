@@ -7,7 +7,24 @@ import '../../widgets/custom_user_list_item.dart';
 import './notifier/report_story_notifier.dart';
 
 class ReportStoryScreen extends ConsumerStatefulWidget {
-  ReportStoryScreen({Key? key}) : super(key: key);
+  const ReportStoryScreen({
+    Key? key,
+    required this.storyId,
+    required this.reportedUserName,
+    required this.reportedUserId,
+    this.reportedUserAvatar,
+    this.storyTitle,
+    this.storyPostedAtLabel,
+  }) : super(key: key);
+
+  final String storyId;
+  final String reportedUserName;
+  final String reportedUserId;
+  final String? reportedUserAvatar;
+
+  // Optional: pass these from story viewer if you have them
+  final String? storyTitle;
+  final String? storyPostedAtLabel;
 
   @override
   ReportStoryScreenState createState() => ReportStoryScreenState();
@@ -17,31 +34,53 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(reportStoryNotifier.notifier).setContext(
+        storyId: widget.storyId,
+        reportedUserName: widget.reportedUserName,
+        reportedUserId: widget.reportedUserId,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Regular bottom sheet content (no Scaffold, no fixed height)
     return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: Container(
-          width: double.maxFinite,
+      top: false,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
           decoration: BoxDecoration(
             color: appTheme.gray_900_02,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(30.h),
-              topRight: Radius.circular(30.h),
-            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24.h)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20.h,
+            right: 20.h,
+            top: 12.h,
+            bottom: 16.h + MediaQuery.of(context).padding.bottom,
           ),
           child: SingleChildScrollView(
-            padding: EdgeInsets.all(40.h),
+            // Guarantees no overflow; will only scroll if it must
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildHeaderSection(context),
-                SizedBox(height: 38.h),
+                SizedBox(height: 12.h),
+
                 _buildUserInfoSection(context),
-                SizedBox(height: 28.h),
+                SizedBox(height: 12.h),
+
                 _buildReportOptionsSection(context),
-                SizedBox(height: 28.h),
+                SizedBox(height: 10.h),
+
                 _buildAdditionalDetailsSection(context),
-                SizedBox(height: 16.h),
+                SizedBox(height: 12.h),
+
                 _buildSubmitButton(context),
               ],
             ),
@@ -51,91 +90,108 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
     );
   }
 
-  /// Section Widget
-  Widget _buildMainContent(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
-      height: double.maxFinite,
-      padding: EdgeInsets.all(40.h),
-      decoration: BoxDecoration(
-        color: appTheme.color5B0000,
-      ),
-      child: Column(
-        children: [
-          _buildHeaderSection(context),
-          SizedBox(height: 38.h),
-          _buildUserInfoSection(context),
-          SizedBox(height: 28.h),
-          _buildReportOptionsSection(context),
-          SizedBox(height: 28.h),
-          _buildAdditionalDetailsSection(context),
-          SizedBox(height: 16.h),
-          _buildSubmitButton(context),
-        ],
-      ),
-    );
-  }
-
-  /// Section Widget
   Widget _buildHeaderSection(BuildContext context) {
     return CustomHeaderRow(
       title: 'Report Story',
-      margin: EdgeInsets.only(top: 22.h, left: 12.h, right: 12.h),
-      onIconTap: () => onTapCloseButton(context),
+      textAlignment: TextAlign.center,
+      margin: EdgeInsets.zero,
+      onIconTap: () => Navigator.of(context).pop(),
     );
   }
 
-  /// Section Widget
   Widget _buildUserInfoSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Report story posted by user:',
-          style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-              .copyWith(color: appTheme.blue_gray_300, height: 1.31),
-        ),
-        SizedBox(height: 14.h),
-        CustomUserListItem(
-          imagePath: ImageConstant.imgEllipse8DeepOrange100,
-          name: 'Sarah Smith',
-          margin: EdgeInsets.zero,
-        ),
-      ],
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(reportStoryNotifier);
+        final model = state.reportStoryModel;
+
+        final displayName = model?.reportedUser ?? widget.reportedUserName;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reporting story posted by:',
+              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+            ),
+            SizedBox(height: 8.h),
+
+            // If CustomUserListItem is too large and has no sizing controls,
+            // replace it with your own Row. For now, keep it.
+            CustomUserListItem(
+              imagePath: widget.reportedUserAvatar ?? ImageConstant.imgEllipse842x42,
+              name: displayName,
+              avatarSize: 28, // 👈 smaller avatar for modal
+              margin: EdgeInsets.zero,
+            ),
+
+            if ((widget.storyTitle != null && widget.storyTitle!.isNotEmpty) ||
+                (widget.storyPostedAtLabel != null && widget.storyPostedAtLabel!.isNotEmpty))
+              Padding(
+                padding: EdgeInsets.only(top: 6.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.storyTitle != null && widget.storyTitle!.isNotEmpty)
+                      Text(
+                        widget.storyTitle!,
+                        style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                            .copyWith(color: appTheme.whiteCustom.withAlpha(220)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    if (widget.storyPostedAtLabel != null && widget.storyPostedAtLabel!.isNotEmpty)
+                      Text(
+                        widget.storyPostedAtLabel!,
+                        style: TextStyleHelper.instance.body12RegularPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
-  /// Section Widget
   Widget _buildReportOptionsSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(reportStoryNotifier);
         final notifier = ref.read(reportStoryNotifier.notifier);
 
-        ref.listen(
-          reportStoryNotifier,
-          (previous, current) {
-            if (current.isSubmitted ?? false) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Report submitted successfully'),
-                  backgroundColor: appTheme.colorFF52D1,
-                ),
-              );
-              NavigatorService.goBack();
-            }
-          },
-        );
+        ref.listen(reportStoryNotifier, (previous, current) {
+          final msg = current.errorMessage;
+          if (msg != null && msg.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(msg),
+                backgroundColor: appTheme.redCustom,
+              ),
+            );
+          }
 
+          if ((current.isSubmitted ?? false) == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Report submitted successfully'),
+                backgroundColor: appTheme.colorFF52D1,
+              ),
+            );
+            Navigator.of(context).pop();
+          }
+        });
+
+
+        // NOTE: no const list, because your CustomRadioOption is not const
         return CustomRadioGroup<String>(
           options: [
-            CustomRadioOption(
-                value: 'inappropriate', label: 'Inappropriate Content'),
-            CustomRadioOption(
-                value: 'harassment', label: 'Harassment or Bullying'),
+            CustomRadioOption(value: 'inappropriate', label: 'Inappropriate Content'),
+            CustomRadioOption(value: 'harassment', label: 'Harassment or Bullying'),
             CustomRadioOption(value: 'spam', label: 'Spam'),
-            CustomRadioOption(
-                value: 'violence', label: 'Violence / Dangerous Content'),
+            CustomRadioOption(value: 'violence', label: 'Violence / Dangerous Content'),
             CustomRadioOption(value: 'hate_speech', label: 'Hate Speech'),
             CustomRadioOption(value: 'other', label: 'Other'),
           ],
@@ -146,7 +202,6 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
     );
   }
 
-  /// Section Widget
   Widget _buildAdditionalDetailsSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -156,18 +211,17 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
           key: _formKey,
           child: CustomEditText(
             controller: state.additionalDetailsController,
-            hintText: 'Additional details',
+            hintText: 'Additional details (optional)',
             maxLines: 4,
             fillColor: appTheme.gray_900,
             borderRadius: 8.h,
-            validator: (value) => _validateAdditionalDetails(value),
+            validator: _validateAdditionalDetails,
           ),
         );
       },
     );
   }
 
-  /// Section Widget
   Widget _buildSubmitButton(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -175,20 +229,17 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
         final notifier = ref.read(reportStoryNotifier.notifier);
 
         return CustomButton(
-          text: 'Report Story',
+          text: 'Submit Report',
           width: double.infinity,
-          onPressed: () => onTapReportStoryButton(context, notifier),
-          buttonStyle: CustomButtonStyle
-              .fillDark, // Modified: Replaced unavailable fillRed style with fillDark
-          buttonTextStyle: CustomButtonTextStyle
-              .bodyMedium, // Modified: Replaced unavailable bodyMediumWhite style with bodyMedium
+          onPressed: () => onTapReportStoryButton(notifier),
+          buttonStyle: CustomButtonStyle.fillPrimary,
+          buttonTextStyle: CustomButtonTextStyle.bodyMedium,
           isDisabled: state.isLoading ?? false,
         );
       },
     );
   }
 
-  /// Validation method for additional details
   String? _validateAdditionalDetails(String? value) {
     if (value != null && value.length > 500) {
       return 'Additional details should not exceed 500 characters';
@@ -196,14 +247,7 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
     return null;
   }
 
-  /// Navigates back to the previous screen
-  void onTapCloseButton(BuildContext context) {
-    NavigatorService.goBack();
-  }
-
-  /// Handles report story submission
-  void onTapReportStoryButton(
-      BuildContext context, ReportStoryNotifier notifier) {
+  void onTapReportStoryButton(ReportStoryNotifier notifier) {
     if (_formKey.currentState?.validate() ?? false) {
       notifier.submitReport();
     }
