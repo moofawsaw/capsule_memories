@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 
 import '../../../core/app_export.dart';
-import '../../../widgets/custom_icon_button.dart';
 import '../notifier/friends_management_notifier.dart';
 
 class CameraScannerScreen extends ConsumerStatefulWidget {

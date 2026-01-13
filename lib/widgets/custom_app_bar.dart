@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../core/app_export.dart';
 import '../presentation/create_memory_screen/create_memory_screen.dart';
 import '../presentation/notifications_screen/notifier/notifications_notifier.dart';
@@ -76,18 +78,40 @@ class CustomAppBar extends ConsumerStatefulWidget
 
   @override
   Size get preferredSize => Size.fromHeight(
-        (customHeight ?? 102.h) + (showBottomBorder ? 1.h : 0),
-      );
+    (customHeight ?? 102.h) + (showBottomBorder ? 1.h : 0),
+  );
 }
 
-class _CustomAppBarState extends ConsumerState<CustomAppBar> {
+class _CustomAppBarState extends ConsumerState<CustomAppBar>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _plusSpinController;
+  late final Animation<double> _plusSpin;
+
   @override
   void initState() {
     super.initState();
+
+    // Plus micro-interaction (one quick spin)
+    _plusSpinController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+
+    _plusSpin = CurvedAnimation(
+      parent: _plusSpinController,
+      curve: Curves.easeOutCubic,
+    );
+
     // Load avatar only if not already cached
     if (widget.showProfileImage) {
       Future.microtask(() => _ensureAvatarLoaded());
     }
+  }
+
+  @override
+  void dispose() {
+    _plusSpinController.dispose();
+    super.dispose();
   }
 
   /// Ensure avatar is loaded whenever avatarUrl is null/empty
@@ -104,7 +128,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
 
       // 🎯 CRITICAL: Load if avatarUrl is null/empty (not based on userId)
       if ((currentAvatarState.avatarUrl == null ||
-              currentAvatarState.avatarUrl!.isEmpty) &&
+          currentAvatarState.avatarUrl!.isEmpty) &&
           !currentAvatarState.isLoading) {
         await ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
         print('✅ Avatar loaded in custom_app_bar based on empty avatarUrl');
@@ -173,59 +197,78 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
             ),
             SizedBox(width: 18.h),
           ],
-          // 🔥 Use synchronously-derived auth state - NO FLASH
+
           if (isAuthenticated) ...[
+            // ➕ PLUS BUTTON (spin stays)
             if (widget.showIconButton &&
                 widget.iconButtonImagePath != null) ...[
               Container(
                 width: 46.h,
                 height: 46.h,
                 decoration: BoxDecoration(
-                  color: widget.iconButtonBackgroundColor ?? Color(0x3BD81E29),
+                  color:
+                  widget.iconButtonBackgroundColor ?? const Color(0x3BD81E29),
                   borderRadius: BorderRadius.circular(22.h),
                 ),
                 child: IconButton(
-                  onPressed: () => _handlePlusButtonTap(context),
+                  onPressed: () async => await _handlePlusButtonTap(context),
                   padding: EdgeInsets.all(6.h),
-                  icon: Icon(
-                    Icons.add,
-                    size: 34,
-                    color: Theme.of(context).colorScheme.onSurface,
+                  icon: AnimatedBuilder(
+                    animation: _plusSpinController,
+                    builder: (context, child) {
+                      final angle = _plusSpin.value * 2 * math.pi;
+                      return Transform.rotate(
+                        angle: angle,
+                        child: child,
+                      );
+                    },
+                    child: Icon(
+                      Icons.add,
+                      size: 34,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                 ),
               ),
               SizedBox(width: 18.h),
             ],
+
+            // ACTION ICONS
             if (widget.actionIcons != null) ...[
               ...widget.actionIcons!.asMap().entries.map((entry) {
-                int index = entry.key;
-                String iconPath = entry.value;
-                bool isNotificationIcon = _isNotificationIcon(iconPath);
-                bool isPicturesIcon = _isPicturesIcon(iconPath);
+                final index = entry.key;
+                final iconPath = entry.value;
 
-                // 🎯 Determine if this icon should be in active state
+                final isNotificationIcon = _isNotificationIcon(iconPath);
+                final isPicturesIcon = _isPicturesIcon(iconPath);
+
                 bool isActive = false;
-                Color? activeColor;
-
                 if (isNotificationIcon &&
                     currentRoute == AppRoutes.appNotifications) {
                   isActive = true;
-                  activeColor = appTheme.deep_purple_A100;
                 } else if (isPicturesIcon &&
                     currentRoute == AppRoutes.appMemories) {
                   isActive = true;
-                  activeColor = appTheme.deep_purple_A100;
                 }
 
-                // Determine Material icon based on icon path
-                IconData materialIcon;
+                // OUTLINE vs FILLED
+                IconData outlineIcon;
+                IconData filledIcon;
+
                 if (isNotificationIcon) {
-                  materialIcon = Icons.notifications_outlined;
+                  outlineIcon = Icons.notifications_outlined;
+                  filledIcon = Icons.notifications;
                 } else if (isPicturesIcon) {
-                  materialIcon = Icons.photo_outlined;
+                  outlineIcon = Icons.photo_outlined;
+                  filledIcon = Icons.photo;
                 } else {
-                  materialIcon = Icons.help_outline;
+                  outlineIcon = Icons.help_outline;
+                  filledIcon = Icons.help;
                 }
+
+                final iconColor = isActive
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurface;
 
                 return Padding(
                   padding: EdgeInsets.only(left: index > 0 ? 6.h : 0),
@@ -234,25 +277,19 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        // Icon with conditional active state
-                        Container(
+                        SizedBox(
                           width: 32.h,
                           height: 32.h,
-                          padding: EdgeInsets.all(isActive ? 6.h : 0),
-                          decoration: isActive
-                              ? BoxDecoration(
-                                  color: activeColor,
-                                  shape: BoxShape.circle,
-                                )
-                              : null,
-                          child: Icon(
-                            materialIcon,
-                            size: isActive ? 20 : 32,
-                            color: isActive
-                                ? appTheme.gray_50
-                                : Theme.of(context).colorScheme.onSurface,
+                          child: Center(
+                            child: Icon(
+                              isActive ? filledIcon : outlineIcon,
+                              size: 32,
+                              color: iconColor,
+                            ),
                           ),
                         ),
+
+                        // 🔔 Notification badge (unchanged)
                         if (isNotificationIcon && unreadCount > 0)
                           Positioned(
                             right: -4.h,
@@ -281,7 +318,8 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
                                       .copyWith(
                                     color: appTheme.gray_50,
                                     height: 1.0,
-                                    fontSize: unreadCount > 99 ? 8.h : 10.h,
+                                    fontSize:
+                                    unreadCount > 99 ? 8.h : 10.h,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -295,6 +333,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
               }),
             ],
           ],
+
           if (widget.showProfileImage) ...[
             SizedBox(width: 8.h),
             _buildAuthenticationWidget(context),
@@ -387,35 +426,35 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
         shape: BoxShape.circle,
         image: !showLetterAvatar
             ? DecorationImage(
-                image: NetworkImage(avatarUrl),
-                fit: BoxFit.cover,
-              )
+          image: NetworkImage(avatarUrl),
+          fit: BoxFit.cover,
+        )
             : null,
       ),
       child: showLetterAvatar
           ? Center(
-              child: Text(
-                avatarLetter,
-                style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-                    .copyWith(
-                  color: appTheme.gray_50,
-                  fontSize: 20.h,
-                ),
-              ),
-            )
+        child: Text(
+          avatarLetter,
+          style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+              .copyWith(
+            color: appTheme.gray_50,
+            fontSize: 20.h,
+          ),
+        ),
+      )
           : avatarState.isLoading
-              ? Center(
-                  child: SizedBox(
-                    width: 20.h,
-                    height: 20.h,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.h,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(appTheme.gray_50),
-                    ),
-                  ),
-                )
-              : null,
+          ? Center(
+        child: SizedBox(
+          width: 20.h,
+          height: 20.h,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.h,
+            valueColor:
+            AlwaysStoppedAnimation<Color>(appTheme.gray_50),
+          ),
+        ),
+      )
+          : null,
     );
   }
 
@@ -483,7 +522,14 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
   }
 
   /// Handles plus button tap - always opens memory_create bottom sheet
-  void _handlePlusButtonTap(BuildContext context) {
+  Future<void> _handlePlusButtonTap(BuildContext context) async {
+    // Spin first (restart if tapped repeatedly)
+    if (mounted) {
+      await _plusSpinController.forward(from: 0);
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -491,6 +537,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar> {
       builder: (context) => CreateMemoryScreen(),
     );
   }
+
 
   /// Handles action icon tap - identifies and navigates accordingly
   /// Bell/notification icons always navigate to notifications screen

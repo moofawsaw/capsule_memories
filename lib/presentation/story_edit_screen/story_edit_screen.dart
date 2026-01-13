@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'dart:ui';
-import '../../widgets/custom_button.dart';
+
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/custom_button.dart';
 import './notifier/story_edit_notifier.dart';
 
 class StoryEditScreen extends ConsumerStatefulWidget {
@@ -40,6 +41,9 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   String? _locationName;
   bool _isLoadingMemoryDetails = true;
 
+  // 🔥 NEW: Track memory visibility
+  String? _memoryVisibility;
+
   bool _showVideoControls = true;
 
   @override
@@ -63,10 +67,11 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
       final client = SupabaseService.instance.client;
       if (client == null) return;
 
+      // 🔥 MODIFIED: Added 'visibility' to the select query
       final response = await client
           .from('memories')
           .select(
-          'created_at, location_name, memory_categories(icon_url)')
+              'created_at, location_name, visibility, memory_categories(icon_url)')
           .eq('id', widget.memoryId)
           .single();
 
@@ -82,6 +87,8 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
         _createdAt =
             DateTime.tryParse(response['created_at']?.toString() ?? '');
         _locationName = response['location_name']?.toString();
+        _memoryVisibility =
+            response['visibility']?.toString(); // 🔥 NEW: Store visibility
         _isLoadingMemoryDetails = false;
       });
     } catch (_) {
@@ -117,16 +124,16 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
         backgroundColor: Colors.black,
         body: state.isLoading
             ? Center(
-          child: CircularProgressIndicator(
-              color: appTheme.deep_purple_A100),
-        )
+                child:
+                    CircularProgressIndicator(color: appTheme.deep_purple_A100),
+              )
             : Stack(
-          children: [
-            _buildMediaPreview(),
-            _buildTopOverlay(),
-            _buildBottomOverlay(state),
-          ],
-        ),
+                children: [
+                  _buildMediaPreview(),
+                  _buildTopOverlay(),
+                  _buildBottomOverlay(state),
+                ],
+              ),
       ),
     );
   }
@@ -136,9 +143,9 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
       child: widget.isVideo && _videoController != null
           ? _buildVideo()
           : Image.file(
-        File(widget.mediaPath),
-        fit: BoxFit.cover,
-      ),
+              File(widget.mediaPath),
+              fit: BoxFit.cover,
+            ),
     );
   }
 
@@ -196,7 +203,7 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
       right: 0,
       child: Container(
         padding:
-        EdgeInsets.only(left: 12.w, right: 12.w, top: 10.h, bottom: 12.h),
+            EdgeInsets.only(left: 12.w, right: 12.w, top: 10.h, bottom: 12.h),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -214,7 +221,7 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
             Row(
               children: [
                 _roundIcon(Icons.close_rounded,
-                        () => Navigator.of(context).maybePop()),
+                    () => Navigator.of(context).maybePop()),
                 Expanded(
                   child: Text(
                     'Post Story',
@@ -226,13 +233,11 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
                   ),
                 ),
                 _roundIcon(Icons.refresh_rounded,
-                        () => Navigator.of(context).maybePop()),
+                    () => Navigator.of(context).maybePop()),
               ],
             ),
             SizedBox(height: 12.h),
-            _isLoadingMemoryDetails
-                ? const SizedBox()
-                : _memoryMetaCard(),
+            _isLoadingMemoryDetails ? const SizedBox() : _memoryMetaCard(),
           ],
         ),
       ),
@@ -304,34 +309,32 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   Widget _buildCategoryIcon() {
     final url = _categoryIconUrl?.trim() ?? '';
     if (url.isEmpty) {
-      return Icon(Icons.category_rounded,
-          size: 22.sp, color: Colors.white54);
+      return Icon(Icons.category_rounded, size: 22.sp, color: Colors.white54);
     }
 
     final isSvg = url.toLowerCase().endsWith('.svg');
 
     return isSvg
         ? SvgPicture.network(
-      url,
-      width: 22.sp,
-      height: 22.sp,
-      placeholderBuilder: (_) => SizedBox(
-        width: 22.sp,
-        height: 22.sp,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor:
-          AlwaysStoppedAnimation<Color>(Colors.white70),
-        ),
-      ),
-    )
+            url,
+            width: 22.sp,
+            height: 22.sp,
+            placeholderBuilder: (_) => SizedBox(
+              width: 22.sp,
+              height: 22.sp,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+              ),
+            ),
+          )
         : Image.network(
-      url,
-      width: 22.sp,
-      height: 22.sp,
-      errorBuilder: (_, __, ___) => Icon(Icons.category_rounded,
-          size: 22.sp, color: Colors.white70),
-    );
+            url,
+            width: 22.sp,
+            height: 22.sp,
+            errorBuilder: (_, __, ___) => Icon(Icons.category_rounded,
+                size: 22.sp, color: Colors.white70),
+          );
   }
 
   Widget _roundIcon(IconData icon, VoidCallback onTap) {
@@ -374,16 +377,15 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
               width: double.infinity,
               child: CustomButton(
                 text: 'Share to $_safeMemoryName',
-                onPressed: state.isUploading ? null : () => _onShareStory(context),
+                onPressed:
+                    state.isUploading ? null : () => _onShareStory(context),
                 isDisabled: state.isUploading,
                 isLoading: state.isUploading, // 🔥 loading spinner
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
               ),
             ),
-
             SizedBox(height: 8.h),
-
             Text(
               'Your story will be added to the timeline for $_safeMemoryName.',
               style: TextStyle(
@@ -398,16 +400,29 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
     );
   }
 
-
-
   Future<void> _onShareStory(BuildContext context) async {
     final notifier = ref.read(storyEditProvider.notifier);
-    await notifier.uploadAndShareStory(
+    final success = await notifier.uploadAndShareStory(
       memoryId: widget.memoryId,
       mediaPath: widget.mediaPath,
       isVideo: widget.isVideo,
       caption: _captionController.text.trim(),
     );
-    if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+
+    if (!mounted) return;
+
+    // 🔥 NEW: Navigate to timeline for private memories after successful upload
+    if (success && _memoryVisibility == 'private') {
+      print(
+          '✅ Private story posted - navigating to timeline for memory: ${widget.memoryId}');
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.appTimeline,
+        (route) => route.settings.name == AppRoutes.appFeed,
+        arguments: widget.memoryId,
+      );
+    } else {
+      // For public memories or failed uploads, use original behavior
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    }
   }
 }

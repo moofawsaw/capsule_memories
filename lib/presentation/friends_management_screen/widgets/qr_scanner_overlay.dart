@@ -2,7 +2,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/app_export.dart';
 import '../../../services/supabase_service.dart';
-import '../../../widgets/custom_icon_button.dart';
 
 class QRScannerOverlay extends ConsumerStatefulWidget {
   final String scanType;

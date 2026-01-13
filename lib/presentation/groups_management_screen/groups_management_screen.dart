@@ -4,7 +4,6 @@ import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_group_card.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_group_invitation_card.dart';
-import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../create_group_screen/create_group_screen.dart';
 import '../friends_management_screen/widgets/qr_scanner_overlay.dart';

@@ -451,7 +451,9 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       final List<TimelineStoryItem> timelineStories =
       storiesData.map<TimelineStoryItem>((dynamic storyData) {
         final Map<String, dynamic>? contributor =
-        storyData['user_profiles'] as Map<String, dynamic>?;
+            (storyData['user_profiles_public'] as Map<String, dynamic>?) ??
+                (storyData['user_profiles'] as Map<String, dynamic>?);
+
 
         final DateTime createdAt = DateTime.parse(storyData['created_at'] as String);
         final String storyId = storyData['id'] as String;

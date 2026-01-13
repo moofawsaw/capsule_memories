@@ -2,7 +2,6 @@
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_export.dart';
-import '../../widgets/custom_icon_button.dart';
 import '../../widgets/custom_image_view.dart';
 import './models/memory_timeline_playback_model.dart';
 import './notifier/memory_timeline_playback_notifier.dart';

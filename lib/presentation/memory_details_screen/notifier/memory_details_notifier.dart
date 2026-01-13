@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
 import '../../../services/avatar_helper_service.dart';
