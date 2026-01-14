@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:share_plus/share_plus.dart';
-
+import '../memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import '../../core/app_export.dart';
 import '../../services/friends_service.dart';
 import '../../services/supabase_service.dart';
@@ -76,7 +76,7 @@ class _MemoryConfirmationScreenState
 
   void _initializeMemoryData() async {
     final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
     if (args != null) {
       setState(() {
@@ -122,7 +122,7 @@ class _MemoryConfirmationScreenState
       final response = await supabase
           .from('memories')
           .select(
-              'qr_code_url, invite_code, created_at, visibility, expires_at, contributor_count, creator_id')
+          'qr_code_url, invite_code, created_at, visibility, expires_at, contributor_count, creator_id')
           .eq('id', memoryId)
           .maybeSingle() // Use maybeSingle() instead of single() to handle 0 rows gracefully
           .timeout(
@@ -446,9 +446,6 @@ class _MemoryConfirmationScreenState
                             decoration: BoxDecoration(
                               color: appTheme.gray_900_01,
                               borderRadius: BorderRadius.circular(12.h),
-                              // border: Border.all(
-                              //   color: appTheme.blue_gray_300.withAlpha(77),
-                              // ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -509,9 +506,6 @@ class _MemoryConfirmationScreenState
                           decoration: BoxDecoration(
                             color: appTheme.gray_900_01,
                             borderRadius: BorderRadius.circular(12.h),
-                            // border: Border.all(
-                            //   color: appTheme.blue_gray_300.withAlpha(77),
-                            // ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,7 +533,7 @@ class _MemoryConfirmationScreenState
                                     style: TextStyleHelper
                                         .instance.body14RegularPlusJakartaSans
                                         .copyWith(
-                                            color: appTheme.blue_gray_300),
+                                        color: appTheme.blue_gray_300),
                                   ),
                                 ],
                               ),
@@ -565,7 +559,7 @@ class _MemoryConfirmationScreenState
                                     style: TextStyleHelper
                                         .instance.body14RegularPlusJakartaSans
                                         .copyWith(
-                                            color: appTheme.blue_gray_300),
+                                        color: appTheme.blue_gray_300),
                                   ),
                                 ],
                               ),
@@ -583,7 +577,7 @@ class _MemoryConfirmationScreenState
                                     style: TextStyleHelper
                                         .instance.body14RegularPlusJakartaSans
                                         .copyWith(
-                                            color: appTheme.blue_gray_300),
+                                        color: appTheme.blue_gray_300),
                                   ),
                                 ],
                               ),
@@ -601,9 +595,6 @@ class _MemoryConfirmationScreenState
                             decoration: BoxDecoration(
                               color: appTheme.gray_900_01,
                               borderRadius: BorderRadius.circular(12.h),
-                              // border: Border.all(
-                              //   color: appTheme.deep_purple_A100.withAlpha(128),
-                              // ),
                             ),
                             child: Column(
                               children: [
@@ -619,7 +610,7 @@ class _MemoryConfirmationScreenState
                                   style: TextStyleHelper.instance
                                       .headline24ExtraBoldPlusJakartaSans
                                       .copyWith(
-                                          color: appTheme.deep_purple_A100),
+                                      color: appTheme.deep_purple_A100),
                                 ),
                               ],
                             ),
@@ -687,7 +678,7 @@ class _MemoryConfirmationScreenState
                                 text: 'Share QR Code',
                                 buttonStyle: CustomButtonStyle.outlinePrimary,
                                 buttonTextStyle:
-                                    CustomButtonTextStyle.bodyMedium,
+                                CustomButtonTextStyle.bodyMedium,
                                 onPressed: _shareQRCode,
                                 padding: EdgeInsets.symmetric(
                                     horizontal: 30.h, vertical: 12.h),
@@ -712,9 +703,6 @@ class _MemoryConfirmationScreenState
                           decoration: BoxDecoration(
                             color: appTheme.gray_900_01,
                             borderRadius: BorderRadius.circular(12.h),
-                            border: Border.all(
-                              color: appTheme.blue_gray_300.withAlpha(77),
-                            ),
                           ),
                           child: TextField(
                             controller: _searchController,
@@ -746,94 +734,106 @@ class _MemoryConfirmationScreenState
                           decoration: BoxDecoration(
                             color: appTheme.gray_900_01,
                             borderRadius: BorderRadius.circular(12.h),
-                            border: Border.all(
-                              color: appTheme.blue_gray_300.withAlpha(77),
-                            ),
                           ),
                           child: _isLoadingFriends
                               ? Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.h),
+                              child: CircularProgressIndicator(
+                                color: appTheme.deep_purple_A100,
+                              ),
+                            ),
+                          )
+                              : _filteredFriends.isEmpty
+                              ? Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.h),
+                              child: Text(
+                                _searchController.text.isEmpty
+                                    ? 'No friends to invite'
+                                    : 'No friends found',
+                                style: TextStyleHelper.instance
+                                    .body14RegularPlusJakartaSans
+                                    .copyWith(
+                                    color:
+                                    appTheme.blue_gray_300),
+                              ),
+                            ),
+                          )
+                              : ListView.separated(
+                            padding: EdgeInsets.all(12.h),
+                            itemCount: _filteredFriends.length,
+                            separatorBuilder: (context, index) =>
+                                Divider(
+                                  color: appTheme.blue_gray_300
+                                      .withAlpha(51),
+                                  height: 1,
+                                ),
+                            itemBuilder: (context, index) {
+                              final friend = _filteredFriends[index];
+                              final friendId =
+                              (friend['id'] ?? '').toString();
+                              final isSelected = _selectedFriendIds
+                                  .contains(friendId);
+
+                              return ListTile(
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12.h,
+                                  vertical: 8.h,
+                                ),
+                                leading: ClipOval(
+                                  child: CustomImageView(
+                                    imagePath:
+                                    friend['avatar_url'] ?? '',
+                                    height: 40.h,
+                                    width: 40.h,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                title: Text(
+                                  friend['display_name'] ?? 'Unknown',
+                                  style: TextStyleHelper.instance
+                                      .body14MediumPlusJakartaSans
+                                      .copyWith(
+                                    color: appTheme.gray_50,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '@${friend['username'] ?? 'username'}',
+                                  style: TextStyleHelper.instance
+                                      .body12MediumPlusJakartaSans
+                                      .copyWith(
+                                    color: appTheme.blue_gray_300,
+                                  ),
+                                ),
+
+                                // ✅ FIX: Use Material Icons instead of Checkbox widget (prevents the "empty square" bug)
+                                trailing: InkWell(
+                                  onTap: () =>
+                                      _toggleFriendSelection(friendId),
+                                  borderRadius:
+                                  BorderRadius.circular(24.h),
                                   child: Padding(
-                                    padding: EdgeInsets.all(20.h),
-                                    child: CircularProgressIndicator(
-                                      color: appTheme.deep_purple_A100,
+                                    padding: EdgeInsets.all(8.h),
+                                    child: Icon(
+                                      isSelected
+                                          ? Icons.check_box
+                                          : Icons
+                                          .check_box_outline_blank,
+                                      size: 24.h,
+                                      color: isSelected
+                                          ? appTheme.deep_purple_A100
+                                          : appTheme.blue_gray_300,
                                     ),
                                   ),
-                                )
-                              : _filteredFriends.isEmpty
-                                  ? Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(20.h),
-                                        child: Text(
-                                          _searchController.text.isEmpty
-                                              ? 'No friends to invite'
-                                              : 'No friends found',
-                                          style: TextStyleHelper.instance
-                                              .body14RegularPlusJakartaSans
-                                              .copyWith(
-                                                  color:
-                                                      appTheme.blue_gray_300),
-                                        ),
-                                      ),
-                                    )
-                                  : ListView.separated(
-                                      padding: EdgeInsets.all(12.h),
-                                      itemCount: _filteredFriends.length,
-                                      separatorBuilder: (context, index) =>
-                                          Divider(
-                                        color: appTheme.blue_gray_300
-                                            .withAlpha(51),
-                                        height: 1,
-                                      ),
-                                      itemBuilder: (context, index) {
-                                        final friend = _filteredFriends[index];
-                                        final isSelected = _selectedFriendIds
-                                            .contains(friend['id']);
+                                ),
 
-                                        return ListTile(
-                                          contentPadding: EdgeInsets.symmetric(
-                                            horizontal: 12.h,
-                                            vertical: 8.h,
-                                          ),
-                                          leading: ClipOval(
-                                            child: CustomImageView(
-                                              imagePath:
-                                                  friend['avatar_url'] ?? '',
-                                              height: 40.h,
-                                              width: 40.h,
-                                              fit: BoxFit.cover,
-                                            ),
-                                          ),
-                                          title: Text(
-                                            friend['display_name'] ?? 'Unknown',
-                                            style: TextStyleHelper.instance
-                                                .body14MediumPlusJakartaSans
-                                                .copyWith(
-                                              color: appTheme.gray_50,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                          subtitle: Text(
-                                            '@${friend['username'] ?? 'username'}',
-                                            style: TextStyleHelper.instance
-                                                .body12MediumPlusJakartaSans
-                                                .copyWith(
-                                              color: appTheme.blue_gray_300,
-                                            ),
-                                          ),
-                                          trailing: Checkbox(
-                                            value: isSelected,
-                                            onChanged: (value) =>
-                                                _toggleFriendSelection(
-                                                    friend['id']),
-                                            activeColor:
-                                                appTheme.deep_purple_A100,
-                                            checkColor: appTheme.gray_50,
-                                          ),
-                                          onTap: () => _toggleFriendSelection(
-                                              friend['id']),
-                                        );
-                                      },
-                                    ),
+                                onTap: () =>
+                                    _toggleFriendSelection(friendId),
+                              );
+                            },
+                          ),
                         ),
 
                         SizedBox(height: 20.h),
@@ -847,7 +847,7 @@ class _MemoryConfirmationScreenState
                                   text: 'Send Invites',
                                   buttonStyle: CustomButtonStyle.fillPrimary,
                                   buttonTextStyle:
-                                      CustomButtonTextStyle.bodyMedium,
+                                  CustomButtonTextStyle.bodyMedium,
                                   onPressed: _sendInvites,
                                   padding: EdgeInsets.symmetric(
                                       horizontal: 30.h, vertical: 12.h),
@@ -862,11 +862,22 @@ class _MemoryConfirmationScreenState
                                     ? CustomButtonStyle.fillPrimary
                                     : CustomButtonStyle.outlinePrimary,
                                 buttonTextStyle:
-                                    CustomButtonTextStyle.bodyMedium,
+                                CustomButtonTextStyle.bodyMedium,
                                 onPressed: () {
-                                  NavigatorService.pushNamed(
-                                      AppRoutes.appStoryRecord);
+                                  if (memoryId.isEmpty) return;
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => NativeCameraRecordingScreen(
+                                        memoryId: memoryId,
+                                        memoryTitle: memoryName.isNotEmpty ? memoryName : 'Memory',
+                                        categoryIcon: null, // you don't have it on this screen currently
+                                      ),
+                                    ),
+                                  );
                                 },
+
                                 padding: EdgeInsets.symmetric(
                                     horizontal: 30.h, vertical: 12.h),
                               ),

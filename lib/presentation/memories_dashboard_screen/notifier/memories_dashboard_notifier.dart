@@ -27,9 +27,11 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
   bool _isDisposed = false;
 
   MemoriesDashboardNotifier()
-      : super(MemoriesDashboardState(
-    memoriesDashboardModel: MemoriesDashboardModel(),
-  )) {
+      : super(
+    MemoriesDashboardState(
+      memoriesDashboardModel: MemoriesDashboardModel(),
+    ),
+  ) {
     _setupRealtimeSubscriptions();
   }
 
@@ -77,7 +79,12 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
     try {
       final results = await Future.wait([
-        _cacheService.getStories(userId, forceRefresh: forceRefresh),
+        // ✅ Dashboard wants ALL stories (no 24h rule)
+        _cacheService.getStories(
+          userId,
+          forceRefresh: forceRefresh,
+          onlyLast24Hours: false,
+        ),
         _cacheService.getMemories(userId, forceRefresh: forceRefresh),
       ]);
 
@@ -85,7 +92,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final memories = results[1] as List<MemoryItemModel>;
 
       print(
-          '✅ MEMORIES DEBUG: Loaded ${stories.length} stories and ${memories.length} memories');
+        '✅ MEMORIES DEBUG: Loaded ${stories.length} stories and ${memories.length} memories',
+      );
 
       final liveMemories = memories.where((m) => m.state == 'open').toList();
       final sealedMemories = memories.where((m) => m.state == 'sealed').toList();
@@ -212,8 +220,13 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
       if (currentUser != null) {
-        final stories =
-        await _cacheService.getStories(currentUser.id, forceRefresh: true);
+        // ✅ Dashboard wants ALL stories
+        final stories = await _cacheService.getStories(
+          currentUser.id,
+          forceRefresh: true,
+          onlyLast24Hours: false,
+        );
+
         final updatedModel =
         (state.memoriesDashboardModel ?? MemoriesDashboardModel())
             .copyWith(storyItems: stories);
@@ -416,8 +429,8 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         if (story.id == storyId) {
           found = true;
           return story.copyWith(
-            backgroundImage: payload.newRecord['thumbnail_url'] as String? ??
-                story.backgroundImage,
+            backgroundImage:
+            payload.newRecord['thumbnail_url'] as String? ?? story.backgroundImage,
           );
         }
         return story;
@@ -515,8 +528,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       final updatedMemories = [newMemoryItem, ...currentMemories];
 
-      final liveMemories =
-      updatedMemories.where((m) => m.state == 'open').toList();
+      final liveMemories = updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
       updatedMemories.where((m) => m.state == 'sealed').toList();
 
@@ -618,8 +630,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final currentMemories = state.memoriesDashboardModel?.memoryItems ?? [];
       final updatedMemories = [newMemoryItem, ...currentMemories];
 
-      final liveMemories =
-      updatedMemories.where((m) => m.state == 'open').toList();
+      final liveMemories = updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
       updatedMemories.where((m) => m.state == 'sealed').toList();
 
@@ -664,8 +675,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       if (!found) return;
 
-      final liveMemories =
-      updatedMemories.where((m) => m.state == 'open').toList();
+      final liveMemories = updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
       updatedMemories.where((m) => m.state == 'sealed').toList();
 
@@ -698,8 +708,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final updatedMemories =
       memoryItems.where((memory) => memory.id != memoryId).toList();
 
-      final liveMemories =
-      updatedMemories.where((m) => m.state == 'open').toList();
+      final liveMemories = updatedMemories.where((m) => m.state == 'open').toList();
       final sealedMemories =
       updatedMemories.where((m) => m.state == 'sealed').toList();
 
@@ -734,8 +743,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     try {
       state = newState;
     } catch (e) {
-      if (e.toString().contains('dispose') ||
-          e.toString().contains('Bad state')) {
+      if (e.toString().contains('dispose') || e.toString().contains('Bad state')) {
         _isDisposed = true;
         print('⚠️ MEMORIES NOTIFIER: Attempted to set state after dispose');
       } else {

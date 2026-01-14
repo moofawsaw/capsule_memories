@@ -5,6 +5,8 @@ import '../core/app_export.dart';
 import './custom_image_view.dart';
 
 class CustomEventCard extends StatelessWidget {
+  final bool isLoading; // NEW
+
   final String? eventTitle;
   final String? eventDate;
   final String? eventLocation;
@@ -17,6 +19,7 @@ class CustomEventCard extends StatelessWidget {
 
   const CustomEventCard({
     Key? key,
+    this.isLoading = false, // NEW
     this.eventTitle,
     this.eventDate,
     this.eventLocation,
@@ -28,17 +31,19 @@ class CustomEventCard extends StatelessWidget {
     this.onAvatarTap,
   }) : super(key: key);
 
-  bool _isNetworkUrl(String s) => s.startsWith('http://') || s.startsWith('https://');
+  bool _isNetworkUrl(String s) =>
+      s.startsWith('http://') || s.startsWith('https://');
   bool _isSvg(String s) => s.toLowerCase().split('?').first.endsWith('.svg');
 
   @override
   Widget build(BuildContext context) {
-    final String iconPath = (iconButtonImagePath ?? '').trim().isNotEmpty
+    final String? iconPath = (iconButtonImagePath ?? '').trim().isNotEmpty
         ? iconButtonImagePath!.trim()
-        : ImageConstant.imgFrame13;
+        : null;
 
-    final bool isNetwork = _isNetworkUrl(iconPath);
-    final bool isSvg = isNetwork && _isSvg(iconPath);
+    final bool isNetwork = iconPath != null && _isNetworkUrl(iconPath);
+    final bool isSvg = iconPath != null && isNetwork && _isSvg(iconPath);
+
 
     return Container(
       width: double.infinity,
@@ -49,20 +54,16 @@ class CustomEventCard extends StatelessWidget {
         ),
       ),
       padding: EdgeInsets.fromLTRB(12.h, 12.h, 12.h, 12.h),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildBackButton(),
-              SizedBox(width: 16.h),
-              _buildIconButton(iconPath, isNetwork, isSvg),
-              SizedBox(width: 16.h),
-              _buildEventDetails(context),
-              SizedBox(width: 16.h),
-              _buildAvatarStack(),
-            ],
-          ),
+          _buildBackButton(),
+          SizedBox(width: 16.h),
+          _buildIconButton(iconPath, isNetwork, isSvg),
+          SizedBox(width: 16.h),
+          _buildEventDetails(context),
+          SizedBox(width: 16.h),
+          _buildAvatarStack(),
         ],
       ),
     );
@@ -72,7 +73,7 @@ class CustomEventCard extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(top: 14.h),
       child: GestureDetector(
-        onTap: onBackTap,
+        onTap: isLoading ? null : onBackTap, // disable while loading
         child: CustomImageView(
           imagePath: ImageConstant.imgArrowLeft,
           width: 24.h,
@@ -82,22 +83,25 @@ class CustomEventCard extends StatelessWidget {
     );
   }
 
-  Widget _buildIconButton(String iconPath, bool isNetwork, bool isSvg) {
+  Widget _buildIconButton(String? iconPath, bool isNetwork, bool isSvg) {
     return Padding(
       padding: EdgeInsets.only(top: 14.h),
-      child: GestureDetector(
-        onTap: onIconButtonTap,
-        child: Container(
-          width: 42.h,
-          height: 42.h,
-          // color: appTheme.color41C124,
-          // padding: EdgeInsets.all(6.h),
-          alignment: Alignment.center,
+      child: SizedBox(
+        width: 42.h,
+        height: 42.h,
+        child: isLoading
+            ? _skeletonBox(width: 42.h, height: 42.h, radius: 10.h)
+            : (iconPath == null
+        // ✅ Keep spacing but render nothing (no flash)
+            ? const SizedBox.shrink()
+            : GestureDetector(
+          onTap: onIconButtonTap,
           child: _buildIcon(iconPath, isNetwork, isSvg),
-        ),
+        )),
       ),
     );
   }
+
 
   Widget _buildIcon(String iconPath, bool isNetwork, bool isSvg) {
     if (!isNetwork) {
@@ -130,37 +134,45 @@ class CustomEventCard extends StatelessWidget {
           color: appTheme.whiteCustom,
         ),
       ),
-      errorWidget: (context, url, error) => CustomImageView(
-        imagePath: ImageConstant.imgFrame13,
-        fit: BoxFit.contain,
-      ),
+      errorWidget: (context, url, error) => const SizedBox.shrink(),
     );
   }
 
   Widget _buildEventDetails(BuildContext context) {
-    final locationText = eventLocation ?? 'no location';
-
     return Expanded(
       child: Padding(
         padding: EdgeInsets.only(top: 14.h),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              eventTitle ?? 'Event Title',
-              style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50, height: 1.22),
-            ),
+            if (isLoading)
+              _skeletonBox(width: 190.h, height: 18.h, radius: 6.h)
+            else
+              Text(
+                eventTitle ?? '', // NO VISIBLE FALLBACK
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                    .copyWith(color: appTheme.gray_50, height: 1.22),
+              ),
             SizedBox(height: 4.h),
             Row(
               children: [
-                Text(
-                  locationText,
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                      .copyWith(height: 1.33),
-                ),
+                if (isLoading)
+                  _skeletonBox(width: 120.h, height: 12.h, radius: 6.h)
+                else
+                  Text(
+                    eventLocation ?? '', // NO VISIBLE FALLBACK
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                        .copyWith(height: 1.33),
+                  ),
                 SizedBox(width: 6.h),
-                _buildPrivacyButton(),
+                if (isLoading)
+                  _skeletonBox(width: 64.h, height: 18.h, radius: 6.h)
+                else if (isPrivate != null)
+                  _buildPrivacyButton(),
               ],
             ),
           ],
@@ -170,7 +182,11 @@ class CustomEventCard extends StatelessWidget {
   }
 
   Widget _buildPrivacyButton() {
-    final bool isEventPrivate = isPrivate ?? true;
+    // ✅ If unknown, render nothing (prevents PRIVATE flash)
+    if (isPrivate == null) return const SizedBox.shrink();
+
+    final bool isEventPrivate = isPrivate!;
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 2.h),
       decoration: BoxDecoration(
@@ -190,17 +206,36 @@ class CustomEventCard extends StatelessWidget {
           SizedBox(width: 4.h),
           Text(
             isEventPrivate ? 'PRIVATE' : 'PUBLIC',
-            style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-                .copyWith(color: appTheme.deep_purple_A100),
+            style: TextStyleHelper.instance.body12BoldPlusJakartaSans.copyWith(
+              color: appTheme.deep_purple_A100,
+            ),
           ),
         ],
       ),
     );
   }
 
+
   Widget _buildAvatarStack() {
-    final List<String> avatars = participantImages ??
-        [ImageConstant.imgFrame2, ImageConstant.imgFrame1, ImageConstant.imgEllipse81];
+    if (isLoading) {
+      return Padding(
+        padding: EdgeInsets.only(top: 14.h),
+        child: SizedBox(
+          width: 84.h,
+          height: 36.h,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(right: 0, child: _skeletonCircle(36.h)),
+              Positioned(right: 24.h, child: _skeletonCircle(36.h)),
+              Positioned(right: 48.h, child: _skeletonCircle(36.h)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final List<String> avatars = participantImages ?? const [];
 
     Widget avatarAt(int index, double right) {
       if (avatars.length <= index) return const SizedBox.shrink();
@@ -238,6 +273,32 @@ class CustomEventCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _skeletonBox({
+    required double width,
+    required double height,
+    double radius = 8,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_03, // use your skeleton color
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+
+  Widget _skeletonCircle(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_03,
+        shape: BoxShape.circle,
       ),
     );
   }

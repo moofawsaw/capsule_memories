@@ -9,6 +9,11 @@ import './supabase_service.dart';
 /// In-memory cache service for memory objects with auto-refresh functionality.
 /// Fixes deadlocks by removing custom RW locks and using in-flight request dedupe.
 /// Ensures navigating away/back cannot wedge the cache.
+///
+/// ✅ UPDATE:
+/// - Split stories cache into 2 buckets:
+///   1) onlyLast24Hours=true  (Happening Now)
+///   2) onlyLast24Hours=false (Dashboard wants ALL)
 class MemoryCacheService {
   static final MemoryCacheService _instance = MemoryCacheService._internal();
   factory MemoryCacheService() => _instance;
@@ -18,7 +23,11 @@ class MemoryCacheService {
 
   // Cache storage (single-user app assumption; keyed by userId)
   List<MemoryItemModel>? _cachedMemories;
-  List<StoryItemModel>? _cachedStories;
+
+  // ✅ Stories cache buckets
+  List<StoryItemModel>? _cachedStories24h;
+  List<StoryItemModel>? _cachedStoriesAll;
+
   String? _cachedUserId;
   DateTime? _lastCacheTime;
 
@@ -35,16 +44,19 @@ class MemoryCacheService {
 
   // In-flight request dedupe (prevents overlapping loads + wedges)
   Future<List<MemoryItemModel>>? _memoriesInFlight;
-  Future<List<StoryItemModel>>? _storiesInFlight;
+
+  // ✅ In-flight per bucket
+  Future<List<StoryItemModel>>? _stories24hInFlight;
+  Future<List<StoryItemModel>>? _storiesAllInFlight;
 
   // Optimistic update tracking
   final Map<String, dynamic> _pendingUpdates = {};
 
   // Stream controllers for cache updates
   final _memoriesStreamController =
-      StreamController<List<MemoryItemModel>>.broadcast();
+  StreamController<List<MemoryItemModel>>.broadcast();
   final _storiesStreamController =
-      StreamController<List<StoryItemModel>>.broadcast();
+  StreamController<List<StoryItemModel>>.broadcast();
 
   Stream<List<MemoryItemModel>> get memoriesStream =>
       _memoriesStreamController.stream;
@@ -52,7 +64,15 @@ class MemoryCacheService {
       _storiesStreamController.stream;
 
   bool _isCacheValid(String userId) {
-    if (_cachedMemories == null || _cachedStories == null) return false;
+    if (_cachedMemories == null) return false;
+    if (_cachedUserId != userId) return false;
+    if (_lastCacheTime == null) return false;
+
+    final cacheAge = DateTime.now().difference(_lastCacheTime!);
+    return cacheAge < _cacheDuration;
+  }
+
+  bool _isStoriesCacheValid(String userId) {
     if (_cachedUserId != userId) return false;
     if (_lastCacheTime == null) return false;
 
@@ -62,16 +82,16 @@ class MemoryCacheService {
 
   /// Public: get memories with cache + deduped fetch
   Future<List<MemoryItemModel>> getMemories(
-    String userId, {
-    bool forceRefresh = false,
-  }) async {
+      String userId, {
+        bool forceRefresh = false,
+      }) async {
     print(
-        '🔍 CACHE: getMemories called for userId: $userId (forceRefresh=$forceRefresh)');
+      '🔍 CACHE: getMemories called for userId: $userId (forceRefresh=$forceRefresh)',
+    );
 
     // If switching users, hard reset cache and in-flight
     if (_cachedUserId != null && _cachedUserId != userId) {
-      print(
-          '🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
+      print('🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
       clearCache();
       _cachedUserId = userId;
     }
@@ -90,7 +110,7 @@ class MemoryCacheService {
 
     // Start a new fetch
     _memoriesInFlight = _retryOperation(
-      () => _loadUserMemories(userId),
+          () => _loadUserMemories(userId),
       'load memories',
     ).then((memories) {
       _cachedUserId = userId;
@@ -99,9 +119,8 @@ class MemoryCacheService {
       _memoriesStreamController.add(memories);
       print('✅ CACHE: Cached ${memories.length} memories');
       return memories;
-    }).catchError((e, st) {
+    }).catchError((e) {
       print('❌ CACHE: getMemories failed: $e');
-      // Do NOT poison cache; just clear inflight and rethrow
       throw e;
     }).whenComplete(() {
       _memoriesInFlight = null;
@@ -111,59 +130,85 @@ class MemoryCacheService {
   }
 
   /// Public: get stories with cache + deduped fetch
+  ///
+  /// ✅ onlyLast24Hours=true  -> Happening Now behavior
+  /// ✅ onlyLast24Hours=false -> Dashboard wants ALL (including sealed, older, etc.)
   Future<List<StoryItemModel>> getStories(
-    String userId, {
-    bool forceRefresh = false,
-  }) async {
+      String userId, {
+        bool forceRefresh = false,
+        bool onlyLast24Hours = true,
+      }) async {
     print(
-        '🔍 CACHE: getStories called for userId: $userId (forceRefresh=$forceRefresh)');
+      '🔍 CACHE: getStories called for userId: $userId (forceRefresh=$forceRefresh onlyLast24Hours=$onlyLast24Hours)',
+    );
 
     // If switching users, hard reset cache and in-flight
     if (_cachedUserId != null && _cachedUserId != userId) {
-      print(
-          '🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
+      print('🔄 CACHE: User changed ($_cachedUserId -> $userId). Clearing cache.');
       clearCache();
       _cachedUserId = userId;
     }
 
+    final cached = onlyLast24Hours ? _cachedStories24h : _cachedStoriesAll;
+    final inflight =
+    onlyLast24Hours ? _stories24hInFlight : _storiesAllInFlight;
+
     // Return cache if valid
-    if (!forceRefresh && _isCacheValid(userId)) {
-      print('✅ CACHE: Returning cached stories (${_cachedStories!.length})');
-      return _cachedStories!;
+    if (!forceRefresh && cached != null && _isStoriesCacheValid(userId)) {
+      print('✅ CACHE: Returning cached stories (${cached.length})');
+      return cached;
     }
 
     // If a fetch is already in-flight, await it instead of starting another
-    if (_storiesInFlight != null) {
+    if (inflight != null) {
       print('⏳ CACHE: Awaiting in-flight stories request...');
-      return _storiesInFlight!;
+      return inflight;
     }
 
-    // Start a new fetch
-    _storiesInFlight = _retryOperation(
-      () => _loadUserStories(userId),
+    Future<List<StoryItemModel>> future = _retryOperation(
+          () => _loadUserStories(userId, onlyLast24Hours: onlyLast24Hours),
       'load stories',
     ).then((stories) {
       _cachedUserId = userId;
-      _cachedStories = stories;
       _lastCacheTime = DateTime.now();
+
+      if (onlyLast24Hours) {
+        _cachedStories24h = stories;
+      } else {
+        _cachedStoriesAll = stories;
+      }
+
       _storiesStreamController.add(stories);
-      print('✅ CACHE: Cached ${stories.length} stories');
+
+      print(
+        '✅ CACHE: Cached ${stories.length} stories (onlyLast24Hours=$onlyLast24Hours)',
+      );
       return stories;
-    }).catchError((e, st) {
+    }).catchError((e) {
       print('❌ CACHE: getStories failed: $e');
       throw e;
     }).whenComplete(() {
-      _storiesInFlight = null;
+      if (onlyLast24Hours) {
+        _stories24hInFlight = null;
+      } else {
+        _storiesAllInFlight = null;
+      }
     });
 
-    return _storiesInFlight!;
+    if (onlyLast24Hours) {
+      _stories24hInFlight = future;
+    } else {
+      _storiesAllInFlight = future;
+    }
+
+    return future;
   }
 
   /// Retry operation with exponential backoff
   Future<T> _retryOperation<T>(
-    Future<T> Function() operation,
-    String operationName,
-  ) async {
+      Future<T> Function() operation,
+      String operationName,
+      ) async {
     int attempt = 0;
     Duration delay = _initialRetryDelay;
 
@@ -174,8 +219,7 @@ class MemoryCacheService {
         attempt++;
 
         if (attempt >= _maxRetries) {
-          print(
-              '❌ CACHE: Failed to $operationName after $attempt attempts: $e');
+          print('❌ CACHE: Failed to $operationName after $attempt attempts: $e');
           rethrow;
         }
 
@@ -202,8 +246,14 @@ class MemoryCacheService {
         // Force refresh both; in-flight dedupe will prevent overlaps
         await Future.wait([
           getMemories(userId, forceRefresh: true),
-          getStories(userId, forceRefresh: true),
+
+          // ✅ Keep default 24h bucket refreshed by default
+          getStories(userId, forceRefresh: true, onlyLast24Hours: true),
+
+          // ✅ Also refresh ALL bucket so dashboard stays updated
+          getStories(userId, forceRefresh: true, onlyLast24Hours: false),
         ]);
+
         print('✅ CACHE: Debounced refresh complete');
         completer.complete();
       } catch (e) {
@@ -238,20 +288,31 @@ class MemoryCacheService {
     _refreshDebounceTimer?.cancel();
 
     _cachedMemories = null;
-    _cachedStories = null;
+
+    _cachedStories24h = null;
+    _cachedStoriesAll = null;
+
     _cachedUserId = null;
     _lastCacheTime = null;
 
     _memoriesInFlight = null;
-    _storiesInFlight = null;
+
+    _stories24hInFlight = null;
+    _storiesAllInFlight = null;
 
     _pendingUpdates.clear();
   }
 
   /// Load user stories from database
-  Future<List<StoryItemModel>> _loadUserStories(String userId) async {
+  Future<List<StoryItemModel>> _loadUserStories(
+      String userId, {
+        required bool onlyLast24Hours,
+      }) async {
     try {
-      final storiesData = await _storyService.fetchUserStories(userId);
+      final storiesData = await _storyService.fetchUserStories(
+        userId,
+        onlyLast24Hours: onlyLast24Hours,
+      );
 
       final storyIds = storiesData.map((s) => s['id'] as String).toList();
 
@@ -266,29 +327,20 @@ class MemoryCacheService {
         if (viewsResponse != null) {
           viewedStoryIds =
               viewsResponse.map((view) => view['story_id'] as String).toSet();
-          print(
-              '🔍 CACHE: Found ${viewedStoryIds.length} viewed stories for user');
+          print('🔍 CACHE: Found ${viewedStoryIds.length} viewed stories for user');
         }
       }
 
       return storiesData.map((storyData) {
         final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
-        final memory = storyData['memories']
-            as Map<String, dynamic>?; // ✅ ADDED: Get memory data
         final createdAt = DateTime.parse(storyData['created_at'] as String);
         final storyId = storyData['id'] as String;
 
         final backgroundImage = _storyService.getStoryMediaUrl(storyData);
+
         final profileImage = AvatarHelperService.getAvatarUrl(
           contributor?['avatar_url'] as String?,
         );
-
-        final contributorName = contributor?['display_name'] as String? ??
-            contributor?['username'] as String? ??
-            'Unknown';
-
-        final memoryTitle = memory?['title'] as String? ??
-            'Unknown Memory'; // ✅ ADDED: Extract memory title
 
         final isRead = viewedStoryIds.contains(storyId);
 
@@ -298,8 +350,6 @@ class MemoryCacheService {
           profileImage: profileImage,
           timestamp: _storyService.getTimeAgo(createdAt),
           navigateTo: '/story/view',
-          memoryId: storyData['memory_id'] as String,
-          memoryTitle: memoryTitle, // ✅ ADDED: Include memory title in model
           isRead: isRead,
         );
       }).toList();
@@ -314,11 +364,9 @@ class MemoryCacheService {
     try {
       final memoriesData = await _storyService.fetchUserTimelines(userId);
 
-      final allMemories =
-          await Future.wait(memoriesData.map((memoryData) async {
+      final allMemories = await Future.wait(memoriesData.map((memoryData) async {
         final creator = memoryData['user_profiles'] as Map<String, dynamic>?;
-        final category =
-            memoryData['memory_categories'] as Map<String, dynamic>?;
+        final category = memoryData['memory_categories'] as Map<String, dynamic>?;
         final stories = memoryData['stories'] as List?;
 
         DateTime createdAt;
@@ -366,12 +414,12 @@ class MemoryCacheService {
         }
 
         final memoryThumbnails = stories
-                ?.map((story) {
-                  return (story['thumbnail_url'] ?? story['image_url'] ?? '')
-                      as String;
-                })
-                .where((url) => url.isNotEmpty)
-                .toList() ??
+            ?.map((story) {
+          return (story['thumbnail_url'] ?? story['image_url'] ?? '')
+          as String;
+        })
+            .where((url) => url.isNotEmpty)
+            .toList() ??
             [];
 
         final memoryId = memoryData['id'] as String;
@@ -399,12 +447,12 @@ class MemoryCacheService {
             // Contributor avatars (as returned by join order)
             final contributorAvatars = contributorsResponse
                 .map((contributor) {
-                  final userProfile =
-                      contributor['user_profiles'] as Map<String, dynamic>?;
-                  return AvatarHelperService.getAvatarUrl(
-                    userProfile?['avatar_url'] as String?,
-                  );
-                })
+              final userProfile =
+              contributor['user_profiles'] as Map<String, dynamic>?;
+              return AvatarHelperService.getAvatarUrl(
+                userProfile?['avatar_url'] as String?,
+              );
+            })
                 .where((url) => url.isNotEmpty)
                 .toList();
 
@@ -423,9 +471,7 @@ class MemoryCacheService {
 
             // Build "others" list by removing current user avatar (by URL)
             final others = (currentUserAvatar.isNotEmpty)
-                ? uniqueContributors
-                    .where((a) => a != currentUserAvatar)
-                    .toList()
+                ? uniqueContributors.where((a) => a != currentUserAvatar).toList()
                 : uniqueContributors;
 
             // ✅ Rule:
@@ -439,8 +485,7 @@ class MemoryCacheService {
                 ...others,
                 if (currentUserAvatar.isNotEmpty) currentUserAvatar,
               ];
-              participantAvatars =
-                  _dedupePreserveOrder(merged).take(3).toList();
+              participantAvatars = _dedupePreserveOrder(merged).take(3).toList();
             } else {
               participantAvatars = currentUserAvatar.isNotEmpty
                   ? <String>[currentUserAvatar]

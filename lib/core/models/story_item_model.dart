@@ -1,57 +1,47 @@
 import 'package:equatable/equatable.dart';
 
 class StoryItemModel extends Equatable {
-  final String? storyId;
-  final String? contributorId;
-  final String? backgroundImage; // thumbnail or preview
-  final String? userAvatar;
-  final String? userName;
-  final String? categoryIcon;
-  final String? categoryText;
+  final String? id;
+  final String? backgroundImage; // thumbnail/preview
+  final String? profileImage; // avatar
   final String? timestamp;
+  final String? navigateTo; // route/id used by list
+  final bool? isRead;
 
   const StoryItemModel({
-    this.storyId,
-    this.contributorId,
+    this.id,
     this.backgroundImage,
-    this.userAvatar,
-    this.userName,
-    this.categoryIcon,
-    this.categoryText,
+    this.profileImage,
     this.timestamp,
+    this.navigateTo,
+    this.isRead,
   });
 
   StoryItemModel copyWith({
-    String? storyId,
-    String? contributorId,
+    String? id,
     String? backgroundImage,
-    String? userAvatar,
-    String? userName,
-    String? categoryIcon,
-    String? categoryText,
+    String? profileImage,
     String? timestamp,
+    String? navigateTo,
+    bool? isRead,
   }) {
     return StoryItemModel(
-      storyId: storyId ?? this.storyId,
-      contributorId: contributorId ?? this.contributorId,
+      id: id ?? this.id,
       backgroundImage: backgroundImage ?? this.backgroundImage,
-      userAvatar: userAvatar ?? this.userAvatar,
-      userName: userName ?? this.userName,
-      categoryIcon: categoryIcon ?? this.categoryIcon,
-      categoryText: categoryText ?? this.categoryText,
+      profileImage: profileImage ?? this.profileImage,
       timestamp: timestamp ?? this.timestamp,
+      navigateTo: navigateTo ?? this.navigateTo,
+      isRead: isRead ?? this.isRead,
     );
   }
 
   @override
   List<Object?> get props => [
-        storyId,
-        contributorId,
-        backgroundImage,
-        userAvatar,
-        userName,
-        categoryIcon,
-        categoryText,
-        timestamp,
-      ];
+    id,
+    backgroundImage,
+    profileImage,
+    timestamp,
+    navigateTo,
+    isRead,
+  ];
 }

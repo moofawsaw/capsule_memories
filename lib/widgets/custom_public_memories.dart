@@ -7,6 +7,7 @@ import './custom_button.dart';
 import './custom_image_view.dart';
 import './custom_memory_skeleton.dart';
 import './timeline_widget.dart';
+import '../presentation/memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import '../presentation/event_timeline_view_screen/widgets/timeline_story_widget.dart';
 
 /// Controls card sizing + badge behavior per screen.
@@ -738,15 +739,41 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     );
   }
 
-  // ======= NAV =======
+// ======= NAV =======
 
-  void _onCreateStoryTap() {
-    if (widget.memory.id != null) {
-      NavigatorService.pushNamed(
-        AppRoutes.appBsUpload,
-        arguments: widget.memory.id,
-      );
-    }
+  Future<int> _getActiveMemoryCountForCurrentUser() async {
+    final client = SupabaseService.instance.client;
+    final user = client?.auth.currentUser;
+    if (client == null || user == null) return 0;
+
+    // "Active" = memories the user is a contributor of, that are open + not ended.
+    // If your schema uses different fields, adjust here.
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+
+    final res = await client
+        .from('memory_contributors')
+        .select('memory_id, memories!inner(id, state, end_time)')
+        .eq('user_id', user.id)
+        .eq('memories.state', 'open')
+        .gt('memories.end_time', nowIso);
+
+    if (res is List) return res.length;
+    return 0;
+  }
+
+  Future<void> _onCreateStoryTap() async {
+    final id = widget.memory.id;
+    if (id == null || id.isEmpty) return;
+
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) => NativeCameraRecordingScreen(
+          memoryId: id,
+          memoryTitle: widget.memory.title ?? '',
+          categoryIcon: widget.memory.iconPath,
+        ),
+      ),
+    );
   }
 
   // ======= LAYOUT RULES =======

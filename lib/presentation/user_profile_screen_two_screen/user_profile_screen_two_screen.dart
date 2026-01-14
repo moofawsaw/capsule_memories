@@ -18,6 +18,9 @@ class UserProfileScreenTwo extends ConsumerStatefulWidget {
 class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
   String? _userId;
 
+  // ✅ Pull-to-refresh needs AlwaysScrollable + optional controller
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -26,14 +29,28 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _userId = args?['userId'] as String?;
 
-      ref
-          .read(userProfileScreenTwoNotifier.notifier)
-          .initialize(userId: _userId);
+      ref.read(userProfileScreenTwoNotifier.notifier).initialize(userId: _userId);
 
       if (_userId == null) {
         ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // ✅ Unified refresh method (mirrors home screen behavior)
+  Future<void> _onRefresh() async {
+    await ref.read(userProfileScreenTwoNotifier.notifier).initialize(userId: _userId);
+
+    // If this is your own profile, also refresh avatar state (optional but useful)
+    if (_userId == null) {
+      await ref.read(avatarStateProvider.notifier).refreshAvatar();
+    }
   }
 
   @override
@@ -53,24 +70,33 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
               );
             }
 
-            return Container(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Container(
-                  padding: EdgeInsets.only(top: 24.h, left: 18.h, right: 18.h),
-                  child: Column(
-                    children: [
-                      _buildProfileHeader(context),
-                      SizedBox(height: 12.h),
-                      _buildStatsSection(context),
-                      if (_userId != null) ...[
-                        SizedBox(height: 16.h),
-                        _buildActionButtons(context),
+            return RefreshIndicator(
+              color: appTheme.deep_purple_A100,
+              backgroundColor: appTheme.gray_900_02,
+              strokeWidth: 3.0,
+              displacement: 40.0,
+              onRefresh: _onRefresh,
+              child: Container(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(), // ✅ required
+                  child: Container(
+                    padding: EdgeInsets.only(top: 24.h, left: 18.h, right: 18.h),
+                    child: Column(
+                      children: [
+                        _buildProfileHeader(context),
+                        SizedBox(height: 12.h),
+                        _buildStatsSection(context),
+                        if (_userId != null) ...[
+                          SizedBox(height: 16.h),
+                          _buildActionButtons(context),
+                        ],
+                        SizedBox(height: 28.h),
+                        _buildStoriesGrid(context),
+                        SizedBox(height: 12.h),
                       ],
-                      SizedBox(height: 28.h),
-                      _buildStoriesGrid(context),
-                      SizedBox(height: 12.h),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -110,8 +136,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
                         model?.avatarImagePath ??
                         ImageConstant.imgEllipse896x96,
                     userName: model?.userName ?? 'Loading...',
-                    // ✅ Do NOT show anything for non-current users
-                    //    (CustomProfileHeader will hide the row if empty)
                     email: isCurrentUser ? (model?.email ?? '') : '',
                     onEditTap: isCurrentUser
                         ? () {
@@ -189,7 +213,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     );
   }
 
-
   /// Stats Section
   Widget _buildStatsSection(BuildContext context) {
     return Consumer(
@@ -228,7 +251,8 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             Expanded(
               child: CustomButton(
                 text: state.isFollowing ? 'Unfollow' : 'Follow',
-                leftIcon: state.isFollowing ? Icons.person_remove : Icons.person_add,
+                leftIcon:
+                state.isFollowing ? Icons.person_remove : Icons.person_add,
                 buttonStyle: state.isFollowing
                     ? CustomButtonStyle.fillPrimary
                     : CustomButtonStyle.fillDeepPurpleA,
@@ -257,15 +281,14 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
                     ? null
                     : () {
                   if (state.isFriend) {
-                    _showUnfriendConfirmationDialog(context, notifier.unfriendUser);
+                    _showUnfriendConfirmationDialog(
+                        context, notifier.unfriendUser);
                   } else {
                     notifier.sendFriendRequest();
                   }
                 },
               ),
-
             ),
-
           ],
         );
       },
@@ -327,8 +350,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
               onTap: () {
                 onTapStoryCard(context, index);
               },
-
-              // ✅ only show delete on YOUR profile + only if ID exists
               showDelete:
               isCurrentUserProfile && storyId.isNotEmpty ? true : false,
               onDelete: (isCurrentUserProfile && storyId.isNotEmpty)
@@ -384,7 +405,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
 
     if (shouldDelete != true) return;
 
-    // ✅ Use the notifier method we added: deleteStoryFromProfile(storyId)
     final notifier = ref.read(userProfileScreenTwoNotifier.notifier);
     final success = await notifier.deleteStoryFromProfile(storyId);
 
@@ -437,17 +457,8 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     );
   }
 
-  /// Navigate to notifications screen
-  void onTapNotificationIcon(BuildContext context) {
-    NavigatorService.pushNamed(AppRoutes.appNotifications);
-  }
+  void onTapEditProfile(BuildContext context) {}
 
-  /// Navigate to edit profile
-  void onTapEditProfile(BuildContext context) {
-    // Edit profile functionality
-  }
-
-  /// Navigate to story viewer when story is tapped
   void onTapStoryCard(BuildContext context, int index) {
     final storyItems = ref
         .read(userProfileScreenTwoNotifier)
@@ -460,7 +471,6 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       return;
     }
 
-    // ✅ Force correct type: List<String>
     final List<String> storyIds = storyItems
         .where((item) => (item.storyId ?? '').isNotEmpty)
         .map((item) => item.storyId!)
@@ -484,16 +494,11 @@ class UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       initialStoryId: clickedStoryId,
     );
 
-    print('🚀 DEBUG: Navigating to story viewer with ${storyIds.length} stories');
-    print('   Initial story ID: $clickedStoryId');
-    print('   Story index: $index');
-
     NavigatorService.pushNamed(
       AppRoutes.appStoryView,
       arguments: feedContext,
     );
   }
-
 
   void _showBlockConfirmationDialog(
       BuildContext context, bool isBlocked, VoidCallback onConfirm) {

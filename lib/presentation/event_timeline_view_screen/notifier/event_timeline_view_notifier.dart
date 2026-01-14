@@ -1,3 +1,5 @@
+// lib/presentation/event_timeline_view_screen/notifier/event_timeline_view_notifier.dart
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
@@ -14,9 +16,9 @@ import '../widgets/timeline_story_widget.dart';
 
 part 'event_timeline_view_state.dart';
 
-final eventTimelineViewNotifier = StateNotifierProvider.autoDispose<
-    EventTimelineViewNotifier, EventTimelineViewState>(
-  (ref) => EventTimelineViewNotifier(),
+final eventTimelineViewNotifier =
+StateNotifierProvider.autoDispose<EventTimelineViewNotifier, EventTimelineViewState>(
+      (ref) => EventTimelineViewNotifier(),
 );
 
 class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
@@ -69,8 +71,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         return false;
       }
 
-      print(
-          '🔍 MEMBERSHIP CHECK: Verifying user ${currentUser.id} for memory $memoryId');
+      print('🔍 MEMBERSHIP CHECK: Verifying user ${currentUser.id} for memory $memoryId');
 
       // Check if user is the creator
       final memoryResponse = await SupabaseService.instance.client
@@ -79,8 +80,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           .eq('id', memoryId)
           .single();
 
-      if (memoryResponse != null &&
-          memoryResponse['creator_id'] == currentUser.id) {
+      if (memoryResponse != null && memoryResponse['creator_id'] == currentUser.id) {
         print('✅ MEMBERSHIP CHECK: User is memory creator');
         return true;
       }
@@ -115,8 +115,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         return false;
       }
 
-      print(
-          '🔍 CREATOR CHECK: Verifying user ${currentUser.id} for memory $memoryId');
+      print('🔍 CREATOR CHECK: Verifying user ${currentUser.id} for memory $memoryId');
 
       final memoryResponse = await SupabaseService.instance.client
           ?.from('memories')
@@ -124,8 +123,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           .eq('id', memoryId)
           .single();
 
-      final isCreator = memoryResponse != null &&
-          memoryResponse['creator_id'] == currentUser.id;
+      final isCreator =
+          memoryResponse != null && memoryResponse['creator_id'] == currentUser.id;
 
       print(
           '${isCreator ? "✅" : "❌"} CREATOR CHECK: User ${isCreator ? "is" : "is NOT"} the creator');
@@ -146,12 +145,10 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       'eventTitle': _validateField(model?.eventTitle, 'Beach Day Adventure'),
       'eventDate': _validateField(model?.eventDate, 'Dec 22'),
       'memoryId': _validateField(model?.memoryId, ''),
-      'categoryIcon':
-          _validateField(model?.categoryIcon, ImageConstant.imgFrame13),
+      'categoryIcon': _validateField(model?.categoryIcon, ImageConstant.imgFrame13),
       'participantImages': _validateList(model?.participantImages),
       'customStoryItems': _validateList(model?.customStoryItems),
-      'location': _validateField(
-          model?.timelineDetail?.centerLocation, 'Unknown Location'),
+      'location': _validateField(model?.timelineDetail?.centerLocation, 'Unknown Location'),
       'timelineStories': _validateList(model?.timelineDetail?.timelineStories),
     };
 
@@ -180,13 +177,21 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   }
 
   /// Real-time validation against Supabase data
+  ///
+  /// ✅ REAL FIX:
+  /// - Do NOT clear `eventTimelineViewModel` during refresh.
+  /// - Only flip `isLoading` and update the model if we actually need to reload.
   Future<bool> validateMemoryData(String memoryId) async {
     try {
-      print(
-          '🔍 VALIDATION: Starting real-time validation for memory: $memoryId');
+      // ✅ Start "refresh" without clearing snapshot/model
+      state = state.copyWith(
+        isLoading: true,
+        errorMessage: null,
+      );
 
-      final memoryResponse =
-          await SupabaseService.instance.client?.from('memories').select('''
+      print('🔍 VALIDATION: Starting real-time validation for memory: $memoryId');
+
+      final memoryResponse = await SupabaseService.instance.client?.from('memories').select('''
             id, title, created_at, start_time, end_time,
             visibility, state, location_name,
             category_id, creator_id,
@@ -208,14 +213,14 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           .eq('memory_id', memoryId);
 
       final contributorAvatars = (contributorsResponse as List?)
-              ?.map((c) {
-                final profile = c['user_profiles'] as Map<String, dynamic>?;
-                return AvatarHelperService.getAvatarUrl(
-                  profile?['avatar_url'] as String?,
-                );
-              })
-              .whereType<String>()
-              .toList() ??
+          ?.map((c) {
+        final profile = c['user_profiles'] as Map<String, dynamic>?;
+        return AvatarHelperService.getAvatarUrl(
+          profile?['avatar_url'] as String?,
+        );
+      })
+          .whereType<String>()
+          .toList() ??
           [];
 
       final storiesResponse = await SupabaseService.instance.client
@@ -237,52 +242,60 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       final dbLocation = memoryResponse['location_name'] as String?;
       validationResults['location'] =
-          currentModel?.timelineDetail?.centerLocation == dbLocation &&
-              dbLocation != null;
+          currentModel?.timelineDetail?.centerLocation == dbLocation && dbLocation != null;
 
       final dbVisibility = memoryResponse['visibility'] as String?;
       validationResults['visibility'] =
           currentModel?.isPrivate == (dbVisibility == 'private');
 
       validationResults['contributorCount'] =
-          (currentModel?.participantImages?.length ?? 0) ==
-              contributorAvatars.length;
+          (currentModel?.participantImages?.length ?? 0) == contributorAvatars.length;
 
       validationResults['storiesCount'] =
           (currentModel?.customStoryItems?.length ?? 0) == storyCount;
 
-      final passedCount =
-          validationResults.values.where((v) => v == true).length;
+      final passedCount = validationResults.values.where((v) => v == true).length;
       final totalCount = validationResults.length;
 
       print('📊 VALIDATION RESULTS: $passedCount/$totalCount checks passed');
       validationResults.forEach((field, isValid) {
-        print(
-            '   ${isValid ? "✅" : "❌"} $field: ${isValid ? "MATCH" : "MISMATCH"}');
+        print('   ${isValid ? "✅" : "❌"} $field: ${isValid ? "MATCH" : "MISMATCH"}');
       });
 
+      // ✅ Only reload if critical fields mismatch.
       if (!validationResults['memoryId']! || !validationResults['title']!) {
         print('⚠️ CRITICAL MISMATCH: Refreshing memory data from database');
-        await _reloadValidatedData(
-            memoryId, memoryResponse, contributorAvatars);
+        await _reloadValidatedData(memoryId, memoryResponse, contributorAvatars);
+
+        // ✅ End refresh (keep model!)
+        state = state.copyWith(isLoading: false, errorMessage: null);
         return true;
       }
 
+      // ✅ End refresh (keep model!)
+      state = state.copyWith(isLoading: false, errorMessage: null);
       return passedCount == totalCount;
     } catch (e, stackTrace) {
       print('❌ VALIDATION ERROR: $e');
       print('   Stack trace: $stackTrace');
-      setErrorState('Failed to validate memory data');
+
+      // ✅ Stop loading but KEEP snapshot/model to prevent UI flash
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Failed to validate memory data',
+      );
       return false;
     }
   }
 
   /// Reload memory data with validated Supabase data
+  ///
+  /// ✅ Also does not clear snapshot; it replaces fields while preserving stories/timeline where possible.
   Future<void> _reloadValidatedData(
-    String memoryId,
-    Map<String, dynamic> memoryData,
-    List<String> contributorAvatars,
-  ) async {
+      String memoryId,
+      Map<String, dynamic> memoryData,
+      List<String> contributorAvatars,
+      ) async {
     try {
       final title = memoryData['title'] as String?;
       final createdAt = memoryData['created_at'];
@@ -313,27 +326,32 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         }
       }
 
+      final existingStories = state.eventTimelineViewModel?.customStoryItems ?? [];
+      final existingTimelineStories =
+          state.eventTimelineViewModel?.timelineDetail?.timelineStories ?? [];
+      final existingCenterDistance =
+          state.eventTimelineViewModel?.timelineDetail?.centerDistance ?? '0km';
+
       state = state.copyWith(
         memoryId: memoryId,
-        eventTimelineViewModel: EventTimelineViewModel(
+        eventTimelineViewModel: (state.eventTimelineViewModel ?? EventTimelineViewModel(memoryId: memoryId))
+            .copyWith(
           memoryId: memoryId,
           eventTitle: title ?? 'Unknown Memory',
           eventDate: dateDisplay,
           isPrivate: visibility == 'private',
           categoryIcon: categoryIconUrl,
           participantImages: contributorAvatars,
-          customStoryItems:
-              state.eventTimelineViewModel?.customStoryItems ?? [],
+          customStoryItems: existingStories,
           timelineDetail: TimelineDetailModel(
             centerLocation: location ?? 'Unknown Location',
-            centerDistance: '0km',
+            centerDistance: existingCenterDistance,
             memoryStartTime: startTime != null ? _parseUtc(startTime) : null,
             memoryEndTime: endTime != null ? _parseUtc(endTime) : null,
-            timelineStories:
-                state.eventTimelineViewModel?.timelineDetail?.timelineStories ??
-                    [],
+            timelineStories: existingTimelineStories,
           ),
         ),
+        errorMessage: null,
       );
 
       print('✅ VALIDATION: Memory data reloaded with validated Supabase data');
@@ -349,17 +367,20 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('🔍 TIMELINE NOTIFIER: Initializing from MemoryNavArgs');
       print('   - Memory ID: ${navArgs.memoryId}');
 
-      // CRITICAL FIX: Set loading state TRUE immediately to trigger skeleton loading
+      // ✅ Start initial load: set loading true, but KEEP any existing model if present.
+      // (If you prefer: you can keep your placeholder EventTimelineViewModel(...) here too.)
       state = state.copyWith(
         isLoading: true,
         memoryId: navArgs.memoryId,
         eventTimelineViewModel:
-            EventTimelineViewModel(memoryId: navArgs.memoryId),
+        state.eventTimelineViewModel ?? EventTimelineViewModel(memoryId: navArgs.memoryId),
+        errorMessage: null,
       );
 
       final client = SupabaseService.instance.client;
       if (client == null) {
         print('❌ ERROR: Supabase client is null');
+        state = state.copyWith(isLoading: false);
         return;
       }
 
@@ -389,37 +410,37 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       final categoryData = memoryResponse['memory_categories'];
       final iconName = categoryData?['icon_name'] as String?;
-      final categoryIconUrl = iconName != null
-          ? StorageUtils.resolveMemoryCategoryIconUrl(iconName)
-          : null;
+      final categoryIconUrl = iconName != null ? StorageUtils.resolveMemoryCategoryIconUrl(iconName) : null;
 
+      // Contributors
       final contributorsResponse = await client
           .from('memory_contributors')
           .select('user_id, user_profiles(avatar_url)')
           .eq('memory_id', navArgs.memoryId);
 
       final contributorAvatars = (contributorsResponse as List?)
-              ?.map((c) {
-                final profile = c['user_profiles'] as Map<String, dynamic>?;
-                return AvatarHelperService.getAvatarUrl(
-                  profile?['avatar_url'] as String?,
-                );
-              })
-              .whereType<String>()
-              .toList() ??
+          ?.map((c) {
+        final profile = c['user_profiles'] as Map<String, dynamic>?;
+        return AvatarHelperService.getAvatarUrl(
+          profile?['avatar_url'] as String?,
+        );
+      })
+          .whereType<String>()
+          .toList() ??
           [];
 
       // Normalize memory window times to UTC
-      final DateTime? startUtc = memoryResponse['start_time'] != null
-          ? _parseUtc(memoryResponse['start_time'])
-          : null;
-      final DateTime? endUtc = memoryResponse['end_time'] != null
-          ? _parseUtc(memoryResponse['end_time'])
-          : null;
+      final DateTime? startUtc =
+      memoryResponse['start_time'] != null ? _parseUtc(memoryResponse['start_time']) : null;
+      final DateTime? endUtc =
+      memoryResponse['end_time'] != null ? _parseUtc(memoryResponse['end_time']) : null;
+
+      final existingTimelineDetail = state.eventTimelineViewModel?.timelineDetail;
 
       state = state.copyWith(
         memoryId: navArgs.memoryId,
-        eventTimelineViewModel: EventTimelineViewModel(
+        eventTimelineViewModel: (state.eventTimelineViewModel ?? EventTimelineViewModel(memoryId: navArgs.memoryId))
+            .copyWith(
           memoryId: navArgs.memoryId,
           eventTitle: memoryResponse['title'] ?? 'Memory',
           eventDate: _formatTimestamp(memoryResponse['created_at'] ?? ''),
@@ -428,35 +449,31 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           participantImages: contributorAvatars,
           timelineDetail: TimelineDetailModel(
             centerLocation: (memoryResponse['location_name'] as String?) ??
-                (state.eventTimelineViewModel?.timelineDetail?.centerLocation ??
-                    'Unknown Location'),
-            centerDistance:
-                state.eventTimelineViewModel?.timelineDetail?.centerDistance ??
-                    '0km',
+                (existingTimelineDetail?.centerLocation ?? 'Unknown Location'),
+            centerDistance: existingTimelineDetail?.centerDistance ?? '0km',
             memoryStartTime: startUtc,
             memoryEndTime: endUtc,
-            timelineStories: [],
+            timelineStories: existingTimelineDetail?.timelineStories ?? [],
           ),
-          customStoryItems: [],
+          customStoryItems: state.eventTimelineViewModel?.customStoryItems ?? [],
         ),
         isCurrentUserMember: isMember,
         isCurrentUserCreator: isCreator,
         // Keep loading true until stories are loaded
         isLoading: true,
+        errorMessage: null,
       );
 
       print('✅ TIMELINE NOTIFIER: State updated with all data');
-
       print('🔍 TIMELINE NOTIFIER: Loading stories for memory...');
       await loadMemoryStories(navArgs.memoryId);
       print('✅ TIMELINE NOTIFIER: Stories loading complete');
 
-      // CRITICAL: Set up real-time subscription for memory updates
+      // Set up real-time subscription for memory updates
       _setupRealtimeSubscription(navArgs.memoryId);
     } catch (e, stackTrace) {
       print('❌ ERROR in initializeFromMemory: $e');
       print('Stack trace: $stackTrace');
-      // Set loading false on error
       state = state.copyWith(isLoading: false);
     }
   }
@@ -466,8 +483,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
     try {
       final client = SupabaseService.instance.client;
       if (client == null) {
-        print(
-            '⚠️ REALTIME: Supabase client is null, cannot setup subscription');
+        print('⚠️ REALTIME: Supabase client is null, cannot setup subscription');
         return;
       }
 
@@ -480,28 +496,25 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       print('🔗 REALTIME: Setting up subscription for memory: $memoryId');
 
-      // Create channel for memory updates
       _memorySubscription = client
           .channel('memory-updates-$memoryId')
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'memories',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'id',
-              value: memoryId,
-            ),
-            callback: (payload) {
-              print('🔔 REALTIME: Memory update detected');
-              print('   - Memory ID: $memoryId');
-              print(
-                  '   - Changed fields: ${payload.newRecord.keys.join(", ")}');
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'memories',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'id',
+          value: memoryId,
+        ),
+        callback: (payload) {
+          print('🔔 REALTIME: Memory update detected');
+          print('   - Memory ID: $memoryId');
+          print('   - Changed fields: ${payload.newRecord.keys.join(", ")}');
 
-              // Reload memory data with updated information
-              _handleMemoryUpdate(memoryId, payload.newRecord);
-            },
-          )
+          _handleMemoryUpdate(memoryId, payload.newRecord);
+        },
+      )
           .subscribe();
 
       print('✅ REALTIME: Subscription active for memory: $memoryId');
@@ -512,73 +525,36 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   }
 
   /// Handle real-time memory update
-  Future<void> _handleMemoryUpdate(
-      String memoryId, Map<String, dynamic> updatedData) async {
+  Future<void> _handleMemoryUpdate(String memoryId, Map<String, dynamic> updatedData) async {
     try {
       print('🔄 REALTIME: Processing memory update');
       print('   - Memory ID: $memoryId');
 
-      // Extract updated fields
       final title = updatedData['title'] as String?;
       final visibility = updatedData['visibility'] as String?;
       final startTime = updatedData['start_time'];
       final endTime = updatedData['end_time'];
       final location = updatedData['location_name'] as String?;
-      final state = updatedData['state'] as String?;
-
-      print('🔍 REALTIME: Updated fields:');
-      print('   - Title: $title');
-      print('   - End Time: $endTime');
-      print('   - Start Time: $startTime');
-      print('   - Location: $location');
-      print('   - State: $state');
 
       // Normalize times to UTC
-      final DateTime? startUtc =
-          startTime != null ? _parseUtc(startTime) : null;
+      final DateTime? startUtc = startTime != null ? _parseUtc(startTime) : null;
       final DateTime? endUtc = endTime != null ? _parseUtc(endTime) : null;
 
-      // Update state with new data
-      this.state = this.state.copyWith(
-            eventTimelineViewModel: this.state.eventTimelineViewModel?.copyWith(
-                  eventTitle:
-                      title ?? this.state.eventTimelineViewModel?.eventTitle,
-                  isPrivate: visibility == 'private',
-                  timelineDetail: TimelineDetailModel(
-                    centerLocation: location ??
-                        this
-                            .state
-                            .eventTimelineViewModel
-                            ?.timelineDetail
-                            ?.centerLocation ??
-                        'Unknown Location',
-                    centerDistance: this
-                            .state
-                            .eventTimelineViewModel
-                            ?.timelineDetail
-                            ?.centerDistance ??
-                        '0km',
-                    memoryStartTime: startUtc ??
-                        this
-                            .state
-                            .eventTimelineViewModel
-                            ?.timelineDetail
-                            ?.memoryStartTime,
-                    memoryEndTime: endUtc ??
-                        this
-                            .state
-                            .eventTimelineViewModel
-                            ?.timelineDetail
-                            ?.memoryEndTime,
-                    timelineStories: this
-                            .state
-                            .eventTimelineViewModel
-                            ?.timelineDetail
-                            ?.timelineStories ??
-                        [],
-                  ),
-                ),
-          );
+      state = state.copyWith(
+        eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
+          eventTitle: title ?? state.eventTimelineViewModel?.eventTitle,
+          isPrivate: visibility == 'private',
+          timelineDetail: TimelineDetailModel(
+            centerLocation: location ??
+                state.eventTimelineViewModel?.timelineDetail?.centerLocation ??
+                'Unknown Location',
+            centerDistance: state.eventTimelineViewModel?.timelineDetail?.centerDistance ?? '0km',
+            memoryStartTime: startUtc ?? state.eventTimelineViewModel?.timelineDetail?.memoryStartTime,
+            memoryEndTime: endUtc ?? state.eventTimelineViewModel?.timelineDetail?.memoryEndTime,
+            timelineStories: state.eventTimelineViewModel?.timelineDetail?.timelineStories ?? [],
+          ),
+        ),
+      );
 
       print('✅ REALTIME: Timeline state updated with new memory data');
     } catch (e, stackTrace) {
@@ -599,27 +575,34 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   }
 
   /// Public loader used by initializeFromMemory
+  ///
+  /// ✅ REAL FIX:
+  /// - Never null out eventTimelineViewModel when refreshing/loading stories.
+  /// - Update pieces in place; always keep previous snapshot.
   Future<void> loadMemoryStories(String memoryId) async {
     try {
       print('🔍 TIMELINE DEBUG: Loading stories for memory: $memoryId');
 
-      // Fetch stories
+      // ✅ Start loading without clearing snapshot
+      state = state.copyWith(isLoading: true, errorMessage: null);
+
       final storiesData = await _storyService.fetchMemoryStories(memoryId);
 
-      print(
-          '🔍 TIMELINE DEBUG: Fetched ${storiesData.length} stories from database');
+      print('🔍 TIMELINE DEBUG: Fetched ${storiesData.length} stories from database');
 
       if (storiesData.isEmpty) {
         print('⚠️ TIMELINE DEBUG: Memory exists but has no stories yet');
+
+        final existingTimelineDetail = state.eventTimelineViewModel?.timelineDetail;
 
         state = state.copyWith(
           eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
             customStoryItems: [],
             timelineDetail: TimelineDetailModel(
-              centerLocation: state
-                      .eventTimelineViewModel?.timelineDetail?.centerLocation ??
-                  'Unknown Location',
-              centerDistance: '0km',
+              centerLocation: existingTimelineDetail?.centerLocation ?? 'Unknown Location',
+              centerDistance: existingTimelineDetail?.centerDistance ?? '0km',
+              memoryStartTime: existingTimelineDetail?.memoryStartTime,
+              memoryEndTime: existingTimelineDetail?.memoryEndTime,
               timelineStories: [],
             ),
           ),
@@ -630,8 +613,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       }
 
       // Story IDs for cycling
-      _currentMemoryStoryIds =
-          storiesData.map((storyData) => storyData['id'] as String).toList();
+      _currentMemoryStoryIds = storiesData.map((storyData) => storyData['id'] as String).toList();
 
       // Load memory window timestamps (UTC-normalized)
       final memoryResponse = await SupabaseService.instance.client
@@ -649,14 +631,11 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         memoryStartTime = _parseUtc(memoryResponse['start_time']);
         memoryEndTime = _parseUtc(memoryResponse['end_time']);
 
-        print(
-            '✅ TIMELINE DEBUG: Using memory window timestamps (UTC-normalized):');
+        print('✅ TIMELINE DEBUG: Using memory window timestamps (UTC-normalized):');
         print('   - Event start: ${memoryStartTime.toIso8601String()}');
         print('   - Event end:   ${memoryEndTime.toIso8601String()}');
       } else {
-        // Fallback based on story timestamps (UTC-normalized)
-        final storyTimes =
-            storiesData.map((s) => _parseUtc(s['created_at'])).toList();
+        final storyTimes = storiesData.map((s) => _parseUtc(s['created_at'])).toList();
         storyTimes.sort();
 
         memoryStartTime = storyTimes.first;
@@ -714,6 +693,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         );
       }).toList();
 
+      final existingTimelineDetail = state.eventTimelineViewModel?.timelineDetail;
+
       state = state.copyWith(
         timelineStories: timelineStories,
         memoryStartTime: memoryStartTime,
@@ -721,12 +702,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         eventTimelineViewModel: state.eventTimelineViewModel?.copyWith(
           customStoryItems: storyItems,
           timelineDetail: TimelineDetailModel(
-            centerLocation:
-                state.eventTimelineViewModel?.timelineDetail?.centerLocation ??
-                    'Unknown Location',
-            centerDistance:
-                state.eventTimelineViewModel?.timelineDetail?.centerDistance ??
-                    '0km',
+            centerLocation: existingTimelineDetail?.centerLocation ?? 'Unknown Location',
+            centerDistance: existingTimelineDetail?.centerDistance ?? '0km',
             memoryStartTime: memoryStartTime,
             memoryEndTime: memoryEndTime,
             timelineStories: timelineStories,
@@ -743,6 +720,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('❌ TIMELINE DEBUG: Error loading memory stories: $e');
       print('❌ TIMELINE DEBUG: Stack trace: $stackTrace');
 
+      // ✅ Stop loading, keep snapshot/model
       state = state.copyWith(
         errorMessage: 'Failed to load memory data. Please try refreshing.',
         isLoading: false,
@@ -808,6 +786,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   }
 
   void refreshData() {
+    // ✅ Don’t clear model; just mark loading if you still use this
     state = state.copyWith(isLoading: true);
     initialize();
   }
@@ -828,11 +807,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         throw Exception('No authenticated user');
       }
 
-      final memoryResponse = await client
-          .from('memories')
-          .select('creator_id')
-          .eq('id', memoryId)
-          .single();
+      final memoryResponse =
+      await client.from('memories').select('creator_id').eq('id', memoryId).single();
 
       if (memoryResponse['creator_id'] != currentUser.id) {
         throw Exception('Only the memory creator can delete this memory');
@@ -880,13 +856,10 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       if (existingContributor != null) {
         print('⚠️ JOIN MEMORY: User is already a member');
-
-        // Update membership status in state
         state = state.copyWith(isCurrentUserMember: true);
         return;
       }
 
-      // Add user as contributor
       await client.from('memory_contributors').insert({
         'memory_id': memoryId,
         'user_id': currentUser.id,
@@ -895,15 +868,78 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       print('✅ JOIN MEMORY: User added as contributor');
 
-      // Update membership status in state
       state = state.copyWith(isCurrentUserMember: true);
 
-      // Refresh cache
       await _cacheService.refreshMemoryCache(currentUser.id);
 
       print('✅ JOIN MEMORY: Successfully joined memory');
     } catch (e, stackTrace) {
       print('❌ JOIN MEMORY ERROR: $e');
+      print('   Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// LEAVE MEMORY: Remove current user as a contributor (non-creator only)
+  Future<void> leaveMemory(String memoryId) async {
+    try {
+      print('🔍 LEAVE MEMORY: Starting leave process');
+      print('   - Memory ID: $memoryId');
+
+      final client = SupabaseService.instance.client;
+      if (client == null) {
+        throw Exception('Supabase client is not initialized');
+      }
+
+      final currentUser = client.auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('No authenticated user');
+      }
+
+      // Safety: creator should not leave (creator uses delete flow)
+      final memoryResponse =
+      await client.from('memories').select('creator_id').eq('id', memoryId).single();
+
+      final creatorId = memoryResponse['creator_id'] as String?;
+      if (creatorId != null && creatorId == currentUser.id) {
+        throw Exception('Memory creator cannot leave their own memory');
+      }
+
+      // Check if contributor row exists
+      final existingContributor = await client
+          .from('memory_contributors')
+          .select('id')
+          .eq('memory_id', memoryId)
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+      if (existingContributor == null) {
+        print('⚠️ LEAVE MEMORY: User is not a contributor (already left)');
+        state = state.copyWith(
+          isCurrentUserMember: false,
+          isCurrentUserCreator: false,
+        );
+        return;
+      }
+
+      await client
+          .from('memory_contributors')
+          .delete()
+          .eq('memory_id', memoryId)
+          .eq('user_id', currentUser.id);
+
+      print('✅ LEAVE MEMORY: Contributor row deleted');
+
+      state = state.copyWith(
+        isCurrentUserMember: false,
+        isCurrentUserCreator: false,
+      );
+
+      await _cacheService.refreshMemoryCache(currentUser.id);
+
+      print('✅ LEAVE MEMORY: Successfully left memory');
+    } catch (e, stackTrace) {
+      print('❌ LEAVE MEMORY ERROR: $e');
       print('   Stack trace: $stackTrace');
       rethrow;
     }

@@ -30,44 +30,51 @@ class StoryService {
         .getPublicUrl(normalized);
   }
 
-  Future<List<Map<String, dynamic>>> fetchUserStories(String userId) async {
+  // ✅ UPDATED: caller can choose whether to apply the 24h filter
+  Future<List<Map<String, dynamic>>> fetchUserStories(
+      String userId, {
+        bool onlyLast24Hours = true,
+      }) async {
     return await _retryOperation(
-      () => _fetchUserStoriesInternal(userId),
+          () => _fetchUserStoriesInternal(
+        userId,
+        onlyLast24Hours: onlyLast24Hours,
+      ),
       'fetch user stories',
     );
   }
 
+  // ✅ UPDATED: supports 24h OR ALL, and fixes null receiver issues by requiring supabase
   Future<List<Map<String, dynamic>>> _fetchUserStoriesInternal(
-    String userId,
-  ) async {
-    try {
-      // ✅ FIXED: First get memory IDs where user is creator or contributor
-      final creatorMemories = await _supabase
-          ?.from('memories')
-          .select('id')
-          .eq('creator_id', userId);
+      String userId, {
+        required bool onlyLast24Hours,
+      }) async {
+    final supabase = _supabase;
+    if (supabase == null) return [];
 
-      final contributorMemories = await _supabase
-          ?.from('memory_contributors')
+    try {
+      // ✅ Get memory IDs where user is creator or contributor
+      final creatorMemories =
+      await supabase.from('memories').select('id').eq('creator_id', userId);
+
+      final contributorMemories = await supabase
+          .from('memory_contributors')
           .select('memory_id')
           .eq('user_id', userId);
 
       // Combine memory IDs from both sources
       final memoryIds = <String>{
-        ...((creatorMemories as List?)?.map((m) => m['id'] as String) ?? []),
-        ...((contributorMemories as List?)
-                ?.map((m) => m['memory_id'] as String) ??
-            []),
+        ...(creatorMemories as List)
+            .map((m) => m['id'] as String)
+            .toList(),
+        ...(contributorMemories as List)
+            .map((m) => m['memory_id'] as String)
+            .toList(),
       }.toList();
 
-      if (memoryIds.isEmpty) {
-        return [];
-      }
+      if (memoryIds.isEmpty) return [];
 
-      // Now fetch stories from those memories
-      final response = await _supabase
-          ?.from('stories')
-          .select('''
+      var query = supabase.from('stories').select('''
             id,
             memory_id,
             contributor_id,
@@ -89,16 +96,22 @@ class StoryService {
               id,
               title,
               visibility,
-              creator_id
+              creator_id,
+              state
             )
-          ''')
-          .inFilter('memory_id', memoryIds)
-          .gte(
-              'created_at',
-              DateTime.now()
-                  .subtract(const Duration(hours: 24))
-                  .toIso8601String())
-          .order('created_at', ascending: false);
+          ''').inFilter('memory_id', memoryIds);
+
+      // ✅ Only apply 24h filter if requested (Happening Now keeps this ON)
+      if (onlyLast24Hours) {
+        query = query.gte(
+          'created_at',
+          DateTime.now()
+              .subtract(const Duration(hours: 24))
+              .toIso8601String(),
+        );
+      }
+
+      final response = await query.order('created_at', ascending: false);
 
       return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
@@ -109,14 +122,14 @@ class StoryService {
 
   Future<List<Map<String, dynamic>>> fetchStoriesByAuthor(String userId) async {
     return await _retryOperation(
-      () => _fetchStoriesByAuthorInternal(userId),
+          () => _fetchStoriesByAuthorInternal(userId),
       'fetch stories by author',
     );
   }
 
   Future<List<Map<String, dynamic>>> _fetchStoriesByAuthorInternal(
-    String userId,
-  ) async {
+      String userId,
+      ) async {
     try {
       final response = await _supabase
           ?.from('stories')
@@ -164,14 +177,14 @@ class StoryService {
 
   Future<List<Map<String, dynamic>>> fetchUserTimelines(String userId) async {
     return await _retryOperation(
-      () => _fetchUserTimelinesInternal(userId),
+          () => _fetchUserTimelinesInternal(userId),
       'fetch user timelines',
     );
   }
 
   Future<List<Map<String, dynamic>>> _fetchUserTimelinesInternal(
-    String userId,
-  ) async {
+      String userId,
+      ) async {
     try {
       final contributorMemoryIds = await _supabase
           ?.from('memory_contributors')
@@ -179,8 +192,8 @@ class StoryService {
           .eq('user_id', userId);
 
       final contributorIds = (contributorMemoryIds as List?)
-              ?.map((m) => m['memory_id'] as String)
-              .toList() ??
+          ?.map((m) => m['memory_id'] as String)
+          .toList() ??
           [];
 
       final response = await _supabase?.from('memories').select('''
@@ -229,14 +242,14 @@ class StoryService {
 
   Future<List<Map<String, dynamic>>> fetchMemoryStories(String memoryId) async {
     return await _retryOperation(
-      () => _fetchMemoryStoriesInternal(memoryId),
+          () => _fetchMemoryStoriesInternal(memoryId),
       'fetch memory stories',
     );
   }
 
   Future<List<Map<String, dynamic>>> _fetchMemoryStoriesInternal(
-    String memoryId,
-  ) async {
+      String memoryId,
+      ) async {
     try {
       final response = await _supabase?.from('stories').select('''
             id,
@@ -319,13 +332,13 @@ class StoryService {
         'duration_seconds': durationSeconds,
         'text_overlays': caption != null
             ? [
-                {'text': caption}
-              ]
+          {'text': caption}
+        ]
             : [],
       };
 
       final response =
-          await _supabase.from('stories').insert(storyData).select('''
+      await _supabase!.from('stories').insert(storyData).select('''
             id,
             location_name,
             location_lat,
@@ -365,9 +378,9 @@ class StoryService {
   }
 
   Future<T> _retryOperation<T>(
-    Future<T> Function() operation,
-    String operationName,
-  ) async {
+      Future<T> Function() operation,
+      String operationName,
+      ) async {
     int attempt = 0;
     Duration delay = _initialRetryDelay;
 
@@ -490,7 +503,7 @@ class StoryService {
     if (_supabase == null) return false;
 
     return await _retryOperation(
-      () => _deleteStoryInternal(storyId),
+          () => _deleteStoryInternal(storyId),
       'delete story',
     );
   }
@@ -508,7 +521,7 @@ class StoryService {
     if (_supabase == null) return null;
 
     try {
-      final response = await _supabase.from('stories').select('''
+      final response = await _supabase!.from('stories').select('''
             id,
             image_url,
             video_url,

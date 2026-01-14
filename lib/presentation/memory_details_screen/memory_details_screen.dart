@@ -103,11 +103,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                         _buildDurationSection(context),
                         SizedBox(height: 24.h),
 
-                        // ✅ Invite section removed for sealed
-                        if (!state.isSealed) ...[
-                          _buildMemoryInfo(context),
-                          SizedBox(height: 24.h),
-                        ],
+                        // ✅ Invite Link row removed entirely (no longer shown for open OR sealed)
 
                         _buildMembersList(context),
                         SizedBox(height: 24.h),
@@ -405,7 +401,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
       ) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // ✅ allow taller sheet
+      isScrollControlled: true,
       backgroundColor: appTheme.gray_900_02,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
@@ -431,7 +427,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 mainAxisSize: MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -451,8 +446,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                     ],
                   ),
                   SizedBox(height: 16.h),
-
-                  // Body
                   if (state.isLoadingCategories)
                     Expanded(
                       child: Center(
@@ -468,7 +461,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       child: Center(
                         child: Text(
                           'No categories available',
-                          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                          style: TextStyleHelper
+                              .instance.body14RegularPlusJakartaSans
                               .copyWith(color: appTheme.blue_gray_300),
                         ),
                       ),
@@ -483,7 +477,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                           final category = state.categories[index];
                           final categoryId = category['id'] as String;
                           final categoryName = category['name'] as String;
-                          final isSelected = categoryId == state.selectedCategoryId;
+                          final isSelected =
+                              categoryId == state.selectedCategoryId;
 
                           return GestureDetector(
                             onTap: () {
@@ -510,7 +505,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(8.h),
                                       child: CustomImageView(
-                                        imagePath: category['icon_url'] as String,
+                                        imagePath:
+                                        category['icon_url'] as String,
                                         height: 40.h,
                                         width: 40.h,
                                         fit: BoxFit.cover,
@@ -521,8 +517,10 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                       height: 40.h,
                                       width: 40.h,
                                       decoration: BoxDecoration(
-                                        color: appTheme.deep_purple_A100.withAlpha(51),
-                                        borderRadius: BorderRadius.circular(8.h),
+                                        color: appTheme.deep_purple_A100
+                                            .withAlpha(51),
+                                        borderRadius:
+                                        BorderRadius.circular(8.h),
                                       ),
                                       child: Icon(
                                         Icons.category,
@@ -533,7 +531,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                   SizedBox(width: 12.h),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                      CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           categoryName,
@@ -547,8 +546,11 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                           Text(
                                             category['tagline'] as String,
                                             style: TextStyleHelper
-                                                .instance.body12MediumPlusJakartaSans
-                                                .copyWith(color: appTheme.blue_gray_300),
+                                                .instance
+                                                .body12MediumPlusJakartaSans
+                                                .copyWith(
+                                                color:
+                                                appTheme.blue_gray_300),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -577,7 +579,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
       },
     );
   }
-
 
   Widget _buildDurationSection(BuildContext context) {
     return Consumer(
@@ -621,8 +622,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
               ],
             ),
             SizedBox(height: 12.h),
-
-            // Editable only when open
             if (canEditDuration)
               GestureDetector(
                 onTap: () {
@@ -681,7 +680,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                       .copyWith(color: appTheme.gray_50),
                 ),
               ),
-
             if (state.isSealed) ...[
               SizedBox(height: 8.h),
               Text(
@@ -690,7 +688,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                     .copyWith(color: appTheme.blue_gray_300),
               ),
             ],
-
             if (!state.isSealed && state.endTime != null) ...[
               SizedBox(height: 8.h),
               Row(
@@ -838,102 +835,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
     }
   }
 
-  Widget _buildMemoryInfo(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(memoryDetailsNotifier);
-        final notifier = ref.read(memoryDetailsNotifier.notifier);
-
-        // This entire section is hidden when sealed (handled in build())
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CustomImageView(
-                  imagePath: ImageConstant.imgFrameBlueGray300,
-                  height: 18.h,
-                  width: 18.h,
-                ),
-                SizedBox(width: 6.h),
-                Text(
-                  'Invite Link',
-                  style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300, height: 1.31),
-                ),
-              ],
-            ),
-            SizedBox(height: 12.h),
-            Container(
-              margin: EdgeInsets.only(right: 12.h),
-              child: Row(
-                spacing: 12.h,
-                children: [
-                  Expanded(
-                    child: CustomEditText(
-                      controller: state.inviteLinkController,
-                      hintText: ImageConstant
-                          .imgNetworkR812309r72309r572093t722323t23t23t08,
-                      fillColor: appTheme.gray_900,
-                      borderRadius: 8.h,
-                      textStyle: TextStyleHelper
-                          .instance.title16RegularPlusJakartaSans
-                          .copyWith(color: appTheme.gray_50),
-                      readOnly: true,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      notifier.copyInviteLink();
-                    },
-                    child: CustomImageView(
-                      imagePath: ImageConstant.imgIcon14,
-                      height: 24.h,
-                      width: 24.h,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      notifier.showQRCodeBottomSheet(context);
-                    },
-                    child: Icon(
-                      Icons.qr_code,
-                      color: appTheme.gray_50,
-                      size: 24.h,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: state.isSharing
-                        ? null
-                        : () {
-                      notifier.shareMemoryNative();
-                    },
-                    child: state.isSharing
-                        ? SizedBox(
-                      width: 24.h,
-                      height: 24.h,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          appTheme.gray_50,
-                        ),
-                      ),
-                    )
-                        : Icon(
-                      Icons.share,
-                      color: appTheme.gray_50,
-                      size: 24.h,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Widget _buildMembersList(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -967,7 +868,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
               ],
             ),
             SizedBox(height: 12.h),
-
             if (state.memoryDetailsModel?.members?.isNotEmpty ?? false) ...[
               ListView.separated(
                 shrinkWrap: true,
@@ -979,7 +879,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
 
                   return MemberItemWidget(
                     member: member,
-                    // Pass "isCreator" only when member edits are allowed
                     isCreator: canEditMembers,
                     onRemove: !canEditMembers
                         ? null
@@ -1039,7 +938,6 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
               SizedBox(height: 16.h),
             ],
 
-            // ✅ Sealed: no invite/search section
             if (canEditMembers) ...[
               Divider(color: appTheme.blue_gray_300.withAlpha(51)),
               SizedBox(height: 16.h),
@@ -1153,8 +1051,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                   vertical: 6.h,
                                 ),
                                 decoration: BoxDecoration(
-                                  color:
-                                  appTheme.deep_purple_A100.withAlpha(26),
+                                  color: appTheme.deep_purple_A100.withAlpha(26),
                                   borderRadius: BorderRadius.circular(6.h),
                                   border: Border.all(
                                     color: appTheme.deep_purple_A100,
@@ -1165,7 +1062,8 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                   'Invite',
                                   style: TextStyleHelper
                                       .instance.body12BoldPlusJakartaSans
-                                      .copyWith(color: appTheme.deep_purple_A100),
+                                      .copyWith(
+                                      color: appTheme.deep_purple_A100),
                                 ),
                               ),
                             ),
@@ -1246,5 +1144,4 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
   }
 
   void onTapMemberAction(BuildContext context) {}
-
 }

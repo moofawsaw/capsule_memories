@@ -516,30 +516,30 @@ class MemoryDetailsViewScreenState
                 ),
               ),
 
-              // INLINE BUTTONS
-              Align(
-                alignment: Alignment.topRight,
-                child: Container(
-                  margin: EdgeInsets.only(right: 16.h),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isOwner)
+              // INLINE BUTTONS (OWNER ONLY)
+              if (isOwner)
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Container(
+                    margin: EdgeInsets.only(right: 16.h),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         _CircleIconButton(
                           icon: Icons.delete_outline,
                           isDestructive: true,
                           onTap: () => _onTapDeleteMemory(context),
                         ),
-                      if (isOwner) SizedBox(width: 8.h),
-                      if (isOwner)
+                        SizedBox(width: 8.h),
                         _CircleIconButton(
                           icon: Icons.edit,
                           onTap: () => _onTapEditMemory(context),
                         ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
+
             ],
           ),
         );

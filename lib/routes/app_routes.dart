@@ -30,14 +30,17 @@ import '../presentation/memory_details_view_screen/memory_details_view_screen.da
 import '../presentation/memory_feed_dashboard_screen/memory_feed_dashboard_screen.dart';
 import '../presentation/memory_invitation_screen/memory_invitation_screen.dart';
 import '../presentation/memory_members_screen/memory_members_screen.dart';
+import '../presentation/memory_selection_bottom_sheet/memory_selection_bottom_sheet.dart';
 import '../presentation/memory_share_options_screen/memory_share_options_screen.dart';
 import '../presentation/memory_timeline_playback_screen/memory_timeline_playback_screen.dart';
+import '../presentation/native_camera_recording_screen/native_camera_recording_screen.dart';
 import '../presentation/notification_settings_screen/notification_settings_screen.dart';
 import '../presentation/notifications_screen/notifications_screen.dart';
 import '../presentation/password_reset_screen/password_reset_screen.dart';
 import '../presentation/post_story_screen/post_story_screen.dart';
 import '../presentation/qr_code_share_screen/qr_code_share_screen.dart';
 import '../presentation/qr_code_share_screen_two_screen/qr_code_share_screen_two_screen.dart';
+import '../presentation/qr_scanner_screen/qr_scanner_screen.dart';
 import '../presentation/qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import '../presentation/share_story_screen/share_story_screen.dart';
 import '../presentation/splash_screen/splash_screen.dart';
@@ -46,9 +49,7 @@ import '../presentation/user_menu_screen/user_menu_screen.dart';
 import '../presentation/user_profile_screen_two_screen/user_profile_screen_two_screen.dart';
 import '../presentation/vibe_selection_screen/vibe_selection_screen.dart';
 import '../presentation/video_call_interface_screen/video_call_interface_screen.dart';
-import '../presentation/qr_scanner_screen/qr_scanner_screen.dart';
 import '../presentation/friend_request_confirmation_dialog/friend_request_confirmation_dialog.dart';
-import '../presentation/memory_selection_bottom_sheet/memory_selection_bottom_sheet.dart';
 
 class AppRoutes {
   // App shell route - renders AppShell with persistent header
@@ -78,7 +79,7 @@ class AppRoutes {
   static const String appFollowing = '/app/following';
   static const String appFriends = '/app/friends';
   static const String appGroups = '/app/groups';
-  @Deprecated('Use appStoryRecord instead')
+  @Deprecated('Use appNativeCamera instead')
   static const String appHome = '/app/home';
   static const String appJoin = '/app/join';
   static const String appMemories = '/app/memories';
@@ -94,10 +95,13 @@ class AppRoutes {
   static const String appReport = '/app/report';
   static const String appSettings = '/app/settings';
   static const String appStickers = '/app/stickers';
+
+  // ✅ Correct story workflow
   static const String appNativeCamera = '/app/native-camera';
   static const String appStoryEdit = '/app/story/edit';
-  static const String appStoryRecord = '/app/story/record';
+  static const String appStoryRecord = '/app/story/record'; // keep as alias -> native camera
   static const String appStoryView = '/app/story/view';
+
   static const String appTimeline = '/app/timeline';
   static const String appTimelineSealed = '/app/timeline-sealed';
   @Deprecated('Use appStoryView instead')
@@ -125,23 +129,66 @@ class AppRoutes {
   static const String memoryTimelinePlayback =
       '/memory-timeline-playback-screen';
 
+  // ----------------------------
+  // Argument helpers
+  // ----------------------------
+  static Map<String, dynamic> _argsMap(RouteSettings settings) {
+    final args = settings.arguments;
+    if (args is Map<String, dynamic>) return args;
+    if (args is Map) return args.cast<String, dynamic>();
+    return <String, dynamic>{};
+  }
+
+  static String _argString(RouteSettings settings, String key,
+      {String fallback = ''}) {
+    final map = _argsMap(settings);
+    final v = map[key];
+    return (v is String) ? v : fallback;
+  }
+
+  static String? _argNullableString(RouteSettings settings, String key) {
+    final map = _argsMap(settings);
+    final v = map[key];
+    return (v is String) ? v : null;
+  }
+
   /// Get the child widget for a given app route
-  static Widget _getAppChild(String routeName) {
+  static Widget _getAppChild(String routeName, RouteSettings settings) {
     switch (routeName) {
-      // Story workflow routes - record, edit, view
-      case appStoryRecord:
-        return HangoutCallScreen();
+    // ✅ Story workflow routes
+    // Record should be native camera
+    //   case appNativeCamera:
+    //     return NativeCameraRecordingScreen(
+    //       memoryId: _argString(settings, 'memoryId'),
+    //       memoryTitle: _argString(settings, 'memoryTitle'),
+    //       categoryIcon: _argNullableString(settings, 'categoryIcon'),
+    //     );
+    //
+    // // Keep /app/story/record as an alias to the real recorder
+    //   case appStoryRecord:
+    //     return NativeCameraRecordingScreen(
+    //       memoryId: _argString(settings, 'memoryId'),
+    //       memoryTitle: _argString(settings, 'memoryTitle'),
+    //       categoryIcon: _argNullableString(settings, 'categoryIcon'),
+    //     );
+
+    // Edit and view
       case appStoryEdit:
         return PostStoryScreen();
       case appStoryView:
         return EventStoriesViewScreen();
+    //
+    // // Backward compatibility - deprecated routes redirect
+    //   case appHome:
+    //     return NativeCameraRecordingScreen(
+    //       memoryId: _argString(settings, 'memoryId'),
+    //       memoryTitle: _argString(settings, 'memoryTitle'),
+    //       categoryIcon: _argNullableString(settings, 'categoryIcon'),
+    //     );
+    //   case appPost:
+    //     return PostStoryScreen();
 
-      // Backward compatibility - deprecated routes redirect to new story routes
-      case appHome:
-        return HangoutCallScreen(); // Redirects to record
-      case appPost:
-        return PostStoryScreen(); // Redirects to edit
-
+    // App tabs/screens
       case appFeed:
         return const MemoryFeedDashboardScreen();
       case appMemories:
@@ -177,7 +224,7 @@ class AppRoutes {
       case appFeedback:
         return FeatureRequestScreen();
 
-      // Bottom sheet routes
+    // Bottom sheet routes
       case appBsMemoryCreate:
         return CreateMemoryScreen();
       case appBsShare:
@@ -197,25 +244,23 @@ class AppRoutes {
       case appBsStories:
         return EventStoriesViewScreen();
       case appBsUpload:
-        // Add this line: Extract memoryId and dates from route settings
         final uploadArgs = NavigatorService.navigatorKey.currentContext != null
             ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)
-                ?.settings
-                .arguments as Map<String, dynamic>?
+            ?.settings
+            .arguments as Map<String, dynamic>?
             : null;
         return AddMemoryUploadScreen(
           memoryId: uploadArgs?['memoryId'] as String? ?? '',
           memoryStartDate:
-              uploadArgs?['memoryStartDate'] as DateTime? ?? DateTime.now(),
+          uploadArgs?['memoryStartDate'] as DateTime? ?? DateTime.now(),
           memoryEndDate:
-              uploadArgs?['memoryEndDate'] as DateTime? ?? DateTime.now(),
+          uploadArgs?['memoryEndDate'] as DateTime? ?? DateTime.now(),
         );
       case appBsDetails:
-        // Add this line: Extract memoryId from route settings
         final memoryId = NavigatorService.navigatorKey.currentContext != null
             ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)
-                ?.settings
-                .arguments as String?
+            ?.settings
+            .arguments as String?
             : null;
         return MemoryDetailsScreen(memoryId: memoryId ?? '');
       case appBsVibes:
@@ -224,10 +269,8 @@ class AppRoutes {
         return MemoryInvitationScreen();
       case appBsDownload:
         return AppDownloadScreen();
-      case appBsMemorySelection:
-        return const MemorySelectionBottomSheet();
 
-      // Overlay routes
+    // Overlay routes
       case appOverlayText:
         return ColorSelectionScreen();
 
@@ -243,7 +286,6 @@ class AppRoutes {
 
   /// Check if route should have animation
   static bool _shouldAnimate(String routeName) {
-    // Bottom sheets and overlays should have animation
     return routeName.contains('/bs/') || routeName.contains('/overlay/');
   }
 
@@ -281,15 +323,15 @@ class AppRoutes {
       return _buildRoute(SplashScreen(), settings, shouldAnimate: false);
     }
 
-    // ✅ CRITICAL FIX: Explicit handling for memory confirmation screen
+    // Explicit handling for memory confirmation screen
     if (routeName == memoryConfirmationScreen) {
       return MaterialPageRoute(
         builder: (context) => const MemoryConfirmationScreen(),
-        settings: settings, // Ensure settings with arguments are passed through
+        settings: settings,
       );
     }
 
-    // ✅ CRITICAL FIX: Explicit handling for memory timeline playback screen
+    // Explicit handling for memory timeline playback screen
     if (routeName == memoryTimelinePlayback) {
       return MaterialPageRoute(
         builder: (context) {
@@ -300,41 +342,39 @@ class AppRoutes {
       );
     }
 
-    // ✅ NEW: Special handling for menu overlay - slides from left over current screen
+    // Menu overlay
     if (routeName == appMenu) {
       return _buildSlideOverlayRoute(UserMenuScreen(), settings);
     }
 
     // App routes (with persistent header)
     if (routeName.startsWith('/app')) {
-      final child = _getAppChild(routeName);
+      final child = _getAppChild(routeName, settings);
       final requiresAuth = _requiresAuth(routeName);
       final shouldAnimate = _shouldAnimate(routeName);
 
-      // Wrap with auth guard if needed
       final protectedChild = requiresAuth
           ? AuthGuard.protectedRoute(
-              NavigatorService.navigatorKey.currentContext!,
-              routeName,
-              child,
-            )
+        NavigatorService.navigatorKey.currentContext!,
+        routeName,
+        child,
+      )
           : child;
 
-      // Wrap with AppShell for persistent header
       final shellChild = AppShell(child: protectedChild);
 
       return _buildRoute(shellChild, settings, shouldAnimate: shouldAnimate);
     }
 
-    return null; // Unknown route
+    return null;
   }
 
   /// Build route with optional animation
   static Route<dynamic> _buildRoute(
-    Widget child,
-    RouteSettings settings, {
-    required bool shouldAnimate,
-  }) {
+      Widget child,
+      RouteSettings settings, {
+        required bool shouldAnimate,
+      }) {
     if (shouldAnimate) {
       return MaterialPageRoute(
         builder: (context) => child,
@@ -350,27 +390,25 @@ class AppRoutes {
     }
   }
 
-  /// ✅ NEW: Build slide overlay route - slides from left over current screen
+  /// Build slide overlay route - slides from left over current screen
   static Route<dynamic> _buildSlideOverlayRoute(
-    Widget child,
-    RouteSettings settings,
-  ) {
+      Widget child,
+      RouteSettings settings,
+      ) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => child,
       settings: settings,
-      opaque:
-          false, // Makes the route transparent so previous screen shows through
-      barrierColor: Colors.black.withAlpha(128), // Semi-transparent backdrop
-      barrierDismissible: true, // Allow dismissing by tapping backdrop
+      opaque: false,
+      barrierColor: Colors.black.withAlpha(128),
+      barrierDismissible: true,
       transitionDuration: const Duration(milliseconds: 300),
       reverseTransitionDuration: const Duration(milliseconds: 250),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        // Slide animation from left to right
-        const begin = Offset(-1.0, 0.0); // Start off-screen to the left
-        const end = Offset.zero; // End at normal position
+        const begin = Offset(-1.0, 0.0);
+        const end = Offset.zero;
         const curve = Curves.easeInOut;
 
-        var tween = Tween(begin: begin, end: end).chain(
+        final tween = Tween(begin: begin, end: end).chain(
           CurveTween(curve: curve),
         );
 
@@ -384,37 +422,53 @@ class AppRoutes {
 
   // Legacy route map for backward compatibility
   static Map<String, WidgetBuilder> get routes => {
-        authLogin: (context) => LoginScreen(),
-        authRegister: (context) => AccountRegistrationScreen(),
-        authReset: (context) => PasswordResetScreen(),
-        splash: (context) => SplashScreen(),
-        qrCodeShareScreenTwo: (context) => const QRCodeShareScreenTwoScreen(),
-        qrTimelineShare: (context) {
-          final memoryId =
-              ModalRoute.of(context)?.settings.arguments as String?;
-          return QRTimelineShareScreen(
-            memoryId: memoryId ?? '',
-          );
-        },
-        memoryShareOptionsScreen: (context) => const MemoryShareOptionsScreen(),
-        memoryConfirmationScreen: (context) => const MemoryConfirmationScreen(),
-        qrScannerScreen: (context) => const QRScannerScreen(),
-        friendRequestConfirmationDialog: (context) =>
-            const FriendRequestConfirmationDialog(),
-        appStoryEdit: (context) {
-          final args = ModalRoute.of(context)!.settings.arguments
-              as Map<String, dynamic>;
-          return StoryEditScreen(
-            mediaPath: args['video_path'] as String,
-            isVideo: args['is_video'] as bool? ?? true,
-            memoryId: args['memory_id'] as String,
-            memoryTitle: args['memory_title'] as String,
-            categoryIcon: args['category_icon'] as String?,
-          );
-        },
-        memoryTimelinePlayback: (context) {
-          final memoryId = ModalRoute.of(context)!.settings.arguments as String;
-          return MemoryTimelinePlaybackScreen(memoryId: memoryId);
-        },
-      };
+    authLogin: (context) => LoginScreen(),
+    authRegister: (context) => AccountRegistrationScreen(),
+    authReset: (context) => PasswordResetScreen(),
+    splash: (context) => SplashScreen(),
+    qrCodeShareScreenTwo: (context) => const QRCodeShareScreenTwoScreen(),
+    qrTimelineShare: (context) {
+      final memoryId =
+      ModalRoute.of(context)?.settings.arguments as String?;
+      return QRTimelineShareScreen(
+        memoryId: memoryId ?? '',
+      );
+    },
+    memoryShareOptionsScreen: (context) => const MemoryShareOptionsScreen(),
+    memoryConfirmationScreen: (context) => const MemoryConfirmationScreen(),
+    qrScannerScreen: (context) => const QRScannerScreen(),
+    friendRequestConfirmationDialog: (context) =>
+    const FriendRequestConfirmationDialog(),
+
+    // ✅ Keep StoryEditScreen mapping as-is
+    appStoryEdit: (context) {
+      final args = ModalRoute.of(context)!.settings.arguments
+      as Map<String, dynamic>;
+      return StoryEditScreen(
+        mediaPath: args['video_path'] as String,
+        isVideo: args['is_video'] as bool? ?? true,
+        memoryId: args['memory_id'] as String,
+        memoryTitle: args['memory_title'] as String,
+        categoryIcon: args['category_icon'] as String?,
+      );
+    },
+
+    // // ✅ Add a legacy builder for appNativeCamera as well (in case anything uses routes map)
+    // appNativeCamera: (context) {
+    //   final args = (ModalRoute.of(context)?.settings.arguments as Map?)
+    //       ?.cast<String, dynamic>() ??
+    //       <String, dynamic>{};
+    //
+    //   return NativeCameraRecordingScreen(
+    //     memoryId: (args['memoryId'] ?? '') as String,
+    //     memoryTitle: (args['memoryTitle'] ?? '') as String,
+    //     categoryIcon: args['categoryIcon'] as String?,
+    //   );
+    // },
+
+    memoryTimelinePlayback: (context) {
+      final memoryId = ModalRoute.of(context)!.settings.arguments as String;
+      return MemoryTimelinePlaybackScreen(memoryId: memoryId);
+    },
+  };
 }

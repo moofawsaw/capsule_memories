@@ -8,6 +8,7 @@ import '../../../widgets/custom_image_view.dart';
 import '../../create_memory_screen/create_memory_screen.dart';
 import '../../event_timeline_view_screen/widgets/timeline_story_widget.dart';
 import '../../memory_details_screen/memory_details_screen.dart';
+import '../../memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import '../../memory_invitation_screen/memory_invitation_screen.dart';
 import '../models/memory_item_model.dart';
 
@@ -469,14 +470,17 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
               '🎬 CREATE STORY TAPPED: Opening story record screen for memory $memoryId');
 
           // Navigate to story recording screen with memory ID as argument
-          NavigatorService.pushNamed(
-            AppRoutes.appStoryRecord,
-            arguments: {
-              'memory_id': memoryId,
-              'memory_title': widget.memoryItem.title ?? 'Memory',
-              'category_icon': widget.memoryItem.categoryIconUrl,
-            },
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => NativeCameraRecordingScreen(
+                memoryId: memoryId,
+                memoryTitle: widget.memoryItem.title ?? 'Memory',
+                categoryIcon: widget.memoryItem.categoryIconUrl,
+              ),
+            ),
           );
+
         },
         child: Container(
           margin: EdgeInsets.symmetric(horizontal: 4.h, vertical: 8.h),
