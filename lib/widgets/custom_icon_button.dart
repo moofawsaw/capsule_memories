@@ -1,18 +1,11 @@
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
-/**
- * CustomIconButton - A reusable circular icon button component with full customization
- * 
- * This component provides a flexible, styled button that can display icons from either SVG files
- * or Material Icons. Features include:
- * - Support for both SVG images and Material Design icons
- * - Configurable size, padding, and border radius
- * - Optional tonal, outlined, or filled styles
- * - Theme-aware color handling
- * - Ripple effect on tap
- * - Accessibility support
- */
+/// CustomIconButton - A reusable circular icon button component.
+///
+/// Supports:
+/// - Material icons via [icon]
+/// - SVG/assets via [iconPath] (optional fallback)
 class CustomIconButton extends StatelessWidget {
   const CustomIconButton({
     Key? key,
@@ -32,129 +25,134 @@ class CustomIconButton extends StatelessWidget {
     this.iconSize,
     this.semanticLabel,
   })  : assert(iconPath != null || icon != null,
-            'Either iconPath or icon must be provided'),
+  'Either iconPath or icon must be provided'),
         super(key: key);
 
-  /// Path to SVG icon file (used if no Material icon provided)
+  /// Path to SVG/icon asset (optional)
   final String? iconPath;
 
-  /// Material Design icon data (takes precedence over iconPath)
+  /// Material icon data (preferred)
   final IconData? icon;
 
-  /// Callback function triggered when button is tapped
   final VoidCallback? onTap;
 
-  /// Fixed height of the button (defaults to 48.h)
   final double? height;
-
-  /// Fixed width of the button (defaults to 48.h)
   final double? width;
-
-  /// Internal padding around the icon
   final EdgeInsetsGeometry? padding;
-
-  /// External margin around the button
   final EdgeInsetsGeometry? margin;
 
-  /// Background color of the button
   final Color? backgroundColor;
-
-  /// Border color (only visible when isOutlined is true)
   final Color? borderColor;
-
-  /// Border radius for rounded corners
   final double? borderRadius;
 
-  /// Whether to apply Material 3 tonal style (background with lower opacity)
   final bool isTonal;
-
-  /// Whether to show only border without fill
   final bool isOutlined;
 
-  /// Color for the icon (only applies to Material icons)
   final Color? iconColor;
-
-  /// Size of the icon (defaults to 24.h)
   final double? iconSize;
-
-  /// Accessibility label for screen readers
   final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final effectiveHeight = height ?? 48.h;
     final effectiveWidth = width ?? 48.h;
+
+    // NOTE:
+    // For Option A (IconButton), we must NOT rely on Container padding to "center"
+    // the glyph; IconButton will handle sizing when configured with zero padding.
+    // For SVGs, we still use padding to keep them visually balanced.
     final effectivePadding = padding ?? EdgeInsets.all(12.h);
+
     final effectiveBorderRadius = borderRadius ?? (effectiveHeight / 2);
     final effectiveIconSize = iconSize ?? 24.h;
 
-    // Determine background color based on style
+    // Background color based on style
     Color effectiveBackgroundColor;
     if (isOutlined) {
       effectiveBackgroundColor = Colors.transparent;
     } else if (isTonal) {
-      effectiveBackgroundColor = backgroundColor?.withAlpha(31) ??
-          Theme.of(context).colorScheme.surfaceContainerHighest;
+      effectiveBackgroundColor =
+          (backgroundColor ?? Theme.of(context).colorScheme.surface)
+              .withAlpha(31);
     } else {
       effectiveBackgroundColor = backgroundColor ?? appTheme.gray_900_03;
     }
 
-    // Determine icon color
+    // Icon color
     final effectiveIconColor =
         iconColor ?? Theme.of(context).colorScheme.onSurface;
 
-    Widget iconWidget;
+    // Build inner content
+    Widget innerChild;
+
     if (icon != null) {
-      // Use Material Design icon
-      iconWidget = Icon(
-        icon,
-        size: effectiveIconSize,
+      // ✅ Option A: IconButton with zero padding/constraints
+      // This removes default IconButton padding/constraints that can cause drift
+      // inside tightly sized circular buttons.
+      innerChild = IconButton(
+        onPressed: onTap,
+        icon: Icon(
+          icon,
+          semanticLabel: semanticLabel,
+        ),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(),
+        visualDensity: VisualDensity.compact,
+        iconSize: effectiveIconSize,
         color: effectiveIconColor,
-        semanticLabel: semanticLabel,
+        splashRadius: (effectiveHeight / 2).clamp(18.0, 28.0),
+        tooltip: semanticLabel,
       );
     } else {
-      // Use SVG icon
-      iconWidget = CustomImageView(
-        imagePath: iconPath!,
-        height: effectiveIconSize,
-        width: effectiveIconSize,
-        color: effectiveIconColor,
-        fit: BoxFit.contain,
+      // Asset/SVG path fallback
+      innerChild = Padding(
+        padding: effectivePadding,
+        child: Center(
+          child: CustomImageView(
+            imagePath: iconPath!,
+            height: effectiveIconSize,
+            width: effectiveIconSize,
+            color: effectiveIconColor,
+            fit: BoxFit.contain,
+          ),
+        ),
       );
     }
 
-    Widget buttonContent = Container(
-      height: effectiveHeight,
-      width: effectiveWidth,
-      padding: effectivePadding,
-      decoration: BoxDecoration(
-        color: effectiveBackgroundColor,
-        borderRadius: BorderRadius.circular(effectiveBorderRadius),
-        border: isOutlined
-            ? Border.all(
-                color: borderColor ?? Theme.of(context).colorScheme.outline,
-                width: 1.5,
-              )
-            : null,
-      ),
-      child: Center(child: iconWidget),
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(effectiveBorderRadius),
+      side: isOutlined
+          ? BorderSide(
+        color: borderColor ?? Theme.of(context).colorScheme.outline,
+        width: 1.5,
+      )
+          : BorderSide.none,
     );
 
-    if (onTap != null) {
-      buttonContent = InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(effectiveBorderRadius),
-        child: buttonContent,
-      );
-    }
+    Widget button = SizedBox(
+      height: effectiveHeight,
+      width: effectiveWidth,
+      child: Material(
+        color: effectiveBackgroundColor,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          // If icon != null, IconButton already handles taps.
+          // But we still want Ink ripple on the entire circle for SVG + general consistency.
+          // For IconButton path, InkWell onTap is null so there isn't a double tap handler.
+          onTap: (icon == null) ? onTap : null,
+          child: Center(child: innerChild),
+        ),
+      ),
+    );
 
     if (margin != null) {
-      return Container(
-        margin: margin,
-        child: buttonContent,
+      button = Padding(
+        padding: margin as EdgeInsetsGeometry,
+        child: button,
       );
     }
 
-    return buttonContent;
+    return button;
   }
 }

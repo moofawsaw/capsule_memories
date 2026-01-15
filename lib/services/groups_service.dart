@@ -396,8 +396,20 @@ class GroupsService {
             created_at,
             updated_at
           ''').eq('id', groupId).single();
+      print('✅ GROUP FETCH: Loaded group');
+      print('   - Name: ${response['name']}');
+      print('   - Invite Code: ${response['invite_code']}');
+      print('   - QR Code URL: ${response['qr_code_url']}');
+      print('🔍 GROUP DEBUG qr_code_url analysis:');
+      final rawQr = response['qr_code_url'];
+      print('   - Raw value: $rawQr');
+      print('   - Type: ${rawQr.runtimeType}');
+      print('   - Is null: ${rawQr == null}');
+      print('   - Is empty string: ${rawQr == ""}');
+      print('   - Keys: ${response.keys.toList()}');
 
       return response;
+
     } catch (e) {
       print('Error fetching group: $e');
       return null;

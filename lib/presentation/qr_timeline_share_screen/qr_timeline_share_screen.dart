@@ -219,19 +219,19 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // Header icon
-        Container(
-          width: 64.h,
-          height: 64.h,
-          decoration: BoxDecoration(
-            color: appTheme.deep_purple_A100.withAlpha(51),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.qr_code_2_rounded,
-            size: 32.h,
-            color: appTheme.deep_purple_A100,
-          ),
-        ),
+        // Container(
+        //   width: 64.h,
+        //   height: 64.h,
+        //   decoration: BoxDecoration(
+        //     color: appTheme.deep_purple_A100.withAlpha(51),
+        //     shape: BoxShape.circle,
+        //   ),
+        //   child: Icon(
+        //     Icons.qr_code_2_rounded,
+        //     size: 32.h,
+        //     color: appTheme.deep_purple_A100,
+        //   ),
+        // ),
         SizedBox(height: 16.h),
         Text(
           'Share Memory',

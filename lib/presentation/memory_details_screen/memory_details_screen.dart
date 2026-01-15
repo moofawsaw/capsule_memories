@@ -1100,7 +1100,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 onPressed: () {
                   Navigator.pop(context);
                 },
-                buttonStyle: CustomButtonStyle.fillDeepPurpleA,
+                buttonStyle: CustomButtonStyle.fillDark,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
               ),
             ),

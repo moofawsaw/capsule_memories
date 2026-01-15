@@ -1,4 +1,3 @@
-// lib/presentation/event_stories_view_screen/event_stories_view_screen.dart
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -9,16 +8,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../core/models/feed_story_context.dart';
 import '../../core/app_export.dart';
+import '../../core/models/feed_story_context.dart';
+import '../../core/utils/image_constant.dart';
 import '../../core/utils/memory_nav_args.dart';
+import '../../core/utils/navigator_service.dart';
+import '../../routes/app_routes.dart';
 import '../../services/feed_service.dart';
 import '../../services/supabase_service.dart';
+import '../../theme/text_style_helper.dart';
 import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/story_reactions.dart';
 import '../report_story_screen/report_story_screen.dart';
+
+// lib/presentation/event_stories_view_screen/event_stories_view_screen.dart
 
 /// Enum for different haptic feedback types
 enum HapticFeedbackType {
@@ -329,7 +334,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
       // Fetch memory category information
       final memoryId = storyData['memory_id'] as String?;
-      if (memoryId != null) {
+      if (memoryId != null && memoryId.isNotEmpty) {
+        _memoryId = memoryId; // set immediately (no await needed)
         await _fetchMemoryCategory(memoryId);
       }
 
@@ -658,7 +664,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _currentVideoController?.pause();
       } else {
         _timerController?.forward();
-        final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+        final mediaType =
+            _currentStoryData?['media_type'] as String? ?? 'image';
         if (mediaType == 'video' &&
             _currentVideoController != null &&
             _isCurrentVideoInitialized) {
@@ -832,6 +839,31 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     }
   }
 
+  Future<void> _navigateToTimeline(MemoryNavArgs navArgs) async {
+    final wasPausedBefore = _isPaused;
+
+    // Pause without destroying state (do NOT hard reset)
+    _pausePlaybackForModal();
+    setState(() {
+      _isAnyModalOpen = true; // blocks tap-through while navigating
+    });
+
+    await Navigator.pushNamed(
+      context,
+      AppRoutes.appTimeline,
+      arguments: navArgs,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isAnyModalOpen = false;
+    });
+
+    // Resume the story where the user left off
+    _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
+  }
+
   /// Mark the current story as viewed in the database
   Future<void> _markStoryAsViewed() async {
     try {
@@ -915,7 +947,6 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     _isAnyModalOpen = false;
     _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
   }
-
 
   // =========================
   // UI
@@ -1335,55 +1366,84 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    userName,
-                    style: TextStyleHelper.instance.body16BoldPlusJakartaSans
-                        .copyWith(color: appTheme.whiteCustom),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      if (_isAnyModalOpen) return;
+                      print('🔍 DEBUG: User name tapped - userId: $userId');
+                      if (userId != null && userId.isNotEmpty) {
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.appProfileUser,
+                          arguments: {'userId': userId},
+                        );
+                      } else {
+                        print(
+                            '⚠️ WARNING: userId is null or empty, cannot navigate');
+                      }
+                    },
+                    child: Text(
+                      userName,
+                      style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                          .copyWith(color: appTheme.whiteCustom),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                   if (memoryTitle != null && memoryTitle.isNotEmpty)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () {
+                      onTap: () async {
                         if (_isAnyModalOpen) return;
-                        if (_memoryId != null && _currentStoryData != null) {
-                          final navArgs = MemoryNavArgs(
-                            memoryId: _memoryId!,
-                            snapshot: MemorySnapshot(
-                              title: memoryTitle,
-                              date: _currentStoryData?['memory_date']
-                              as String? ??
-                                  _formatDate(_currentStoryData?['created_at']
-                                  as String?),
-                              location: _currentStoryData?['memory_location']
-                              as String?,
-                              categoryIcon: _memoryCategoryIcon,
-                              participantAvatars: null,
-                              isPrivate:
-                              _currentStoryData?['memory_visibility'] ==
-                                  'private',
-                            ),
-                          );
 
-                          _performHardMediaReset();
+                        final resolvedMemoryId =
+                            _memoryId ?? (_currentStoryData?['memory_id'] as String?);
 
-                          NavigatorService.pushNamed(
-                            AppRoutes.appTimeline,
-                            arguments: navArgs,
-                          );
+                        print('🔍 DEBUG: Memory title tapped - memoryId: $resolvedMemoryId');
+
+                        if (resolvedMemoryId == null || resolvedMemoryId.isEmpty) {
+                          print('⚠️ WARNING: resolvedMemoryId is null/empty, cannot navigate');
+                          return;
                         }
+
+                        final navArgs = MemoryNavArgs(
+                          memoryId: resolvedMemoryId,
+                          snapshot: MemorySnapshot(
+                            title: memoryTitle,
+                            date: _currentStoryData?['memory_date'] as String? ??
+                                _formatDate(_currentStoryData?['created_at'] as String?),
+                            location: _currentStoryData?['memory_location'] as String?,
+                            categoryIcon: _memoryCategoryIcon,
+                            participantAvatars: null,
+                            isPrivate: _currentStoryData?['memory_visibility'] == 'private',
+                          ),
+                        );
+
+                        await _navigateToTimeline(navArgs);
+
                       },
-                      child: Text(
-                        memoryTitle,
-                        style: TextStyleHelper
-                            .instance.body14RegularPlusJakartaSans
-                            .copyWith(
-                          color: appTheme.whiteCustom.withAlpha(204),
-                          decoration: TextDecoration.none,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              memoryTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyleHelper
+                                  .instance.body14MediumPlusJakartaSans
+                                  .copyWith(
+                                color: appTheme.whiteCustom.withAlpha(220),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 4.h),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 16.h,
+                            color: appTheme.whiteCustom.withAlpha(160),
+                          ),
+                        ],
                       ),
                     ),
                   Text(
@@ -1467,12 +1527,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                     ),
                   );
 
-                  _performHardMediaReset();
+                  await _navigateToTimeline(navArgs);
 
-                  NavigatorService.pushNamed(
-                    AppRoutes.appTimeline,
-                    arguments: navArgs,
-                  );
                 }
               },
               child: Container(
@@ -1761,7 +1817,8 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
 
       if (!_isPaused) {
         _timerController?.forward();
-        final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+        final mediaType =
+            _currentStoryData?['media_type'] as String? ?? 'image';
         if (mediaType == 'video' &&
             _currentVideoController != null &&
             _isCurrentVideoInitialized) {

@@ -29,12 +29,25 @@ class _TimelineSkeletonBlock extends StatelessWidget {
       margin: EdgeInsets.only(top: 6.h),
       padding: EdgeInsets.symmetric(horizontal: 16.h),
       width: double.maxFinite,
-      child: Container(
-        height: 220.h,
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_03,
-          borderRadius: BorderRadius.circular(16.h),
-        ),
+      child: Column(
+        children: [
+          SizedBox(height: 44.h),
+          Container(
+            height: 220.h,
+            width: double.maxFinite,
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_03,
+              borderRadius: BorderRadius.circular(16.h),
+            ),
+          ),
+          SizedBox(height: 16.h),
+          Container(
+            width: double.maxFinite,
+            height: 1,
+            color: appTheme.blue_gray_900,
+          ),
+          SizedBox(height: 16.h),
+        ],
       ),
     );
   }
@@ -261,7 +274,6 @@ class _CircleIconButton extends StatelessWidget {
         height: 48.h,
         width: 48.h,
         decoration: BoxDecoration(
-          // color: appTheme.gray_900_03,
           borderRadius: BorderRadius.circular(24.h),
         ),
         child: Center(
@@ -274,6 +286,9 @@ class _CircleIconButton extends StatelessWidget {
 
 class MemoryDetailsViewScreenState
     extends ConsumerState<MemoryDetailsViewScreen> {
+  // ✅ Prevent first-frame “blank shell” before skeleton
+  bool _booting = true;
+
   bool _isValidUuid(String? value) {
     if (value == null) return false;
     final v = value.trim();
@@ -287,39 +302,32 @@ class MemoryDetailsViewScreenState
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final rawArgs = ModalRoute.of(context)?.settings.arguments;
-
-      print('🚨 SEALED SCREEN: Processing navigation arguments');
-      print('   - Raw type: ${rawArgs.runtimeType}');
 
       MemoryNavArgs? navArgs;
 
       if (rawArgs is MemoryNavArgs) {
         navArgs = rawArgs;
-        print('✅ SEALED SCREEN: Received typed MemoryNavArgs');
       } else if (rawArgs is Map<String, dynamic>) {
         navArgs = MemoryNavArgs.fromMap(rawArgs);
-        print('✅ SEALED SCREEN: Converted Map to MemoryNavArgs');
-      } else {
-        print(
-          '❌ SEALED SCREEN: Invalid argument type - expected MemoryNavArgs or Map',
-        );
       }
 
       if (navArgs == null || !navArgs.isValid) {
-        print('❌ SEALED SCREEN: Missing or invalid memory ID');
         ref.read(memoryDetailsViewNotifier.notifier).setErrorState(
           'Unable to load memory. Invalid navigation arguments.',
         );
+
+        if (mounted) setState(() => _booting = false);
         return;
       }
 
-      print('✅ SEALED SCREEN: Valid MemoryNavArgs received');
-      print('   - Memory ID: ${navArgs.memoryId}');
-      print('   - Has snapshot: ${navArgs.snapshot != null}');
-
+      // ✅ Kick init
       ref.read(memoryDetailsViewNotifier.notifier).initializeFromMemory(navArgs);
+
+      // ✅ Ensures frame-1 renders skeleton instead of any partial/default UI
+      if (mounted) setState(() => _booting = false);
     });
   }
 
@@ -327,10 +335,7 @@ class MemoryDetailsViewScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(memoryDetailsViewNotifier);
 
-    print(
-      '🧪 SEALED UI: isLoading=${state.isLoading} error=${state.errorMessage}',
-    );
-
+    // Error state
     if (state.errorMessage != null) {
       return SafeArea(
         child: Scaffold(
@@ -341,11 +346,7 @@ class MemoryDetailsViewScreenState
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 64.h,
-                    color: appTheme.red_500,
-                  ),
+                  Icon(Icons.error_outline, size: 64.h, color: appTheme.red_500),
                   SizedBox(height: 16.h),
                   Text(
                     'Failed to Load Memory',
@@ -366,9 +367,7 @@ class MemoryDetailsViewScreenState
                     width: double.infinity,
                     buttonStyle: CustomButtonStyle.fillPrimary,
                     buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                    onPressed: () {
-                      NavigatorService.goBack();
-                    },
+                    onPressed: NavigatorService.goBack,
                   ),
                 ],
               ),
@@ -379,8 +378,16 @@ class MemoryDetailsViewScreenState
     }
 
     final hasSnapshot = state.memoryDetailsViewModel != null;
+    final isLoading = state.isLoading ?? false;
 
-    if ((state.isLoading ?? false) && !hasSnapshot) {
+    // ✅ Single source of truth (matches Open screen behavior)
+    final effectiveLoading = isLoading || (_booting && !hasSnapshot);
+
+    // ✅ Refresh skeletons only when snapshot exists
+    final showSectionSkeletons = isLoading && hasSnapshot;
+
+    // ✅ No blank shell first frame
+    if (effectiveLoading && !hasSnapshot) {
       return SafeArea(
         child: Scaffold(
           backgroundColor: appTheme.gray_900_02,
@@ -400,7 +407,9 @@ class MemoryDetailsViewScreenState
               _buildTimelineSection(context),
               _buildStoriesSection(context),
               SizedBox(height: 18.h),
-              _buildActionButtons(context),
+              showSectionSkeletons
+                  ? _buildActionButtonsSkeleton()
+                  : _buildActionButtons(context),
               SizedBox(height: 20.h),
             ],
           ),
@@ -414,23 +423,33 @@ class MemoryDetailsViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsViewNotifier);
 
+        final hasSnapshot = state.memoryDetailsViewModel != null;
+        final isLoading = state.isLoading ?? false;
+        final showSectionSkeletons = isLoading && hasSnapshot;
+
         return CustomEventCard(
-          eventTitle: state.memoryDetailsViewModel?.eventTitle,
-          eventDate: state.memoryDetailsViewModel?.eventDate,
-          eventLocation: state.memoryDetailsViewModel?.eventLocation,
-          isPrivate: state.memoryDetailsViewModel?.isPrivate,
-          iconButtonImagePath: state.memoryDetailsViewModel?.categoryIcon ??
-              ImageConstant.imgFrame13,
-          participantImages: state.memoryDetailsViewModel?.participantImages,
-          onBackTap: () {
-            NavigatorService.goBack();
-          },
+          // ✅ Let card render internal skeleton consistently
+          isLoading: showSectionSkeletons,
+          eventTitle:
+          showSectionSkeletons ? null : state.memoryDetailsViewModel?.eventTitle,
+          eventDate:
+          showSectionSkeletons ? null : state.memoryDetailsViewModel?.eventDate,
+          eventLocation: showSectionSkeletons
+              ? null
+              : state.memoryDetailsViewModel?.eventLocation,
+          isPrivate: showSectionSkeletons ? null : state.memoryDetailsViewModel?.isPrivate,
+          iconButtonImagePath: showSectionSkeletons
+              ? null
+              : (state.memoryDetailsViewModel?.categoryIcon ??
+              ImageConstant.imgFrame13),
+          participantImages: showSectionSkeletons
+              ? null
+              : state.memoryDetailsViewModel?.participantImages,
+          onBackTap: NavigatorService.goBack,
           onIconButtonTap: () {
-            print('ℹ️ SEALED: Header icon tapped (inline controls used)');
+            // Inline controls used on sealed
           },
-          onAvatarTap: () {
-            onTapAvatars(context);
-          },
+          onAvatarTap: () => onTapAvatars(context),
         );
       },
     );
@@ -441,39 +460,20 @@ class MemoryDetailsViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsViewNotifier);
 
-        if (state.isLoading == true) {
-          return Container(
-            margin: EdgeInsets.only(top: 6.h),
-            padding: EdgeInsets.symmetric(horizontal: 16.h),
-            width: double.maxFinite,
-            child: Column(
-              children: [
-                SizedBox(height: 44.h),
-                Container(
-                  height: 220.h,
-                  width: double.maxFinite,
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_900_03,
-                    borderRadius: BorderRadius.circular(16.h),
-                  ),
-                ),
-                SizedBox(height: 16.h),
-                Container(
-                  width: double.maxFinite,
-                  height: 1,
-                  color: appTheme.blue_gray_900,
-                ),
-                SizedBox(height: 16.h),
-              ],
-            ),
-          );
+        final hasSnapshot = state.memoryDetailsViewModel != null;
+        final isLoading = state.isLoading ?? false;
+        final showSectionSkeletons = isLoading && hasSnapshot;
+
+        // ✅ Only show skeleton block when refreshing AND snapshot exists
+        if (showSectionSkeletons) {
+          return const _TimelineSkeletonBlock();
         }
 
         final timelineDetail = state.memoryDetailsViewModel?.timelineDetail;
-        final List<TimelineStoryItem> timelineStories =
-            timelineDetail?.timelineStories ?? <TimelineStoryItem>[];
-
         if (timelineDetail == null) return const SizedBox.shrink();
+
+        final List<TimelineStoryItem> timelineStories =
+            timelineDetail.timelineStories ?? <TimelineStoryItem>[];
 
         final memoryStartTime = timelineDetail.memoryStartTime;
         final memoryEndTime = timelineDetail.memoryEndTime;
@@ -539,11 +539,55 @@ class MemoryDetailsViewScreenState
                     ),
                   ),
                 ),
-
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStoriesSection(BuildContext context) {
+    return SizedBox(
+      width: double.maxFinite,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: EdgeInsets.only(left: 20.h),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final state = ref.watch(memoryDetailsViewNotifier);
+
+                final hasSnapshot = state.memoryDetailsViewModel != null;
+                final isLoading = state.isLoading ?? false;
+                final showSectionSkeletons = isLoading && hasSnapshot;
+
+                if (showSectionSkeletons) {
+                  return Container(
+                    height: 14.h,
+                    width: 120.h,
+                    decoration: BoxDecoration(
+                      color: appTheme.blue_gray_900,
+                      borderRadius: BorderRadius.circular(6.h),
+                    ),
+                  );
+                }
+
+                final storyCount =
+                    state.memoryDetailsViewModel?.customStoryItems?.length ?? 0;
+
+                return Text(
+                  'Stories ($storyCount)',
+                  style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                );
+              },
+            ),
+          ),
+          SizedBox(height: 18.h),
+          _buildStoryList(context),
+        ],
+      ),
     );
   }
 
@@ -552,7 +596,11 @@ class MemoryDetailsViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryDetailsViewNotifier);
 
-        if (state.isLoading == true) {
+        final hasSnapshot = state.memoryDetailsViewModel != null;
+        final isLoading = state.isLoading ?? false;
+        final showSectionSkeletons = isLoading && hasSnapshot;
+
+        if (showSectionSkeletons) {
           return const _StoriesSkeletonRow();
         }
 
@@ -565,7 +613,7 @@ class MemoryDetailsViewScreenState
 
         if (storyItems.isEmpty) {
           return Container(
-            margin: EdgeInsets.only(left: 20.h),
+            margin: EdgeInsets.only(left: 20.h, right: 20.h),
             padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 16.h),
             decoration: BoxDecoration(
               color: appTheme.gray_900_03,
@@ -590,30 +638,28 @@ class MemoryDetailsViewScreenState
     );
   }
 
-  Widget _buildStoriesSection(BuildContext context) {
-    return Container(
-      width: double.maxFinite,
+  Widget _buildActionButtonsSkeleton() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24.h),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            margin: EdgeInsets.only(left: 20.h),
-            child: Consumer(
-              builder: (context, ref, _) {
-                final state = ref.watch(memoryDetailsViewNotifier);
-                final storyCount =
-                    state.memoryDetailsViewModel?.customStoryItems?.length ?? 0;
-
-                return Text(
-                  'Stories ($storyCount)',
-                  style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-                );
-              },
+            height: 48.h,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_03,
+              borderRadius: BorderRadius.circular(14.h),
             ),
           ),
-          SizedBox(height: 18.h),
-          _buildStoryList(context),
+          SizedBox(height: 12.h),
+          Container(
+            height: 48.h,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_03,
+              borderRadius: BorderRadius.circular(14.h),
+            ),
+          ),
         ],
       ),
     );
@@ -705,8 +751,7 @@ class MemoryDetailsViewScreenState
 
     if (ids.isEmpty) return;
 
-    final initialId =
-    (index >= 0 && index < ids.length) ? ids[index] : ids.first;
+    final initialId = (index >= 0 && index < ids.length) ? ids[index] : ids.first;
 
     final feedContext = FeedStoryContext(
       feedType: 'memory_timeline',
@@ -747,7 +792,6 @@ class MemoryDetailsViewScreenState
     final memoryId = state.memoryDetailsViewModel?.memoryId;
 
     if (!_isValidUuid(memoryId)) {
-      print('❌ SEALED: Edit blocked (invalid memoryId="$memoryId")');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -761,9 +805,6 @@ class MemoryDetailsViewScreenState
     }
 
     final safeId = memoryId!.trim();
-
-    print('🔍 SEALED: Opening Memory Details bottom sheet for editing');
-    print('   - Memory ID: $safeId');
 
     showModalBottomSheet(
       context: context,
@@ -782,7 +823,6 @@ class MemoryDetailsViewScreenState
     final memoryTitle = state.memoryDetailsViewModel?.eventTitle;
 
     if (!_isValidUuid(memoryId)) {
-      print('❌ SEALED: Delete blocked (invalid memoryId="$memoryId")');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

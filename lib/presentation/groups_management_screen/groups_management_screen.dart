@@ -98,6 +98,7 @@ class GroupsManagementScreenState
               child: CustomImageView(
                 imagePath: ImageConstant.imgIcon7,
                 fit: BoxFit.contain,
+                color: appTheme.deep_purple_A100,
               ),
             ),
             SizedBox(width: 6.h),
@@ -382,6 +383,8 @@ class GroupsManagementScreenState
         builder: (_) => QRScannerOverlay(
           scanType: 'group',
           onSuccess: () {
+            // ✅ Overlay handles the DB-aware success message + auto-close.
+            // Only refresh the groups list here.
             ref.read(groupsManagementNotifier.notifier).refresh();
           },
         ),

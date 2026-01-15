@@ -252,38 +252,41 @@ class StoryService {
       ) async {
     try {
       final response = await _supabase?.from('stories').select('''
-            id,
-            memory_id,
-            contributor_id,
-            media_type,
-            image_url,
-            video_url,
-            thumbnail_url,
-            created_at,
-            capture_timestamp,
-            duration_seconds,
-            location_name,
-            location_lat,
-            location_lng,
-            is_from_camera_roll,
-            background_music,
-            text_overlays,
-            stickers,
-            drawings,
-            view_count,
-            user_profiles!stories_contributor_id_fkey (
-              id,
-              username,
-              display_name,
-              avatar_url
-            )
-          ''').eq('memory_id', memoryId).order('created_at', ascending: false);
+      id,
+      memory_id,
+      contributor_id,
+      media_type,
+      image_url,
+      video_url,
+      thumbnail_url,
+      created_at,
+      capture_timestamp,
+      duration_seconds,
+      location_name,
+      location_lat,
+      location_lng,
+      is_from_camera_roll,
+      background_music,
+      text_overlays,
+      stickers,
+      drawings,
+      view_count,
+      user_profiles_public!stories_contributor_id_fkey (
+        id,
+        username,
+        display_name,
+        avatar_url
+      )
+    ''').eq('memory_id', memoryId).order('created_at', ascending: false);
+
 
       return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
       rethrow;
     }
   }
+
+
 
   Future<Map<String, dynamic>?> createStory({
     required String memoryId,
@@ -438,21 +441,14 @@ class StoryService {
   }
 
   String getContributorAvatar(Map<String, dynamic> story) {
-    final contributor = story['user_profiles'];
-    if (contributor != null && contributor['avatar_url'] != null) {
-      final avatarPath = contributor['avatar_url'] as String;
+    final contributor =
+        (story['user_profiles_public'] as Map<String, dynamic>?) ??
+            (story['user_profiles'] as Map<String, dynamic>?);
 
-      if (!avatarPath.startsWith('http://') &&
-          !avatarPath.startsWith('https://')) {
-        final supabaseService = SupabaseService.instance;
-        return supabaseService.getStorageUrl(avatarPath, bucket: 'avatars') ??
-            avatarPath;
-      }
-
-      return avatarPath;
-    }
-    return '';
+    final avatarUrl = contributor?['avatar_url'] as String?;
+    return AvatarHelperService.getAvatarUrl(avatarUrl);
   }
+
 
   String getMemoryThumbnail(Map<String, dynamic> memory) {
     final stories = memory['stories'] as List?;

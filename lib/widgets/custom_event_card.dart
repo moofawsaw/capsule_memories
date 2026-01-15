@@ -5,7 +5,7 @@ import '../core/app_export.dart';
 import './custom_image_view.dart';
 
 class CustomEventCard extends StatelessWidget {
-  final bool isLoading; // NEW
+  final bool isLoading;
 
   final String? eventTitle;
   final String? eventDate;
@@ -19,7 +19,7 @@ class CustomEventCard extends StatelessWidget {
 
   const CustomEventCard({
     Key? key,
-    this.isLoading = false, // NEW
+    this.isLoading = false,
     this.eventTitle,
     this.eventDate,
     this.eventLocation,
@@ -33,17 +33,18 @@ class CustomEventCard extends StatelessWidget {
 
   bool _isNetworkUrl(String s) =>
       s.startsWith('http://') || s.startsWith('https://');
+
   bool _isSvg(String s) => s.toLowerCase().split('?').first.endsWith('.svg');
 
   @override
   Widget build(BuildContext context) {
-    final String? iconPath = (iconButtonImagePath ?? '').trim().isNotEmpty
+    final String? iconPath =
+    (iconButtonImagePath ?? '').trim().isNotEmpty
         ? iconButtonImagePath!.trim()
         : null;
 
     final bool isNetwork = iconPath != null && _isNetworkUrl(iconPath);
     final bool isSvg = iconPath != null && isNetwork && _isSvg(iconPath);
-
 
     return Container(
       width: double.infinity,
@@ -73,7 +74,7 @@ class CustomEventCard extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(top: 14.h),
       child: GestureDetector(
-        onTap: isLoading ? null : onBackTap, // disable while loading
+        onTap: isLoading ? null : onBackTap,
         child: CustomImageView(
           imagePath: ImageConstant.imgArrowLeft,
           width: 24.h,
@@ -92,7 +93,6 @@ class CustomEventCard extends StatelessWidget {
         child: isLoading
             ? _skeletonBox(width: 42.h, height: 42.h, radius: 10.h)
             : (iconPath == null
-        // ✅ Keep spacing but render nothing (no flash)
             ? const SizedBox.shrink()
             : GestureDetector(
           onTap: onIconButtonTap,
@@ -101,7 +101,6 @@ class CustomEventCard extends StatelessWidget {
       ),
     );
   }
-
 
   Widget _buildIcon(String iconPath, bool isNetwork, bool isSvg) {
     if (!isNetwork) {
@@ -112,29 +111,15 @@ class CustomEventCard extends StatelessWidget {
       return SvgPicture.network(
         iconPath,
         fit: BoxFit.contain,
-        placeholderBuilder: (_) => SizedBox(
-          width: 26.h,
-          height: 26.h,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: appTheme.whiteCustom,
-          ),
-        ),
+        placeholderBuilder: (_) => _skeletonCircle(26.h),
       );
     }
 
     return CachedNetworkImage(
       imageUrl: iconPath,
       fit: BoxFit.contain,
-      placeholder: (context, url) => SizedBox(
-        width: 26.h,
-        height: 26.h,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: appTheme.whiteCustom,
-        ),
-      ),
-      errorWidget: (context, url, error) => const SizedBox.shrink(),
+      placeholder: (_, __) => _skeletonCircle(26.h),
+      errorWidget: (_, __, ___) => const SizedBox.shrink(),
     );
   }
 
@@ -145,34 +130,31 @@ class CustomEventCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (isLoading)
-              _skeletonBox(width: 190.h, height: 18.h, radius: 6.h)
-            else
-              Text(
-                eventTitle ?? '', // NO VISIBLE FALLBACK
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50, height: 1.22),
-              ),
+            isLoading
+                ? _skeletonBox(width: 190.h, height: 18.h, radius: 6.h)
+                : Text(
+              eventTitle ?? '',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
             SizedBox(height: 4.h),
             Row(
               children: [
-                if (isLoading)
-                  _skeletonBox(width: 120.h, height: 12.h, radius: 6.h)
-                else
-                  Text(
-                    eventLocation ?? '', // NO VISIBLE FALLBACK
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                        .copyWith(height: 1.33),
-                  ),
+                isLoading
+                    ? _skeletonBox(width: 120.h, height: 12.h, radius: 6.h)
+                    : Text(
+                  eventLocation ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyleHelper
+                      .instance.body12MediumPlusJakartaSans,
+                ),
                 SizedBox(width: 6.h),
-                if (isLoading)
-                  _skeletonBox(width: 64.h, height: 18.h, radius: 6.h)
-                else if (isPrivate != null)
-                  _buildPrivacyButton(),
+                isLoading
+                    ? _skeletonBox(width: 64.h, height: 18.h, radius: 6.h)
+                    : _buildPrivacyButton(),
               ],
             ),
           ],
@@ -182,22 +164,19 @@ class CustomEventCard extends StatelessWidget {
   }
 
   Widget _buildPrivacyButton() {
-    // ✅ If unknown, render nothing (prevents PRIVATE flash)
     if (isPrivate == null) return const SizedBox.shrink();
-
-    final bool isEventPrivate = isPrivate!;
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 2.h),
       decoration: BoxDecoration(
-        color: appTheme.gray_900_03,
+        color: appTheme.gray_900_01,
         borderRadius: BorderRadius.circular(6.h),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           CustomImageView(
-            imagePath: isEventPrivate
+            imagePath: isPrivate!
                 ? ImageConstant.imgIconDeepPurpleA10014x14
                 : ImageConstant.imgIcon14x14,
             height: 14.h,
@@ -205,16 +184,14 @@ class CustomEventCard extends StatelessWidget {
           ),
           SizedBox(width: 4.h),
           Text(
-            isEventPrivate ? 'PRIVATE' : 'PUBLIC',
-            style: TextStyleHelper.instance.body12BoldPlusJakartaSans.copyWith(
-              color: appTheme.deep_purple_A100,
-            ),
+            isPrivate! ? 'PRIVATE' : 'PUBLIC',
+            style: TextStyleHelper.instance.body12BoldPlusJakartaSans
+                .copyWith(color: appTheme.deep_purple_A100),
           ),
         ],
       ),
     );
   }
-
 
   Widget _buildAvatarStack() {
     if (isLoading) {
@@ -224,7 +201,6 @@ class CustomEventCard extends StatelessWidget {
           width: 84.h,
           height: 36.h,
           child: Stack(
-            clipBehavior: Clip.none,
             children: [
               Positioned(right: 0, child: _skeletonCircle(36.h)),
               Positioned(right: 24.h, child: _skeletonCircle(36.h)),
@@ -235,10 +211,15 @@ class CustomEventCard extends StatelessWidget {
       );
     }
 
-    final List<String> avatars = participantImages ?? const [];
+    final avatars = (participantImages ?? [])
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
 
     Widget avatarAt(int index, double right) {
       if (avatars.length <= index) return const SizedBox.shrink();
+      final url = avatars[index];
+      final isNet = _isNetworkUrl(url);
 
       return Positioned(
         right: right,
@@ -246,8 +227,15 @@ class CustomEventCard extends StatelessWidget {
           width: 36.h,
           height: 36.h,
           child: ClipOval(
-            child: CustomImageView(
-              imagePath: avatars[index],
+            child: isNet
+                ? CachedNetworkImage(
+              imageUrl: url,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => _skeletonCircle(36.h),
+              errorWidget: (_, __, ___) => _skeletonCircle(36.h),
+            )
+                : CustomImageView(
+              imagePath: url,
               width: 36.h,
               height: 36.h,
               fit: BoxFit.cover,
@@ -265,7 +253,6 @@ class CustomEventCard extends StatelessWidget {
           width: 84.h,
           height: 36.h,
           child: Stack(
-            clipBehavior: Clip.none,
             children: [
               avatarAt(0, 0),
               avatarAt(1, 24.h),
@@ -286,7 +273,7 @@ class CustomEventCard extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: appTheme.gray_900_03, // use your skeleton color
+        color: appTheme.gray_900_01,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -297,7 +284,7 @@ class CustomEventCard extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: appTheme.gray_900_03,
+        color: appTheme.gray_900_01,
         shape: BoxShape.circle,
       ),
     );

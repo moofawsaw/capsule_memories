@@ -19,13 +19,8 @@ class CustomConfirmationDialog {
           backgroundColor: appTheme.gray_900_01,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16.h),
-            side: BorderSide(
-              color: appTheme.blue_gray_300.withAlpha(51),
-              width: 1.0,
-            ),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          title: Column(
             children: [
               if (icon != null) ...[
                 Container(
@@ -48,39 +43,32 @@ class CustomConfirmationDialog {
                     .copyWith(color: appTheme.gray_50),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 12.h),
-              Text(
-                message,
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 24.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: CustomButton(
-                      text: cancelText,
-                      onPressed: () => Navigator.of(dialogContext).pop(false),
-                      buttonStyle: CustomButtonStyle.outlineDark,
-                      buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-                      height: 44.h,
-                    ),
-                  ),
-                  SizedBox(width: 12.h),
-                  Expanded(
-                    child: CustomButton(
-                      text: confirmText,
-                      onPressed: () => Navigator.of(dialogContext).pop(true),
-                      buttonStyle: CustomButtonStyle.fillPrimary,
-                      buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-                      height: 44.h,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
+          content: Text(
+            message,
+            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300),
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                cancelText,
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                confirmText,
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                    .copyWith(color: confirmColor ?? Colors.red),
+              ),
+            ),
+          ],
         );
       },
     );

@@ -653,7 +653,10 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       // Horizontal story list items
       final storyItems = storiesData.map((storyData) {
-        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final contributor =
+            (storyData['user_profiles_public'] as Map<String, dynamic>?) ??
+                (storyData['user_profiles'] as Map<String, dynamic>?);
+
         final createdAt = _parseUtc(storyData['created_at']);
 
         final backgroundImage = _storyService.getStoryMediaUrl(storyData);
@@ -666,12 +669,17 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           profileImage: profileImage,
           timestamp: _storyService.getTimeAgo(createdAt),
           navigateTo: storyData['id'] as String,
+          storyId: storyData['id'] as String, // optional but recommended
         );
       }).toList();
 
+
       // Timeline positioned stories (UTC-normalized postedAt)
       final timelineStories = storiesData.map((storyData) {
-        final contributor = storyData['user_profiles'] as Map<String, dynamic>?;
+        final contributor =
+            (storyData['user_profiles_public'] as Map<String, dynamic>?) ??
+                (storyData['user_profiles'] as Map<String, dynamic>?);
+
         final createdAt = _parseUtc(storyData['created_at']);
         final storyId = storyData['id'] as String;
 
@@ -679,6 +687,11 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         final profileImage = AvatarHelperService.getAvatarUrl(
           contributor?['avatar_url'] as String?,
         );
+        print('👤 STORY AVATAR DEBUG: story=${storyData['id']} '
+            'has_public=${storyData['user_profiles_public'] != null} '
+            'has_private=${storyData['user_profiles'] != null} '
+            'avatar_raw=${contributor?['avatar_url']} '
+            'avatar_final=$profileImage');
 
         final diffMin = createdAt.difference(memoryStartTime).inMinutes;
         print(
@@ -692,6 +705,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           storyId: storyId,
         );
       }).toList();
+
 
       final existingTimelineDetail = state.eventTimelineViewModel?.timelineDetail;
 

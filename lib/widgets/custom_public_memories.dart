@@ -39,33 +39,42 @@ class CustomPublicMemories extends StatelessWidget {
   /// controls layout + height + badge visibility rules
   final MemoryCardVariant variant;
 
+  Future<bool> _memoryHasAnyStories(String memoryId) async {
+    final client = SupabaseService.instance.client;
+    if (client == null) return false;
+
+    try {
+      // ✅ Lightweight existence check (NO profile joins, no heavy selects)
+      final res = await client
+          .from('stories')
+          .select('id')
+          .eq('memory_id', memoryId)
+          .limit(1);
+
+      return (res as List).isNotEmpty;
+    } catch (e) {
+      // ignore: avoid_print
+      print('❌ FEED EXISTS CHECK failed for memory $memoryId: $e');
+      return false;
+    }
+  }
+
   Future<List<CustomMemoryItem>> _filterFeedMemoriesWithStories(
       List<CustomMemoryItem> input,
       ) async {
-    // Rule: feed must only show memories with 1+ stories.
-    // We enforce it here so the parent can show empty state correctly.
-    final StoryService storyService = StoryService();
+    final List<CustomMemoryItem> filtered = [];
 
-    final List<CustomMemoryItem> filtered = <CustomMemoryItem>[];
+    for (final memory in input) {
+      final id = memory.id;
+      if (id == null || id.isEmpty) continue;
 
-    for (final CustomMemoryItem memory in input) {
-      final String? memoryId = memory.id;
-      if (memoryId == null || memoryId.isEmpty) continue;
-
-      try {
-        final List<dynamic> stories = await storyService.fetchMemoryStories(memoryId);
-        if (stories.isNotEmpty) {
-          filtered.add(memory);
-        }
-      } catch (e) {
-        // ignore: avoid_print
-        print('❌ FEED FILTER: Error checking stories for memory $memoryId: $e');
-        // If the check fails, treat as not eligible for feed to avoid flashing empty memories.
-      }
+      final hasStories = await _memoryHasAnyStories(id);
+      if (hasStories) filtered.add(memory);
     }
 
     return filtered;
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -334,32 +343,32 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   Future<void> _checkMemoryOwnershipFallback() async {
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
-      if (currentUser == null || widget.memory.id == null) {
+      final memoryId = widget.memory.id;
+
+      if (currentUser == null || memoryId == null || memoryId.isEmpty) {
         if (mounted) setState(() => _isUserCreatedMemory = false);
         return;
       }
 
       final dynamic memoryResponse = await SupabaseService.instance.client
           ?.from('memories')
-          .select('user_id')
-          .eq('id', widget.memory.id!)
-          .single();
+          .select('creator_id')
+          .eq('id', memoryId)
+          .maybeSingle();
 
       if (!mounted) return;
 
-      if (memoryResponse != null && memoryResponse['user_id'] != null) {
-        setState(() {
-          _isUserCreatedMemory = memoryResponse['user_id'] == currentUser.id;
-        });
-      } else {
-        setState(() => _isUserCreatedMemory = false);
-      }
+      final String? creatorId = memoryResponse?['creator_id'] as String?;
+      setState(() {
+        _isUserCreatedMemory = creatorId != null && creatorId == currentUser.id;
+      });
     } catch (e) {
       // ignore: avoid_print
       print('❌ Error checking memory ownership (fallback): $e');
       if (mounted) setState(() => _isUserCreatedMemory = false);
     }
   }
+
 
   Future<void> _fetchMemberCount() async {
     if (widget.memory.id == null || widget.memory.id!.isEmpty) {

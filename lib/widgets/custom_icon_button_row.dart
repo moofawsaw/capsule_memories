@@ -1,17 +1,5 @@
 import '../core/app_export.dart';
 
-/** 
- * CustomIconButtonRow - A reusable row component that displays two icon buttons with consistent styling
- * 
- * This component provides a horizontal layout with two icon buttons, commonly used for action bars,
- * toolbars, or control panels. Features include:
- * - Consistent spacing and alignment
- * - Configurable icons (SVG paths or Material Design icons)
- * - Optional expanded width behavior
- * - Responsive design using SizeUtils extensions
- * - Built-in tap callbacks for both buttons
- * - Theme-aware icon colors
- */
 class CustomIconButtonRow extends StatelessWidget {
   final String? firstIconPath;
   final IconData? firstIcon;
@@ -19,6 +7,8 @@ class CustomIconButtonRow extends StatelessWidget {
   final IconData? secondIcon;
   final double? firstIconSize;
   final double? secondIconSize;
+  final Color? firstIconColor;   // ✅ add
+  final Color? secondIconColor;  // ✅ add
   final VoidCallback? onFirstIconTap;
   final VoidCallback? onSecondIconTap;
 
@@ -30,12 +20,16 @@ class CustomIconButtonRow extends StatelessWidget {
     this.secondIcon,
     this.firstIconSize,
     this.secondIconSize,
+    this.firstIconColor,   // ✅ add
+    this.secondIconColor,  // ✅ add
     this.onFirstIconTap,
     this.onSecondIconTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final defaultIconColor = Theme.of(context).colorScheme.onSurface;
+
     return Row(
       children: [
         CustomIconButton(
@@ -46,6 +40,7 @@ class CustomIconButtonRow extends StatelessWidget {
           backgroundColor: appTheme.gray_900_01.withAlpha(179),
           borderRadius: 22.h,
           iconSize: firstIconSize ?? 24.h,
+          iconColor: firstIconColor ?? defaultIconColor, // ✅ apply
           onTap: onFirstIconTap,
         ),
         SizedBox(width: 8.h),
@@ -57,7 +52,7 @@ class CustomIconButtonRow extends StatelessWidget {
           backgroundColor: appTheme.gray_900_01.withAlpha(179),
           borderRadius: 22.h,
           iconSize: secondIconSize ?? 24.h,
-          iconColor: Theme.of(context).colorScheme.onSurface,
+          iconColor: secondIconColor ?? defaultIconColor, // ✅ apply
           onTap: onSecondIconTap,
         ),
       ],

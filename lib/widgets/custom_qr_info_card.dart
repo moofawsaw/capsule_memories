@@ -48,7 +48,7 @@ class CustomQrInfoCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           CustomIconButton(
-            iconPath: ImageConstant.imgButtons,
+            iconPath: ImageConstant.imgIcon7,
             height: 48.h,
             width: 48.h,
             padding: EdgeInsets.all(12.h),

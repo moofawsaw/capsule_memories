@@ -305,7 +305,6 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     if (context == null) return;
 
     try {
-      // Use existing QRScannerOverlay instead of custom scanner
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -313,16 +312,9 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
           builder: (_) => QRScannerOverlay(
             scanType: 'friend',
             onSuccess: () async {
-              // QR scanner returns after successful scan
-              // We'll get the scanned user from the service
-              // Refresh invites or show success
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('User added to memory invites!'),
-                  backgroundColor: appTheme.deep_purple_A100,
-                  duration: Duration(seconds: 2),
-                ),
-              );
+              // ✅ Success messaging is now handled inside QRScannerOverlay
+              // Only refresh local state here if needed
+              // Example: refresh invites / members list
             },
           ),
         ),

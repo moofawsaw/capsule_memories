@@ -46,7 +46,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(16.h),
               decoration: BoxDecoration(
-                color: appTheme.gray_900_03,
+                color: appTheme.gray_900_01,
                 borderRadius: BorderRadius.circular(16.h),
               ),
               child: Column(
@@ -148,7 +148,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
                   height: 48.h,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: appTheme.gray_900_03,
+                    color: appTheme.gray_900_01,
                     borderRadius: BorderRadius.circular(14.h),
                   ),
                 ),
@@ -157,7 +157,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
                   height: 48.h,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: appTheme.gray_900_03,
+                    color: appTheme.gray_900_01,
                     borderRadius: BorderRadius.circular(14.h),
                   ),
                 ),
@@ -188,7 +188,7 @@ class _OpenTimelineSkeletonSection extends StatelessWidget {
             height: 220.h,
             width: double.maxFinite,
             decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
+              color: appTheme.gray_900_01,
               borderRadius: BorderRadius.circular(16.h),
             ),
           ),
@@ -222,7 +222,7 @@ class _StoriesSkeletonRow extends StatelessWidget {
           return Container(
             width: 120.h,
             decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
+              color: appTheme.gray_900_01,
               borderRadius: BorderRadius.circular(16.h),
             ),
           );
@@ -277,11 +277,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       }
 
       ref.read(eventTimelineViewNotifier.notifier).initializeFromMemory(navArgs);
-
-      Future.delayed(const Duration(seconds: 1), () async {
-        final notifier = ref.read(eventTimelineViewNotifier.notifier);
-        await notifier.validateMemoryData(navArgs!.memoryId);
-      });
     });
 
     _firstLoadSub = ref.listenManual<EventTimelineViewState>(
@@ -504,12 +499,19 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
   Widget _buildTimelineWidget(BuildContext context) {
     final state = ref.watch(eventTimelineViewNotifier);
 
+    // Keep your first-load gating if you want (prevents showing partial UI)
     if (!_hasCompletedFirstLoad) return const SizedBox.shrink();
 
-    final timelineStories = state.timelineStories;
-    final memoryStartTime = state.memoryStartTime;
-    final memoryEndTime = state.memoryEndTime;
+    // ✅ MATCH SEALED: pull from the snapshot's timelineDetail
+    final timelineDetail = state.eventTimelineViewModel?.timelineDetail;
 
+    final List<TimelineStoryItem> timelineStories =
+        timelineDetail?.timelineStories ?? <TimelineStoryItem>[];
+
+    final memoryStartTime = timelineDetail?.memoryStartTime;
+    final memoryEndTime = timelineDetail?.memoryEndTime;
+
+    // If start/end missing OR no stories, use your existing empty state
     if (memoryStartTime == null || memoryEndTime == null) {
       return _buildTimelineEmptyState(context);
     }
@@ -523,6 +525,7 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       memoryEndTime: memoryEndTime,
       onStoryTap: (storyId) {
         final notifier = ref.read(eventTimelineViewNotifier.notifier);
+
         final feedContext = FeedStoryContext(
           feedType: 'memory_timeline',
           storyIds: notifier.currentMemoryStoryIds,
@@ -538,6 +541,62 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     );
   }
 
+
+  // Timeline Empty State UI (3 Pieces)
+  Widget _buildDateMarkerSkeletonCompact() {
+    return Column(
+      children: [
+        Container(
+          width: 2,
+          height: 8.h,
+          color: appTheme.blue_gray_300.withAlpha(51),
+        ),
+        SizedBox(height: 6.h),
+        Container(
+          width: 46.h,
+          height: 12.h,
+          decoration: BoxDecoration(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        SizedBox(height: 5.h),
+        Container(
+          width: 38.h,
+          height: 10.h,
+          decoration: BoxDecoration(
+            color: appTheme.blue_gray_300.withAlpha(51),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ],
+    );
+  }
+  Widget _buildTimelineSkeletonCompact() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+      child: Column(
+        children: [
+          Container(
+            height: 4.h,
+            decoration: BoxDecoration(
+              color: appTheme.blue_gray_300.withAlpha(51),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          SizedBox(height: 14.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildDateMarkerSkeletonCompact(),
+              _buildDateMarkerSkeletonCompact(),
+              _buildDateMarkerSkeletonCompact(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildTimelineEmptyState(BuildContext context) {
     return Center(
       child: Container(
@@ -545,26 +604,29 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CustomImageView(
-              imagePath: ImageConstant.imgIcon10,
-              height: 56.h,
-              width: 56.h,
-              color: appTheme.blue_gray_300,
-            ),
-            SizedBox(height: 18.h),
+            // ✅ Correct skeleton for empty timeline
+            _buildTimelineSkeletonCompact(),
+
+            SizedBox(height: 20.h),
+
             Text(
               'No stories in timeline yet',
               style: TextStyleHelper.instance.title18BoldPlusJakartaSans
                   .copyWith(color: appTheme.gray_50),
+              textAlign: TextAlign.center,
             ),
+
             SizedBox(height: 6.h),
+
             Text(
               'Start creating stories to build your memory timeline',
               style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                   .copyWith(color: appTheme.blue_gray_300),
               textAlign: TextAlign.center,
             ),
+
             SizedBox(height: 18.h),
+
             CustomButton(
               text: 'Create Story',
               leftIcon: ImageConstant.imgIcon20x20,
@@ -580,6 +642,7 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       ),
     );
   }
+
 
   Widget _buildStoriesSection(BuildContext context) {
     return SizedBox(
@@ -647,7 +710,7 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
             margin: EdgeInsets.symmetric(horizontal: 20.h),
             padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 16.h),
             decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
+              color: appTheme.gray_900_01,
               borderRadius: BorderRadius.circular(12.h),
             ),
             child: Center(
@@ -702,28 +765,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   onPressed: () => onTapCreateStory(context),
-                ),
-                if (!isCurrentUserCreator) ...[
-                  SizedBox(height: 12.h),
-                  CustomButton(
-                    text: 'Leave Memory',
-                    width: double.infinity,
-                    buttonStyle: CustomButtonStyle.outlineDark,
-                    buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-                    onPressed: () {
-                      if (memoryId != null) onTapLeaveMemory(context);
-                    },
-                  ),
-                ],
-              ] else ...[
-                CustomButton(
-                  text: 'Join Memory',
-                  width: double.infinity,
-                  buttonStyle: CustomButtonStyle.fillPrimary,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  onPressed: () {
-                    if (memoryId != null) _onJoinMemory(context, memoryId);
-                  },
                 ),
               ],
             ],

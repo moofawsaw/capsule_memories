@@ -1,9 +1,13 @@
+// lib/presentation/group_qr_invite_screen/group_qr_invite_screen.dart
+
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -137,64 +141,174 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
             _buildActionButtons(model),
             SizedBox(height: 20.h),
             _buildInfoText(),
+            SizedBox(height: 20.h),
           ],
         );
       },
     );
   }
 
-  /// Section Widget
+  /// QR Code section
   Widget _buildQRCodeSection(GroupQRInviteModel model) {
-    // Check if pre-generated QR code URL exists from backend
     final qrCodeUrl = model.qrCodeUrl;
+
+    const double qrSize = 200;
+    const double containerPadding = 12;
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 68.h),
       child: RepaintBoundary(
         key: _qrKey,
         child: Container(
-          padding: EdgeInsets.all(16.h),
+          padding: EdgeInsets.all(containerPadding.h),
           decoration: BoxDecoration(
             color: appTheme.whiteCustom,
             borderRadius: BorderRadius.circular(12.h),
           ),
-          child: (qrCodeUrl != null && qrCodeUrl.isNotEmpty)
-              ? CachedNetworkImage(
-                  imageUrl: qrCodeUrl,
-                  width: 200.h,
-                  height: 200.h,
-                  fit: BoxFit.contain,
-                  placeholder: (context, url) => Container(
-                    width: 200.h,
-                    height: 200.h,
-                    alignment: Alignment.center,
-                    child: CircularProgressIndicator(
-                      color: appTheme.deep_purple_A100,
+          child: SizedBox(
+            width: qrSize.h,
+            height: qrSize.h,
+            child: ClipRect(
+              child: FittedBox(
+                fit: BoxFit.cover, // crops baked padding for symmetry
+                child: SizedBox(
+                  width: qrSize,
+                  height: qrSize,
+                  child: (qrCodeUrl != null && qrCodeUrl.isNotEmpty)
+                      ? _buildQrFromUrl(
+                    qrCodeUrl,
+                    qrSize,
+                    fallbackData:
+                    model.qrCodeData ?? model.invitationUrl ?? '',
+                  )
+                      : SizedBox(
+                    width: qrSize,
+                    height: qrSize,
+                    child: Center(
+                      child: Icon(
+                        Icons.error_outline,
+                        color: appTheme.gray_400,
+                        size: 32,
+                      ),
                     ),
                   ),
-                  errorWidget: (context, url, error) {
-                    return QrImageView(
-                      data: model.qrCodeData ?? '',
-                      version: QrVersions.auto,
-                      size: 200.h,
-                      backgroundColor: appTheme.whiteCustom,
-                      foregroundColor: appTheme.blackCustom,
-                    );
-                  },
-                )
-              : QrImageView(
-                  data: model.qrCodeData ?? '',
-                  version: QrVersions.auto,
-                  size: 200.h,
-                  backgroundColor: appTheme.whiteCustom,
-                  foregroundColor: appTheme.blackCustom,
                 ),
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  /// Section Widget
+  /// ✅ Supports both SVG and raster URLs (png/jpg/webp).
+  /// SVG URLs must use flutter_svg; raster can use CachedNetworkImage.
+  Widget _buildQrFromUrl(
+      String url,
+      double size, {
+        required String fallbackData,
+      }) {
+    final lower = url.toLowerCase();
+    final isSvg = lower.endsWith('.svg') || lower.contains('.svg?');
+
+    if (isSvg) {
+      return FutureBuilder<File>(
+        future: DefaultCacheManager().getSingleFile(url),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return SizedBox(
+              width: size,
+              height: size,
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: appTheme.deep_purple_A100,
+                ),
+              ),
+            );
+          }
+
+          if (!snapshot.hasData) {
+            // fallback to generated QR if available, else icon
+            if (fallbackData.isNotEmpty) {
+              return QrImageView(
+                data: fallbackData,
+                version: QrVersions.auto,
+                size: size,
+                backgroundColor: appTheme.whiteCustom,
+              );
+            }
+            return SizedBox(
+              width: size,
+              height: size,
+              child: Center(
+                child: Icon(
+                  Icons.broken_image_outlined,
+                  color: appTheme.gray_400,
+                  size: 32,
+                ),
+              ),
+            );
+          }
+
+          return SvgPicture.file(
+            snapshot.data!,
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+            placeholderBuilder: (_) => SizedBox(
+              width: size,
+              height: size,
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: appTheme.deep_purple_A100,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // Raster images (png/jpg/webp/gif)
+    return CachedNetworkImage(
+      imageUrl: url,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      placeholder: (context, _) => SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: appTheme.deep_purple_A100,
+          ),
+        ),
+      ),
+      errorWidget: (context, _, __) {
+        if (fallbackData.isNotEmpty) {
+          return QrImageView(
+            data: fallbackData,
+            version: QrVersions.auto,
+            size: size,
+            backgroundColor: appTheme.whiteCustom,
+          );
+        }
+        return SizedBox(
+          width: size,
+          height: size,
+          child: Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: appTheme.gray_400,
+              size: 32,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// URL section
   Widget _buildUrlSection(GroupQRInviteModel model) {
     return Container(
       margin: EdgeInsets.only(right: 16.h, left: 4.h),
@@ -230,85 +344,81 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
     );
   }
 
-  /// Section Widget
+  /// Action buttons
   Widget _buildActionButtons(GroupQRInviteModel model) {
-    return Container(
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _downloadQR(model.groupName ?? 'group'),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 22.h, vertical: 12.h),
-                decoration: BoxDecoration(
-                  color: appTheme.color41C124,
-                  borderRadius: BorderRadius.circular(6.h),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CustomImageView(
-                      imagePath: ImageConstant.imgIcon15,
-                      height: 18.h,
-                      width: 18.h,
-                    ),
-                    SizedBox(width: 8.h),
-                    Text(
-                      "Download QR",
-                      style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                          .copyWith(color: appTheme.gray_50),
-                    ),
-                  ],
-                ),
+    return Row(
+      children: [
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _downloadQR(model.groupName ?? 'group'),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 22.h, vertical: 12.h),
+              decoration: BoxDecoration(
+                color: appTheme.color41C124,
+                borderRadius: BorderRadius.circular(6.h),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CustomImageView(
+                    imagePath: ImageConstant.imgIcon15,
+                    height: 18.h,
+                    width: 18.h,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    "Download QR",
+                    style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ],
               ),
             ),
           ),
-          SizedBox(width: 12.h),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _shareLink(
-                model.groupName ?? 'group',
-                model.invitationUrl ?? '',
+        ),
+        SizedBox(width: 12.h),
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _shareLink(
+              model.groupName ?? 'group',
+              model.invitationUrl ?? '',
+            ),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+              decoration: BoxDecoration(
+                color: appTheme.deep_purple_A100,
+                borderRadius: BorderRadius.circular(6.h),
               ),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
-                decoration: BoxDecoration(
-                  color: appTheme.deep_purple_A100,
-                  borderRadius: BorderRadius.circular(6.h),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CustomImageView(
-                      imagePath: ImageConstant.imgIcon16,
-                      height: 18.h,
-                      width: 18.h,
-                    ),
-                    SizedBox(width: 8.h),
-                    Text(
-                      "Share Link",
-                      style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                          .copyWith(color: appTheme.white_A700),
-                    ),
-                  ],
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CustomImageView(
+                    imagePath: ImageConstant.imgIcon16,
+                    height: 18.h,
+                    width: 18.h,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    "Share Link",
+                    style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                        .copyWith(color: appTheme.white_A700),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  /// Section Widget
+  /// Info text
   Widget _buildInfoText() {
-    return Container(
-      child: Text(
-        "People who scan this code or open the link will be added to your group instantly",
-        textAlign: TextAlign.center,
-        style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-            .copyWith(color: appTheme.blue_gray_300, height: 1.2),
-      ),
+    return Text(
+      "People who scan this code or open the link will be added to your group instantly",
+      textAlign: TextAlign.center,
+      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+          .copyWith(color: appTheme.blue_gray_300, height: 1.2),
     );
   }
 
@@ -332,18 +442,17 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
       ref.read(groupQRInviteNotifier.notifier).onDownloadQR();
 
       final boundary =
-          _qrKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      _qrKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
       ByteData? byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      await image.toByteData(format: ui.ImageByteFormat.png);
 
       if (byteData != null) {
         final Uint8List pngBytes = byteData.buffer.asUint8List();
 
-        // Get the downloads directory
         final directory = await getApplicationDocumentsDirectory();
         final sanitizedName =
-            groupName.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_');
+        groupName.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_');
         final String fileName =
             '${sanitizedName}_qr_${DateTime.now().millisecondsSinceEpoch}.png';
         final File file = File('${directory.path}/$fileName');

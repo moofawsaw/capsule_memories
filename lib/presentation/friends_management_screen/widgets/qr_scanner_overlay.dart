@@ -1,3 +1,5 @@
+qr_scanner_overlay// lib/presentation/friends_management_screen/widgets/qr_scanner_overlay.dart
+
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/app_export.dart';
@@ -19,9 +21,16 @@ class QRScannerOverlay extends ConsumerStatefulWidget {
 
 class QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
   MobileScannerController? _controller;
+
   bool isProcessing = false;
   String? resultMessage;
+
+  /// True only when backend says success AND user is authenticated (action completed).
   bool isSuccess = false;
+
+  /// True when backend created a pending action and user must sign in to finish.
+  bool _needsAuth = false;
+
   bool _flashEnabled = false;
 
   @override
@@ -29,6 +38,8 @@ class QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
     super.initState();
     _controller = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,
+      // You can optionally set formats to QR only if needed:
+      // formats: [BarcodeFormat.qrCode],
     );
   }
 
@@ -43,27 +54,46 @@ class QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
 
     setState(() {
       isProcessing = true;
+      resultMessage = null;
+      isSuccess = false;
+      _needsAuth = false;
     });
+
+    // ✅ Stop camera while processing (prevents repeated triggers / unstable reads)
+    await _controller?.stop();
 
     try {
       // Parse the code - can be URL or raw code
       String extractedCode;
       String type = widget.scanType;
 
-      if (code.startsWith('http')) {
-        // Parse URL: https://capsule.app/join/{type}/{code}
-        final uri = Uri.parse(code);
-        final segments = uri.pathSegments;
+      final trimmed = code.trim();
 
+      if (trimmed.startsWith('http') ||
+          trimmed.startsWith('capapp://') ||
+          trimmed.startsWith('capsule://')) {
+        final uri = Uri.parse(trimmed);
+        final segments =
+        uri.pathSegments.where((s) => s.trim().isNotEmpty).toList();
+
+        // Accept: /join/group/<code>
         if (segments.length >= 3 && segments[0] == 'join') {
           type = segments[1];
           extractedCode = segments[2];
+        }
+        // Accept: /join/group?code=SK9RZ4YD
+        else if (segments.length >= 2 && segments[0] == 'join') {
+          type = segments[1];
+          extractedCode = uri.queryParameters['code'] ?? '';
+          if (extractedCode.trim().isEmpty) {
+            throw Exception('Invalid QR code format');
+          }
         } else {
           throw Exception('Invalid QR code format');
         }
-      } else if (code.length == 8) {
+      } else if (trimmed.length == 8) {
         // Raw 8-character code
-        extractedCode = code;
+        extractedCode = trimmed;
       } else {
         throw Exception('Invalid code length');
       }
@@ -81,32 +111,66 @@ class QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
       );
 
       if (response.status == 200) {
+        final data = response.data;
+
+        final bool success = data is Map && data['success'] == true;
+        final bool authenticated = data is Map && data['authenticated'] == true;
+
+        final String message = (data is Map &&
+            data['message'] is String &&
+            (data['message'] as String).trim().isNotEmpty)
+            ? (data['message'] as String)
+            : 'QR processed.';
+
         setState(() {
-          isSuccess = true;
-          resultMessage = 'Friend request sent successfully!';
+          isSuccess = success && authenticated;
+          _needsAuth = success && !authenticated;
+          resultMessage = message;
         });
 
-        await Future.delayed(Duration(seconds: 2));
-
-        if (mounted) {
-          Navigator.pop(context);
-          widget.onSuccess?.call();
+        // ✅ Auto-close only when action truly completed
+        if (success && authenticated) {
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) {
+            Navigator.pop(context);
+            widget.onSuccess?.call();
+          }
+        } else {
+          // Not completed (needs login or backend reported not-success)
+          await Future.delayed(const Duration(seconds: 3));
+          if (mounted) {
+            setState(() {
+              isProcessing = false;
+              resultMessage = null;
+              _needsAuth = false;
+              isSuccess = false;
+            });
+            await _controller?.start();
+          }
         }
       } else {
-        throw Exception(response.data['error'] ?? 'Failed to process QR code');
+        final data = response.data;
+        final String errorMsg = (data is Map && data['error'] is String)
+            ? data['error'] as String
+            : 'Failed to process QR code';
+        throw Exception(errorMsg);
       }
     } catch (e) {
       setState(() {
         isSuccess = false;
+        _needsAuth = false;
         resultMessage = e.toString().replaceAll('Exception: ', '');
       });
 
-      await Future.delayed(Duration(seconds: 3));
+      await Future.delayed(const Duration(seconds: 3));
 
-      setState(() {
-        isProcessing = false;
-        resultMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          isProcessing = false;
+          resultMessage = null;
+        });
+        await _controller?.start();
+      }
     }
   }
 
@@ -120,9 +184,16 @@ class QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
           MobileScanner(
             controller: _controller,
             onDetect: (BarcodeCapture capture) {
-              final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty && barcodes.first.rawValue != null) {
-                _handleScannedCode(barcodes.first.rawValue!);
+              // ✅ Take the first non-empty rawValue, not just barcodes.first
+              final String? value = capture.barcodes
+                  .map((b) => b.rawValue)
+                  .firstWhere(
+                    (v) => v != null && v.trim().isNotEmpty,
+                orElse: () => null,
+              );
+
+              if (value != null) {
+                _handleScannedCode(value.trim());
               }
             },
           ),
@@ -221,11 +292,18 @@ class QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
                       children: [
                         if (resultMessage == null)
                           CircularProgressIndicator(
-                              color: appTheme.deep_purple_A100),
+                            color: appTheme.deep_purple_A100,
+                          ),
                         if (resultMessage != null)
                           Icon(
-                            isSuccess ? Icons.check_circle : Icons.error,
-                            color: isSuccess ? Colors.green : Colors.red,
+                            isSuccess
+                                ? Icons.check_circle
+                                : (_needsAuth ? Icons.info : Icons.error),
+                            color: isSuccess
+                                ? Colors.green
+                                : (_needsAuth
+                                ? appTheme.deep_purple_A100
+                                : Colors.red),
                             size: 48.h,
                           ),
                         SizedBox(height: 12.h),
@@ -270,10 +348,12 @@ class ScannerOverlayPainter extends CustomPainter {
     canvas.drawPath(
       Path()
         ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-        ..addRRect(RRect.fromRectAndRadius(
-          scanRect,
-          Radius.circular(16.0),
-        ))
+        ..addRRect(
+          RRect.fromRectAndRadius(
+            scanRect,
+            const Radius.circular(16.0),
+          ),
+        )
         ..fillType = PathFillType.evenOdd,
       paint,
     );
@@ -283,7 +363,7 @@ class ScannerOverlayPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0;
 
-    final cornerLength = 30.0;
+    const cornerLength = 30.0;
 
     // Top-left
     canvas.drawLine(
@@ -323,14 +403,18 @@ class ScannerOverlayPainter extends CustomPainter {
 
     // Bottom-right
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize - cornerLength,
-          scanAreaTop + scanAreaSize),
+      Offset(
+        scanAreaLeft + scanAreaSize - cornerLength,
+        scanAreaTop + scanAreaSize,
+      ),
       Offset(scanAreaLeft + scanAreaSize, scanAreaTop + scanAreaSize),
       cornerPaint,
     );
     canvas.drawLine(
-      Offset(scanAreaLeft + scanAreaSize,
-          scanAreaTop + scanAreaSize - cornerLength),
+      Offset(
+        scanAreaLeft + scanAreaSize,
+        scanAreaTop + scanAreaSize - cornerLength,
+      ),
       Offset(scanAreaLeft + scanAreaSize, scanAreaTop + scanAreaSize),
       cornerPaint,
     );

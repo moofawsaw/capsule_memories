@@ -35,7 +35,7 @@ class TimelineWidget extends StatelessWidget {
   static const double _storyMarkerWidth = 70.0;
   static const double _markerLabelWidth = 72.0;
 
-  // Keep markers away from the edges (Option B)
+  // Keep markers away from the edges
   static const double _markerEdgeInset = 14.0; // px, tweak 10–20
 
   double get _totalHeight =>
@@ -53,6 +53,18 @@ class TimelineWidget extends StatelessWidget {
 
   // Display to user in local timezone (EST/whatever device is set to)
   DateTime _toLocal(DateTime dt) => _toUtc(dt).toLocal();
+
+  // ============================
+  // URL SAFETY (AVATAR + THUMBNAIL)
+  // ============================
+
+  bool _isValidNetworkUrl(String? s) {
+    if (s == null) return false;
+    final v = s.trim();
+    if (v.isEmpty) return false;
+    if (v == 'null' || v == 'undefined') return false;
+    return v.startsWith('http://') || v.startsWith('https://');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +96,6 @@ class TimelineWidget extends StatelessWidget {
                   progressRatio: progressRatio,
                 ),
               ),
-
               ..._buildStoryWidgets(usableWidth, padding),
               ..._buildThreeMarkers(usableWidth, padding),
             ],
@@ -170,8 +181,7 @@ class TimelineWidget extends StatelessWidget {
 
       // Clamp so center can reach both ends (allow overflow off the edges)
       final double minLeft = padding - halfMarker; // center at x=0
-      final double maxLeft =
-          padding + usableWidth - halfMarker; // center at x=max
+      final double maxLeft = padding + usableWidth - halfMarker; // center at x=max
       leftPos = leftPos.clamp(minLeft, maxLeft).toDouble();
 
       return Positioned(
@@ -190,8 +200,82 @@ class TimelineWidget extends StatelessWidget {
     }).toList();
   }
 
-  /// Markers: Start (bold), Midpoint (regular), End (bold)
-  /// Start/End labels must equal memoryStartTime/memoryEndTime EXACTLY (shown in local timezone)
+  // ============================
+  // MIDPOINT COUNTDOWN BADGE
+  // ============================
+
+  String _formatRemainingClock(Duration d) {
+    if (d.isNegative || d.inSeconds <= 0) return '00:00:00';
+
+    final int totalSeconds = d.inSeconds;
+
+    final int days = totalSeconds ~/ 86400;
+    final int hours = (totalSeconds % 86400) ~/ 3600;
+    final int minutes = (totalSeconds % 3600) ~/ 60;
+    final int seconds = totalSeconds % 60;
+
+    final String hh = hours.toString().padLeft(2, '0');
+    final String mm = minutes.toString().padLeft(2, '0');
+    final String ss = seconds.toString().padLeft(2, '0');
+
+    if (days > 0) return '${days}d $hh:$mm:$ss';
+    return '$hh:$mm:$ss';
+  }
+
+  Widget _buildCountdownBadge(DateTime endUtc) {
+    if (variant == TimelineVariant.sealed) {
+      return _countdownBadgeShell(value: '00:00:00');
+    }
+
+    return StreamBuilder<int>(
+      stream: Stream.periodic(const Duration(seconds: 1), (i) => i),
+      builder: (context, snapshot) {
+        final DateTime nowUtc = DateTime.now().toUtc();
+        final Duration remaining = endUtc.difference(nowUtc);
+        final String clock = _formatRemainingClock(remaining);
+
+        return _countdownBadgeShell(value: clock);
+      },
+    );
+  }
+
+  Widget _countdownBadgeShell({required String value}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: appTheme.deep_purple_A100.withAlpha(40),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(40),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.max,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.access_time_rounded,
+            size: 16.h,
+            color: appTheme.gray_50.withAlpha(210),
+          ),
+          SizedBox(width: 8.h),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.visible,
+            style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Markers: Start (bold), Midpoint (COUNTDOWN BADGE), End (bold)
   List<Widget> _buildThreeMarkers(double usableWidth, double padding) {
     DateTime startUtc = _toUtc(memoryStartTime);
     DateTime endUtc = _toUtc(memoryEndTime);
@@ -211,7 +295,7 @@ class TimelineWidget extends StatelessWidget {
     final markers = <_MarkerSpec>[
       _MarkerSpec(
         timeForPositionUtc: startUtc,
-        timeForLabelExact: memoryStartTime, // EXACT
+        timeForLabelExact: memoryStartTime,
         isEmphasized: true,
       ),
       _MarkerSpec(
@@ -221,7 +305,7 @@ class TimelineWidget extends StatelessWidget {
       ),
       _MarkerSpec(
         timeForPositionUtc: endUtc,
-        timeForLabelExact: memoryEndTime, // EXACT
+        timeForLabelExact: memoryEndTime,
         isEmphasized: true,
       ),
     ];
@@ -229,22 +313,34 @@ class TimelineWidget extends StatelessWidget {
     final widgets = <Widget>[];
     final double halfLabel = _markerLabelWidth / 2;
 
-    for (final m in markers) {
+    for (int i = 0; i < markers.length; i++) {
+      final m = markers[i];
+      final bool isMidpoint = i == 1;
+
       final double rawPos =
       _calculateTimePosition(m.timeForPositionUtc, usableWidth);
 
-      // === OPTION B: keep markers away from edges ===
       final double minCenter = _markerEdgeInset;
       final double maxCenter = (usableWidth - _markerEdgeInset)
           .clamp(0.0, double.infinity)
           .toDouble();
-      final double clampedCenter =
-      rawPos.clamp(minCenter, maxCenter).toDouble();
+      final double clampedCenter = rawPos.clamp(minCenter, maxCenter).toDouble();
 
       final double leftPos = (padding + clampedCenter - halfLabel).toDouble();
 
-      final _MarkerTextParts parts =
-      _formatMarkerPartsLocal(m.timeForLabelExact);
+      if (isMidpoint) {
+        widgets.add(
+          Positioned(
+            left: padding + _markerLabelWidth,
+            right: padding + _markerLabelWidth,
+            bottom: 4.h,
+            child: _buildCountdownBadge(endUtc),
+          ),
+        );
+        continue;
+      }
+
+      final _MarkerTextParts parts = _formatMarkerPartsLocal(m.timeForLabelExact);
 
       widgets.add(
         Positioned(
@@ -267,10 +363,9 @@ class TimelineWidget extends StatelessWidget {
                       parts.dateLine,
                       textAlign: TextAlign.center,
                       style: (m.isEmphasized
-                          ? TextStyleHelper
-                          .instance.body14BoldPlusJakartaSans
-                          : TextStyleHelper
-                          .instance.body14RegularPlusJakartaSans)
+                          ? TextStyleHelper.instance.body14BoldPlusJakartaSans
+                          : TextStyleHelper.instance
+                          .body14RegularPlusJakartaSans)
                           .copyWith(color: appTheme.gray_50),
                       maxLines: 1,
                     ),
@@ -278,8 +373,7 @@ class TimelineWidget extends StatelessWidget {
                     Text(
                       parts.timeLine,
                       textAlign: TextAlign.center,
-                      style: TextStyleHelper
-                          .instance.body14RegularPlusJakartaSans
+                      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                           .copyWith(color: appTheme.blue_gray_300),
                       maxLines: 1,
                     ),
@@ -295,7 +389,6 @@ class TimelineWidget extends StatelessWidget {
     return widgets;
   }
 
-  /// Position across the bar based on time ratio (UTC normalization for math)
   double _calculateTimePosition(DateTime dateTime, double usableWidth) {
     DateTime start = _toUtc(memoryStartTime);
     DateTime end = _toUtc(memoryEndTime);
@@ -320,18 +413,7 @@ class TimelineWidget extends StatelessWidget {
     final DateTime local = _toLocal(dt);
 
     const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
+      'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
     ];
     final String month = months[local.month - 1];
     final int day = local.day;
@@ -387,6 +469,14 @@ class _TimelineStoryWidget extends StatelessWidget {
     this.onTap,
   }) : super(key: key);
 
+  bool _isValidNetworkUrl(String? s) {
+    if (s == null) return false;
+    final v = s.trim();
+    if (v.isEmpty) return false;
+    if (v == 'null' || v == 'undefined') return false;
+    return v.startsWith('http://') || v.startsWith('https://');
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -398,14 +488,11 @@ class _TimelineStoryWidget extends StatelessWidget {
             _buildStoryCard(),
             SizedBox(height: TimelineWidget._connectorAboveBar.h),
             SizedBox(height: TimelineWidget._barHeight.h),
-
-            // connector BELOW bar
             Container(
               width: 2,
               height: TimelineWidget._connectorBelowBar.h,
               color: appTheme.deep_purple_A100,
             ),
-
             _buildAvatar(),
           ],
         ),
@@ -414,6 +501,8 @@ class _TimelineStoryWidget extends StatelessWidget {
   }
 
   Widget _buildStoryCard() {
+    final String url = item.backgroundImage.trim();
+
     return Container(
       width: TimelineWidget._cardWidth,
       height: TimelineWidget._cardHeight.h,
@@ -426,10 +515,10 @@ class _TimelineStoryWidget extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(6.h),
-        child: CachedNetworkImage(
-          imageUrl: item.backgroundImage,
-          key: ValueKey(
-              'story_thumbnail_${item.storyId}_${item.backgroundImage.hashCode}'),
+        child: _isValidNetworkUrl(url)
+            ? CachedNetworkImage(
+          imageUrl: url,
+          key: ValueKey('story_thumbnail_${item.storyId}_${url.hashCode}'),
           fit: BoxFit.cover,
           memCacheWidth: 200,
           memCacheHeight: 280,
@@ -451,95 +540,78 @@ class _TimelineStoryWidget extends StatelessWidget {
               ),
             ),
           ),
-          errorWidget: (context, url, error) {
-            print(
-                '🔄 TIMELINE: Thumbnail load failed for ${item.storyId}, retrying...');
-
-            return FutureBuilder(
-              future: Future.delayed(
-                const Duration(milliseconds: 500),
-                    () => CachedNetworkImage(
-                  imageUrl: item.backgroundImage,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 200,
-                  memCacheHeight: 280,
-                  errorWidget: (context, url, retryError) => Container(
-                    color: const Color(0xFF2A2A3A),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      Icons.refresh,
-                      color: Colors.white38,
-                      size: 18.h,
-                    ),
-                  ),
-                ),
-              ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Container(
-                    color: const Color(0xFF2A2A3A),
-                    alignment: Alignment.center,
-                    child: SizedBox(
-                      width: 16.h,
-                      height: 16.h,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          appTheme.deep_purple_A100.withAlpha(128),
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                return snapshot.data ??
-                    Container(
-                      color: const Color(0xFF2A2A3A),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.image_not_supported,
-                        color: Colors.white38,
-                        size: 18.h,
-                      ),
-                    );
-              },
-            );
-          },
+          errorWidget: (context, url, error) => Container(
+            color: const Color(0xFF2A2A3A),
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.image_not_supported,
+              color: Colors.white38,
+              size: 18.h,
+            ),
+          ),
+        )
+            : Container(
+          color: const Color(0xFF2A2A3A),
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.image_not_supported,
+            color: Colors.white38,
+            size: 18.h,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildAvatar() {
+    final String url = item.userAvatar.trim();
+
     return SizedBox(
       width: TimelineWidget._avatarSize.h,
       height: TimelineWidget._avatarSize.h,
-      child: ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: item.userAvatar,
-          key: ValueKey('avatar_${item.storyId}_${item.userAvatar.hashCode}'),
-          fit: BoxFit.cover,
-          memCacheWidth: 80,
-          memCacheHeight: 80,
-          maxHeightDiskCache: 120,
-          maxWidthDiskCache: 120,
-          fadeInDuration: const Duration(milliseconds: 200),
-          fadeOutDuration: const Duration(milliseconds: 100),
-          placeholder: (context, url) => Container(
-            color: const Color(0xFF2A2A3A),
-            alignment: Alignment.center,
-            child: SizedBox(
-              width: 12.h,
-              height: 12.h,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  appTheme.deep_purple_A100.withAlpha(128),
+      child: Container(
+        padding: const EdgeInsets.all(1),
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF222D3E),
+        ),
+        child: ClipOval(
+          child: _isValidNetworkUrl(url)
+              ? CachedNetworkImage(
+            imageUrl: url,
+            key: ValueKey('avatar_${item.storyId}_${url.hashCode}'),
+            fit: BoxFit.cover,
+            memCacheWidth: 80,
+            memCacheHeight: 80,
+            maxHeightDiskCache: 120,
+            maxWidthDiskCache: 120,
+            fadeInDuration: const Duration(milliseconds: 200),
+            fadeOutDuration: const Duration(milliseconds: 100),
+            placeholder: (context, url) => Container(
+              color: const Color(0xFF2A2A3A),
+              alignment: Alignment.center,
+              child: SizedBox(
+                width: 12.h,
+                height: 12.h,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    appTheme.deep_purple_A100.withAlpha(128),
+                  ),
                 ),
               ),
             ),
-          ),
-          errorWidget: (context, url, error) => Container(
+            errorWidget: (context, url, error) => Container(
+              color: const Color(0xFF2A2A3A),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.person,
+                color: Colors.white38,
+                size: 18.h,
+              ),
+            ),
+          )
+              : Container(
             color: const Color(0xFF2A2A3A),
             alignment: Alignment.center,
             child: Icon(
