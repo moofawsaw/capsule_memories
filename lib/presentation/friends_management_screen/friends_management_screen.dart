@@ -100,8 +100,7 @@ class FriendsManagementScreenState
   Widget _buildFriendsHeaderSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(friendsManagementNotifier);
-      final friendsCount =
-          state.filteredFriendsList?.length ?? 0;
+      final friendsCount = state.filteredFriendsList?.length ?? 0;
 
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,7 +137,7 @@ class FriendsManagementScreenState
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => QRCodeShareScreenTwoScreen(),
+      builder: (context) => const QRCodeShareScreenTwoScreen(),
     );
   }
 

@@ -341,7 +341,7 @@ class StoryService {
       };
 
       final response =
-      await _supabase!.from('stories').insert(storyData).select('''
+      await _supabase.from('stories').insert(storyData).select('''
             id,
             location_name,
             location_lat,
@@ -517,7 +517,7 @@ class StoryService {
     if (_supabase == null) return null;
 
     try {
-      final response = await _supabase!.from('stories').select('''
+      final response = await _supabase.from('stories').select('''
             id,
             image_url,
             video_url,

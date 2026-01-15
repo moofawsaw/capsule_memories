@@ -766,7 +766,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         .eq('memories.state', 'open')
         .gt('memories.end_time', nowIso);
 
-    if (res is List) return res.length;
+    return res.length;
     return 0;
   }
 

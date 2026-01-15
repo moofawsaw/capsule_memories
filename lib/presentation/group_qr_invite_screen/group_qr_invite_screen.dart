@@ -250,8 +250,8 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
             );
           }
 
-          return SvgPicture.file(
-            snapshot.data!,
+          return SvgPicture.network(
+            url,
             width: size,
             height: size,
             fit: BoxFit.contain,
