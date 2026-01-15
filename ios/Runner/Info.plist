@@ -67,7 +67,8 @@
     <!-- Universal Links for HTTPS deep links -->
     <key>com.apple.developer.associated-domains</key>
     <array>
-        <string>applinks:capsule.app</string>
+            <string>applinks:capapp.co</string>
+            <string>applinks:share.capapp.co</string>
     </array>
     
     <key>NSLocationWhenInUseUsageDescription</key>

@@ -1,3 +1,4 @@
+// lib/widgets/custom_image_view.dart
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -38,13 +39,14 @@ class CustomImageView extends StatefulWidget {
     this.margin,
     this.border,
     this.placeHolder,
+    this.isCircular = false, // ✅ NEW
   }) : super(key: key) {
     if (imagePath == null || imagePath!.isEmpty) {
       imagePath = ImageConstant.imgImageNotFound;
     }
   }
 
-  ///[imagePath] is required parameter for showing image
+  /// [imagePath] is required parameter for showing image
   late String? imagePath;
 
   final double? height;
@@ -61,6 +63,9 @@ class CustomImageView extends StatefulWidget {
   final EdgeInsetsGeometry? margin;
   final BorderRadius? radius;
   final BoxBorder? border;
+
+  /// ✅ When true, forces ClipOval around the image (perfect avatars)
+  final bool isCircular;
 
   @override
   State<CustomImageView> createState() => _CustomImageViewState();
@@ -189,15 +194,22 @@ class _CustomImageViewState extends State<CustomImageView>
     return imageContent;
   }
 
+  // ✅ NEW: proper circular mode for avatars
   Widget _buildCircleImage() {
+    if (widget.isCircular) {
+      return ClipOval(
+        child: _buildImageWithBorder(),
+      );
+    }
+
     if (widget.radius != null) {
       return ClipRRect(
         borderRadius: widget.radius ?? BorderRadius.zero,
         child: _buildImageWithBorder(),
       );
-    } else {
-      return _buildImageWithBorder();
     }
+
+    return _buildImageWithBorder();
   }
 
   Widget _buildImageWithBorder() {
@@ -230,7 +242,9 @@ class _CustomImageViewState extends State<CustomImageView>
             fit: widget.fit ?? BoxFit.contain,
             colorFilter: widget.color != null
                 ? ColorFilter.mode(
-                widget.color ?? appTheme.transparentCustom, BlendMode.srcIn)
+              widget.color ?? appTheme.transparentCustom,
+              BlendMode.srcIn,
+            )
                 : null,
           ),
         );
@@ -252,7 +266,9 @@ class _CustomImageViewState extends State<CustomImageView>
           fit: widget.fit ?? BoxFit.contain,
           colorFilter: widget.color != null
               ? ColorFilter.mode(
-              widget.color ?? appTheme.transparentCustom, BlendMode.srcIn)
+            widget.color ?? appTheme.transparentCustom,
+            BlendMode.srcIn,
+          )
               : null,
         );
 
@@ -263,7 +279,10 @@ class _CustomImageViewState extends State<CustomImageView>
         return CachedNetworkImage(
           height: safeH,
           width: safeW,
-          fit: widget.fit,
+
+          // ✅ CRITICAL: default to cover if caller didn’t specify fit
+          fit: widget.fit ?? BoxFit.cover,
+
           imageUrl: widget.imagePath!,
           color: widget.color,
           cacheManager: CacheManager(
@@ -348,10 +367,10 @@ class _CustomImageViewState extends State<CustomImageView>
             );
           },
           fadeInDuration: const Duration(milliseconds: 200),
-          // ✅ SAFE: never toInt() Infinity/NaN
           memCacheHeight: cacheH,
           memCacheWidth: cacheW,
         );
+
 
       case ImageType.png:
       default:
@@ -362,9 +381,13 @@ class _CustomImageViewState extends State<CustomImageView>
           fit: widget.fit ?? BoxFit.cover,
           color: widget.color,
           errorBuilder: (context, error, stackTrace) {
+            // ignore: avoid_print
             print('❌ ASSET LOAD FAILED:');
+            // ignore: avoid_print
             print('   Asset Path: ${widget.imagePath}');
+            // ignore: avoid_print
             print('   Error: $error');
+            // ignore: avoid_print
             print('   Stack Trace: $stackTrace');
 
             return Image.asset(

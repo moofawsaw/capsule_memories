@@ -1238,6 +1238,7 @@ class FeedService {
     try {
       final response = await _client!.from('stories').select('''
             id,
+            share_code,
             image_url,
             video_url,
             media_type,
@@ -1284,6 +1285,8 @@ class FeedService {
       }
 
       return {
+        'id': storyId,                          // ADD THIS LINE
+        'share_code': response['share_code'],   // ADD THIS LINE
         'media_url': mediaUrl,
         'media_type': mediaType,
         'user_name': contributor?['display_name'] ?? 'Unknown User',

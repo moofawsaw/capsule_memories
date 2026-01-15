@@ -1,14 +1,15 @@
+// lib/widgets/custom_user_status_row.dart
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
-/** 
+/**
  * CustomUserStatusRow - A reusable user profile row component with status badge
- * 
+ *
  * This component displays a user's profile image, name, and optional status badge in a horizontal layout.
  * Features responsive design, customizable status styling, and optional interaction callbacks.
- * 
+ *
  * @param profileImagePath - Path to the user's profile image
- * @param userName - Display name of the user  
+ * @param userName - Display name of the user
  * @param statusText - Optional status text to display in badge
  * @param statusBackgroundColor - Background color for status badge
  * @param statusTextColor - Text color for status badge
@@ -82,7 +83,7 @@ class CustomUserStatusRow extends StatelessWidget {
       imagePath: profileImagePath,
       height: 36.h,
       width: 36.h,
-      radius: BorderRadius.circular(18.h),
+      isCircular: true, // ✅ NEW: enforce true circular avatar
       fit: BoxFit.cover,
     );
   }
@@ -106,13 +107,15 @@ class CustomUserStatusRow extends StatelessWidget {
         vertical: 4.h,
       ),
       decoration: BoxDecoration(
-        color: statusBackgroundColor ?? Color(0xFF221730),
+        color: statusBackgroundColor ?? const Color(0xFF221730),
         borderRadius: BorderRadius.circular(6.h),
       ),
       child: Text(
         statusText!,
         style: TextStyleHelper.instance.body12BoldPlusJakartaSans.copyWith(
-            color: statusTextColor ?? Color(0xFFFF7A00), height: 1.33),
+          color: statusTextColor ?? const Color(0xFFFF7A00),
+          height: 1.33,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

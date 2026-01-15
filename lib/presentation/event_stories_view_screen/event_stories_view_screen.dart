@@ -703,77 +703,36 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   }
 
   /// Shares the current story with native share sheet
+  /// Shares the current story using the web URL (OG preview),
+  /// NOT an attached file (attachments cause iMessage to open camera/MMS UI).
   Future<void> _shareStory() async {
-    if (_currentStoryData == null) {
-      print('⚠️ WARNING: No story data available to share');
+    // Prefer share_code for shorter URLs, fallback to storyId (UUID)
+    final shareCode = _currentStoryData?['share_code'] as String?;
+    final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : _initialStoryId;
+
+    final shareIdentifier = shareCode ?? storyId;
+
+    if (shareIdentifier == null || shareIdentifier.isEmpty) {
+      debugPrint('⚠️ WARNING: No share code or storyId available to share');
       return;
     }
 
     try {
-      final userName =
-          _currentStoryData?['user_name'] as String? ?? 'Unknown User';
-      final mediaUrl = _currentStoryData?['media_url'] as String?;
-      final memoryId = _currentStoryData?['memory_id'] as String?;
-      final caption = _currentStoryData?['caption'] as String? ?? '';
+      // Always share the web URL so iMessage/WhatsApp/etc. render OG tags.
+      final shareUrl = 'https://share.capapp.co/$shareIdentifier';
 
-      String memoryName = 'Memory';
-      if (memoryId != null) {
-        try {
-          final client = SupabaseService.instance.client;
-          final memoryData = await client
-              ?.from('memories')
-              .select('name')
-              .eq('id', memoryId)
-              .single();
-
-          memoryName = memoryData?['name'] as String? ?? 'Memory';
-        } catch (e) {
-          print('⚠️ WARNING: Failed to fetch memory name: $e');
-        }
-      }
-
-      final shareText = '''
-Check out this story by $userName from "$memoryName"!
-
-${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
-
-#CapsuleMemories #$memoryName
-''';
-
-      if (mediaUrl != null && mediaUrl.isNotEmpty) {
-        try {
-          final response = await http.get(Uri.parse(mediaUrl));
-
-          if (response.statusCode == 200) {
-            final tempDir = await getTemporaryDirectory();
-            final fileName =
-                'story_${DateTime.now().millisecondsSinceEpoch}.jpg';
-            final file = File('${tempDir.path}/$fileName');
-
-            await file.writeAsBytes(response.bodyBytes);
-
-            await Share.shareXFiles(
-              [XFile(file.path)],
-              text: shareText,
-              subject: 'Check out $userName\'s story on Capsule',
-            );
-
-            print('✅ DEBUG: Story shared successfully with thumbnail');
-            return;
-          }
-        } catch (e) {
-          print('⚠️ WARNING: Failed to share with thumbnail: $e');
-        }
-      }
 
       await Share.share(
-        shareText,
-        subject: 'Check out $userName\'s story on Capsule',
+        shareUrl, // ✅ URL only (no caption)
+        // Optional: you can remove subject too if you want it even "cleaner"
+        // subject: 'Story on Capsule',
       );
 
-      print('✅ DEBUG: Story shared successfully (text only)');
+      debugPrint('✅ DEBUG: Shared story link: $shareUrl');
     } catch (e) {
-      print('❌ ERROR sharing story: $e');
+      debugPrint('❌ ERROR sharing story: $e');
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -782,7 +741,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 .copyWith(color: appTheme.whiteCustom),
           ),
           backgroundColor: appTheme.colorFF3A3A,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -1930,18 +1889,24 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
     }
   }
 
-  // ✅ Updated: opens options sheet, pauses immediately, resumes on close,
-  // ✅ and opens Report as its own modal sheet (not route navigation).
-  void _showMoreOptions() {
+// ✅ Updated: pauses immediately, does NOT resume until the chosen action finishes.
+// ✅ Share keeps video paused while native share sheet is open.
+  Future<void> _showMoreOptions() async {
     final wasPausedBefore = _isPaused;
 
     _pausePlaybackForModal();
-    setState(() {
+    if (mounted) {
+      setState(() {
+        _isAnyModalOpen = true;
+      });
+    } else {
       _isAnyModalOpen = true;
-    });
+    }
 
-    showModalBottomSheet(
+    // Return an action from the bottom sheet so we can decide what to do AFTER it closes.
+    final action = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: appTheme.gray_900_02,
       barrierColor: Colors.black.withAlpha(180),
       shape: RoundedRectangleBorder(
@@ -1959,18 +1924,7 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                     .copyWith(color: appTheme.whiteCustom),
               ),
-              onTap: () async {
-                // Close options sheet first
-                Navigator.pop(sheetContext);
-
-                // Open report modal after sheet closes
-                await Future.delayed(const Duration(milliseconds: 80));
-                if (!mounted) return;
-
-                // Keep paused while report modal is up
-                _pausePlaybackForModal();
-                await _openReportStoryModal(wasPausedBefore: wasPausedBefore);
-              },
+              onTap: () => Navigator.pop(sheetContext, 'report'),
             ),
             ListTile(
               leading: Icon(Icons.share_outlined, color: appTheme.whiteCustom),
@@ -1979,23 +1933,59 @@ ${caption.isNotEmpty ? caption : 'View their amazing memory on Capsule 📸'}
                 style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                     .copyWith(color: appTheme.whiteCustom),
               ),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await Future.delayed(const Duration(milliseconds: 40));
-                if (!mounted) return;
-                await _shareStory();
-              },
+              onTap: () => Navigator.pop(sheetContext, 'share'),
             ),
           ],
         ),
       ),
-    ).whenComplete(() {
+    );
+
+    if (!mounted) return;
+
+    // Keep modal-open state while we perform the action (esp. share sheet).
+    // Only clear + resume after action finishes.
+    try {
+      if (action == 'report') {
+        // Give the sheet a beat to animate out cleanly
+        await Future.delayed(const Duration(milliseconds: 80));
+        _pausePlaybackForModal();
+        await _openReportStoryModal(wasPausedBefore: wasPausedBefore);
+        // _openReportStoryModal already resumes when it closes
+        return;
+      }
+
+      if (action == 'share') {
+        // keep paused
+        _pausePlaybackForModal();
+        setState(() => _isAnyModalOpen = true);
+
+        // ✅ wait for the bottom sheet route to be fully removed
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        // or: await WidgetsBinding.instance.endOfFrame;
+
+        await _shareStory();
+
+        if (!mounted) return;
+        setState(() => _isAnyModalOpen = false);
+        _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
+        return;
+      }
+
+
+      // User dismissed the sheet without action
+      setState(() {
+        _isAnyModalOpen = false;
+      });
+      _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
+    } catch (_) {
+      // Safety: never leave modal flag stuck
       if (!mounted) return;
       setState(() {
         _isAnyModalOpen = false;
       });
       _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
-    });
+    }
   }
 
   /// Format date for snapshot if memory_date not available

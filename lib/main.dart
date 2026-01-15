@@ -44,11 +44,6 @@ Future<void> main() async {
         '   flutter run --dart-define=SUPABASE_URL=your_url --dart-define=SUPABASE_ANON_KEY=your_key');
   }
 
-  await Supabase.initialize(
-    url: const String.fromEnvironment('SUPABASE_URL'),
-    anonKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
-  );
-
   // 🎯 Initialize notification channels
   await PushNotificationService.instance.initNotificationChannels();
 

@@ -210,14 +210,15 @@ class TimelineWidget extends StatelessWidget {
     final int totalSeconds = d.inSeconds;
 
     final int days = totalSeconds ~/ 86400;
-    final int hours = (totalSeconds % 86400) ~/ 3600;
+    final int hoursTotal = (totalSeconds % 86400) ~/ 3600;
     final int minutes = (totalSeconds % 3600) ~/ 60;
     final int seconds = totalSeconds % 60;
 
-    final String hh = hours.toString().padLeft(2, '0');
+    final String hh = hoursTotal.toString().padLeft(2, '0');
     final String mm = minutes.toString().padLeft(2, '0');
     final String ss = seconds.toString().padLeft(2, '0');
 
+    // ✅ Only show days when days > 0 (never "0d")
     if (days > 0) return '${days}d $hh:$mm:$ss';
     return '$hh:$mm:$ss';
   }
@@ -240,37 +241,48 @@ class TimelineWidget extends StatelessWidget {
   }
 
   Widget _countdownBadgeShell({required String value}) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
-      decoration: BoxDecoration(
-        color: appTheme.deep_purple_A100.withAlpha(40),
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(40),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
-          ),
-        ],
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        // ✅ forces a real pill width (no tiny pills)
+        minWidth: 150.h,
+        maxWidth: 180.h,
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.access_time_rounded,
-            size: 16.h,
-            color: appTheme.gray_50.withAlpha(210),
-          ),
-          SizedBox(width: 8.h),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.visible,
-            style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
-          ),
-        ],
+      child: Container(
+        height: 34.h, // taller = stronger visual weight
+        padding: EdgeInsets.symmetric(horizontal: 14.h),
+        decoration: BoxDecoration(
+          color: appTheme.deep_purple_A100.withAlpha(40),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(40),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.access_time_rounded,
+              size: 16.h,
+              color: appTheme.gray_50.withAlpha(220),
+            ),
+            SizedBox(width: 8.h),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis, // ✅ clip text, never shrink font
+              style: TextStyleHelper.instance.body14BoldPlusJakartaSans.copyWith(
+                color: appTheme.gray_50,
+                height: 1.0,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -329,12 +341,18 @@ class TimelineWidget extends StatelessWidget {
       final double leftPos = (padding + clampedCenter - halfLabel).toDouble();
 
       if (isMidpoint) {
+        // Keep the countdown inside the space between the left/right marker label columns.
+        const double gap = 10.0;
+
         widgets.add(
           Positioned(
-            left: padding + _markerLabelWidth,
-            right: padding + _markerLabelWidth,
-            bottom: 4.h,
-            child: _buildCountdownBadge(endUtc),
+            left: padding + _markerLabelWidth + gap,
+            right: padding + _markerLabelWidth + gap,
+            // ✅ Move up so it doesn't collide with the date/time labels area
+            bottom: 34.h,
+            child: Center(
+              child: _buildCountdownBadge(endUtc),
+            ),
           ),
         );
         continue;
