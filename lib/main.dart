@@ -209,8 +209,9 @@ class MyApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('en', '')],
-      initialRoute: AppRoutes.initialRoute,
+      initialRoute: AppRoutes.initialRoute, // now /splash
       onGenerateRoute: AppRoutes.onGenerateRoute,
+
     );
   }
 }

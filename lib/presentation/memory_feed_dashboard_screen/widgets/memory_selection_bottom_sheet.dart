@@ -65,22 +65,74 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
     );
   }
 
-  Widget _buildMemoryCard(BuildContext context, Map<String, dynamic> memory) {
-    bool isExpiringUrgently = false;
-    final expirationText = (memory['expiration_text'] ?? '').toString();
-    if (expirationText.isNotEmpty) {
-      final regex = RegExp(r'(\d+)\s*(hour|minute)');
-      final match = regex.firstMatch(expirationText);
-      if (match != null) {
-        final value = int.tryParse(match.group(1) ?? '0') ?? 0;
-        final unit = match.group(2);
-        if (unit == 'hour' && value < 3) {
-          isExpiringUrgently = true;
-        } else if (unit == 'minute') {
-          isExpiringUrgently = true;
-        }
-      }
+  DateTime? _parseEndTime(dynamic rawEndTime) {
+    if (rawEndTime == null) return null;
+
+    if (rawEndTime is DateTime) return rawEndTime;
+
+    final asString = rawEndTime.toString().trim();
+    if (asString.isEmpty) return null;
+
+    // Supabase typically returns ISO8601 timestamps (often with "Z" for UTC).
+    // DateTime.parse handles both with/without timezone offsets.
+    final parsed = DateTime.tryParse(asString);
+    return parsed;
+  }
+
+  String _buildExpirationTextFromEndTime(DateTime? endTime) {
+    if (endTime == null) return 'No expiration';
+
+    final nowUtc = DateTime.now().toUtc();
+    final endUtc = endTime.isUtc ? endTime : endTime.toUtc();
+
+    final remaining = endUtc.difference(nowUtc);
+
+    if (remaining.inSeconds <= 0) {
+      return 'Expired';
     }
+
+    final days = remaining.inDays;
+    final hours = remaining.inHours % 24;
+    final minutes = remaining.inMinutes % 60;
+
+    // 1+ days: show days + hours (optionally minutes)
+    if (days >= 1) {
+      if (hours == 0 && minutes == 0) {
+        return 'Expires in ${days}d';
+      }
+      if (minutes == 0) {
+        return 'Expires in ${days}d ${hours}h';
+      }
+      return 'Expires in ${days}d ${hours}h ${minutes}m';
+    }
+
+    // < 1 day: show hours + minutes
+    if (remaining.inHours >= 1) {
+      if (minutes == 0) {
+        return 'Expires in ${remaining.inHours}h';
+      }
+      return 'Expires in ${remaining.inHours}h ${minutes}m';
+    }
+
+    // < 1 hour: minutes only
+    return 'Expires in ${remaining.inMinutes}m';
+  }
+
+  bool _isExpiringUrgently(DateTime? endTime) {
+    if (endTime == null) return false;
+
+    final nowUtc = DateTime.now().toUtc();
+    final endUtc = endTime.isUtc ? endTime : endTime.toUtc();
+    final remaining = endUtc.difference(nowUtc);
+
+    if (remaining.inSeconds <= 0) return true;
+    return remaining.inMinutes < 180; // < 3 hours
+  }
+
+  Widget _buildMemoryCard(BuildContext context, Map<String, dynamic> memory) {
+    final endTime = _parseEndTime(memory['end_time']);
+    final expirationText = _buildExpirationTextFromEndTime(endTime);
+    final isExpiringUrgently = _isExpiringUrgently(endTime);
 
     final rawVis = memory['visibility'];
     final normVis = (rawVis ?? '').toString().trim().toLowerCase();
@@ -149,7 +201,7 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
                           vertical: 4.h,
                         ),
                         decoration: BoxDecoration(
-                          color: memory['visibility'] == 'public'
+                          color: isPublic
                               ? appTheme.green_500.withOpacity(0.15)
                               : appTheme.blue_gray_300.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12.h),
@@ -158,24 +210,20 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              memory['visibility'] == 'public'
-                                  ? Icons.public
-                                  : Icons.lock,
+                              isPublic ? Icons.public : Icons.lock,
                               size: 14.h,
-                              color: memory['visibility'] == 'public'
+                              color: isPublic
                                   ? appTheme.green_500
                                   : appTheme.blue_gray_300,
                             ),
                             SizedBox(width: 4.h),
                             Text(
-                              memory['visibility'] == 'public'
-                                  ? 'Public'
-                                  : 'Private',
+                              isPublic ? 'Public' : 'Private',
                               style: TextStyleHelper
                                   .instance
                                   .body12MediumPlusJakartaSans
                                   .copyWith(
-                                color: memory['visibility'] == 'public'
+                                color: isPublic
                                     ? appTheme.green_500
                                     : appTheme.blue_gray_300,
                               ),
@@ -190,7 +238,7 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
 
                   // ── METADATA ───────────────────────────────────────────────
                   Text(
-                    memory['expiration_text'] ?? 'No expiration',
+                    expirationText,
                     style: TextStyleHelper
                         .instance
                         .body12MediumPlusJakartaSans
@@ -207,7 +255,8 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
                   Text(
                     'created ${memory['created_date'] ?? 'Unknown'}'
                         '${(memory['creator_name'] != null && memory['creator_name'].toString().isNotEmpty) ? ' by ${memory['creator_name']}' : ''}',
-                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
+                    style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                        .copyWith(
                       fontSize: 11.h,
                       color: appTheme.blue_gray_300.withAlpha(179),
                     ),
@@ -220,5 +269,4 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
       ),
     );
   }
-
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_export.dart';
@@ -14,6 +15,9 @@ class ShareStoryScreen extends ConsumerStatefulWidget {
 }
 
 class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
+  // ✅ Uses capapp.co, not capsulememories.app
+  static const String _shareDomain = 'https://capapp.co';
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -53,6 +57,13 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
                     SizedBox(height: 24.h),
                     _buildContactsList(context),
                     SizedBox(height: 20.h),
+
+                    // ✅ IMPORTANT: your original file defined these but never rendered them.
+                    // Without this, you only ever run the "Done" header tap and your share
+                    // logic is effectively disconnected from the UI.
+                    _buildActionButtons(context),
+
+                    SizedBox(height: 16.h),
                   ],
                 ),
               ),
@@ -80,8 +91,8 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
         builder: (context, ref, _) {
           final state = ref.watch(shareStoryNotifier);
           final selectedCount = state.shareStoryModel?.contacts
-                  ?.where((contact) => contact.isSelected ?? false)
-                  .length ??
+              ?.where((contact) => contact.isSelected ?? false)
+              .length ??
               0;
 
           return Row(
@@ -175,7 +186,6 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
       width: double.maxFinite,
       padding: EdgeInsets.all(22.h),
       child: Row(
-        spacing: 16.h,
         children: [
           Expanded(
             child: GestureDetector(
@@ -188,13 +198,13 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  spacing: 8.h,
                   children: [
                     CustomImageView(
                       imagePath: ImageConstant.imgShareIcon,
                       height: 20.h,
                       width: 20.h,
                     ),
+                    SizedBox(width: 8.h),
                     Text(
                       'Share',
                       style: TextStyleHelper.instance.title16SemiBold
@@ -205,6 +215,7 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
               ),
             ),
           ),
+          SizedBox(width: 16.h),
           GestureDetector(
             onTap: () => onTapCopyLink(context),
             child: Container(
@@ -223,6 +234,7 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
               ),
             ),
           ),
+          SizedBox(width: 16.h),
           GestureDetector(
             onTap: () => onTapDownload(context),
             child: Container(
@@ -251,36 +263,105 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
     NavigatorService.goBack();
   }
 
+  // =========================
+  // ✅ SHARE (UPDATED)
+  // =========================
+
+  /// Tries to pull storyId from the current route args.
+  /// This matches your deep link / story viewer pattern where the story viewer is opened with:
+  /// - String storyId, OR
+  /// - FeedStoryContext (initialStoryId), OR
+  /// - Map {storyId: ...}
+  String? _tryGetStoryIdFromRouteArgs(BuildContext context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is String && args.isNotEmpty) return args;
+
+    // If you have FeedStoryContext available in this file, you can uncomment this:
+    // if (args is FeedStoryContext && args.initialStoryId.isNotEmpty) {
+    //   return args.initialStoryId;
+    // }
+
+    if (args is Map) {
+      final map = args.cast<String, dynamic>();
+      final v = map['storyId'];
+      if (v is String && v.isNotEmpty) return v;
+    }
+
+    // Fallback: notifier should ideally provide this (recommended).
+    // return ref.read(shareStoryNotifier).shareStoryModel?.storyId;
+    return null;
+  }
+
+  String _buildStoryShareUrl(String storyId) {
+    // ✅ canonical short link
+    return '$_shareDomain/s/$storyId';
+  }
+
   /// Handles share button tap
   void onTapShare(BuildContext context) {
+    final storyId = _tryGetStoryIdFromRouteArgs(context);
+
+    if (storyId == null || storyId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No story selected to share'),
+          backgroundColor: appTheme.colorFF3A3A,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final url = _buildStoryShareUrl(storyId);
+
     final selectedContacts = ref
-            .read(shareStoryNotifier)
-            .shareStoryModel
-            ?.contacts
-            ?.where((contact) => contact.isSelected ?? false)
-            .toList() ??
+        .read(shareStoryNotifier)
+        .shareStoryModel
+        ?.contacts
+        ?.where((contact) => contact.isSelected ?? false)
+        .toList() ??
         [];
 
-    if (selectedContacts.isNotEmpty) {
-      final contactNames =
-          selectedContacts.map((contact) => contact.name ?? '').join(', ');
+    // Keep the message minimal so the receiver app uses the OG preview.
+    // Including media attachments often changes iMessage behavior (camera/media composer UI).
+    final message = url;
 
-      Share.share(
-        'Check out this story!',
-        subject: 'Story shared with: $contactNames',
-      );
-    }
+    final subject = selectedContacts.isNotEmpty
+        ? 'Story shared with: ${selectedContacts.map((c) => c.name ?? '').where((n) => n.isNotEmpty).join(', ')}'
+        : 'Check out this story on Capsule';
+
+    Share.share(
+      message,
+      subject: subject,
+    );
   }
 
   /// Handles copy link button tap
   void onTapCopyLink(BuildContext context) {
+    final storyId = _tryGetStoryIdFromRouteArgs(context);
+
+    if (storyId == null || storyId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('No story selected to copy'),
+          backgroundColor: appTheme.colorFF3A3A,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final url = _buildStoryShareUrl(storyId);
+
+    Clipboard.setData(ClipboardData(text: url));
     ref.read(shareStoryNotifier.notifier).copyStoryLink();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Link copied to clipboard'),
+        content: const Text('Link copied to clipboard'),
         backgroundColor: appTheme.colorFF52D1,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -291,9 +372,9 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Story downloaded successfully'),
+        content: const Text('Story downloaded successfully'),
         backgroundColor: appTheme.colorFF52D1,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

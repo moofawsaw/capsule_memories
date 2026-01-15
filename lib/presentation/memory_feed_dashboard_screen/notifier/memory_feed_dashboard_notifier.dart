@@ -48,16 +48,19 @@ class MemoryFeedDashboardNotifier
 
   /// Ensure activeMemories includes `visibility`.
   /// If FeedService didn't include it, fetch visibilities from `memories` and merge.
+  /// Ensure activeMemories includes `visibility` and `end_time`.
+  /// If FeedService didn't include them, fetch from `memories` and merge.
+  /// Also computes `expiration_text` from `end_time` so UI has a stable label.
   Future<List<Map<String, dynamic>>> _hydrateActiveMemoriesWithVisibility(
-    dynamic activeMemoriesData,
-  ) async {
+      dynamic activeMemoriesData,
+      ) async {
     final client = SupabaseService.instance.client;
     if (client == null) return const [];
 
     final List<Map<String, dynamic>> list =
         (activeMemoriesData as List<dynamic>?)
-                ?.map((e) => (e as Map).cast<String, dynamic>())
-                .toList() ??
+            ?.map((e) => (e as Map).cast<String, dynamic>())
+            .toList() ??
             <Map<String, dynamic>>[];
 
     if (list.isEmpty) return list;
@@ -70,26 +73,71 @@ class MemoryFeedDashboardNotifier
     if (ids.isEmpty) return list;
 
     try {
-      final visRows = await client
+      final rows = await client
           .from('memories')
-          .select('id, visibility')
+          .select('id, visibility, end_time')
           .inFilter('id', ids);
 
-      final visMap = <String, String>{};
-      for (final row in (visRows as List<dynamic>)) {
+      final memMap = <String, Map<String, dynamic>>{};
+      for (final row in (rows as List<dynamic>)) {
         final r = (row as Map).cast<String, dynamic>();
         final id = r['id']?.toString() ?? '';
         if (id.isEmpty) continue;
-        visMap[id] = _normVisibility(r['visibility']);
+        memMap[id] = r;
+      }
+
+      DateTime? parseEndTime(dynamic rawEndTime) {
+        if (rawEndTime == null) return null;
+
+        if (rawEndTime is DateTime) return rawEndTime;
+
+        if (rawEndTime is int) {
+          final isMillis = rawEndTime > 2000000000;
+          return DateTime.fromMillisecondsSinceEpoch(
+            isMillis ? rawEndTime : rawEndTime * 1000,
+            isUtc: true,
+          );
+        }
+
+        if (rawEndTime is double) {
+          final asInt = rawEndTime.toInt();
+          final isMillis = asInt > 2000000000;
+          return DateTime.fromMillisecondsSinceEpoch(
+            isMillis ? asInt : asInt * 1000,
+            isUtc: true,
+          );
+        }
+
+        final asString = rawEndTime.toString().trim();
+        if (asString.isEmpty) return null;
+
+        return DateTime.tryParse(asString);
       }
 
       final merged = list.map((m) {
         final id = (m['id'] ?? m['memory_id'])?.toString() ?? '';
-        final existing = _normVisibility(m['visibility']);
-        final hydrated = existing.isNotEmpty ? existing : (visMap[id] ?? '');
+        final server = memMap[id];
+
+        final existingVis = _normVisibility(m['visibility']);
+        final hydratedVis = existingVis.isNotEmpty
+            ? existingVis
+            : _normVisibility(server?['visibility']);
+
+        final existingEndTime = m['end_time'];
+        final hydratedEndTime = (existingEndTime != null &&
+            existingEndTime.toString().trim().isNotEmpty)
+            ? existingEndTime
+            : server?['end_time'];
+
+        final endTimeDt = parseEndTime(hydratedEndTime);
+        final expirationText = endTimeDt == null ? '' : _formatExpirationTime(endTimeDt);
+
         return <String, dynamic>{
           ...m,
-          'visibility': hydrated,
+          'visibility': hydratedVis,
+          'end_time': hydratedEndTime,
+          // keep a stable UI string available too
+          'expiration_text': expirationText.isNotEmpty ? expirationText : (m['expiration_text'] ?? ''),
         };
       }).toList();
 
@@ -98,7 +146,7 @@ class MemoryFeedDashboardNotifier
           final mm = merged[i];
           // ignore: avoid_print
           print(
-            '✅ ACTIVE MEMORY VIS HYDRATE: title="${mm['title']}" id="${mm['id'] ?? mm['memory_id']}" visibility="${mm['visibility']}"',
+            '✅ ACTIVE MEMORY HYDRATE: title="${mm['title']}" id="${mm['id'] ?? mm['memory_id']}" visibility="${mm['visibility']}" end_time="${mm['end_time']}" expiration_text="${mm['expiration_text']}"',
           );
         }
       }
@@ -106,10 +154,11 @@ class MemoryFeedDashboardNotifier
       return merged;
     } catch (e) {
       // ignore: avoid_print
-      print('❌ HYDRATE VISIBILITY FAILED: $e');
+      print('❌ HYDRATE VISIBILITY/END_TIME FAILED: $e');
       return list;
     }
   }
+
 
   /// Load initial data from the database
   Future<void> loadInitialData() async {
@@ -641,7 +690,7 @@ class MemoryFeedDashboardNotifier
               state,
               visibility,
               created_at,
-              expires_at,
+              end_time,
               creator_id,
               category_id,
               memory_categories:category_id(
@@ -662,7 +711,9 @@ class MemoryFeedDashboardNotifier
         final creator =
             memoryDetails['user_profiles_public'] as Map<String, dynamic>?;
         final createdAt = DateTime.parse(memoryDetails['created_at']);
-        final expiresAt = DateTime.parse(memoryDetails['expires_at']);
+        final endTime = memoryDetails['end_time'] != null
+            ? DateTime.parse(memoryDetails['end_time'])
+            : null;
 
         final creatorName = (creator?['display_name'] as String?)?.trim();
         final safeCreatorName = (creatorName != null && creatorName.isNotEmpty)
@@ -676,9 +727,9 @@ class MemoryFeedDashboardNotifier
           'category_name': category?['name'] ?? 'Custom',
           'category_icon': category?['icon_url'] ?? '',
           'created_at': memoryDetails['created_at'] ?? '',
-          'expires_at': memoryDetails['expires_at'] ?? '',
+          'end_time': memoryDetails['end_time'] ?? '',
           'created_date': _formatDate(createdAt),
-          'expiration_text': _formatExpirationTime(expiresAt),
+          'expiration_text': _formatExpirationTime(endTime),
           'creator_id': memoryDetails['creator_id'],
           'creator_name': safeCreatorName,
         };
@@ -1395,19 +1446,35 @@ class MemoryFeedDashboardNotifier
   }
 
   /// Helper method to format expiration time
-  String _formatExpirationTime(DateTime expiresAt) {
-    final now = DateTime.now();
-    final difference = expiresAt.difference(now);
+  String _formatExpirationTime(DateTime? endTime) {
+    if (endTime == null) return 'No expiration';
 
-    if (difference.isNegative) return 'Expired';
-    if (difference.inMinutes < 60)
-      return 'Expires in ${difference.inMinutes} mins';
-    if (difference.inHours < 24)
-      return 'Expires in ${difference.inHours} hours';
-    if (difference.inDays == 1) return 'Expires tomorrow';
+    final nowUtc = DateTime.now().toUtc();
+    final endUtc = endTime.isUtc ? endTime : endTime.toUtc();
 
-    return 'Expires in ${difference.inDays} days';
+    final diff = endUtc.difference(nowUtc);
+
+    if (diff.inSeconds <= 0) return 'Expired';
+
+    final days = diff.inDays;
+    final hours = diff.inHours % 24;
+    final minutes = diff.inMinutes % 60;
+
+    if (days >= 1) {
+      if (hours == 0) {
+        return 'Expires in ${days}d';
+      }
+      return 'Expires in ${days}d ${hours}h';
+    }
+
+    if (diff.inHours >= 1) {
+      return 'Expires in ${diff.inHours}h ${minutes}m';
+    }
+
+    return 'Expires in ${diff.inMinutes}m';
   }
+
+
 
   Future<void> loadCategories() async {
     try {

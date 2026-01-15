@@ -15,7 +15,6 @@ import './widgets/native_camera_recording_screen.dart';
 import 'notifier/memory_feed_dashboard_notifier.dart';
 import '../../widgets/custom_public_memories.dart' as unified_widget;
 
-
 class MemoryFeedDashboardScreen extends ConsumerStatefulWidget {
   const MemoryFeedDashboardScreen({Key? key}) : super(key: key);
 
@@ -27,53 +26,16 @@ class MemoryFeedDashboardScreen extends ConsumerStatefulWidget {
 class _MemoryFeedDashboardScreenState
     extends ConsumerState<MemoryFeedDashboardScreen> {
   bool _isAuthenticated = false;
-  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _checkAuthState();
-    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      // Load more when user is 200px from bottom
-      _loadMoreContent();
-    }
-  }
-
-  void _loadMoreContent() {
-    final notifier = ref.read(memoryFeedDashboardProvider.notifier);
-    final state = ref.read(memoryFeedDashboardProvider);
-
-    // Load more for each section that has more data
-    if (state.hasMoreHappeningNow && !state.isLoadingMore) {
-      notifier.loadMoreHappeningNow();
-    }
-    if (state.hasMorePublicMemories && !state.isLoadingMore) {
-      notifier.loadMorePublicMemories();
-    }
-    if (state.hasMoreTrending && !state.isLoadingMore) {
-      notifier.loadMoreTrending();
-    }
-    if (state.hasMoreLongestStreak && !state.isLoadingMore) {
-      notifier.loadMoreLongestStreak();
-    }
-    if (state.hasMorePopularUsers && !state.isLoadingMore) {
-      notifier.loadMorePopularUsers();
-    }
-    if (state.hasMorePopularMemories && !state.isLoadingMore) {
-      notifier.loadMorePopularMemories();
-    }
   }
 
   Future<void> _checkAuthState() async {
@@ -105,7 +67,7 @@ class _MemoryFeedDashboardScreenState
           child: Container(
             width: double.maxFinite,
             child: SingleChildScrollView(
-              controller: _scrollController,
+              key: const PageStorageKey<String>('memory_feed_scroll'),
               physics: const AlwaysScrollableScrollPhysics(),
               child: Container(
                 width: double.maxFinite,
@@ -124,13 +86,6 @@ class _MemoryFeedDashboardScreenState
                     _buildLongestStreakSection(context),
                     _buildPopularMemoriesSection(context),
                     _buildPopularUsersSection(context),
-                    if (state.isLoadingMore)
-                      Padding(
-                        padding: EdgeInsets.all(16.h),
-                        child: CircularProgressIndicator(
-                          color: appTheme.deep_purple_A100,
-                        ),
-                      ),
                     SizedBox(height: 30.h),
                   ],
                 ),
@@ -237,7 +192,6 @@ class _MemoryFeedDashboardScreenState
     );
   }
 
-
   /// Build skeleton loader for action button
   Widget _buildActionButtonSkeleton() {
     return Container(
@@ -342,8 +296,11 @@ class _MemoryFeedDashboardScreenState
                         MaterialPageRoute(
                           builder: (context) => AddMemoryUploadScreen(
                             memoryId: memory['id'],
-                            memoryStartDate: DateTime.parse(memory['start_date'] ?? DateTime.now().toIso8601String()),
-                            memoryEndDate: DateTime.parse(memory['end_date'] ?? DateTime.now().toIso8601String()),
+                            memoryStartDate: DateTime.parse(
+                                memory['start_date'] ??
+                                    DateTime.now().toIso8601String()),
+                            memoryEndDate: DateTime.parse(memory['end_date'] ??
+                                DateTime.now().toIso8601String()),
                           ),
                           settings: RouteSettings(
                             arguments: {
@@ -425,9 +382,15 @@ class _MemoryFeedDashboardScreenState
         final state = ref.watch(memoryFeedDashboardProvider);
         final happeningNowStories =
             state.memoryFeedDashboardModel?.happeningNowStories ?? [];
-        final latestStories =
-            state.memoryFeedDashboardModel?.latestStories ?? [];
-        final isLoading = state.isLoading ?? false;
+        final latestStories = state.memoryFeedDashboardModel?.latestStories ?? [];
+
+        // IMPORTANT:
+        // Use skeleton only for initial/empty state to prevent "hard reload" flashes
+        // when other sections load.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading &&
+            happeningNowStories.isEmpty &&
+            latestStories.isEmpty;
 
         // If happening now has stories, show it
         if (happeningNowStories.isNotEmpty) {
@@ -461,67 +424,70 @@ class _MemoryFeedDashboardScreenState
               height: 240.h,
               child: isLoading
                   ? ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.only(left: 24.h),
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        return Container(
-                          width: 140.h,
-                          margin: EdgeInsets.only(right: 12.h),
-                          child: CustomStorySkeleton(),
-                        );
-                      },
-                    )
+                key: const PageStorageKey<String>('latest_stories_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 140.h,
+                    margin: EdgeInsets.only(right: 12.h),
+                    child: CustomStorySkeleton(),
+                  );
+                },
+              )
                   : latestStories.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24.h),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CustomImageView(
-                                  imagePath:
-                                      ImageConstant.imgIconDeepPurpleA10022x22,
-                                  height: 48.h,
-                                  width: 48.h,
-                                  color: appTheme.blue_gray_300,
-                                ),
-                                SizedBox(height: 12.h),
-                                Text(
-                                  'No stories yet',
-                                  style: TextStyleHelper
-                                      .instance.title16MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  'Create your first story',
-                                  style: TextStyleHelper
-                                      .instance.body12MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.only(left: 24.h),
-                          itemCount: latestStories.length,
-                          itemBuilder: (context, index) {
-                            final story = latestStories[index];
-                            return HappeningNowStoryCard(
-                              story: story,
-                              onTap: () {
-                                // Navigate directly without FeedStoryContext
-                                NavigatorService.pushNamed(
-                                  AppRoutes.appStoryView,
-                                  arguments: story.storyId,
-                                );
-                              },
-                            );
-                          },
-                        ),
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CustomImageView(
+                        imagePath:
+                        ImageConstant.imgIconDeepPurpleA10022x22,
+                        height: 48.h,
+                        width: 48.h,
+                        color: appTheme.blue_gray_300,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'No stories yet',
+                        style: TextStyleHelper
+                            .instance.title16MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Create your first story',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key:
+                const PageStorageKey<String>('latest_stories_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: latestStories.length,
+                itemBuilder: (context, index) {
+                  final story = latestStories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () {
+                      // Navigate directly without FeedStoryContext
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: story.storyId,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         );
@@ -533,9 +499,12 @@ class _MemoryFeedDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
-        final stories =
-            state.memoryFeedDashboardModel?.happeningNowStories ?? [];
-        final isLoading = state.isLoading ?? false;
+        final stories = state.memoryFeedDashboardModel?.happeningNowStories ?? [];
+
+        // IMPORTANT:
+        // Use skeleton only for initial/empty state to prevent "hard reload" flashes.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && stories.isEmpty;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,67 +532,70 @@ class _MemoryFeedDashboardScreenState
               height: 240.h,
               child: isLoading
                   ? ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.only(left: 24.h),
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        return Container(
-                          width: 140.h,
-                          margin: EdgeInsets.only(right: 12.h),
-                          child: CustomStorySkeleton(),
-                        );
-                      },
-                    )
+                key: const PageStorageKey<String>('happening_now_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 140.h,
+                    margin: EdgeInsets.only(right: 12.h),
+                    child: CustomStorySkeleton(),
+                  );
+                },
+              )
                   : stories.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24.h),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CustomImageView(
-                                  imagePath:
-                                      ImageConstant.imgIconDeepPurpleA10022x22,
-                                  height: 48.h,
-                                  width: 48.h,
-                                  color: appTheme.blue_gray_300,
-                                ),
-                                SizedBox(height: 12.h),
-                                Text(
-                                  'No stories happening now',
-                                  style: TextStyleHelper
-                                      .instance.title16MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  'Check back later for new stories',
-                                  style: TextStyleHelper
-                                      .instance.body12MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.only(left: 24.h),
-                          itemCount: stories.length,
-                          itemBuilder: (context, index) {
-                            final story = stories[index];
-                            return HappeningNowStoryCard(
-                              story: story,
-                              onTap: () {
-                                // Navigate directly without FeedStoryContext
-                                NavigatorService.pushNamed(
-                                  AppRoutes.appStoryView,
-                                  arguments: story.storyId,
-                                );
-                              },
-                            );
-                          },
-                        ),
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CustomImageView(
+                        imagePath:
+                        ImageConstant.imgIconDeepPurpleA10022x22,
+                        height: 48.h,
+                        width: 48.h,
+                        color: appTheme.blue_gray_300,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'No stories happening now',
+                        style: TextStyleHelper
+                            .instance.title16MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Check back later for new stories',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key:
+                const PageStorageKey<String>('happening_now_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () {
+                      // Navigate directly without FeedStoryContext
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: story.storyId,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         );
@@ -636,7 +608,12 @@ class _MemoryFeedDashboardScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
         final memories = state.memoryFeedDashboardModel?.publicMemories ?? [];
-        final isLoading = state.isLoading ?? false;
+
+        // IMPORTANT:
+        // Prevent "hard reload" flashes: only show loading skeletons when the
+        // section has no data yet.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && memories.isEmpty;
 
         // Convert memory_feed_dashboard_model.CustomMemoryItem to custom_public_memories.CustomMemoryItem
         final convertedMemories = memories.map((memory) {
@@ -663,6 +640,7 @@ class _MemoryFeedDashboardScreenState
         }).toList();
 
         return unified_widget.CustomPublicMemories(
+          key: const PageStorageKey<String>('public_memories_section'),
           sectionTitle: 'Public Memories',
           sectionIcon: ImageConstant.imgIcon22x22,
           variant: unified_widget.MemoryCardVariant.feed,
@@ -695,7 +673,10 @@ class _MemoryFeedDashboardScreenState
         // ✅ FIX: Popular section must read popularMemories (not publicMemories)
         final memories = state.memoryFeedDashboardModel?.popularMemories ?? [];
 
-        final isLoading = state.isLoading ?? false;
+        // IMPORTANT:
+        // Prevent "hard reload" flashes: only show loading skeletons when empty.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && memories.isEmpty;
 
         // Convert dashboard model items into the widget's item type
         final convertedMemories = memories.map((memory) {
@@ -722,6 +703,7 @@ class _MemoryFeedDashboardScreenState
         }).toList();
 
         return custom_widget.CustomPublicMemories(
+          key: const PageStorageKey<String>('popular_memories_section'),
           sectionTitle: 'Popular Memories',
           sectionIcon: ImageConstant.imgIconRed500,
           memories: convertedMemories,
@@ -745,14 +727,16 @@ class _MemoryFeedDashboardScreenState
     );
   }
 
-
-
   Widget _buildTrendingStoriesSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
         final stories = state.memoryFeedDashboardModel?.trendingStories ?? [];
-        final isLoading = state.isLoading ?? false;
+
+        // IMPORTANT:
+        // Prevent "hard reload" flashes: only show loading skeletons when empty.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && stories.isEmpty;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -781,66 +765,68 @@ class _MemoryFeedDashboardScreenState
               height: 240.h,
               child: isLoading
                   ? ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.only(left: 24.h),
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        return Container(
-                          width: 140.h,
-                          margin: EdgeInsets.only(right: 12.h),
-                          child: CustomStorySkeleton(),
-                        );
-                      },
-                    )
+                key: const PageStorageKey<String>('trending_stories_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 140.h,
+                    margin: EdgeInsets.only(right: 12.h),
+                    child: CustomStorySkeleton(),
+                  );
+                },
+              )
                   : stories.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24.h),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CustomImageView(
-                                  imagePath: ImageConstant.imgIconBlueA700,
-                                  height: 48.h,
-                                  width: 48.h,
-                                  color: appTheme.blue_gray_300,
-                                ),
-                                SizedBox(height: 12.h),
-                                Text(
-                                  'No trending stories yet',
-                                  style: TextStyleHelper
-                                      .instance.title16MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  'Check back later for trending content',
-                                  style: TextStyleHelper
-                                      .instance.body12MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.only(left: 24.h),
-                          itemCount: stories.length,
-                          itemBuilder: (context, index) {
-                            final story = stories[index];
-                            return HappeningNowStoryCard(
-                              story: story,
-                              onTap: () {
-                                // Navigate directly without FeedStoryContext
-                                NavigatorService.pushNamed(
-                                  AppRoutes.appStoryView,
-                                  arguments: story.storyId,
-                                );
-                              },
-                            );
-                          },
-                        ),
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CustomImageView(
+                        imagePath: ImageConstant.imgIconBlueA700,
+                        height: 48.h,
+                        width: 48.h,
+                        color: appTheme.blue_gray_300,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'No trending stories yet',
+                        style: TextStyleHelper
+                            .instance.title16MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Check back later for trending content',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key: const PageStorageKey<String>('trending_stories_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () {
+                      // Navigate directly without FeedStoryContext
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: story.storyId,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         );
@@ -889,48 +875,49 @@ class _MemoryFeedDashboardScreenState
               height: 100.h,
               child: state.isLoadingCategories
                   ? Center(
-                      child: CircularProgressIndicator(
-                        color: appTheme.deep_purple_A100,
-                      ),
-                    )
+                child: CircularProgressIndicator(
+                  color: appTheme.deep_purple_A100,
+                ),
+              )
                   : categories.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24.h),
-                            child: Text(
-                              'No categories available',
-                              style: TextStyleHelper
-                                  .instance.body14MediumPlusJakartaSans
-                                  .copyWith(color: appTheme.blue_gray_300),
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.only(left: 24.h, right: 12.h),
-                          itemCount: categories.length,
-                          itemBuilder: (context, index) {
-                            final category = categories[index];
-                            return CustomCategoryBadge(
-                              iconUrl: category['icon_url'] ?? '',
-                              title: category['name'] ?? '',
-                              description: category['tagline'] ?? '',
-                              backgroundColor: appTheme.gray_900_01,
-                              onTap: () {
-                                // Pass selected category ID to CreateMemoryScreen
-                                showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (context) => CreateMemoryScreen(
-                                    preSelectedCategoryId:
-                                        category['id'] as String?,
-                                  ),
-                                );
-                              },
-                            );
-                          },
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Text(
+                    'No categories available',
+                    style: TextStyleHelper
+                        .instance.body14MediumPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300),
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key: const PageStorageKey<String>('categories_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h, right: 12.h),
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  return CustomCategoryBadge(
+                    iconUrl: category['icon_url'] ?? '',
+                    title: category['name'] ?? '',
+                    description: category['tagline'] ?? '',
+                    backgroundColor: appTheme.gray_900_01,
+                    onTap: () {
+                      // Pass selected category ID to CreateMemoryScreen
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => CreateMemoryScreen(
+                          preSelectedCategoryId:
+                          category['id'] as String?,
                         ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         );
@@ -942,9 +929,12 @@ class _MemoryFeedDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
-        final stories =
-            state.memoryFeedDashboardModel?.longestStreakStories ?? [];
-        final isLoading = state.isLoading ?? false;
+        final stories = state.memoryFeedDashboardModel?.longestStreakStories ?? [];
+
+        // IMPORTANT:
+        // Prevent "hard reload" flashes: only show loading skeletons when empty.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && stories.isEmpty;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -973,67 +963,69 @@ class _MemoryFeedDashboardScreenState
               height: 240.h,
               child: isLoading
                   ? ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.only(left: 24.h),
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        return Container(
-                          width: 140.h,
-                          margin: EdgeInsets.only(right: 12.h),
-                          child: CustomStorySkeleton(),
-                        );
-                      },
-                    )
+                key: const PageStorageKey<String>('longest_streak_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 140.h,
+                    margin: EdgeInsets.only(right: 12.h),
+                    child: CustomStorySkeleton(),
+                  );
+                },
+              )
                   : stories.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24.h),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CustomImageView(
-                                  imagePath:
-                                      ImageConstant.imgIconDeepPurpleA10022x22,
-                                  height: 48.h,
-                                  width: 48.h,
-                                  color: appTheme.blue_gray_300,
-                                ),
-                                SizedBox(height: 12.h),
-                                Text(
-                                  'No streak stories yet',
-                                  style: TextStyleHelper
-                                      .instance.title16MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  'Check back for consistent creators',
-                                  style: TextStyleHelper
-                                      .instance.body12MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.only(left: 24.h),
-                          itemCount: stories.length,
-                          itemBuilder: (context, index) {
-                            final story = stories[index];
-                            return HappeningNowStoryCard(
-                              story: story,
-                              onTap: () {
-                                // Navigate directly without FeedStoryContext
-                                NavigatorService.pushNamed(
-                                  AppRoutes.appStoryView,
-                                  arguments: story.storyId,
-                                );
-                              },
-                            );
-                          },
-                        ),
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CustomImageView(
+                        imagePath:
+                        ImageConstant.imgIconDeepPurpleA10022x22,
+                        height: 48.h,
+                        width: 48.h,
+                        color: appTheme.blue_gray_300,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'No streak stories yet',
+                        style: TextStyleHelper
+                            .instance.title16MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Check back for consistent creators',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key: const PageStorageKey<String>('longest_streak_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () {
+                      // Navigate directly without FeedStoryContext
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: story.storyId,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         );
@@ -1045,9 +1037,12 @@ class _MemoryFeedDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
-        final stories =
-            state.memoryFeedDashboardModel?.popularUserStories ?? [];
-        final isLoading = state.isLoading ?? false;
+        final stories = state.memoryFeedDashboardModel?.popularUserStories ?? [];
+
+        // IMPORTANT:
+        // Prevent "hard reload" flashes: only show loading skeletons when empty.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && stories.isEmpty;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1076,66 +1071,68 @@ class _MemoryFeedDashboardScreenState
               height: 240.h,
               child: isLoading
                   ? ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: EdgeInsets.only(left: 24.h),
-                      itemCount: 3,
-                      itemBuilder: (context, index) {
-                        return Container(
-                          width: 140.h,
-                          margin: EdgeInsets.only(right: 12.h),
-                          child: CustomStorySkeleton(),
-                        );
-                      },
-                    )
+                key: const PageStorageKey<String>('popular_users_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 140.h,
+                    margin: EdgeInsets.only(right: 12.h),
+                    child: CustomStorySkeleton(),
+                  );
+                },
+              )
                   : stories.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24.h),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CustomImageView(
-                                  imagePath: ImageConstant.imgIconGreen500,
-                                  height: 48.h,
-                                  width: 48.h,
-                                  color: appTheme.blue_gray_300,
-                                ),
-                                SizedBox(height: 12.h),
-                                Text(
-                                  'No popular users yet',
-                                  style: TextStyleHelper
-                                      .instance.title16MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                                SizedBox(height: 4.h),
-                                Text(
-                                  'Check back for trending creators',
-                                  style: TextStyleHelper
-                                      .instance.body12MediumPlusJakartaSans
-                                      .copyWith(color: appTheme.blue_gray_300),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.only(left: 24.h),
-                          itemCount: stories.length,
-                          itemBuilder: (context, index) {
-                            final story = stories[index];
-                            return HappeningNowStoryCard(
-                              story: story,
-                              onTap: () {
-                                // Navigate directly without FeedStoryContext
-                                NavigatorService.pushNamed(
-                                  AppRoutes.appStoryView,
-                                  arguments: story.storyId,
-                                );
-                              },
-                            );
-                          },
-                        ),
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CustomImageView(
+                        imagePath: ImageConstant.imgIconGreen500,
+                        height: 48.h,
+                        width: 48.h,
+                        color: appTheme.blue_gray_300,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'No popular users yet',
+                        style: TextStyleHelper
+                            .instance.title16MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Check back for trending creators',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key: const PageStorageKey<String>('popular_users_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () {
+                      // Navigate directly without FeedStoryContext
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: story.storyId,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         );

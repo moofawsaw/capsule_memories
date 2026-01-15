@@ -785,6 +785,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         stories: _timelineStories,
         memoryStartTime: start,
         memoryEndTime: end,
+        layoutVariant: TimelineLayoutVariant.compact,
         onStoryTap: (String storyId) {
           if (widget.onTap != null) widget.onTap!();
         },

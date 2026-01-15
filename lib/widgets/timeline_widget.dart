@@ -5,12 +5,18 @@ import '../presentation/event_timeline_view_screen/widgets/timeline_story_widget
 
 enum TimelineVariant { sealed, active }
 
+/// Layout variant so we can render a tighter version on memory cards.
+enum TimelineLayoutVariant { full, compact }
+
 class TimelineWidget extends StatelessWidget {
   final List<TimelineStoryItem> stories;
   final DateTime memoryStartTime; // stored UTC from DB
   final DateTime memoryEndTime; // stored UTC from DB
   final TimelineVariant variant;
   final Function(String)? onStoryTap;
+
+  /// Controls marker spacing + countdown badge sizing/typography.
+  final TimelineLayoutVariant layoutVariant;
 
   const TimelineWidget({
     Key? key,
@@ -19,6 +25,7 @@ class TimelineWidget extends StatelessWidget {
     required this.memoryEndTime,
     this.variant = TimelineVariant.active,
     this.onStoryTap,
+    this.layoutVariant = TimelineLayoutVariant.full,
   }) : super(key: key);
 
   // ===== Layout constants =====
@@ -33,7 +40,15 @@ class TimelineWidget extends StatelessWidget {
 
   // Raw px widths (do NOT apply .w when positioning horizontally)
   static const double _storyMarkerWidth = 70.0;
-  static const double _markerLabelWidth = 72.0;
+
+  // Marker label widths by layout variant
+  static const double _markerLabelWidthFull = 72.0;
+  static const double _markerLabelWidthCompact = 64.0;
+
+  double get _markerLabelWidth =>
+      layoutVariant == TimelineLayoutVariant.compact
+          ? _markerLabelWidthCompact
+          : _markerLabelWidthFull;
 
   // Keep markers away from the edges
   static const double _markerEdgeInset = 14.0; // px, tweak 10–20
@@ -53,6 +68,12 @@ class TimelineWidget extends StatelessWidget {
 
   // Display to user in local timezone (EST/whatever device is set to)
   DateTime _toLocal(DateTime dt) => _toUtc(dt).toLocal();
+
+  String _countdownWidthTemplate({required bool isCompact}) {
+    // Reserve a fixed text width so the badge NEVER jitters as seconds tick.
+    // If you expect 3-digit days, change to '888d 88:88:88'.
+    return isCompact ? '88d 88:88:88' : '';
+  }
 
   // ============================
   // URL SAFETY (AVATAR + THUMBNAIL)
@@ -174,14 +195,14 @@ class TimelineWidget extends StatelessWidget {
     final double halfMarker = _storyMarkerWidth / 2;
 
     return sorted.map((story) {
-      final double centerX =
-      _calculateTimePosition(story.postedAt, usableWidth);
+      final double centerX = _calculateTimePosition(story.postedAt, usableWidth);
 
       double leftPos = padding + centerX - halfMarker;
 
       // Clamp so center can reach both ends (allow overflow off the edges)
       final double minLeft = padding - halfMarker; // center at x=0
-      final double maxLeft = padding + usableWidth - halfMarker; // center at x=max
+      final double maxLeft =
+          padding + usableWidth - halfMarker; // center at x=max
       leftPos = leftPos.clamp(minLeft, maxLeft).toDouble();
 
       return Positioned(
@@ -223,9 +244,17 @@ class TimelineWidget extends StatelessWidget {
     return '$hh:$mm:$ss';
   }
 
-  Widget _buildCountdownBadge(DateTime endUtc) {
+  Widget _buildCountdownBadge(
+      DateTime endUtc, {
+        double? maxWidth,
+        bool isCompact = false,
+      }) {
     if (variant == TimelineVariant.sealed) {
-      return _countdownBadgeShell(value: '00:00:00');
+      return _countdownBadgeShell(
+        value: '00:00:00',
+        maxWidth: maxWidth,
+        isCompact: isCompact,
+      );
     }
 
     return StreamBuilder<int>(
@@ -235,50 +264,105 @@ class TimelineWidget extends StatelessWidget {
         final Duration remaining = endUtc.difference(nowUtc);
         final String clock = _formatRemainingClock(remaining);
 
-        return _countdownBadgeShell(value: clock);
+        return _countdownBadgeShell(
+          value: clock,
+          maxWidth: maxWidth,
+          isCompact: isCompact,
+        );
       },
     );
   }
 
-  Widget _countdownBadgeShell({required String value}) {
+  Widget _countdownBadgeShell({
+    required String value,
+    double? maxWidth,
+    bool isCompact = false,
+  }) {
+    // Compact pill sizing (memory cards)
+    final double pillHeight = isCompact ? 30.h : 34.h;
+    final double horizontalPadding = isCompact ? 12.h : 14.h;
+    final double iconSize = isCompact ? 14.h : 16.h;
+    final double gap = isCompact ? 6.h : 8.h;
+
+    // FULL keeps its stronger min width, COMPACT can shrink
+    final double desiredMinWidth = isCompact ? 0.0 : 150.h;
+
+    final double fallbackMaxWidth = isCompact ? 260.h : 220.h;
+    final double effectiveMaxWidth =
+    (maxWidth ?? fallbackMaxWidth).clamp(0.0, 99999.0);
+
+    final double effectiveMinWidth =
+    desiredMinWidth > effectiveMaxWidth ? effectiveMaxWidth : desiredMinWidth;
+
+    final TextStyle baseStyle =
+        TextStyleHelper.instance.body14BoldPlusJakartaSans;
+
+    final TextStyle textStyle = isCompact
+        ? baseStyle.copyWith(
+      fontSize: 12.h,
+      height: 1.0,
+      letterSpacing: 0.1,
+      color: appTheme.gray_50,
+    )
+        : baseStyle.copyWith(
+      color: appTheme.gray_50,
+      height: 1.0,
+      letterSpacing: 0.2,
+    );
+
+    final String template = _countdownWidthTemplate(isCompact: isCompact);
+
     return ConstrainedBox(
       constraints: BoxConstraints(
-        // ✅ forces a real pill width (no tiny pills)
-        minWidth: 150.h,
-        maxWidth: 180.h,
+        minWidth: effectiveMinWidth,
+        maxWidth: effectiveMaxWidth,
       ),
       child: Container(
-        height: 34.h, // taller = stronger visual weight
-        padding: EdgeInsets.symmetric(horizontal: 14.h),
+        height: pillHeight,
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
         decoration: BoxDecoration(
           color: appTheme.deep_purple_A100.withAlpha(40),
           borderRadius: BorderRadius.circular(999),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(40),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
+          // COMPACT wraps; FULL can fill its lane
+          mainAxisSize: isCompact ? MainAxisSize.min : MainAxisSize.max,
           children: [
             Icon(
               Icons.access_time_rounded,
-              size: 16.h,
+              size: iconSize,
               color: appTheme.gray_50.withAlpha(220),
             ),
-            SizedBox(width: 8.h),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis, // ✅ clip text, never shrink font
-              style: TextStyleHelper.instance.body14BoldPlusJakartaSans.copyWith(
-                color: appTheme.gray_50,
-                height: 1.0,
-                letterSpacing: 0.2,
+            SizedBox(width: gap),
+            Flexible(
+              child: isCompact
+                  ? Stack(
+                alignment: Alignment.centerLeft,
+                children: [
+                  // Invisible template reserves constant width (prevents jitter)
+                  Opacity(
+                    opacity: 0.0,
+                    child: Text(
+                      template,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      style: textStyle,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textStyle,
+                  ),
+                ],
+              )
+                  : Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textStyle,
               ),
             ),
           ],
@@ -341,17 +425,58 @@ class TimelineWidget extends StatelessWidget {
       final double leftPos = (padding + clampedCenter - halfLabel).toDouble();
 
       if (isMidpoint) {
-        // Keep the countdown inside the space between the left/right marker label columns.
-        const double gap = 10.0;
+        // FULL view: use marker label widths to keep the badge inside the label columns.
+        if (layoutVariant == TimelineLayoutVariant.full) {
+          final double badgeMaxWidth = (usableWidth - (_markerLabelWidth * 2))
+              .clamp(0.0, usableWidth)
+              .toDouble();
+
+          widgets.add(
+            Positioned(
+              left: padding,
+              right: padding,
+              bottom: 34.h,
+              child: Center(
+                child: _buildCountdownBadge(
+                  endUtc,
+                  maxWidth: badgeMaxWidth,
+                  isCompact: false,
+                ),
+              ),
+            ),
+          );
+          continue;
+        }
+
+        // COMPACT view: do RAW px math (no .h) against usableWidth (also raw px),
+        // then hard-trim slightly so it never kisses the left/right markers.
+        final double avatarRadiusPx = _avatarSize / 2.0; // RAW px
+        const double extraPx = 14.0; // tweak 10–18
+        const double trimPx = 12.0; // increase to make badge narrower
+
+        final double safeInsetPx = avatarRadiusPx + extraPx;
+
+        final double badgeMaxWidth = (usableWidth - (safeInsetPx * 2) - trimPx)
+            .clamp(0.0, usableWidth)
+            .toDouble();
 
         widgets.add(
           Positioned(
-            left: padding + _markerLabelWidth + gap,
-            right: padding + _markerLabelWidth + gap,
-            // ✅ Move up so it doesn't collide with the date/time labels area
-            bottom: 34.h,
+            left: padding,
+            right: padding,
+            bottom: 30.h,
             child: Center(
-              child: _buildCountdownBadge(endUtc),
+              // Use a fixed-width slot so width changes are obvious and consistent.
+              child: SizedBox(
+                width: badgeMaxWidth,
+                child: Center(
+                  child: _buildCountdownBadge(
+                    endUtc,
+                    maxWidth: badgeMaxWidth,
+                    isCompact: true,
+                  ),
+                ),
+              ),
             ),
           ),
         );
@@ -382,8 +507,8 @@ class TimelineWidget extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: (m.isEmphasized
                           ? TextStyleHelper.instance.body14BoldPlusJakartaSans
-                          : TextStyleHelper.instance
-                          .body14RegularPlusJakartaSans)
+                          : TextStyleHelper
+                          .instance.body14RegularPlusJakartaSans)
                           .copyWith(color: appTheme.gray_50),
                       maxLines: 1,
                     ),
@@ -431,7 +556,18 @@ class TimelineWidget extends StatelessWidget {
     final DateTime local = _toLocal(dt);
 
     const months = [
-      'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     final String month = months[local.month - 1];
     final int day = local.day;

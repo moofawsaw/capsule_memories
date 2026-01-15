@@ -1,3 +1,5 @@
+// lib/core/services/deep_link_service.dart
+
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
@@ -5,8 +7,8 @@ import 'package:flutter/material.dart';
 
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
-import '../app_export.dart';
 import '../models/feed_story_context.dart';
+import '../utils/navigator_service.dart';
 
 class DeepLinkService with WidgetsBindingObserver {
   static final DeepLinkService _instance = DeepLinkService._internal();
@@ -14,24 +16,27 @@ class DeepLinkService with WidgetsBindingObserver {
   DeepLinkService._internal();
 
   final AppLinks _appLinks = AppLinks();
-
   StreamSubscription<Uri>? _sub;
 
-  String? _pendingSessionToken;
   bool _isInitialized = false;
+  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
+
+  // ===== Invite auth continuation =====
+  String? _pendingSessionToken;
 
   // ===== Story deep link queueing =====
   FeedStoryContext? _pendingStoryArgs;
   bool _navScheduled = false;
-  AppLifecycleState _lifecycleState = AppLifecycleState.resumed;
 
-  // Callback for success messages
+  // Optional callbacks
   Function(String message, String type)? onSuccess;
-
-  // Callback for error messages
   Function(String message)? onError;
 
+  /// True if we have an invite link waiting for login completion
   bool get hasPendingAction => _pendingSessionToken != null;
+
+  /// True if we have a story navigation queued (prevents splash from stomping nav)
+  bool get hasPendingStoryNavigation => _pendingStoryArgs != null;
 
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -39,7 +44,7 @@ class DeepLinkService with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
 
     try {
-      // Cold start link
+      // Cold start link (terminated app)
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
         await _handleDeepLink(initialUri);
@@ -47,19 +52,22 @@ class DeepLinkService with WidgetsBindingObserver {
 
       // Warm start / running app links
       _sub = _appLinks.uriLinkStream.listen(
-            (uri) async {
-          await _handleDeepLink(uri);
-        },
-        onError: (e) {
-          debugPrint('❌ Deep link stream error: $e');
-        },
+            (uri) async => _handleDeepLink(uri),
+        onError: (e) => debugPrint('❌ Deep link stream error: $e'),
       );
 
       _isInitialized = true;
-      debugPrint('✅ Deep link service initialized (app_links)');
+      debugPrint('✅ DeepLinkService initialized');
     } catch (e) {
       debugPrint('❌ Failed to initialize deep link service: $e');
     }
+  }
+
+  Future<void> dispose() async {
+    WidgetsBinding.instance.removeObserver(this);
+    await _sub?.cancel();
+    _sub = null;
+    _isInitialized = false;
   }
 
   @override
@@ -72,42 +80,19 @@ class DeepLinkService with WidgetsBindingObserver {
     }
   }
 
-  Future<void> dispose() async {
-    WidgetsBinding.instance.removeObserver(this);
-    await _sub?.cancel();
-    _sub = null;
-    _isInitialized = false;
-  }
+  // ===========================
+  // Deep link router
+  // ===========================
 
   Future<void> _handleDeepLink(Uri uri) async {
     debugPrint('🔗 Deep link received: $uri');
 
-    // ===========================
-    // 1) STORY LINKS (capsulememories)
-    // ===========================
-    // https://capsulememories.app/s/{storyId}
-    // https://capsulememories.app/story/{storyId}
-    if (_isCapsuleMemoriesStoryHttpLink(uri)) {
-      final storyId = _extractStoryIdFromCapsuleMemoriesHttp(uri);
-      if (storyId != null && storyId.isNotEmpty) {
-        _openStory(storyId);
-      }
-      return;
-    }
+    // ---------------------------
+    // 1) STORY LINKS (PUBLIC VIEWER)
+    // ---------------------------
 
-    // capsule://story/{storyId}
-    if (_isCapsuleCustomSchemeStoryLink(uri)) {
-      final storyId = _extractStoryIdFromCapsuleScheme(uri);
-      if (storyId != null && storyId.isNotEmpty) {
-        _openStory(storyId);
-      }
-      return;
-    }
-
-    // ===========================
-    // 1.5) STORY LINKS (capapp.co)
-    // ===========================
-    // https://capapp.co/s/{storyId}
+    // ✅ Current web route:
+    // https://capapp.co/story/{storyIdOrShareCode}
     if (_isCapappStoryHttpLink(uri)) {
       final storyId = _extractStoryIdFromCapapp(uri);
       if (storyId != null && storyId.isNotEmpty) {
@@ -116,9 +101,40 @@ class DeepLinkService with WidgetsBindingObserver {
       return;
     }
 
-    // ===========================
+    // Optional legacy support (keep if old links exist):
+    // https://capapp.co/s/{id}
+    if (_isCapappLegacySLink(uri)) {
+      final storyId = _extractStoryIdFromCapappLegacyS(uri);
+      if (storyId != null && storyId.isNotEmpty) {
+        _openStory(storyId);
+      }
+      return;
+    }
+
+    // Optional share domain support:
+    // https://share.capapp.co/{shareCodeOrStoryId}
+    if (_isShareCapappLink(uri)) {
+      final storyId = _extractIdFromShareCapapp(uri);
+      if (storyId != null && storyId.isNotEmpty) {
+        _openStory(storyId);
+      }
+      return;
+    }
+
+    // Custom scheme (optional):
+    // capsule://story/{id}
+    if (_isCapsuleCustomSchemeStoryLink(uri)) {
+      final storyId = _extractStoryIdFromCapsuleScheme(uri);
+      if (storyId != null && storyId.isNotEmpty) {
+        _openStory(storyId);
+      }
+      return;
+    }
+
+    // ---------------------------
     // 2) INVITE / JOIN LINKS (capapp.co)
-    // ===========================
+    // ---------------------------
+    // https://capapp.co/join/{type}/{code}
     if (uri.host != 'capapp.co') return;
     if (!uri.path.startsWith('/join')) return;
 
@@ -131,28 +147,51 @@ class DeepLinkService with WidgetsBindingObserver {
     await _processInviteLink(type, code);
   }
 
-  // ---------------------------
-  // STORY: Helpers
-  // ---------------------------
+  // ===========================
+  // STORY helpers
+  // ===========================
 
-  bool _isCapsuleMemoriesStoryHttpLink(Uri uri) {
+  bool _isCapappStoryHttpLink(Uri uri) {
     if (uri.scheme != 'https' && uri.scheme != 'http') return false;
-
-    final hostOk = uri.host == 'capsulememories.app' ||
-        uri.host == 'www.capsulememories.app';
-    if (!hostOk) return false;
-
+    if (uri.host != 'capapp.co' && uri.host != 'www.capapp.co') return false;
     if (uri.pathSegments.isEmpty) return false;
 
-    final first = uri.pathSegments.first;
-    if (first != 's' && first != 'story') return false;
-
+    // ✅ new format: /story/{id}
+    if (uri.pathSegments.first != 'story') return false;
     return uri.pathSegments.length >= 2;
   }
 
-  String? _extractStoryIdFromCapsuleMemoriesHttp(Uri uri) {
+  String? _extractStoryIdFromCapapp(Uri uri) {
     if (uri.pathSegments.length < 2) return null;
     return uri.pathSegments[1];
+  }
+
+  bool _isCapappLegacySLink(Uri uri) {
+    if (uri.scheme != 'https' && uri.scheme != 'http') return false;
+    if (uri.host != 'capapp.co' && uri.host != 'www.capapp.co') return false;
+    if (uri.pathSegments.isEmpty) return false;
+
+    // legacy: /s/{id}
+    return uri.pathSegments.first == 's' && uri.pathSegments.length >= 2;
+  }
+
+  String? _extractStoryIdFromCapappLegacyS(Uri uri) {
+    if (uri.pathSegments.length < 2) return null;
+    return uri.pathSegments[1];
+  }
+
+  bool _isShareCapappLink(Uri uri) {
+    if (uri.scheme != 'https' && uri.scheme != 'http') return false;
+    if (uri.host != 'share.capapp.co' && uri.host != 'www.share.capapp.co') {
+      return false;
+    }
+    return uri.pathSegments.isNotEmpty;
+  }
+
+  String? _extractIdFromShareCapapp(Uri uri) {
+    // https://share.capapp.co/{id}
+    if (uri.pathSegments.isEmpty) return null;
+    return uri.pathSegments.first;
   }
 
   bool _isCapsuleCustomSchemeStoryLink(Uri uri) {
@@ -164,38 +203,26 @@ class DeepLinkService with WidgetsBindingObserver {
     return uri.pathSegments.first;
   }
 
-  bool _isCapappStoryHttpLink(Uri uri) {
-    if (uri.scheme != 'https' && uri.scheme != 'http') return false;
-    if (uri.host != 'capapp.co') return false;
-    if (uri.pathSegments.isEmpty) return false;
-    return uri.pathSegments.first == 's' && uri.pathSegments.length >= 2;
-  }
-
-  String? _extractStoryIdFromCapapp(Uri uri) {
-    if (uri.pathSegments.length < 2) return null;
-    return uri.pathSegments[1];
-  }
-
-  void _openStory(String storyId) {
-    debugPrint('✅ Opening story from deep link: $storyId');
+  void _openStory(String storyIdOrShareCode) {
+    debugPrint('✅ Queue story open: $storyIdOrShareCode');
 
     final args = FeedStoryContext(
       feedType: 'deep_link',
-      initialStoryId: storyId,
-      storyIds: [storyId],
+      initialStoryId: storyIdOrShareCode,
+      storyIds: [storyIdOrShareCode],
     );
 
-    // Queue it and flush when safe (resumed + next frame)
     _pendingStoryArgs = args;
     _flushPendingStoryNavigation();
   }
 
   void _flushPendingStoryNavigation() {
-    if (_pendingStoryArgs == null) return;
+    final args = _pendingStoryArgs;
+    if (args == null) return;
 
     // If app is not resumed yet, wait.
     if (_lifecycleState != AppLifecycleState.resumed) {
-      debugPrint('⏳ App not resumed yet. Waiting to navigate to story...');
+      debugPrint('⏳ Not resumed yet. Waiting to navigate...');
       return;
     }
 
@@ -205,39 +232,39 @@ class DeepLinkService with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _navScheduled = false;
 
-      final args = _pendingStoryArgs;
+      final stillArgs = _pendingStoryArgs;
       _pendingStoryArgs = null;
-      if (args == null) return;
+      if (stillArgs == null) return;
 
       final navState = NavigatorService.navigatorKey.currentState;
-      final navContext = NavigatorService.navigatorKey.currentContext;
-
-      if (navState == null || navContext == null) {
-        debugPrint('❌ Navigator not ready (state/context null). Re-queue story.');
-        _pendingStoryArgs = args;
+      if (navState == null) {
+        debugPrint('❌ Navigator not ready (state null). Re-queue story.');
+        _pendingStoryArgs = stillArgs;
         return;
       }
 
-      // Hard reset the stack to avoid half-dead StoryViewer state (black screen)
-      // You can loosen this later, but this is the most reliable fix.
       try {
+        // ✅ CRITICAL: Use PUBLIC route (no AppShell / no AuthGuard)
         navState.pushNamedAndRemoveUntil(
-          AppRoutes.appStoryView,
-              (route) => route.isFirst,
-          arguments: args,
+          AppRoutes.storyViewPublic,
+              (route) => false,
+          arguments: stillArgs,
         );
-        debugPrint('✅ Navigated to story (hard reset): ${args.initialStoryId}');
+
+        debugPrint(
+          '✅ Navigated to public story view: ${stillArgs.initialStoryId}',
+        );
       } catch (e) {
         debugPrint('❌ Story navigation error: $e');
-        // If navigation fails for timing, re-queue once.
-        _pendingStoryArgs = args;
+        // Re-queue once if timing issue
+        _pendingStoryArgs = stillArgs;
       }
     });
   }
 
-  // ---------------------------
-  // INVITES: Main flow
-  // ---------------------------
+  // ===========================
+  // INVITES
+  // ===========================
 
   Future<void> _processInviteLink(String type, String code) async {
     final client = SupabaseService.instance.client;
@@ -263,14 +290,14 @@ class DeepLinkService with WidgetsBindingObserver {
       if (data['requires_auth'] == true) {
         _pendingSessionToken = data['session_token'] as String?;
         NavigatorService.pushNamed(AppRoutes.authLogin);
-        debugPrint('✅ Deep link requires auth. Session token stored.');
+        debugPrint('✅ Invite deep link requires auth. Token stored.');
         return;
       }
 
       if (data['success'] == true) {
         final message =
             data['message'] as String? ?? 'Action completed successfully';
-        debugPrint('✅ Deep link invite completed: $message');
+        debugPrint('✅ Invite deep link completed: $message');
 
         onSuccess?.call(message, type);
         _navigateToConfirmation(type);
@@ -279,9 +306,9 @@ class DeepLinkService with WidgetsBindingObserver {
 
       final err = data['error'] as String? ?? 'Failed to process invitation';
       onError?.call(err);
-      debugPrint('❌ Deep link invite failed: $err');
+      debugPrint('❌ Invite deep link failed: $err');
     } catch (e) {
-      debugPrint('❌ Deep link error: $e');
+      debugPrint('❌ Invite deep link error: $e');
       onError?.call('Failed to process invitation');
     }
   }
@@ -328,18 +355,5 @@ class DeepLinkService with WidgetsBindingObserver {
         NavigatorService.pushNamed(AppRoutes.appFeed);
         break;
     }
-  }
-
-  void _showError(String message) {
-    final context = NavigatorService.navigatorKey.currentContext;
-    if (context != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-    debugPrint('Deep link error: $message');
   }
 }

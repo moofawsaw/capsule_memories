@@ -96,7 +96,7 @@ class AppRoutes {
   // ✅ Correct story workflow
   static const String appNativeCamera = '/app/native-camera';
   static const String appStoryEdit = '/app/story/edit';
-  static const String appStoryRecord = '/app/story/record'; // keep as alias -> native camera
+  static const String appStoryRecord = '/app/story/record'; // alias -> native camera
   static const String appStoryView = '/app/story/view';
 
   static const String appTimeline = '/app/timeline';
@@ -108,6 +108,10 @@ class AppRoutes {
   static const String authLogin = '/auth/login';
   static const String authRegister = '/auth/register';
   static const String authReset = '/auth/reset';
+
+  // ✅ Public deep link route (NO /app shell)
+  // This is what your website uses: https://capapp.co/story/view/<id>
+  static const String storyViewPublic = '/story/view';
 
   // Other routes (alphabetically organized)
   static const String groupEditBottomSheet = '/group-edit-bottom-sheet';
@@ -121,6 +125,7 @@ class AppRoutes {
       '/friend-request-confirmation-dialog';
   static const String deepLinkHandler = '/deep-link-handler';
 
+  // ✅ this should be splash, not appFeed
   static const String initialRoute = appFeed;
 
   static const String memoryTimelinePlayback =
@@ -152,38 +157,10 @@ class AppRoutes {
   /// Get the child widget for a given app route
   static Widget _getAppChild(String routeName, RouteSettings settings) {
     switch (routeName) {
-    // ✅ Story workflow routes
-    // Record should be native camera
-    //   case appNativeCamera:
-    //     return NativeCameraRecordingScreen(
-    //       memoryId: _argString(settings, 'memoryId'),
-    //       memoryTitle: _argString(settings, 'memoryTitle'),
-    //       categoryIcon: _argNullableString(settings, 'categoryIcon'),
-    //     );
-    //
-    // // Keep /app/story/record as an alias to the real recorder
-    //   case appStoryRecord:
-    //     return NativeCameraRecordingScreen(
-    //       memoryId: _argString(settings, 'memoryId'),
-    //       memoryTitle: _argString(settings, 'memoryTitle'),
-    //       categoryIcon: _argNullableString(settings, 'categoryIcon'),
-    //     );
-
-    // Edit and view
       case appStoryEdit:
         return PostStoryScreen();
       case appStoryView:
-        return EventStoriesViewScreen();
-    //
-    // // Backward compatibility - deprecated routes redirect
-    //   case appHome:
-    //     return NativeCameraRecordingScreen(
-    //       memoryId: _argString(settings, 'memoryId'),
-    //       memoryTitle: _argString(settings, 'memoryTitle'),
-    //       categoryIcon: _argNullableString(settings, 'categoryIcon'),
-    //     );
-    //   case appPost:
-    //     return PostStoryScreen();
+        return const EventStoriesViewScreen();
 
     // App tabs/screens
       case appFeed:
@@ -239,7 +216,7 @@ class AppRoutes {
       case appBsQrGroup:
         return GroupQRInviteScreen();
       case appBsStories:
-        return EventStoriesViewScreen();
+        return const EventStoriesViewScreen();
       case appBsUpload:
         final uploadArgs = NavigatorService.navigatorKey.currentContext != null
             ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)
@@ -303,6 +280,28 @@ class AppRoutes {
       }
     }
 
+    // ✅ PUBLIC STORY DEEP LINK: /story/view/<shareCodeOrStoryId>
+    // This MUST be ABOVE auth + /app handling.
+    if (routeName.startsWith(storyViewPublic)) {
+      final uri = Uri.parse(routeName);
+
+      // Expected segments: ["story","view","<id>"]
+      final String? id =
+      (uri.pathSegments.length >= 3) ? uri.pathSegments[2] : null;
+
+      return PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+        const EventStoriesViewScreen(),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        settings: RouteSettings(
+          name: storyViewPublic,
+          // ✅ EventStoriesViewScreen supports args is String
+          arguments: id,
+        ),
+      );
+    }
+
     // Auth routes (no header)
     if (routeName == authLogin) {
       return _buildRoute(LoginScreen(), settings, shouldAnimate: true);
@@ -347,12 +346,18 @@ class AppRoutes {
     // App routes (with persistent header)
     if (routeName.startsWith('/app')) {
       final child = _getAppChild(routeName, settings);
-      final requiresAuth = _requiresAuth(routeName);
       final shouldAnimate = _shouldAnimate(routeName);
 
-      final protectedChild = requiresAuth
+      // ✅ Only guard routes that actually need auth.
+      final bool shouldGuard =
+          _requiresAuth(routeName) && !AuthGuard.isPublicRoute(routeName);
+
+      // ✅ Never force-unwrap currentContext (it can be null on cold start).
+      final ctx = NavigatorService.navigatorKey.currentContext;
+
+      final protectedChild = shouldGuard && ctx != null
           ? AuthGuard.protectedRoute(
-        NavigatorService.navigatorKey.currentContext!,
+        ctx,
         routeName,
         child,
       )
@@ -422,11 +427,9 @@ class AppRoutes {
     authLogin: (context) => LoginScreen(),
     authRegister: (context) => AccountRegistrationScreen(),
     authReset: (context) => PasswordResetScreen(),
-    splash: (context) => SplashScreen(),
     qrCodeShareScreenTwo: (context) => const QRCodeShareScreenTwoScreen(),
     qrTimelineShare: (context) {
-      final memoryId =
-      ModalRoute.of(context)?.settings.arguments as String?;
+      final memoryId = ModalRoute.of(context)?.settings.arguments as String?;
       return QRTimelineShareScreen(
         memoryId: memoryId ?? '',
       );
@@ -439,8 +442,8 @@ class AppRoutes {
 
     // ✅ Keep StoryEditScreen mapping as-is
     appStoryEdit: (context) {
-      final args = ModalRoute.of(context)!.settings.arguments
-      as Map<String, dynamic>;
+      final args =
+      ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
       return StoryEditScreen(
         mediaPath: args['video_path'] as String,
         isVideo: args['is_video'] as bool? ?? true,
@@ -449,19 +452,6 @@ class AppRoutes {
         categoryIcon: args['category_icon'] as String?,
       );
     },
-
-    // // ✅ Add a legacy builder for appNativeCamera as well (in case anything uses routes map)
-    // appNativeCamera: (context) {
-    //   final args = (ModalRoute.of(context)?.settings.arguments as Map?)
-    //       ?.cast<String, dynamic>() ??
-    //       <String, dynamic>{};
-    //
-    //   return NativeCameraRecordingScreen(
-    //     memoryId: (args['memoryId'] ?? '') as String,
-    //     memoryTitle: (args['memoryTitle'] ?? '') as String,
-    //     categoryIcon: args['categoryIcon'] as String?,
-    //   );
-    // },
 
     memoryTimelinePlayback: (context) {
       final memoryId = ModalRoute.of(context)!.settings.arguments as String;

@@ -7,6 +7,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/timeline_widget.dart';
+import '../../widgets/memory_details_unified_skeleton.dart';
 import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../memory_details_screen/memory_details_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
@@ -18,237 +19,6 @@ class MemoryDetailsViewScreen extends ConsumerStatefulWidget {
 
   @override
   MemoryDetailsViewScreenState createState() => MemoryDetailsViewScreenState();
-}
-
-class _TimelineSkeletonBlock extends StatelessWidget {
-  const _TimelineSkeletonBlock();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(top: 6.h),
-      padding: EdgeInsets.symmetric(horizontal: 16.h),
-      width: double.maxFinite,
-      child: Column(
-        children: [
-          SizedBox(height: 44.h),
-          Container(
-            height: 220.h,
-            width: double.maxFinite,
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
-              borderRadius: BorderRadius.circular(16.h),
-            ),
-          ),
-          SizedBox(height: 16.h),
-          Container(
-            width: double.maxFinite,
-            height: 1,
-            color: appTheme.blue_gray_900,
-          ),
-          SizedBox(height: 16.h),
-        ],
-      ),
-    );
-  }
-}
-
-class _StoriesSkeletonRow extends StatelessWidget {
-  const _StoriesSkeletonRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 120.h,
-      child: ListView.separated(
-        padding: EdgeInsets.only(left: 20.h, right: 20.h),
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 4,
-        separatorBuilder: (_, __) => SizedBox(width: 12.h),
-        itemBuilder: (_, __) {
-          return Container(
-            width: 110.h,
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
-              borderRadius: BorderRadius.circular(14.h),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SealedMemoryDetailsSkeleton extends StatelessWidget {
-  const _SealedMemoryDetailsSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const NeverScrollableScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(height: 12.h),
-
-          // Header skeleton
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.h),
-            child: Container(
-              padding: EdgeInsets.all(16.h),
-              decoration: BoxDecoration(
-                color: appTheme.gray_900_03,
-                borderRadius: BorderRadius.circular(16.h),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44.h,
-                        height: 44.h,
-                        decoration: BoxDecoration(
-                          color: appTheme.blue_gray_900,
-                          borderRadius: BorderRadius.circular(14.h),
-                        ),
-                      ),
-                      SizedBox(width: 12.h),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              height: 14.h,
-                              width: 180.h,
-                              decoration: BoxDecoration(
-                                color: appTheme.blue_gray_900,
-                                borderRadius: BorderRadius.circular(6.h),
-                              ),
-                            ),
-                            SizedBox(height: 10.h),
-                            Container(
-                              height: 12.h,
-                              width: 140.h,
-                              decoration: BoxDecoration(
-                                color: appTheme.blue_gray_900,
-                                borderRadius: BorderRadius.circular(6.h),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 12.h),
-                      Container(
-                        width: 56.h,
-                        height: 28.h,
-                        decoration: BoxDecoration(
-                          color: appTheme.blue_gray_900,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 14.h),
-                  Container(
-                    height: 12.h,
-                    width: 220.h,
-                    decoration: BoxDecoration(
-                      color: appTheme.blue_gray_900,
-                      borderRadius: BorderRadius.circular(6.h),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          SizedBox(height: 16.h),
-
-          // Timeline skeleton
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.h),
-            child: Container(
-              height: 220.h,
-              decoration: BoxDecoration(
-                color: appTheme.gray_900_03,
-                borderRadius: BorderRadius.circular(16.h),
-              ),
-            ),
-          ),
-
-          SizedBox(height: 18.h),
-
-          // Stories title skeleton
-          Padding(
-            padding: EdgeInsets.only(left: 20.h),
-            child: Container(
-              height: 14.h,
-              width: 120.h,
-              decoration: BoxDecoration(
-                color: appTheme.blue_gray_900,
-                borderRadius: BorderRadius.circular(6.h),
-              ),
-            ),
-          ),
-
-          SizedBox(height: 14.h),
-
-          // Story cards skeleton row
-          SizedBox(
-            height: 140.h,
-            child: ListView.separated(
-              padding: EdgeInsets.symmetric(horizontal: 20.h),
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 4,
-              separatorBuilder: (_, __) => SizedBox(width: 12.h),
-              itemBuilder: (_, __) {
-                return Container(
-                  width: 120.h,
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_900_03,
-                    borderRadius: BorderRadius.circular(16.h),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          SizedBox(height: 24.h),
-
-          // Buttons skeleton
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24.h),
-            child: Column(
-              children: [
-                Container(
-                  height: 48.h,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_900_03,
-                    borderRadius: BorderRadius.circular(14.h),
-                  ),
-                ),
-                SizedBox(height: 12.h),
-                Container(
-                  height: 48.h,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_900_03,
-                    borderRadius: BorderRadius.circular(14.h),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          SizedBox(height: 20.h),
-        ],
-      ),
-    );
-  }
 }
 
 /// Inline circle icon button (same layout concept as Open timeline buttons)
@@ -386,12 +156,12 @@ class MemoryDetailsViewScreenState
     // ✅ Refresh skeletons only when snapshot exists
     final showSectionSkeletons = isLoading && hasSnapshot;
 
-    // ✅ No blank shell first frame
+    // ✅ No blank shell first frame (use unified skeleton)
     if (effectiveLoading && !hasSnapshot) {
       return SafeArea(
         child: Scaffold(
           backgroundColor: appTheme.gray_900_02,
-          body: const _SealedMemoryDetailsSkeleton(),
+          body: MemoryDetailsUnifiedSkeleton.fullscreen(),
         ),
       );
     }
@@ -427,24 +197,26 @@ class MemoryDetailsViewScreenState
         final isLoading = state.isLoading ?? false;
         final showSectionSkeletons = isLoading && hasSnapshot;
 
+        // ✅ Refresh header skeleton uses unified skeleton section piece
+        if (showSectionSkeletons) {
+          return MemoryDetailsUnifiedSkeleton.sectionOnly(
+            header: true,
+            timeline: false,
+            storiesTitle: false,
+            storiesRow: false,
+            buttons: false,
+          );
+        }
+
         return CustomEventCard(
-          // ✅ Let card render internal skeleton consistently
-          isLoading: showSectionSkeletons,
-          eventTitle:
-          showSectionSkeletons ? null : state.memoryDetailsViewModel?.eventTitle,
-          eventDate:
-          showSectionSkeletons ? null : state.memoryDetailsViewModel?.eventDate,
-          eventLocation: showSectionSkeletons
-              ? null
-              : state.memoryDetailsViewModel?.eventLocation,
-          isPrivate: showSectionSkeletons ? null : state.memoryDetailsViewModel?.isPrivate,
-          iconButtonImagePath: showSectionSkeletons
-              ? null
-              : (state.memoryDetailsViewModel?.categoryIcon ??
+          isLoading: false,
+          eventTitle: state.memoryDetailsViewModel?.eventTitle,
+          eventDate: state.memoryDetailsViewModel?.eventDate,
+          eventLocation: state.memoryDetailsViewModel?.eventLocation,
+          isPrivate: state.memoryDetailsViewModel?.isPrivate,
+          iconButtonImagePath: (state.memoryDetailsViewModel?.categoryIcon ??
               ImageConstant.imgFrame13),
-          participantImages: showSectionSkeletons
-              ? null
-              : state.memoryDetailsViewModel?.participantImages,
+          participantImages: state.memoryDetailsViewModel?.participantImages,
           onBackTap: NavigatorService.goBack,
           onIconButtonTap: () {
             // Inline controls used on sealed
@@ -466,7 +238,13 @@ class MemoryDetailsViewScreenState
 
         // ✅ Only show skeleton block when refreshing AND snapshot exists
         if (showSectionSkeletons) {
-          return const _TimelineSkeletonBlock();
+          return MemoryDetailsUnifiedSkeleton.sectionOnly(
+            header: false,
+            timeline: true,
+            storiesTitle: false,
+            storiesRow: false,
+            buttons: false,
+          );
         }
 
         final timelineDetail = state.memoryDetailsViewModel?.timelineDetail;
@@ -563,13 +341,12 @@ class MemoryDetailsViewScreenState
                 final showSectionSkeletons = isLoading && hasSnapshot;
 
                 if (showSectionSkeletons) {
-                  return Container(
-                    height: 14.h,
-                    width: 120.h,
-                    decoration: BoxDecoration(
-                      color: appTheme.blue_gray_900,
-                      borderRadius: BorderRadius.circular(6.h),
-                    ),
+                  return MemoryDetailsUnifiedSkeleton.sectionOnly(
+                    header: false,
+                    timeline: false,
+                    storiesTitle: true,
+                    storiesRow: false,
+                    buttons: false,
                   );
                 }
 
@@ -601,7 +378,13 @@ class MemoryDetailsViewScreenState
         final showSectionSkeletons = isLoading && hasSnapshot;
 
         if (showSectionSkeletons) {
-          return const _StoriesSkeletonRow();
+          return MemoryDetailsUnifiedSkeleton.sectionOnly(
+            header: false,
+            timeline: false,
+            storiesTitle: false,
+            storiesRow: true,
+            buttons: false,
+          );
         }
 
         final dynamic storyItemsDynamic =
@@ -616,7 +399,7 @@ class MemoryDetailsViewScreenState
             margin: EdgeInsets.only(left: 20.h, right: 20.h),
             padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 16.h),
             decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
+              color: appTheme.blue_gray_300.withAlpha(77),
               borderRadius: BorderRadius.circular(12.h),
             ),
             child: Center(
@@ -639,29 +422,12 @@ class MemoryDetailsViewScreenState
   }
 
   Widget _buildActionButtonsSkeleton() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24.h),
-      child: Column(
-        children: [
-          Container(
-            height: 48.h,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
-              borderRadius: BorderRadius.circular(14.h),
-            ),
-          ),
-          SizedBox(height: 12.h),
-          Container(
-            height: 48.h,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_03,
-              borderRadius: BorderRadius.circular(14.h),
-            ),
-          ),
-        ],
-      ),
+    return MemoryDetailsUnifiedSkeleton.sectionOnly(
+      header: false,
+      timeline: false,
+      storiesTitle: false,
+      storiesRow: false,
+      buttons: true,
     );
   }
 
@@ -751,7 +517,8 @@ class MemoryDetailsViewScreenState
 
     if (ids.isEmpty) return;
 
-    final initialId = (index >= 0 && index < ids.length) ? ids[index] : ids.first;
+    final initialId =
+    (index >= 0 && index < ids.length) ? ids[index] : ids.first;
 
     final feedContext = FeedStoryContext(
       feedType: 'memory_timeline',

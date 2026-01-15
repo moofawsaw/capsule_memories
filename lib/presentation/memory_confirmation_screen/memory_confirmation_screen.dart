@@ -857,7 +857,7 @@ class _MemoryConfirmationScreenState
                               SizedBox(width: 12.h),
                             Expanded(
                               child: CustomButton(
-                                text: 'Start Adding Stories',
+                                text: 'Create Story',
                                 buttonStyle: _selectedFriendIds.isEmpty
                                     ? CustomButtonStyle.fillPrimary
                                     : CustomButtonStyle.outlinePrimary,
