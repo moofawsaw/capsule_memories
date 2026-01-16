@@ -18,19 +18,33 @@ class MemoryNavArgs {
   bool get isValid => memoryId.isNotEmpty;
 
   /// Create from Map (for ModalRoute arguments)
+  ///
+  /// Supports multiple keys for backward compatibility:
+  /// - memoryId (preferred)
+  /// - id (legacy)
+  /// - memory_id (legacy)
   factory MemoryNavArgs.fromMap(Map<String, dynamic> map) {
+    final String id =
+        (map['memoryId'] as String?) ??
+            (map['id'] as String?) ??
+            (map['memory_id'] as String?) ??
+            '';
+
     return MemoryNavArgs(
-      memoryId: map['id'] as String? ?? '',
-      snapshot: map.containsKey('snapshot')
+      memoryId: id,
+      snapshot: map['snapshot'] is Map<String, dynamic>
           ? MemorySnapshot.fromMap(map['snapshot'] as Map<String, dynamic>)
           : null,
     );
   }
 
   /// Convert to Map (for navigation)
+  ///
+  /// Emits both keys for compatibility across older call sites.
   Map<String, dynamic> toMap() {
     return {
-      'id': memoryId,
+      'memoryId': memoryId,
+      'id': memoryId, // legacy compatibility
       if (snapshot != null) 'snapshot': snapshot!.toMap(),
     };
   }
@@ -62,9 +76,7 @@ class MemorySnapshot {
       location: map['location'] as String?,
       categoryIcon: map['category_icon'] as String?,
       participantAvatars: map['contributor_avatars'] != null
-          ? (map['contributor_avatars'] as List)
-              .map((e) => e.toString())
-              .toList()
+          ? (map['contributor_avatars'] as List).map((e) => e.toString()).toList()
           : null,
       isPrivate: map['visibility'] == 'private',
     );

@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
+
 import '../core/app_export.dart';
 import '../presentation/create_memory_screen/create_memory_screen.dart';
 import '../presentation/notifications_screen/notifier/notifications_notifier.dart';
@@ -11,8 +13,7 @@ import './custom_image_view.dart';
 /// Supports logo display, action buttons, profile images, and custom titles
 /// Implements PreferredSizeWidget for proper AppBar integration
 /// INTERNALLY MANAGES notification count state and user avatar - no need for screens to pass them
-class CustomAppBar extends ConsumerStatefulWidget
-    implements PreferredSizeWidget {
+class CustomAppBar extends ConsumerStatefulWidget implements PreferredSizeWidget {
   CustomAppBar({
     Key? key,
     this.logoImagePath,
@@ -87,6 +88,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
   late final AnimationController _plusSpinController;
   late final Animation<double> _plusSpin;
 
+  // ✅ Keep a stable ImageProvider so rebuilds don’t thrash the avatar image
+  String? _cachedAvatarUrl;
+  ImageProvider? _cachedAvatarProvider;
+
   @override
   void initState() {
     super.initState();
@@ -140,9 +145,12 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
 
   @override
   Widget build(BuildContext context) {
-    // Watch notifications state to get unread count automatically
-    final notificationsState = ref.watch(notificationsNotifier);
-    final unreadCount = notificationsState.notificationsModel?.unreadCount ?? 0;
+    // ✅ Only rebuild AppBar title content when unreadCount changes (not on every notifier change)
+    final unreadCount = ref.watch(
+      notificationsNotifier.select(
+            (s) => s.notificationsModel?.unreadCount ?? 0,
+      ),
+    );
 
     return AppBar(
       backgroundColor: widget.backgroundColor ?? appTheme.transparentCustom,
@@ -169,9 +177,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
   }
 
   Widget _buildLogoWithActionsLayout(BuildContext context, int unreadCount) {
-    // 🔥 SYNCHRONOUSLY derive auth state from cached avatar provider - NO DELAY
-    final avatarState = ref.watch(avatarStateProvider);
-    final isAuthenticated = avatarState.userId != null;
+    // ✅ Only watch the auth flag here (prevents avatarUrl changes from rebuilding the whole row)
+    final isAuthenticated = ref.watch(
+      avatarStateProvider.select((s) => s.userId != null),
+    );
 
     // 🔥 Get current route to determine active state
     final currentRoute = ModalRoute.of(context)?.settings.name ?? '';
@@ -200,14 +209,12 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
 
           if (isAuthenticated) ...[
             // ➕ PLUS BUTTON (spin stays)
-            if (widget.showIconButton &&
-                widget.iconButtonImagePath != null) ...[
+            if (widget.showIconButton && widget.iconButtonImagePath != null) ...[
               Container(
                 width: 46.h,
                 height: 46.h,
                 decoration: BoxDecoration(
-                  color:
-                  widget.iconButtonBackgroundColor ?? const Color(0x3BD81E29),
+                  color: widget.iconButtonBackgroundColor ?? const Color(0x3BD81E29),
                   borderRadius: BorderRadius.circular(22.h),
                 ),
                 child: IconButton(
@@ -243,11 +250,9 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                 final isPicturesIcon = _isPicturesIcon(iconPath);
 
                 bool isActive = false;
-                if (isNotificationIcon &&
-                    currentRoute == AppRoutes.appNotifications) {
+                if (isNotificationIcon && currentRoute == AppRoutes.appNotifications) {
                   isActive = true;
-                } else if (isPicturesIcon &&
-                    currentRoute == AppRoutes.appMemories) {
+                } else if (isPicturesIcon && currentRoute == AppRoutes.appMemories) {
                   isActive = true;
                 }
 
@@ -310,16 +315,13 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                               ),
                               child: Center(
                                 child: Text(
-                                  unreadCount > 99
-                                      ? '99+'
-                                      : unreadCount.toString(),
+                                  unreadCount > 99 ? '99+' : unreadCount.toString(),
                                   style: TextStyleHelper
                                       .instance.body10BoldPlusJakartaSans
                                       .copyWith(
                                     color: appTheme.gray_50,
                                     height: 1.0,
-                                    fontSize:
-                                    unreadCount > 99 ? 8.h : 10.h,
+                                    fontSize: unreadCount > 99 ? 8.h : 10.h,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -344,13 +346,17 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
   }
 
   /// Build authentication widget - shows login button or user avatar based on auth state
-  /// 🔥 OPTIMIZED: Uses cached avatar state synchronously - NO ASYNC DELAY
+  /// ✅ Optimized: only rebuilds when the small set of fields used by this widget change
   Widget _buildAuthenticationWidget(BuildContext context) {
-    final avatarState = ref.watch(avatarStateProvider);
-    final isAuthenticated = avatarState.userId != null;
+    final userId = ref.watch(avatarStateProvider.select((s) => s.userId));
+    final avatarUrl = ref.watch(avatarStateProvider.select((s) => s.avatarUrl));
+    final userEmail = ref.watch(avatarStateProvider.select((s) => s.userEmail));
+    final isLoading = ref.watch(avatarStateProvider.select((s) => s.isLoading));
 
-    // Show loading state only if explicitly loading
-    if (avatarState.isLoading && avatarState.userId == null) {
+    final isAuthenticated = userId != null;
+
+    // Show loading only if we have nothing to display yet (prevents “spinner flash” while other UI updates happen)
+    if (!isAuthenticated && isLoading) {
       return Container(
         width: 50.h,
         height: 50.h,
@@ -371,7 +377,6 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
       );
     }
 
-    // 🔥 SYNCHRONOUS AUTH CHECK - NO FLASH
     if (!isAuthenticated) {
       return GestureDetector(
         onTap: () => _handleLoginButtonTap(context),
@@ -383,8 +388,9 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
           ),
           child: Text(
             'Login',
-            style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
+            style: TextStyleHelper.instance.body14BoldPlusJakartaSans.copyWith(
+              color: appTheme.gray_50,
+            ),
           ),
         ),
       );
@@ -393,7 +399,11 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     // Show user avatar when authenticated
     return GestureDetector(
       onTap: () => _handleProfileTap(context),
-      child: _buildUserAvatar(avatarState),
+      child: _buildUserAvatar(
+        avatarUrl: avatarUrl,
+        userEmail: userEmail,
+        isLoading: isLoading,
+      ),
     );
   }
 
@@ -402,59 +412,68 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     NavigatorService.pushNamed(AppRoutes.authLogin);
   }
 
-  /// Build user avatar widget with real data from global state
-  /// Automatically refreshes when avatar changes anywhere in the app
-  /// 🎯 Uses same logic as user_menu_screen.dart - handles both storage paths and Google OAuth URLs
-  Widget _buildUserAvatar(AvatarState avatarState) {
-    // Use global avatar state if available, otherwise fallback to local state
-    final avatarUrl = (avatarState.avatarUrl?.isNotEmpty ?? false)
-        ? avatarState.avatarUrl
-        : null;
+  /// ✅ Stable avatar rendering:
+  /// - Uses CachedNetworkImageProvider
+  /// - Keeps a stable ImageProvider instance while URL is unchanged
+  /// - Does NOT replace avatar with spinner if we already have an avatar URL
+  Widget _buildUserAvatar({
+    required String? avatarUrl,
+    required String? userEmail,
+    required bool isLoading,
+  }) {
+    final hasUrl = (avatarUrl != null && avatarUrl.isNotEmpty);
 
     // Generate avatar letter from email if no avatar URL
-    final email = avatarState.userEmail ?? '';
+    final email = userEmail ?? '';
     final avatarLetter = email.isNotEmpty ? email[0].toUpperCase() : 'U';
 
-    // Determine if we should show letter avatar (no valid URL)
-    final showLetterAvatar = avatarUrl == null || avatarUrl.isEmpty;
+    // Cache provider by URL so rebuilds don't thrash image resolution
+    if (hasUrl) {
+      if (_cachedAvatarUrl != avatarUrl || _cachedAvatarProvider == null) {
+        _cachedAvatarUrl = avatarUrl;
+        _cachedAvatarProvider = CachedNetworkImageProvider(avatarUrl!);
+      }
+    } else {
+      _cachedAvatarUrl = null;
+      _cachedAvatarProvider = null;
+    }
 
     return Container(
       width: 50.h,
       height: 50.h,
       decoration: BoxDecoration(
-        color: showLetterAvatar ? appTheme.deep_purple_A100 : null,
+        color: !hasUrl ? appTheme.deep_purple_A100 : null,
         shape: BoxShape.circle,
-        image: !showLetterAvatar
+        image: hasUrl
             ? DecorationImage(
-          image: NetworkImage(avatarUrl),
+          image: _cachedAvatarProvider!,
           fit: BoxFit.cover,
         )
             : null,
       ),
-      child: showLetterAvatar
+      child: !hasUrl
           ? Center(
         child: Text(
           avatarLetter,
-          style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-              .copyWith(
+          style: TextStyleHelper.instance.title18BoldPlusJakartaSans.copyWith(
             color: appTheme.gray_50,
             fontSize: 20.h,
           ),
         ),
       )
-          : avatarState.isLoading
-          ? Center(
+          : (isLoading
+          ? Align(
+        alignment: Alignment.center,
         child: SizedBox(
           width: 20.h,
           height: 20.h,
           child: CircularProgressIndicator(
             strokeWidth: 2.h,
-            valueColor:
-            AlwaysStoppedAnimation<Color>(appTheme.gray_50),
+            valueColor: AlwaysStoppedAnimation<Color>(appTheme.gray_50),
           ),
         ),
       )
-          : null,
+          : null),
     );
   }
 
@@ -485,8 +504,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
             Text(
               widget.title!,
               style: widget.titleTextStyle ??
-                  TextStyleHelper.instance.headline28ExtraBoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50, height: 1.28),
+                  TextStyleHelper.instance.headline28ExtraBoldPlusJakartaSans.copyWith(
+                    color: appTheme.gray_50,
+                    height: 1.28,
+                  ),
             ),
           ],
         ],
@@ -513,8 +534,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
             Text(
               widget.title!,
               style: widget.titleTextStyle ??
-                  TextStyleHelper.instance.title18BoldPlusJakartaSans
-                      .copyWith(color: appTheme.blue_A700, height: 1.28),
+                  TextStyleHelper.instance.title18BoldPlusJakartaSans.copyWith(
+                    color: appTheme.blue_A700,
+                    height: 1.28,
+                  ),
             ),
         ],
       ),
@@ -538,8 +561,6 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
       );
     });
   }
-
-
 
   /// Handles action icon tap - identifies and navigates accordingly
   /// Bell/notification icons always navigate to notifications screen
@@ -567,8 +588,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     // 🎯 EXACT match for pictures/memories icon - must match the icon used in app_shell
     // This is the ONLY pictures icon in the app
     return iconPath.contains('icon_gray_50') &&
-        !iconPath
-            .contains('icon_gray_50_32x32') && // Exclude notification bell icon
+        !iconPath.contains('icon_gray_50_32x32') && // Exclude notification bell icon
         !iconPath.contains('icon_gray_50_18x') &&
         !iconPath.contains('icon_gray_50_20x') &&
         !iconPath.contains('icon_gray_50_24x') &&

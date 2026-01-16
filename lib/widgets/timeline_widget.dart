@@ -273,6 +273,15 @@ class TimelineWidget extends StatelessWidget {
     );
   }
 
+  double _measureTextWidth(String text, TextStyle style) {
+    final TextPainter tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    return tp.width;
+  }
+
   Widget _countdownBadgeShell({
     required String value,
     double? maxWidth,
@@ -310,7 +319,12 @@ class TimelineWidget extends StatelessWidget {
       letterSpacing: 0.2,
     );
 
+    // Template only used for compact to reserve width (no jitter)
     final String template = _countdownWidthTemplate(isCompact: isCompact);
+
+    // Fixed text slot width so the text can be centered (and stable)
+    final double compactTextSlotWidth =
+    isCompact ? _measureTextWidth(template, textStyle) : 0.0;
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -326,8 +340,7 @@ class TimelineWidget extends StatelessWidget {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          // COMPACT wraps; FULL can fill its lane
-          mainAxisSize: isCompact ? MainAxisSize.min : MainAxisSize.max,
+          mainAxisSize: MainAxisSize.min, // keep contents centered as a group
           children: [
             Icon(
               Icons.access_time_rounded,
@@ -335,36 +348,46 @@ class TimelineWidget extends StatelessWidget {
               color: appTheme.gray_50.withAlpha(220),
             ),
             SizedBox(width: gap),
-            Flexible(
-              child: isCompact
-                  ? Stack(
-                alignment: Alignment.centerLeft,
-                children: [
-                  // Invisible template reserves constant width (prevents jitter)
-                  Opacity(
-                    opacity: 0.0,
-                    child: Text(
-                      template,
+
+            // COMPACT: fixed-width slot + centered stack
+            if (isCompact)
+              SizedBox(
+                width: compactTextSlotWidth,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Invisible template reserves constant width (prevents jitter)
+                    Opacity(
+                      opacity: 0.0,
+                      child: Text(
+                        template,
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        style: textStyle,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Text(
+                      value,
                       maxLines: 1,
                       overflow: TextOverflow.clip,
                       style: textStyle,
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textStyle,
-                  ),
-                ],
+                  ],
+                ),
               )
-                  : Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textStyle,
+            else
+            // FULL: allow normal layout
+              Flexible(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textStyle,
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -464,7 +487,7 @@ class TimelineWidget extends StatelessWidget {
           Positioned(
             left: padding,
             right: padding,
-            bottom: 30.h,
+            bottom: 15.h,
             child: Center(
               // Use a fixed-width slot so width changes are obvious and consistent.
               child: SizedBox(

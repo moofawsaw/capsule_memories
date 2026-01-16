@@ -48,6 +48,8 @@ import '../presentation/vibe_selection_screen/vibe_selection_screen.dart';
 import '../presentation/video_call_interface_screen/video_call_interface_screen.dart';
 import '../presentation/friend_request_confirmation_dialog/friend_request_confirmation_dialog.dart';
 
+import '../core/models/feed_story_context.dart';
+
 class AppRoutes {
   // App shell route - renders AppShell with persistent header
   static const String app = '/app';
@@ -110,7 +112,6 @@ class AppRoutes {
   static const String authReset = '/auth/reset';
 
   // ✅ Public deep link route (NO /app shell)
-  // This is what your website uses: https://capapp.co/story/view/<id>
   static const String storyViewPublic = '/story/view';
 
   // Other routes (alphabetically organized)
@@ -125,8 +126,11 @@ class AppRoutes {
       '/friend-request-confirmation-dialog';
   static const String deepLinkHandler = '/deep-link-handler';
 
-  // ✅ this should be splash, not appFeed
+// Choose ONE depending on desired default behavior
   static const String initialRoute = appFeed;
+// OR
+// static const String initialRoute = authLogin;
+
 
   static const String memoryTimelinePlayback =
       '/memory-timeline-playback-screen';
@@ -139,13 +143,6 @@ class AppRoutes {
     if (args is Map<String, dynamic>) return args;
     if (args is Map) return args.cast<String, dynamic>();
     return <String, dynamic>{};
-  }
-
-  static String _argString(RouteSettings settings, String key,
-      {String fallback = ''}) {
-    final map = _argsMap(settings);
-    final v = map[key];
-    return (v is String) ? v : fallback;
   }
 
   static String? _argNullableString(RouteSettings settings, String key) {
@@ -168,7 +165,8 @@ class AppRoutes {
       case appMemories:
         return const MemoriesDashboardScreen();
       case appProfileUser:
-        return UserProfileScreenTwo();
+        final userId = _argNullableString(settings, 'userId');
+        return UserProfileScreenTwo(userId: userId);
       case appNotifications:
         return const NotificationsScreen();
       case appSettings:
@@ -180,13 +178,15 @@ class AppRoutes {
       case appFollowing:
         return FollowingListScreen();
       case appGroups:
-        return GroupsManagementScreen();
+        final groupId = _argNullableString(settings, 'groupId');
+        return GroupsManagementScreen(groupId: groupId);
       case appMenu:
         return UserMenuScreen();
       case appNavigation:
         return const AppNavigationScreen();
       case appTimeline:
-        return EventTimelineViewScreen();
+        final memoryId = _argNullableString(settings, 'memoryId');
+        return EventTimelineViewScreen(memoryId: memoryId);
       case appTimelineSealed:
         return MemoryDetailsViewScreen();
       case appReels:
@@ -230,13 +230,13 @@ class AppRoutes {
           memoryEndDate:
           uploadArgs?['memoryEndDate'] as DateTime? ?? DateTime.now(),
         );
+
+    // ✅ FIXED: Use settings.arguments directly instead of ModalRoute.of()
       case appBsDetails:
-        final memoryId = NavigatorService.navigatorKey.currentContext != null
-            ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)
-            ?.settings
-            .arguments as String?
-            : null;
+        final args = settings.arguments;
+        final memoryId = args is String ? args : null;
         return MemoryDetailsScreen(memoryId: memoryId ?? '');
+
       case appBsVibes:
         return VibeSelectionScreen();
       case appBsQrMemory:
@@ -280,14 +280,30 @@ class AppRoutes {
       }
     }
 
-    // ✅ PUBLIC STORY DEEP LINK: /story/view/<shareCodeOrStoryId>
-    // This MUST be ABOVE auth + /app handling.
+    // ✅ PUBLIC STORY DEEP LINK:
+    // Supports BOTH:
+    // 1) DeepLinkService pushing '/story/view' with FeedStoryContext args
+    // 2) Universal link '/story/view/<id>' which we convert into FeedStoryContext
     if (routeName.startsWith(storyViewPublic)) {
-      final uri = Uri.parse(routeName);
+      FeedStoryContext? ctx;
 
-      // Expected segments: ["story","view","<id>"]
-      final String? id =
-      (uri.pathSegments.length >= 3) ? uri.pathSegments[2] : null;
+      // Case A: DeepLinkService already passed FeedStoryContext
+      if (settings.arguments is FeedStoryContext) {
+        ctx = settings.arguments as FeedStoryContext;
+      } else {
+        // Case B: Parse '/story/view/<id>'
+        final uri = Uri.parse(routeName);
+        final String? id =
+        (uri.pathSegments.length >= 3) ? uri.pathSegments[2] : null;
+
+        if (id != null && id.isNotEmpty) {
+          ctx = FeedStoryContext(
+            feedType: 'deep_link',
+            initialStoryId: id,
+            storyIds: [id],
+          );
+        }
+      }
 
       return PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
@@ -296,8 +312,7 @@ class AppRoutes {
         reverseTransitionDuration: Duration.zero,
         settings: RouteSettings(
           name: storyViewPublic,
-          // ✅ EventStoriesViewScreen supports args is String
-          arguments: id,
+          arguments: ctx,
         ),
       );
     }
@@ -312,11 +327,6 @@ class AppRoutes {
     }
     if (routeName == authReset) {
       return _buildRoute(PasswordResetScreen(), settings, shouldAnimate: true);
-    }
-
-    // Top-level routes (no header)
-    if (routeName == splash) {
-      return _buildRoute(SplashScreen(), settings, shouldAnimate: false);
     }
 
     // Explicit handling for memory confirmation screen
@@ -348,11 +358,9 @@ class AppRoutes {
       final child = _getAppChild(routeName, settings);
       final shouldAnimate = _shouldAnimate(routeName);
 
-      // ✅ Only guard routes that actually need auth.
       final bool shouldGuard =
           _requiresAuth(routeName) && !AuthGuard.isPublicRoute(routeName);
 
-      // ✅ Never force-unwrap currentContext (it can be null on cold start).
       final ctx = NavigatorService.navigatorKey.currentContext;
 
       final protectedChild = shouldGuard && ctx != null

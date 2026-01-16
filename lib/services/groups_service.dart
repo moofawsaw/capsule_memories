@@ -190,16 +190,21 @@ class GroupsService {
   }
 
   /// Fetches group members with their profile information
+  /// Fetches group members with their profile information
   static Future<List<Map<String, dynamic>>> fetchGroupMembers(
       String groupId) async {
     try {
       final response = await _client
           .from('group_members')
           .select(
-              'user_id, user_profiles!inner(id, display_name, username, avatar_url)')
-          .eq('group_id', groupId);
+        'user_id, joined_at, user_profiles!inner(id, display_name, username, avatar_url)',
+      )
+          .eq('group_id', groupId)
+      // Optional but useful: deterministic ordering
+          .order('joined_at', ascending: true);
 
       final members = <Map<String, dynamic>>[];
+
       for (final member in response) {
         final profile = member['user_profiles'];
         if (profile != null) {
@@ -224,10 +229,14 @@ class GroupsService {
           }
 
           members.add({
+            // Keep what your UI already expects
             'id': profile['id'],
             'name': profile['display_name'] ?? 'Unknown User',
             'username': profile['username'] ?? 'username',
             'avatar': avatarUrl,
+
+            // IMPORTANT: add joined_at as top-level so UI can read it
+            'joined_at': member['joined_at'],
           });
         }
       }

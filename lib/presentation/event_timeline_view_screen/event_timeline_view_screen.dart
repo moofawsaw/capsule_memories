@@ -16,7 +16,8 @@ import './widgets/timeline_story_widget.dart';
 // lib/presentation/event_timeline_view_screen/event_timeline_view_screen.dart
 
 class EventTimelineViewScreen extends ConsumerStatefulWidget {
-  EventTimelineViewScreen({Key? key}) : super(key: key);
+  final String? memoryId;
+  const EventTimelineViewScreen({this.memoryId, super.key});
 
   @override
   EventTimelineViewScreenState createState() => EventTimelineViewScreenState();
@@ -249,13 +250,28 @@ class EventTimelineViewScreenState
         _booting = false;
       }
 
-      final rawArgs = ModalRoute.of(context)?.settings.arguments;
-
+      // ✅ Priority 1: constructor memoryId (deep link / notification)
       MemoryNavArgs? navArgs;
-      if (rawArgs is MemoryNavArgs) {
-        navArgs = rawArgs;
-      } else if (rawArgs is Map<String, dynamic>) {
-        navArgs = MemoryNavArgs.fromMap(rawArgs);
+
+      // ✅ FIX: MemoryNavArgs.fromMap expects 'id', not 'memoryId'
+      // Best: use constructor directly.
+      if (widget.memoryId != null && widget.memoryId!.isNotEmpty) {
+        navArgs = MemoryNavArgs(memoryId: widget.memoryId!);
+        // Alternatively, if you want to use fromMap:
+        // navArgs = MemoryNavArgs.fromMap({'id': widget.memoryId});
+      }
+
+      // ✅ Priority 2: route arguments (existing behavior)
+      if (navArgs == null) {
+        final rawArgs = ModalRoute.of(context)?.settings.arguments;
+
+        if (rawArgs is MemoryNavArgs) {
+          navArgs = rawArgs;
+        } else if (rawArgs is Map<String, dynamic>) {
+          navArgs = MemoryNavArgs.fromMap(rawArgs);
+        } else if (rawArgs is Map) {
+          navArgs = MemoryNavArgs.fromMap(rawArgs.cast<String, dynamic>());
+        }
       }
 
       if (navArgs == null || !navArgs.isValid) {
@@ -265,7 +281,7 @@ class EventTimelineViewScreenState
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content:
-                    const Text('Please select a memory to view its timeline'),
+                const Text('Please select a memory to view its timeline'),
                 backgroundColor: appTheme.deep_purple_A100,
                 duration: const Duration(seconds: 3),
               ),
@@ -275,14 +291,12 @@ class EventTimelineViewScreenState
         return;
       }
 
-      ref
-          .read(eventTimelineViewNotifier.notifier)
-          .initializeFromMemory(navArgs);
+      ref.read(eventTimelineViewNotifier.notifier).initializeFromMemory(navArgs);
     });
 
     _firstLoadSub = ref.listenManual<EventTimelineViewState>(
       eventTimelineViewNotifier,
-      (prev, next) {
+          (prev, next) {
         final prevLoading = prev?.isLoading ?? false;
         final nextLoading = next.isLoading ?? false;
 
@@ -363,15 +377,15 @@ class EventTimelineViewScreenState
                 SizedBox(height: 18.h),
                 effectiveLoading
                     ? Container(
-                        margin: EdgeInsets.symmetric(horizontal: 24.h),
-                        child: Column(
-                          children: [
-                            CustomButtonSkeleton(),
-                            SizedBox(height: 12.h),
-                            CustomButtonSkeleton(),
-                          ],
-                        ),
-                      )
+                  margin: EdgeInsets.symmetric(horizontal: 24.h),
+                  child: Column(
+                    children: [
+                      CustomButtonSkeleton(),
+                      SizedBox(height: 12.h),
+                      CustomButtonSkeleton(),
+                    ],
+                  ),
+                )
                     : _buildActionButtons(context),
                 SizedBox(height: 20.h),
               ],
@@ -397,16 +411,16 @@ class EventTimelineViewScreenState
     return CustomEventCard(
       isLoading: effectiveLoading,
       eventTitle:
-          effectiveLoading ? null : state.eventTimelineViewModel?.eventTitle,
+      effectiveLoading ? null : state.eventTimelineViewModel?.eventTitle,
       eventDate:
-          effectiveLoading ? null : state.eventTimelineViewModel?.eventDate,
+      effectiveLoading ? null : state.eventTimelineViewModel?.eventDate,
       eventLocation: effectiveLoading
           ? null
           : state.eventTimelineViewModel?.timelineDetail?.centerLocation,
       isPrivate:
-          effectiveLoading ? null : state.eventTimelineViewModel?.isPrivate,
+      effectiveLoading ? null : state.eventTimelineViewModel?.isPrivate,
       iconButtonImagePath:
-          effectiveLoading ? null : state.eventTimelineViewModel?.categoryIcon,
+      effectiveLoading ? null : state.eventTimelineViewModel?.categoryIcon,
       participantImages: effectiveLoading
           ? null
           : state.eventTimelineViewModel?.participantImages,
@@ -723,10 +737,9 @@ class EventTimelineViewScreenState
         if (!_hasCompletedFirstLoad) return const SizedBox.shrink();
 
         final List<CustomStoryItem> storyItems =
-            (state.eventTimelineViewModel?.customStoryItems ??
-                    const <dynamic>[])
-                .whereType<CustomStoryItem>()
-                .toList();
+        (state.eventTimelineViewModel?.customStoryItems ?? const <dynamic>[])
+            .whereType<CustomStoryItem>()
+            .toList();
 
         if (storyItems.isEmpty) {
           return Container(
@@ -803,16 +816,14 @@ class EventTimelineViewScreenState
   }
 
   void onTapJoinFromTimeline(BuildContext context) {
-    // Navigate back to notifications screen where they can accept the invite
     NavigatorService.popAndPushNamed(AppRoutes.appNotifications);
 
-    // Show helpful message
     Future.delayed(const Duration(milliseconds: 300), () {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text(
-                'Accept the memory invite to start creating stories'),
+            content:
+            const Text('Accept the memory invite to start creating stories'),
             backgroundColor: appTheme.deep_purple_A100,
             duration: const Duration(seconds: 3),
           ),
@@ -931,7 +942,7 @@ class EventTimelineViewScreenState
     if (ids.isEmpty) return;
 
     final initialId =
-        (index >= 0 && index < ids.length) ? ids[index] : ids.first;
+    (index >= 0 && index < ids.length) ? ids[index] : ids.first;
 
     final feedContext = FeedStoryContext(
       feedType: 'memory_timeline',
@@ -1028,7 +1039,7 @@ class EventTimelineViewScreenState
       builder: (dialogContext) => AlertDialog(
         backgroundColor: appTheme.gray_900_01,
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
         title: Text(
           'Leave Memory?',
           style: TextStyleHelper.instance.title18BoldPlusJakartaSans
@@ -1076,7 +1087,7 @@ class EventTimelineViewScreenState
       builder: (dialogContext) => AlertDialog(
         backgroundColor: appTheme.gray_900_01,
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
         title: Text(
           'Delete Memory?',
           style: TextStyleHelper.instance.title18BoldPlusJakartaSans

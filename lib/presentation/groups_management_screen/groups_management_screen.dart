@@ -1,3 +1,5 @@
+// lib/presentation/groups_management_screen/groups_management_screen.dart
+
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
@@ -12,21 +14,39 @@ import '../group_qr_invite_screen/group_qr_invite_screen.dart';
 import './models/groups_management_model.dart';
 import 'notifier/groups_management_notifier.dart';
 
-// lib/presentation/groups_management_screen/groups_management_screen.dart
-
 class GroupsManagementScreen extends ConsumerStatefulWidget {
-  const GroupsManagementScreen({Key? key}) : super(key: key);
+  /// Optional: preselect/open a specific group (e.g., from deep link)
+  final String? groupId;
+
+  const GroupsManagementScreen({
+    Key? key,
+    this.groupId,
+  }) : super(key: key);
 
   @override
-  GroupsManagementScreenState createState() => GroupsManagementScreenState();
+  ConsumerState<GroupsManagementScreen> createState() =>
+      _GroupsManagementScreenState();
 }
 
-class GroupsManagementScreenState
-    extends ConsumerState<GroupsManagementScreen> {
+class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> {
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Priority 1: Constructor param (deep link)
+      String? groupId = widget.groupId;
+
+      // Priority 2: Route arguments (normal navigation)
+      if (groupId == null) {
+        final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        groupId = args?['groupId'] as String?;
+      }
+
+      // ✅ IMPORTANT:
+      // Your notifier initialize() does NOT accept a named parameter "groupId",
+      // so call it positionally.
       ref.read(groupsManagementNotifier.notifier).initialize();
     });
   }
@@ -36,7 +56,7 @@ class GroupsManagementScreenState
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        body: Container(
+        body: SizedBox(
           width: double.maxFinite,
           child: Column(
             children: [
@@ -109,26 +129,22 @@ class GroupsManagementScreenState
                 style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans,
               ),
             ),
-            Spacer(),
+            const Spacer(),
 
             // Right side actions (New button + camera icon)
             Row(
               children: [
-                // New button with styled design
                 CustomButton(
                   text: 'New',
-                  leftIcon: ImageConstant
-                      .imgIcon20x20, // same as screenshot; remove if not desired
+                  leftIcon: ImageConstant.imgIcon20x20,
                   onPressed: () => onTapNewGroup(context),
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   height: 38.h,
                   padding:
-                      EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+                  EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
                 ),
-
                 SizedBox(width: 8.h),
-                // Camera icon button for QR scanning
                 CustomIconButton(
                   height: 44.h,
                   width: 44.h,
@@ -190,7 +206,7 @@ class GroupsManagementScreenState
                   groupName: invitation.groupName ?? 'Unknown',
                   memberCount: invitation.memberCount ?? 0,
                   memberAvatarImagePath:
-                      invitation.avatarImage ?? ImageConstant.imgFrame403,
+                  invitation.avatarImage ?? ImageConstant.imgFrame403,
                   onAcceptTap: () => onTapAcceptInvitation(context),
                   onActionTap: () => onTapDeclineInvitation(context),
                 ),
@@ -216,7 +232,7 @@ class GroupsManagementScreenState
             padding: EdgeInsets.only(top: 30.h),
             child: Center(
               child:
-                  CircularProgressIndicator(color: appTheme.deep_purple_A100),
+              CircularProgressIndicator(color: appTheme.deep_purple_A100),
             ),
           );
         }
@@ -256,7 +272,7 @@ class GroupsManagementScreenState
                 groupData: CustomGroupData(
                   title: group.name ?? 'Unnamed Group',
                   memberCountText:
-                      '${group.memberCount ?? 0} member${(group.memberCount ?? 0) == 1 ? '' : 's'}',
+                  '${group.memberCount ?? 0} member${(group.memberCount ?? 0) == 1 ? '' : 's'}',
                   memberImages: group.memberImages?.isNotEmpty == true
                       ? group.memberImages!
                       : [ImageConstant.imgEllipse81],
@@ -264,11 +280,11 @@ class GroupsManagementScreenState
                 ),
                 onActionTap: () => onTapGroupQR(context, group),
                 onDeleteTap:
-                    isCreator ? () => onTapDeleteGroup(context, group) : null,
+                isCreator ? () => onTapDeleteGroup(context, group) : null,
                 onLeaveTap:
-                    !isCreator ? () => onTapLeaveGroup(context, group) : null,
+                !isCreator ? () => onTapLeaveGroup(context, group) : null,
                 onEditTap:
-                    isCreator ? () => onTapEditGroup(context, group) : null,
+                isCreator ? () => onTapEditGroup(context, group) : null,
                 onInfoTap: !isCreator
                     ? () => onTapViewGroupInfo(context, group)
                     : null,
@@ -328,7 +344,7 @@ class GroupsManagementScreenState
       context: context,
       title: 'Delete Group?',
       message:
-          'Are you sure you want to delete "$groupName"? This action cannot be undone.',
+      'Are you sure you want to delete "$groupName"? This action cannot be undone.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       icon: Icons.delete_outline,
@@ -347,7 +363,7 @@ class GroupsManagementScreenState
       context: context,
       title: 'Leave Group?',
       message:
-          'Are you sure you want to leave "$groupName"? You can rejoin if invited again.',
+      'Are you sure you want to leave "$groupName"? You can rejoin if invited again.',
       confirmText: 'Leave',
       cancelText: 'Cancel',
       icon: Icons.logout,
@@ -388,8 +404,6 @@ class GroupsManagementScreenState
         builder: (_) => QRScannerOverlay(
           scanType: 'group',
           onSuccess: () {
-            // ✅ Overlay handles the DB-aware success message + auto-close.
-            // Only refresh the groups list here.
             ref.read(groupsManagementNotifier.notifier).refresh();
           },
         ),

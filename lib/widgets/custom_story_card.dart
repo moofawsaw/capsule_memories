@@ -120,27 +120,28 @@ class CustomStoryCard extends StatelessWidget {
   }
 
   Widget _buildProfileAvatar(BuildContext context) {
+    final double size = 32.h;
+
     return Container(
-      width: 32.h,
-      height: 32.h,
+      width: size,
+      height: size,
       margin: EdgeInsets.only(left: 4.h),
       decoration: BoxDecoration(
+        shape: BoxShape.circle,
         border: Border.all(
           color: appTheme.deep_purple_A100,
           width: 2,
         ),
-        shape: BoxShape.circle, // ✅ circle border
+        color: const Color(0xFF222D3E), // optional: consistent avatar bg
       ),
-      child: ClipOval( // ✅ actually clips the image
-        child: CustomImageView(
+      child: ClipOval(
+        child: _CoverAvatar(
           imagePath: userAvatar,
-          width: 32.h,
-          height: 32.h,
-          fit: BoxFit.cover,
         ),
       ),
     );
   }
+
 
 
   Widget _buildUserInfo(BuildContext context, MemoryCategory category) {
@@ -234,6 +235,62 @@ class _CoverImage extends StatelessWidget {
 
     return Image.asset(
       imagePath,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      width: double.infinity,
+      height: double.infinity,
+    );
+  }
+}
+
+/// Forces true cover behavior for avatars (prevents stretching).
+class _CoverAvatar extends StatelessWidget {
+  final String imagePath;
+
+  const _CoverAvatar({
+    Key? key,
+    required this.imagePath,
+  }) : super(key: key);
+
+  bool _isNetwork(String s) => s.trim().startsWith('http://') || s.trim().startsWith('https://');
+
+  @override
+  Widget build(BuildContext context) {
+    final String path = imagePath.trim();
+
+    if (path.isEmpty || path == 'null' || path == 'undefined') {
+      return Container(
+        color: appTheme.gray_900_02,
+        alignment: Alignment.center,
+        child: Icon(
+          Icons.person,
+          color: appTheme.blue_gray_300,
+          size: 18.h,
+        ),
+      );
+    }
+
+    if (_isNetwork(path)) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => Container(
+          color: appTheme.gray_900_02,
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.person,
+            color: appTheme.blue_gray_300,
+            size: 18.h,
+          ),
+        ),
+      );
+    }
+
+    return Image.asset(
+      path,
       fit: BoxFit.cover,
       alignment: Alignment.center,
       width: double.infinity,

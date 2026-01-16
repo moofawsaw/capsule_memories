@@ -370,8 +370,8 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
                         width: 10.h,
                         height: 10.h,
                         decoration: BoxDecoration(
-                          color:
-                          Colors.greenAccent.withOpacity(_livePulseOpacity.value),
+                          color: Colors.greenAccent
+                              .withOpacity(_livePulseOpacity.value),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -398,26 +398,31 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
                 color: isActive ? appTheme.gray_900_02 : appTheme.gray_50,
               ),
             ),
-            if (isActive) ...[
-              SizedBox(width: 8.h),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 2.h),
-                decoration: BoxDecoration(
-                  color: appTheme.gray_900_02.withAlpha(35),
-                  borderRadius: BorderRadius.circular(12.h),
-                ),
-                child: Text(
-                  '$openCount',
-                  style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_900_02),
+            SizedBox(width: 8.h),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? appTheme.gray_900_02.withAlpha(35)
+                    : appTheme.gray_50.withAlpha(30),
+                borderRadius: BorderRadius.circular(12.h),
+              ),
+              child: Text(
+                '$openCount',
+                style: TextStyleHelper.instance.body12BoldPlusJakartaSans
+                    .copyWith(
+                  color: isActive
+                      ? appTheme.gray_900_02
+                      : appTheme.gray_50,
                 ),
               ),
-            ],
+            ),
           ],
         ),
       ),
     );
   }
+
 
   // ================= MEMORIES =================
 

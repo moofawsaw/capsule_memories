@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/utils/navigator_service.dart';
+import '../core/models/feed_story_context.dart'; // ✅ NEW: Import for story deep links
 import './notification_preferences_service.dart';
 import './platform_stub.dart';
 import './supabase_service.dart';
@@ -24,7 +25,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// This service manages FCM tokens and displays notifications when app is in foreground/background
 class PushNotificationService {
   static final PushNotificationService instance =
-      PushNotificationService._internal();
+  PushNotificationService._internal();
   factory PushNotificationService() => instance;
   PushNotificationService._internal();
 
@@ -32,7 +33,7 @@ class PushNotificationService {
   static String? pendingDeepLink;
 
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
   final SupabaseClient? _client = SupabaseService.instance.client;
@@ -49,17 +50,17 @@ class PushNotificationService {
     try {
       // Initialize Flutter Local Notifications
       const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
+      AndroidInitializationSettings('@mipmap/ic_launcher');
 
       const DarwinInitializationSettings initializationSettingsDarwin =
-          DarwinInitializationSettings(
+      DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
       );
 
       const InitializationSettings initializationSettings =
-          InitializationSettings(
+      InitializationSettings(
         android: initializationSettingsAndroid,
         iOS: initializationSettingsDarwin,
       );
@@ -117,7 +118,7 @@ class PushNotificationService {
 
     // Check for initial message (when app opened from terminated state)
     RemoteMessage? initialMessage =
-        await _firebaseMessaging.getInitialMessage();
+    await _firebaseMessaging.getInitialMessage();
     if (initialMessage != null) {
       debugPrint(
           '📱 App opened from notification: ${initialMessage.messageId}');
@@ -138,7 +139,7 @@ class PushNotificationService {
       if (Platform.isIOS || Platform.isAndroid) {
         // Request FCM permissions
         NotificationSettings settings =
-            await _firebaseMessaging.requestPermission(
+        await _firebaseMessaging.requestPermission(
           alert: true,
           announcement: false,
           badge: true,
@@ -154,17 +155,17 @@ class PushNotificationService {
         if (Platform.isIOS) {
           await _flutterLocalNotificationsPlugin
               .resolvePlatformSpecificImplementation<
-                  IOSFlutterLocalNotificationsPlugin>()
+              IOSFlutterLocalNotificationsPlugin>()
               ?.requestPermissions(
-                alert: true,
-                badge: true,
-                sound: true,
-              );
+            alert: true,
+            badge: true,
+            sound: true,
+          );
         } else if (Platform.isAndroid) {
           final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-              _flutterLocalNotificationsPlugin
-                  .resolvePlatformSpecificImplementation<
-                      AndroidFlutterLocalNotificationsPlugin>();
+          _flutterLocalNotificationsPlugin
+              .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
 
           await androidImplementation?.requestNotificationsPermission();
         }
@@ -290,7 +291,7 @@ class PushNotificationService {
     if (Platform.isAndroid) {
       final androidImplementation = _flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+          AndroidFlutterLocalNotificationsPlugin>();
 
       if (androidImplementation != null) {
         const List<AndroidNotificationChannel> channels = [
@@ -498,7 +499,7 @@ class PushNotificationService {
 
       switch (pathSegments[0]) {
         case 'memory':
-          // Handle: /memory/{memoryId}
+        // Handle: /memory/{memoryId}
           if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
             final memoryId = pathSegments[1];
             debugPrint('📱 Navigating to memory: $memoryId');
@@ -511,8 +512,26 @@ class PushNotificationService {
           }
           break;
 
+        case 'story':
+        // ✅ NEW: Handle: /story/{storyId}
+          if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
+            final storyId = pathSegments[1];
+            debugPrint('📱 Navigating to story: $storyId');
+            navigatorKey.currentState?.pushNamed(
+              '/app/story/view',
+              arguments: FeedStoryContext(
+                feedType: 'deep_link',
+                initialStoryId: storyId,
+                storyIds: [storyId],
+              ),
+            );
+          } else {
+            debugPrint('❌ Story deep link missing ID: $deepLink');
+          }
+          break;
+
         case 'profile':
-          // Handle: /profile/{userId}
+        // Handle: /profile/{userId}
           if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
             final userId = pathSegments[1];
             debugPrint('📱 Navigating to profile: $userId');
@@ -526,13 +545,13 @@ class PushNotificationService {
           break;
 
         case 'friends':
-          // Handle: /friends
+        // Handle: /friends
           debugPrint('📱 Navigating to friends screen');
           navigatorKey.currentState?.pushNamed('/app/friends');
           break;
 
         case 'group':
-          // Handle: /group/{groupId}
+        // Handle: /group/{groupId}
           if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
             final groupId = pathSegments[1];
             debugPrint('📱 Navigating to group: $groupId');
@@ -546,13 +565,13 @@ class PushNotificationService {
           break;
 
         case 'notifications':
-          // Handle: /notifications
+        // Handle: /notifications
           debugPrint('📱 Navigating to notifications screen');
           navigatorKey.currentState?.pushNamed('/app/notifications');
           break;
 
         case 'join':
-          // Handle: /join/{type}/{code} - e.g., /join/memory/ABC123, /join/group/XYZ789, /join/friend/CODE
+        // Handle: /join/{type}/{code} - e.g., /join/memory/ABC123, /join/group/XYZ789, /join/friend/CODE
           if (pathSegments.length >= 3) {
             final type = pathSegments[1]; // memory, group, or friend
             final code = pathSegments[2];
@@ -600,7 +619,7 @@ class PushNotificationService {
     }
 
     const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
+    AndroidNotificationDetails(
       'capsule_notifications',
       'Capsule Notifications',
       channelDescription: 'Notifications for Capsule app events',
@@ -647,7 +666,7 @@ class PushNotificationService {
 
       await _flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(channel);
     }
   }

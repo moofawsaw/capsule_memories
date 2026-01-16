@@ -47,6 +47,11 @@ class CustomGroupCard extends StatelessWidget {
   /// External margin of the card
   final EdgeInsetsGeometry? margin;
 
+  // ========= AVATAR LAYOUT CONSTANTS (RAW PX) =========
+  static const double _avatarSizePx = 32.0;
+  static const double _avatarOffsetPx = 23.0; // overlap spacing
+  static const int _maxAvatars = 3;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -93,8 +98,7 @@ class CustomGroupCard extends StatelessWidget {
                 ),
                 child: Text(
                   'Creator',
-                  style: TextStyleHelper.instance.bodyTextRegularPlusJakartaSans
-                      .copyWith(
+                  style: TextStyleHelper.instance.bodyTextRegularPlusJakartaSans.copyWith(
                     color: appTheme.gray_50,
                     fontSize: 10.fSize,
                     fontWeight: FontWeight.w600,
@@ -104,8 +108,7 @@ class CustomGroupCard extends StatelessWidget {
             ],
           ],
         ),
-        SizedBox(
-            height: groupData.memberImages?.isNotEmpty == true ? 6.h : 4.h),
+        SizedBox(height: groupData.memberImages?.isNotEmpty == true ? 6.h : 4.h),
         _buildMemberInfo(context),
       ],
     );
@@ -128,65 +131,72 @@ class CustomGroupCard extends StatelessWidget {
   }
 
   Widget _buildProfileImages(BuildContext context) {
-    final images = groupData.memberImages ?? [];
-    final memberIds = groupData.memberIds ?? [];
+    final List<String> images = groupData.memberImages ?? <String>[];
+    final List<String?> memberIds = groupData.memberIds ?? <String?>[];
 
-    if (images.isEmpty) return SizedBox.shrink();
+    if (images.isEmpty) return const SizedBox.shrink();
 
-    if (images.length == 1) {
+    final int count = images.length > _maxAvatars ? _maxAvatars : images.length;
+
+    final double size = _avatarSizePx.h;
+    final double stackWidth = (_avatarSizePx + (count - 1) * _avatarOffsetPx).h;
+
+    Widget buildAvatar(String imagePath, String? memberId) {
       return GestureDetector(
-        onTap: memberIds.isNotEmpty && memberIds[0] != null
+        onTap: memberId != null
             ? () {
-                Navigator.pushNamed(
-                  context,
-                  AppRoutes.appProfileUser,
-                  arguments: memberIds[0],
-                );
-              }
+          Navigator.pushNamed(
+            context,
+            AppRoutes.appProfileUser,
+            arguments: memberId,
+          );
+        }
             : null,
-        child: CustomImageView(
-          imagePath: images[0],
-          height: 32.h,
-          width: 32.h,
-          fit: BoxFit.cover,
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF222D3E),
+              border: Border.all(
+                color: appTheme.gray_900_02,
+                width: 1,
+              ),
+            ),
+            child: ClipOval(
+              child: _GroupAvatarImage(
+                imagePath: imagePath,
+                size: size,
+              ),
+            ),
+          ),
         ),
       );
     }
 
-    // Calculate stack width based on number of images
-    final stackWidth = (32 + (images.length - 1) * 23).h;
+    if (count == 1) {
+      final String? memberId = memberIds.isNotEmpty ? memberIds[0] : null;
+      return buildAvatar(images[0], memberId);
+    }
 
+    // ✅ Multiple (stack) — reverse paint order so you can see more than 1
     return SizedBox(
       width: stackWidth,
-      height: 32.h,
+      height: size,
       child: Stack(
-        children: images.asMap().entries.map((entry) {
-          final index = entry.key;
-          final imagePath = entry.value;
-          final leftPosition = (index * 23).h;
-          final memberId = index < memberIds.length ? memberIds[index] : null;
+        clipBehavior: Clip.none,
+        children: List<Widget>.generate(count, (i) {
+          final int index = (count - 1) - i; // reverse paint order
+
+          final String imagePath = images[index];
+          final String? memberId = index < memberIds.length ? memberIds[index] : null;
 
           return Positioned(
-            left: leftPosition,
-            child: GestureDetector(
-              onTap: memberId != null
-                  ? () {
-                      Navigator.pushNamed(
-                        context,
-                        AppRoutes.appProfileUser,
-                        arguments: memberId,
-                      );
-                    }
-                  : null,
-              child: CustomImageView(
-                imagePath: imagePath,
-                height: 32.h,
-                width: 32.h,
-                fit: BoxFit.cover,
-              ),
-            ),
+            left: (index * _avatarOffsetPx).h,
+            child: buildAvatar(imagePath, memberId),
           );
-        }).toList(),
+        }),
       ),
     );
   }
@@ -273,4 +283,50 @@ class CustomGroupData {
 
   /// Whether the current user is the creator of this group
   final bool? isCreator;
+}
+
+/// Forces true cover behavior for group member avatars (prevents stretching + ensures circular crop).
+class _GroupAvatarImage extends StatelessWidget {
+  final String imagePath;
+  final double size;
+
+  const _GroupAvatarImage({
+    Key? key,
+    required this.imagePath,
+    required this.size,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isNetwork = imagePath.startsWith('http');
+
+    if (isNetwork) {
+      return Image.network(
+        imagePath,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        errorBuilder: (_, __, ___) => Container(
+          width: size,
+          height: size,
+          color: appTheme.gray_900_02,
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.person,
+            size: (size * 0.55),
+            color: appTheme.blue_gray_300,
+          ),
+        ),
+      );
+    }
+
+    return Image.asset(
+      imagePath,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+    );
+  }
 }

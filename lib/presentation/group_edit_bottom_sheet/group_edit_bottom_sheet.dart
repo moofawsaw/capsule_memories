@@ -57,6 +57,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
 
     // Existing creator edit view
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: appTheme.gray_900_02,
         borderRadius: BorderRadius.only(
@@ -75,6 +76,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
             _buildHeader(context),
             Flexible(
               child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.symmetric(horizontal: 16.h),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,46 +99,71 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
     );
   }
 
+  // ----------------------------
+  // READ-ONLY VIEW (UPDATED)
+  // ----------------------------
+
   Widget _buildReadOnlyView(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_02,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24.h),
-          topRight: Radius.circular(24.h),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildDragHandle(context),
-          _buildReadOnlyHeader(context),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 16.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: 20.h),
-                  _buildGroupTitleSection(context),
-                  SizedBox(height: 16.h),
-                  _buildCreationDateSection(context),
-                  SizedBox(height: 24.h),
-                  _buildReadOnlyMembersSection(context),
-                  SizedBox(height: 24.h),
-                ],
-              ),
+    final media = MediaQuery.of(context);
+    final maxHeight = media.size.height * 0.85;
+
+    return SafeArea(
+      top: false,
+      child: ConstrainedBox(
+        // Key fix: ONLY maxHeight (no minHeight) so the sheet shrink-wraps
+        // when content is short (removes the big whitespace).
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24.h),
+              topRight: Radius.circular(24.h),
             ),
           ),
-          _buildLeaveGroupButton(context),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDragHandle(context),
+              _buildReadOnlyHeader(context),
+
+              // Flexible + loose fit: allows content to take only the space it needs
+              // while still enabling scroll if it grows taller than maxHeight.
+              Flexible(
+                fit: FlexFit.loose,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.symmetric(horizontal: 16.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: 18.h),
+                      _buildGroupTitleSection(context),
+                      SizedBox(height: 18.h),
+                      _buildCreationDateSection(context),
+                      SizedBox(height: 18.h),
+                      _buildJoinedOnSection(context),
+                      SizedBox(height: 22.h),
+                      _buildReadOnlyMembersSection(context),
+                      SizedBox(height: 20.h),
+                    ],
+                  ),
+                ),
+              ),
+
+              _buildLeaveGroupButton(context),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildReadOnlyHeader(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 0),
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(16.h, 14.h, 16.h, 8.h),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -145,12 +172,22 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
             style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans
                 .copyWith(color: appTheme.gray_50),
           ),
-          GestureDetector(
+          InkWell(
+            borderRadius: BorderRadius.circular(999),
             onTap: () => Navigator.pop(context),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIcon14x14,
-              height: 24.h,
-              width: 24.h,
+            child: Container(
+              width: 36.h,
+              height: 36.h,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: appTheme.gray_50.withAlpha(18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.close,
+                size: 20.h,
+                color: appTheme.gray_50.withAlpha(220),
+              ),
             ),
           ),
         ],
@@ -201,6 +238,70 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
     );
   }
 
+  /// Joined On: when the CURRENT USER joined this group.
+  ///
+  /// This looks for a join timestamp on the current user's member object coming
+  /// from groupEditNotifier.currentMembers.
+  ///
+  /// Supported keys (first match wins):
+  /// - joined_at / joinedAt
+  /// - created_at / createdAt  (common if membership row uses created_at)
+  Widget _buildJoinedOnSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(groupEditNotifier);
+        final currentUserId =
+            SupabaseService.instance.client?.auth.currentUser?.id;
+
+        DateTime? joinedAt;
+
+        if (currentUserId != null) {
+          final me = state.currentMembers.firstWhere(
+                (m) => m['id'] == currentUserId,
+            orElse: () => <String, dynamic>{},
+          );
+
+          joinedAt = _parseAnyDateTime(
+            me['joined_at'] ??
+                me['joinedAt'] ??
+                me['created_at'] ??
+                me['createdAt'],
+          );
+        }
+
+        final joinedText =
+        joinedAt != null ? DateFormat('MMMM d, yyyy').format(joinedAt) : 'Unknown';
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Joined On',
+              style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50.withAlpha(153)),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              joinedText,
+              style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  DateTime? _parseAnyDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) {
+      final parsed = DateTime.tryParse(value);
+      return parsed;
+    }
+    return null;
+  }
+
   Widget _buildReadOnlyMembersSection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -210,13 +311,17 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
 
         if (state.isLoadingMembers) {
           return Center(
-            child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16.h),
+              child:
+              CircularProgressIndicator(color: appTheme.deep_purple_A100),
+            ),
           );
         }
 
         // Sort members: Creator first, then current user (if not creator), then others
         final sortedMembers =
-            List<Map<String, dynamic>>.from(state.currentMembers);
+        List<Map<String, dynamic>>.from(state.currentMembers);
         sortedMembers.sort((a, b) {
           final aIsCreator = a['id'] == widget.group.creatorId;
           final bIsCreator = b['id'] == widget.group.creatorId;
@@ -245,11 +350,13 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
                   .copyWith(color: appTheme.gray_50),
             ),
             SizedBox(height: 12.h),
+
+            // Reverted: no extra “card” wrapper styling around the row.
+            // This restores your original member badge/row design behavior.
             ...sortedMembers.map((member) {
               final isCreator = member['id'] == widget.group.creatorId;
               final isCurrentUser = member['id'] == currentUserId;
 
-              // Build status text with multiple badges
               String? statusText;
               if (isCreator && isCurrentUser) {
                 statusText = 'Creator • You';
@@ -286,26 +393,39 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
         final state = ref.watch(groupEditNotifier);
 
         return Container(
-          padding: EdgeInsets.all(16.h),
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_02,
-            border: Border(
-              top: BorderSide(
+          width: double.infinity,
+          color: appTheme.gray_900_02,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                height: 1,
                 color: appTheme.gray_50.withAlpha(26),
-                width: 1,
               ),
-            ),
-          ),
-          child: CustomButton(
-            text: state.isSaving ? 'Leaving...' : 'Leave Group',
-            onPressed: state.isSaving ? null : () => _handleLeaveGroup(context),
-            buttonStyle: CustomButtonStyle.fillRed,
-            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+              Padding(
+                padding: EdgeInsets.all(16.h),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: CustomButton(
+                    text: state.isSaving ? 'Leaving...' : 'Leave Group',
+                    onPressed:
+                    state.isSaving ? null : () => _handleLeaveGroup(context),
+                    buttonStyle: CustomButtonStyle.fillRed,
+                    buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
     );
   }
+
+  // ----------------------------
+  // EXISTING EDIT MODE UI
+  // ----------------------------
 
   Widget _buildDragHandle(BuildContext context) {
     return Container(
@@ -382,7 +502,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
 
         // Sort members: Creator first, then current user (if not creator), then others
         final sortedMembers =
-            List<Map<String, dynamic>>.from(state.currentMembers);
+        List<Map<String, dynamic>>.from(state.currentMembers);
         sortedMembers.sort((a, b) {
           final aIsCreator = a['id'] == widget.group.creatorId;
           final bIsCreator = b['id'] == widget.group.creatorId;
@@ -498,7 +618,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
             if (state.isLoadingFriends)
               Center(
                 child:
-                    CircularProgressIndicator(color: appTheme.deep_purple_A100),
+                CircularProgressIndicator(color: appTheme.deep_purple_A100),
               )
             else if (state.availableFriends.isEmpty)
               Center(
@@ -570,7 +690,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
                                 style: TextStyleHelper
                                     .instance.body12MediumPlusJakartaSans
                                     .copyWith(
-                                        color: appTheme.gray_50.withAlpha(153)),
+                                    color: appTheme.gray_50.withAlpha(153)),
                               ),
                             ],
                           ),
@@ -622,7 +742,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
                 child: CustomButton(
                   text: state.isSaving ? 'Saving...' : 'Save Changes',
                   onPressed:
-                      state.isSaving ? null : () => _handleSaveChanges(context),
+                  state.isSaving ? null : () => _handleSaveChanges(context),
                   buttonStyle: CustomButtonStyle.fillSuccess,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 ),

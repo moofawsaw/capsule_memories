@@ -107,11 +107,8 @@ class HappeningNowStoryCard extends StatelessWidget {
                         ),
                         padding: EdgeInsets.all(2.h),
                         child: ClipOval(
-                          child: CustomImageView(
+                          child: _CoverAvatar(
                             imagePath: story.profileImage ?? '',
-                            height: 38.h,
-                            width: 38.h,
-                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
@@ -194,6 +191,64 @@ class HappeningNowStoryCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+/// Forces true cover behavior for avatars (prevents stretching).
+class _CoverAvatar extends StatelessWidget {
+  final String imagePath;
+
+  const _CoverAvatar({
+    Key? key,
+    required this.imagePath,
+  }) : super(key: key);
+
+  bool _isNetwork(String s) {
+    final v = s.trim();
+    return v.startsWith('http://') || v.startsWith('https://');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String path = imagePath.trim();
+
+    if (path.isEmpty || path == 'null' || path == 'undefined') {
+      return Container(
+        color: appTheme.gray_900_02,
+        alignment: Alignment.center,
+        child: Icon(
+          Icons.person,
+          color: appTheme.blue_gray_300,
+          size: 18.h,
+        ),
+      );
+    }
+
+    if (_isNetwork(path)) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => Container(
+          color: appTheme.gray_900_02,
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.person,
+            color: appTheme.blue_gray_300,
+            size: 18.h,
+          ),
+        ),
+      );
+    }
+
+    return Image.asset(
+      path,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      width: double.infinity,
+      height: double.infinity,
     );
   }
 }
