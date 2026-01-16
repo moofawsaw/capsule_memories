@@ -32,6 +32,65 @@ class NotificationService {
 
   RealtimeChannel? _subscription;
 
+  /// Accept a memory invite - updates status to 'accepted'
+  /// The database trigger will automatically add user to memory_contributors
+  Future<void> acceptMemoryInvite(String inviteId) async {
+    try {
+      final userId = _client?.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      await _client
+          ?.from('memory_invites')
+          .update({'status': 'accepted'})
+          .eq('id', inviteId)
+          .eq('user_id', userId);
+
+      debugPrint('✅ Memory invite accepted: $inviteId');
+    } catch (error) {
+      debugPrint('❌ Failed to accept memory invite: $error');
+      throw Exception('Failed to accept invite: $error');
+    }
+  }
+
+  /// Decline a memory invite - updates status to 'declined'
+  Future<void> declineMemoryInvite(String inviteId) async {
+    try {
+      final userId = _client?.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      await _client
+          ?.from('memory_invites')
+          .update({'status': 'declined'})
+          .eq('id', inviteId)
+          .eq('user_id', userId);
+
+      debugPrint('✅ Memory invite declined: $inviteId');
+    } catch (error) {
+      debugPrint('❌ Failed to decline memory invite: $error');
+      throw Exception('Failed to decline invite: $error');
+    }
+  }
+
+  /// Check if a memory invite is still pending (not already responded to)
+  Future<bool> isInviteStillPending(String inviteId) async {
+    try {
+      final response = await _client
+          ?.from('memory_invites')
+          .select('status')
+          .eq('id', inviteId)
+          .maybeSingle();
+
+      return response?['status'] == 'pending';
+    } catch (error) {
+      debugPrint('❌ Failed to check invite status: $error');
+      return false;
+    }
+  }
+
   /// Subscribe to real-time notification updates for the current user
   /// with automatic reconnection and error recovery
   Future<void> subscribeToNotifications({
@@ -523,5 +582,52 @@ class NotificationService {
     _debounceTimer?.cancel();
     _reconnectTimer?.cancel();
     unsubscribeFromNotifications();
+  }
+
+  /// Update notification message and data
+  Future<void> updateNotificationContent({
+    required String notificationId,
+    required String newMessage,
+    Map<String, dynamic>? additionalData,
+  }) async {
+    try {
+      final userId = _client?.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Get current notification data
+      final currentNotification = await _client
+          ?.from('notifications')
+          .select('data')
+          .eq('id', notificationId)
+          .eq('user_id', userId)
+          .single();
+
+      final currentData =
+          currentNotification?['data'] as Map<String, dynamic>? ?? {};
+
+      // Merge current data with additional data
+      final updatedData = {
+        ...currentData,
+        if (additionalData != null) ...additionalData,
+      };
+
+      // Update notification
+      await _client
+          ?.from('notifications')
+          .update({
+            'message': newMessage,
+            'data': updatedData,
+            'is_read': true,
+          })
+          .eq('id', notificationId)
+          .eq('user_id', userId);
+
+      debugPrint('✅ Notification content updated: $notificationId');
+    } catch (error) {
+      debugPrint('❌ Failed to update notification content: $error');
+      throw Exception('Failed to update notification: $error');
+    }
   }
 }

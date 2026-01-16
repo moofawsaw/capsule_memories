@@ -303,14 +303,18 @@ class _MemoryConfirmationScreenState
         ),
       );
 
+      // Get the current user's ID (the person sending the invite)
+      final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
+
       // Send invites to selected friends
       for (final friendId in _selectedFriendIds) {
-        // Add friend as memory contributor
+        // Create memory invite (pending status by default)
         await SupabaseService.instance.client
-            ?.from('memory_contributors')
+            ?.from('memory_invites')
             .insert({
           'memory_id': memoryId,
           'user_id': friendId,
+          'invited_by': currentUserId,  // ← This is required!
         });
       }
 
