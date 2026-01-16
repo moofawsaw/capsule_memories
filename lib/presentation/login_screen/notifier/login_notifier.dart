@@ -20,6 +20,7 @@ final loginNotifier =
 
 class LoginNotifier extends StateNotifier<LoginState> {
   StreamSubscription<AuthState>? _authSubscription;
+  Timer? _oauthTimeoutTimer;
 
   LoginNotifier(LoginState state) : super(state) {
     initialize();
@@ -42,6 +43,9 @@ class LoginNotifier extends StateNotifier<LoginState> {
     if (supabaseClient == null) return;
 
     _authSubscription = supabaseClient.auth.onAuthStateChange.listen((data) {
+      // Cancel timeout timer when auth state changes
+      _oauthTimeoutTimer?.cancel();
+
       // Reset loading state when auth succeeds or fails
       if (data.event == AuthChangeEvent.signedIn) {
         debugPrint('✅ OAuth sign-in successful - resetting loading state');
@@ -59,6 +63,23 @@ class LoginNotifier extends StateNotifier<LoginState> {
         );
       }
     });
+  }
+
+  /// Reset loading state if user is not authenticated
+  /// Called when app resumes from background (user returned from OAuth)
+  void resetLoadingIfNotAuthenticated() {
+    final supabaseClient = SupabaseService.instance.client;
+    final isAuthenticated = supabaseClient?.auth.currentUser != null;
+
+    if (!isAuthenticated && (state.isLoading ?? false)) {
+      debugPrint(
+          '🔄 User returned from OAuth without authentication - resetting button states');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: null,
+      );
+      _oauthTimeoutTimer?.cancel();
+    }
   }
 
   /// Validate email field
@@ -166,6 +187,14 @@ class LoginNotifier extends StateNotifier<LoginState> {
         );
       }
 
+      // Set a fallback timeout to reset loading state if OAuth doesn't complete
+      _oauthTimeoutTimer = Timer(Duration(seconds: 60), () {
+        if (state.isLoading ?? false) {
+          debugPrint('⏰ OAuth timeout - resetting loading state');
+          resetLoadingIfNotAuthenticated();
+        }
+      });
+
       // Note: Don't set loading to false here as OAuth flow redirects
       // The auth state listener will update UI when user returns
       // Keep loading state true while waiting for OAuth callback
@@ -185,11 +214,13 @@ class LoginNotifier extends StateNotifier<LoginState> {
         errorMessage = 'Google login failed: ${e.message}';
       }
 
+      _oauthTimeoutTimer?.cancel();
       state = state.copyWith(
         isLoading: false,
         errorMessage: errorMessage,
       );
     } catch (e) {
+      _oauthTimeoutTimer?.cancel();
       state = state.copyWith(
         isLoading: false,
         errorMessage:
@@ -223,6 +254,14 @@ class LoginNotifier extends StateNotifier<LoginState> {
         },
       );
 
+      // Set a fallback timeout to reset loading state if OAuth doesn't complete
+      _oauthTimeoutTimer = Timer(Duration(seconds: 60), () {
+        if (state.isLoading ?? false) {
+          debugPrint('⏰ OAuth timeout - resetting loading state');
+          resetLoadingIfNotAuthenticated();
+        }
+      });
+
       // Note: OAuth flow will redirect to browser/app, so we don't set success here
       // The auth state change listener in main.dart will handle the success case
       // Don't set loading to false here as the OAuth flow is async
@@ -233,6 +272,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
         errorMessage = e.toString();
       }
 
+      _oauthTimeoutTimer?.cancel();
       state = state.copyWith(
         isLoading: false,
         errorMessage: errorMessage,
@@ -303,6 +343,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
     state.emailController?.dispose();
     state.passwordController?.dispose();
     _authSubscription?.cancel();
+    _oauthTimeoutTimer?.cancel();
     super.dispose();
   }
 }

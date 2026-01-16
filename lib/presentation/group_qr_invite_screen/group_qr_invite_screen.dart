@@ -308,39 +308,68 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
     );
   }
 
-  /// URL section
+  /// URL section (✅ animated copy button, same pattern as friend QR screen)
   Widget _buildUrlSection(GroupQRInviteModel model) {
-    return Container(
-      margin: EdgeInsets.only(right: 16.h, left: 4.h),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
-              decoration: BoxDecoration(
-                color: appTheme.gray_900,
-                borderRadius: BorderRadius.circular(8.h),
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(groupQRInviteNotifier);
+        final isCopied = state.copySuccess == true;
+
+        return Container(
+          margin: EdgeInsets.only(right: 16.h, left: 4.h),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900,
+                    borderRadius: BorderRadius.circular(8.h),
+                  ),
+                  child: Text(
+                    model.invitationUrl ?? '',
+                    style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
+                ),
               ),
-              child: Text(
-                model.invitationUrl ?? '',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              SizedBox(width: 22.h),
+
+              // ✅ Copy animation: AnimatedContainer + AnimatedSwitcher (copy -> check)
+              GestureDetector(
+                onTap: () => _copyUrl(model.invitationUrl ?? ''),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: EdgeInsets.all(10.h),
+                  decoration: BoxDecoration(
+                    color: isCopied
+                        ? appTheme.colorFF52D1.withAlpha(51)
+                        : appTheme.deep_purple_A100.withAlpha(51),
+                    borderRadius: BorderRadius.circular(10.h),
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    transitionBuilder: (child, animation) {
+                      return ScaleTransition(scale: animation, child: child);
+                    },
+                    child: Icon(
+                      isCopied ? Icons.check : Icons.copy,
+                      key: ValueKey<bool>(isCopied),
+                      size: 20.h,
+                      color: isCopied
+                          ? appTheme.colorFF52D1
+                          : appTheme.deep_purple_A100,
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-          SizedBox(width: 22.h),
-          GestureDetector(
-            onTap: () => _copyUrl(model.invitationUrl ?? ''),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIcon14,
-              height: 24.h,
-              width: 24.h,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

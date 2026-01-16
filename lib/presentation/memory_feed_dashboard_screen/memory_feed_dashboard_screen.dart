@@ -1,7 +1,12 @@
 import '../../core/app_export.dart';
+import '../../core/models/feed_story_context.dart';
+import '../../core/utils/image_constant.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
+import '../../core/utils/navigator_service.dart';
+import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
+import '../../theme/text_style_helper.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_category_badge.dart';
 import '../../widgets/custom_image_view.dart';
@@ -13,7 +18,6 @@ import './widgets/happening_now_story_card.dart';
 import './widgets/memory_selection_bottom_sheet.dart';
 import './widgets/native_camera_recording_screen.dart';
 import 'notifier/memory_feed_dashboard_notifier.dart';
-import '../../widgets/custom_public_memories.dart' as unified_widget;
 
 class MemoryFeedDashboardScreen extends ConsumerStatefulWidget {
   const MemoryFeedDashboardScreen({Key? key}) : super(key: key);
@@ -382,7 +386,8 @@ class _MemoryFeedDashboardScreenState
         final state = ref.watch(memoryFeedDashboardProvider);
         final happeningNowStories =
             state.memoryFeedDashboardModel?.happeningNowStories ?? [];
-        final latestStories = state.memoryFeedDashboardModel?.latestStories ?? [];
+        final latestStories =
+            state.memoryFeedDashboardModel?.latestStories ?? [];
 
         // IMPORTANT:
         // Use skeleton only for initial/empty state to prevent "hard reload" flashes
@@ -469,8 +474,8 @@ class _MemoryFeedDashboardScreenState
                 ),
               )
                   : ListView.builder(
-                key:
-                const PageStorageKey<String>('latest_stories_list'),
+                key: const PageStorageKey<String>(
+                    'latest_stories_list'),
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.only(left: 24.h),
                 itemCount: latestStories.length,
@@ -499,7 +504,8 @@ class _MemoryFeedDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
-        final stories = state.memoryFeedDashboardModel?.happeningNowStories ?? [];
+        final stories =
+            state.memoryFeedDashboardModel?.happeningNowStories ?? [];
 
         // IMPORTANT:
         // Use skeleton only for initial/empty state to prevent "hard reload" flashes.
@@ -577,8 +583,8 @@ class _MemoryFeedDashboardScreenState
                 ),
               )
                   : ListView.builder(
-                key:
-                const PageStorageKey<String>('happening_now_list'),
+                key: const PageStorageKey<String>(
+                    'happening_now_list'),
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.only(left: 24.h),
                 itemCount: stories.length,
@@ -587,10 +593,17 @@ class _MemoryFeedDashboardScreenState
                   return HappeningNowStoryCard(
                     story: story,
                     onTap: () {
-                      // Navigate directly without FeedStoryContext
+                      // ✅ FIX: Pass feed type when navigating to story viewer
+                      final args = FeedStoryContext(
+                        feedType: 'happening_now',
+                        initialStoryId: story.storyId,
+                        storyIds:
+                        stories.map((s) => s.storyId).toList(),
+                      );
+
                       NavigatorService.pushNamed(
                         AppRoutes.appStoryView,
-                        arguments: story.storyId,
+                        arguments: args,
                       );
                     },
                   );
@@ -639,11 +652,11 @@ class _MemoryFeedDashboardScreenState
           );
         }).toList();
 
-        return unified_widget.CustomPublicMemories(
+        return custom_widget.CustomPublicMemories(
           key: const PageStorageKey<String>('public_memories_section'),
           sectionTitle: 'Public Memories',
           sectionIcon: ImageConstant.imgIcon22x22,
-          variant: unified_widget.MemoryCardVariant.feed,
+          variant: custom_widget.MemoryCardVariant.feed,
           memories: convertedMemories,
           isLoading: isLoading,
           onMemoryTap: (memory) {
@@ -765,7 +778,8 @@ class _MemoryFeedDashboardScreenState
               height: 240.h,
               child: isLoading
                   ? ListView.builder(
-                key: const PageStorageKey<String>('trending_stories_list'),
+                key:
+                const PageStorageKey<String>('trending_stories_list'),
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.only(left: 24.h),
                 itemCount: 3,
@@ -809,7 +823,8 @@ class _MemoryFeedDashboardScreenState
                 ),
               )
                   : ListView.builder(
-                key: const PageStorageKey<String>('trending_stories_list'),
+                key: const PageStorageKey<String>(
+                    'trending_stories_list'),
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.only(left: 24.h),
                 itemCount: stories.length,
@@ -929,7 +944,8 @@ class _MemoryFeedDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
-        final stories = state.memoryFeedDashboardModel?.longestStreakStories ?? [];
+        final stories =
+            state.memoryFeedDashboardModel?.longestStreakStories ?? [];
 
         // IMPORTANT:
         // Prevent "hard reload" flashes: only show loading skeletons when empty.
@@ -1008,7 +1024,8 @@ class _MemoryFeedDashboardScreenState
                 ),
               )
                   : ListView.builder(
-                key: const PageStorageKey<String>('longest_streak_list'),
+                key: const PageStorageKey<String>(
+                    'longest_streak_list'),
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.only(left: 24.h),
                 itemCount: stories.length,
@@ -1037,7 +1054,8 @@ class _MemoryFeedDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
-        final stories = state.memoryFeedDashboardModel?.popularUserStories ?? [];
+        final stories =
+            state.memoryFeedDashboardModel?.popularUserStories ?? [];
 
         // IMPORTANT:
         // Prevent "hard reload" flashes: only show loading skeletons when empty.
@@ -1115,7 +1133,8 @@ class _MemoryFeedDashboardScreenState
                 ),
               )
                   : ListView.builder(
-                key: const PageStorageKey<String>('popular_users_list'),
+                key: const PageStorageKey<String>(
+                    'popular_users_list'),
                 scrollDirection: Axis.horizontal,
                 padding: EdgeInsets.only(left: 24.h),
                 itemCount: stories.length,

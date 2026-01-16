@@ -1,6 +1,5 @@
-// lib/presentation/user_profile_screen_two/user_profile_screen_two.dart
-
 import '../../core/app_export.dart';
+import '../../core/models/feed_story_context.dart';
 import '../../services/avatar_state_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_profile_header.dart';
@@ -8,7 +7,8 @@ import '../../widgets/custom_stat_card.dart';
 import '../../widgets/custom_story_card.dart';
 import '../../widgets/custom_story_skeleton.dart';
 import 'notifier/user_profile_screen_two_notifier.dart';
-import '../../core/models/feed_story_context.dart';
+
+// lib/presentation/user_profile_screen_two/user_profile_screen_two.dart
 
 class UserProfileScreenTwo extends ConsumerStatefulWidget {
   /// Optional: target user (deep link / profile tap)
@@ -24,8 +24,7 @@ class UserProfileScreenTwo extends ConsumerStatefulWidget {
       _UserProfileScreenTwoState();
 }
 
-class _UserProfileScreenTwoState
-    extends ConsumerState<UserProfileScreenTwo> {
+class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
   String? _userId;
   bool _initialized = false;
 
@@ -54,10 +53,10 @@ class _UserProfileScreenTwoState
 
       _userId = resolvedUserId;
 
-      // IMPORTANT:
-      // Call initialize WITHOUT named params to avoid signature mismatch
-      ref.read(userProfileScreenTwoNotifier.notifier).initialize();
-
+      // ✅ FIXED: Pass userId to initialize method
+      ref
+          .read(userProfileScreenTwoNotifier.notifier)
+          .initialize(userId: _userId);
 
       // Load avatar only for current user
       if (_userId == null) {
@@ -74,7 +73,6 @@ class _UserProfileScreenTwoState
 
   Future<void> _onRefresh() async {
     await ref.read(userProfileScreenTwoNotifier.notifier).initialize();
-
 
     if (_userId == null) {
       await ref.read(avatarStateProvider.notifier).refreshAvatar();
@@ -150,26 +148,26 @@ class _UserProfileScreenTwoState
             GestureDetector(
               onTap: isCurrentUser
                   ? () => ref
-                  .read(userProfileScreenTwoNotifier.notifier)
-                  .uploadAvatar()
+                      .read(userProfileScreenTwoNotifier.notifier)
+                      .uploadAvatar()
                   : null,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   CustomProfileHeader(
                     avatarImagePath:
-                    (isCurrentUser ? avatarState.avatarUrl : null) ??
-                        model?.avatarImagePath ??
-                        ImageConstant.imgEllipse896x96,
+                        (isCurrentUser ? avatarState.avatarUrl : null) ??
+                            model?.avatarImagePath ??
+                            ImageConstant.imgEllipse896x96,
                     userName: model?.userName ?? 'Loading...',
                     email: isCurrentUser ? (model?.email ?? '') : '',
                     onEditTap:
-                    isCurrentUser ? () => onTapEditProfile(context) : null,
+                        isCurrentUser ? () => onTapEditProfile(context) : null,
                     allowUsernameEdit: isCurrentUser,
                     onUserNameChanged: isCurrentUser
                         ? (name) => ref
-                        .read(userProfileScreenTwoNotifier.notifier)
-                        .updateUsername(name)
+                            .read(userProfileScreenTwoNotifier.notifier)
+                            .updateUsername(name)
                         : null,
                     margin: EdgeInsets.symmetric(horizontal: 68.h),
                   ),
@@ -246,16 +244,16 @@ class _UserProfileScreenTwoState
                 text: state.isFriend
                     ? 'Unfriend'
                     : state.hasPendingFriendRequest
-                    ? 'Pending'
-                    : 'Add Friend',
+                        ? 'Pending'
+                        : 'Add Friend',
                 onPressed: state.hasPendingFriendRequest
                     ? null
                     : () {
-                  state.isFriend
-                      ? _showUnfriendConfirmationDialog(
-                      context, notifier.unfriendUser)
-                      : notifier.sendFriendRequest();
-                },
+                        state.isFriend
+                            ? _showUnfriendConfirmationDialog(
+                                context, notifier.unfriendUser)
+                            : notifier.sendFriendRequest();
+                      },
               ),
             ),
           ],
@@ -278,8 +276,8 @@ class _UserProfileScreenTwoState
           return GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate:
-            const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3),
             itemCount: 3,
             itemBuilder: (_, __) => CustomStorySkeleton(),
           );
@@ -292,20 +290,17 @@ class _UserProfileScreenTwoState
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3),
           itemCount: stories.length,
           itemBuilder: (_, index) {
             final story = stories[index];
             return CustomStoryCard(
               userName: story.userName ?? 'User',
-              userAvatar:
-              story.userAvatar ?? ImageConstant.imgEllipse896x96,
-              backgroundImage:
-              story.backgroundImage ?? ImageConstant.imgImg,
+              userAvatar: story.userAvatar ?? ImageConstant.imgEllipse896x96,
+              backgroundImage: story.backgroundImage ?? ImageConstant.imgImg,
               categoryText: story.categoryText ?? 'Memory',
-              categoryIcon:
-              story.categoryIcon ?? ImageConstant.imgVector,
+              categoryIcon: story.categoryIcon ?? ImageConstant.imgVector,
               timestamp: story.timestamp ?? 'Just now',
               onTap: () => onTapStoryCard(context, index),
             );
@@ -333,15 +328,14 @@ class _UserProfileScreenTwoState
 
   void onTapStoryCard(BuildContext context, int index) {
     final stories = ref
-        .read(userProfileScreenTwoNotifier)
-        .userProfileScreenTwoModel
-        ?.storyItems ??
+            .read(userProfileScreenTwoNotifier)
+            .userProfileScreenTwoModel
+            ?.storyItems ??
         [];
 
     if (stories.isEmpty) return;
 
-    final ids =
-    stories.map((s) => s.storyId).whereType<String>().toList();
+    final ids = stories.map((s) => s.storyId).whereType<String>().toList();
 
     final initialId = stories[index].storyId;
     if (initialId == null) return;
@@ -362,8 +356,7 @@ class _UserProfileScreenTwoState
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Unfriend User?'),
-        content: const Text(
-            'This will remove your friendship connection.'),
+        content: const Text('This will remove your friendship connection.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),

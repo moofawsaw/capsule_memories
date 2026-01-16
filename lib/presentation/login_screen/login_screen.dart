@@ -14,7 +14,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   LoginScreenState createState() => LoginScreenState();
 }
 
-class LoginScreenState extends ConsumerState<LoginScreen> {
+class LoginScreenState extends ConsumerState<LoginScreen>
+    with WidgetsBindingObserver {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   // ✅ IMPORTANT:
@@ -22,6 +23,29 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
   // Use official, flat marks (no circle badge for Facebook).
   static final String _googleIconAsset = ImageConstant.imgImage5;
   static final String _facebookIconAsset = ImageConstant.imgSocialMedia;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // When app resumes from background (user returned from OAuth browser)
+    if (state == AppLifecycleState.resumed) {
+      // Reset loading state if user returned without completing OAuth
+      ref.read(loginNotifier.notifier).resetLoadingIfNotAuthenticated();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +119,7 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
         // Listen for state changes
         ref.listen(
           loginNotifier,
-              (previous, current) {
+          (previous, current) {
             if (current.isSuccess ?? false) {
               TextInput.finishAutofillContext();
               _clearForm();
@@ -148,14 +172,16 @@ class LoginScreenState extends ConsumerState<LoginScreen> {
             _SocialAuthButton(
               text: 'Log in with Google',
               iconAssetPath: _googleIconAsset,
-              onPressed: state.isLoading ?? false ? null : () => _onGoogleLoginTap(),
+              onPressed:
+                  state.isLoading ?? false ? null : () => _onGoogleLoginTap(),
               isDisabled: state.isLoading ?? false,
             ),
             SizedBox(height: 20.h),
             _SocialAuthButton(
               text: 'Log in with Facebook',
               iconAssetPath: _facebookIconAsset,
-              onPressed: state.isLoading ?? false ? null : () => _onFacebookLoginTap(),
+              onPressed:
+                  state.isLoading ?? false ? null : () => _onFacebookLoginTap(),
               isDisabled: state.isLoading ?? false,
             ),
           ],
@@ -287,8 +313,8 @@ class _SocialAuthButton extends StatelessWidget {
     final Color borderColor = appTheme.blue_gray_300.withAlpha(70);
     final Color bgColor = Colors.transparent;
 
-    final TextStyle textStyle = TextStyleHelper.instance
-        .body14MediumPlusJakartaSans
+    final TextStyle textStyle = TextStyleHelper
+        .instance.body14MediumPlusJakartaSans
         .copyWith(color: appTheme.blue_gray_300);
 
     return Opacity(
@@ -334,22 +360,21 @@ class _NormalizedProviderIcon extends StatelessWidget {
       child: Center(
         child: isSvg
             ? SvgPicture.asset(
-          assetPath,
-          width: 18.h,
-          height: 18.h,
-          fit: BoxFit.contain,
-        )
+                assetPath,
+                width: 18.h,
+                height: 18.h,
+                fit: BoxFit.contain,
+              )
             : Image.asset(
-          assetPath,
-          width: 18.h,
-          height: 18.h,
-          fit: BoxFit.contain,
-        ),
+                assetPath,
+                width: 18.h,
+                height: 18.h,
+                fit: BoxFit.contain,
+              ),
       ),
     );
   }
 }
-
 
 ///
 /// Forces all provider icons into the same visual box so they match.

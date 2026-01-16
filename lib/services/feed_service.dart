@@ -138,7 +138,8 @@ class FeedService {
 
     // Require stories_count > 0 (matches your DB rule)
     if (storiesCount <= 0) {
-      validationErrors.add('Memory has no stories (stories_count=$storiesCount)');
+      validationErrors
+          .add('Memory has no stories (stories_count=$storiesCount)');
     }
 
     if (validationErrors.isNotEmpty) {
@@ -245,7 +246,9 @@ class FeedService {
           .eq('memories.visibility', 'public')
           .gte(
         'created_at',
-        DateTime.now().subtract(const Duration(hours: 24)).toIso8601String(),
+        DateTime.now()
+            .subtract(const Duration(hours: 24))
+            .toIso8601String(),
       )
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
@@ -253,10 +256,8 @@ class FeedService {
       final rows = (response as List);
 
       // Batch view status
-      final storyIds = rows
-          .map((r) => r['id'] as String?)
-          .whereType<String>()
-          .toList();
+      final storyIds =
+      rows.map((r) => r['id'] as String?).whereType<String>().toList();
 
       final viewedIds = (currentUserId != null)
           ? await _fetchViewedStoryIdsForUser(
@@ -275,7 +276,8 @@ class FeedService {
 
         // Required fields
         final memoryTitle = (memory?['title'] as String?)?.trim();
-        final contributorName = (contributor['display_name'] as String?)?.trim();
+        final contributorName =
+        (contributor['display_name'] as String?)?.trim();
         final rawThumb = item['thumbnail_url'];
 
         if (memoryTitle == null ||
@@ -290,7 +292,8 @@ class FeedService {
           continue;
         }
 
-        final isRead = (currentUserId != null) && viewedIds.contains(item['id']);
+        final isRead =
+            (currentUserId != null) && viewedIds.contains(item['id']);
 
         validatedStories.add({
           'id': item['id'] ?? '',
@@ -359,10 +362,8 @@ class FeedService {
       final rows = (response as List);
 
       // Batch contributor avatars for these memories
-      final memoryIds = rows
-          .map((m) => m['id'] as String?)
-          .whereType<String>()
-          .toList();
+      final memoryIds =
+      rows.map((m) => m['id'] as String?).whereType<String>().toList();
 
       final avatarsByMemory = await _fetchContributorAvatarsForMemories(
         memoryIds: memoryIds,
@@ -476,10 +477,8 @@ class FeedService {
       final rows = (response as List);
 
       // Batch view status
-      final storyIds = rows
-          .map((r) => r['id'] as String?)
-          .whereType<String>()
-          .toList();
+      final storyIds =
+      rows.map((r) => r['id'] as String?).whereType<String>().toList();
 
       final viewedIds = (currentUserId != null)
           ? await _fetchViewedStoryIdsForUser(
@@ -497,7 +496,8 @@ class FeedService {
         final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
         final memoryTitle = (memory?['title'] as String?)?.trim();
-        final contributorName = (contributor['display_name'] as String?)?.trim();
+        final contributorName =
+        (contributor['display_name'] as String?)?.trim();
         final rawThumb = item['thumbnail_url'];
 
         if (memoryTitle == null ||
@@ -509,7 +509,8 @@ class FeedService {
           continue;
         }
 
-        final isRead = (currentUserId != null) && viewedIds.contains(item['id']);
+        final isRead =
+            (currentUserId != null) && viewedIds.contains(item['id']);
 
         validatedStories.add({
           'id': item['id'] ?? '',
@@ -586,10 +587,8 @@ class FeedService {
       final rows = (response as List);
 
       // Batch view status
-      final storyIds = rows
-          .map((r) => r['id'] as String?)
-          .whereType<String>()
-          .toList();
+      final storyIds =
+      rows.map((r) => r['id'] as String?).whereType<String>().toList();
 
       final viewedIds = (currentUserId != null)
           ? await _fetchViewedStoryIdsForUser(
@@ -607,7 +606,8 @@ class FeedService {
         final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
         final memoryTitle = (memory?['title'] as String?)?.trim();
-        final contributorName = (contributor['display_name'] as String?)?.trim();
+        final contributorName =
+        (contributor['display_name'] as String?)?.trim();
         final rawThumb = item['thumbnail_url'];
 
         if (memoryTitle == null ||
@@ -619,7 +619,8 @@ class FeedService {
           continue;
         }
 
-        final isRead = (currentUserId != null) && viewedIds.contains(item['id']);
+        final isRead =
+            (currentUserId != null) && viewedIds.contains(item['id']);
 
         validatedStories.add({
           'id': item['id'] ?? '',
@@ -697,10 +698,8 @@ class FeedService {
       final rows = (response as List);
 
       // Batch view status
-      final storyIds = rows
-          .map((r) => r['id'] as String?)
-          .whereType<String>()
-          .toList();
+      final storyIds =
+      rows.map((r) => r['id'] as String?).whereType<String>().toList();
 
       final viewedIds = (currentUserId != null)
           ? await _fetchViewedStoryIdsForUser(
@@ -718,7 +717,8 @@ class FeedService {
         final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
         final memoryTitle = (memory?['title'] as String?)?.trim();
-        final contributorName = (contributor['display_name'] as String?)?.trim();
+        final contributorName =
+        (contributor['display_name'] as String?)?.trim();
         final rawThumb = item['thumbnail_url'];
 
         if (memoryTitle == null ||
@@ -730,7 +730,8 @@ class FeedService {
           continue;
         }
 
-        final isRead = (currentUserId != null) && viewedIds.contains(item['id']);
+        final isRead =
+            (currentUserId != null) && viewedIds.contains(item['id']);
 
         validatedStories.add({
           'id': item['id'] ?? '',
@@ -801,10 +802,8 @@ class FeedService {
       final rows = (response as List);
 
       // Batch contributor avatars for these memories
-      final memoryIds = rows
-          .map((m) => m['id'] as String?)
-          .whereType<String>()
-          .toList();
+      final memoryIds =
+      rows.map((m) => m['id'] as String?).whereType<String>().toList();
 
       final avatarsByMemory = await _fetchContributorAvatarsForMemories(
         memoryIds: memoryIds,
@@ -912,10 +911,8 @@ class FeedService {
       final rows = (response as List);
 
       // Batch view status
-      final storyIds = rows
-          .map((r) => r['id'] as String?)
-          .whereType<String>()
-          .toList();
+      final storyIds =
+      rows.map((r) => r['id'] as String?).whereType<String>().toList();
 
       final viewedIds = (currentUserId != null)
           ? await _fetchViewedStoryIdsForUser(
@@ -933,7 +930,8 @@ class FeedService {
         final category = memory?['memory_categories'] as Map<String, dynamic>?;
 
         final memoryTitle = (memory?['title'] as String?)?.trim();
-        final contributorName = (contributor['display_name'] as String?)?.trim();
+        final contributorName =
+        (contributor['display_name'] as String?)?.trim();
         final rawThumb = item['thumbnail_url'];
 
         if (memoryTitle == null ||
@@ -945,7 +943,8 @@ class FeedService {
           continue;
         }
 
-        final isRead = (currentUserId != null) && viewedIds.contains(item['id']);
+        final isRead =
+            (currentUserId != null) && viewedIds.contains(item['id']);
 
         validatedStories.add({
           'id': item['id'] ?? '',
@@ -1002,6 +1001,49 @@ class FeedService {
       return storyIds;
     } catch (e) {
       print('❌ ERROR fetching latest story IDs: $e');
+      return [];
+    }
+  }
+
+  /// Fetch "Happening Now" story IDs (stories from last 24 hours) in chronological order
+  /// Shows ONLY stories that match the "happening now" criteria (last 24 hours)
+  Future<List<String>> fetchHappeningNowStoryIds() async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) {
+        print('❌ ERROR: Supabase client not initialized');
+        return [];
+      }
+
+      final response = await client
+          .from('stories')
+          .select('''
+            id,
+            created_at,
+            memory_id,
+            memories!inner(visibility)
+          ''')
+          .eq('memories.visibility', 'public')
+          .gte(
+        'created_at',
+        DateTime.now()
+            .subtract(const Duration(hours: 24))
+            .toIso8601String(),
+      )
+          .order('created_at', ascending: false);
+
+      if (response.isEmpty) {
+        print('⚠️ WARNING: No happening now stories found');
+        return [];
+      }
+
+      final storyIds =
+      (response as List).map((story) => story['id'] as String).toList();
+
+      print('✅ SUCCESS: Fetched ${storyIds.length} happening now story IDs');
+      return storyIds;
+    } catch (e) {
+      print('❌ ERROR fetching happening now story IDs: $e');
       return [];
     }
   }
@@ -1070,8 +1112,9 @@ class FeedService {
         final expiresAt = DateTime.parse(memory['expires_at']);
 
         final creatorName = (creator?['display_name'] as String?)?.trim();
-        final safeCreatorName =
-        (creatorName != null && creatorName.isNotEmpty) ? creatorName : null;
+        final safeCreatorName = (creatorName != null && creatorName.isNotEmpty)
+            ? creatorName
+            : null;
 
         return {
           'id': memory['id'] ?? '',
@@ -1264,7 +1307,8 @@ class FeedService {
             )
           ''').eq('id', storyId).single();
 
-      final contributor = response['user_profiles_public'] as Map<String, dynamic>?;
+      final contributor =
+      response['user_profiles_public'] as Map<String, dynamic>?;
       final memory = response['memories'] as Map<String, dynamic>?;
       final textOverlays = response['text_overlays'] as List? ?? [];
 
@@ -1277,16 +1321,18 @@ class FeedService {
       String mediaUrl = '';
 
       if (mediaType == 'video') {
-        final rawVideoPath = response['video_url'] ?? response['thumbnail_url'] ?? '';
+        final rawVideoPath =
+            response['video_url'] ?? response['thumbnail_url'] ?? '';
         mediaUrl = StoryService.resolveStoryMediaUrl(rawVideoPath) ?? '';
       } else {
-        final rawImagePath = response['image_url'] ?? response['thumbnail_url'] ?? '';
+        final rawImagePath =
+            response['image_url'] ?? response['thumbnail_url'] ?? '';
         mediaUrl = StoryService.resolveStoryMediaUrl(rawImagePath) ?? '';
       }
 
       return {
-        'id': storyId,                          // ADD THIS LINE
-        'share_code': response['share_code'],   // ADD THIS LINE
+        'id': storyId, // ADD THIS LINE
+        'share_code': response['share_code'], // ADD THIS LINE
         'media_url': mediaUrl,
         'media_type': mediaType,
         'user_name': contributor?['display_name'] ?? 'Unknown User',

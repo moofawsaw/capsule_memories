@@ -281,7 +281,7 @@ class EventTimelineViewScreenState
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content:
-                const Text('Please select a memory to view its timeline'),
+                    const Text('Please select a memory to view its timeline'),
                 backgroundColor: appTheme.deep_purple_A100,
                 duration: const Duration(seconds: 3),
               ),
@@ -291,12 +291,14 @@ class EventTimelineViewScreenState
         return;
       }
 
-      ref.read(eventTimelineViewNotifier.notifier).initializeFromMemory(navArgs);
+      ref
+          .read(eventTimelineViewNotifier.notifier)
+          .initializeFromMemory(navArgs);
     });
 
     _firstLoadSub = ref.listenManual<EventTimelineViewState>(
       eventTimelineViewNotifier,
-          (prev, next) {
+      (prev, next) {
         final prevLoading = prev?.isLoading ?? false;
         final nextLoading = next.isLoading ?? false;
 
@@ -377,15 +379,15 @@ class EventTimelineViewScreenState
                 SizedBox(height: 18.h),
                 effectiveLoading
                     ? Container(
-                  margin: EdgeInsets.symmetric(horizontal: 24.h),
-                  child: Column(
-                    children: [
-                      CustomButtonSkeleton(),
-                      SizedBox(height: 12.h),
-                      CustomButtonSkeleton(),
-                    ],
-                  ),
-                )
+                        margin: EdgeInsets.symmetric(horizontal: 24.h),
+                        child: Column(
+                          children: [
+                            CustomButtonSkeleton(),
+                            SizedBox(height: 12.h),
+                            CustomButtonSkeleton(),
+                          ],
+                        ),
+                      )
                     : _buildActionButtons(context),
                 SizedBox(height: 20.h),
               ],
@@ -411,16 +413,16 @@ class EventTimelineViewScreenState
     return CustomEventCard(
       isLoading: effectiveLoading,
       eventTitle:
-      effectiveLoading ? null : state.eventTimelineViewModel?.eventTitle,
+          effectiveLoading ? null : state.eventTimelineViewModel?.eventTitle,
       eventDate:
-      effectiveLoading ? null : state.eventTimelineViewModel?.eventDate,
+          effectiveLoading ? null : state.eventTimelineViewModel?.eventDate,
       eventLocation: effectiveLoading
           ? null
           : state.eventTimelineViewModel?.timelineDetail?.centerLocation,
       isPrivate:
-      effectiveLoading ? null : state.eventTimelineViewModel?.isPrivate,
+          effectiveLoading ? null : state.eventTimelineViewModel?.isPrivate,
       iconButtonImagePath:
-      effectiveLoading ? null : state.eventTimelineViewModel?.categoryIcon,
+          effectiveLoading ? null : state.eventTimelineViewModel?.categoryIcon,
       participantImages: effectiveLoading
           ? null
           : state.eventTimelineViewModel?.participantImages,
@@ -475,7 +477,7 @@ class EventTimelineViewScreenState
                   ],
                 ),
               ),
-              if (isCurrentUserMember)
+              if (isCurrentUserMember) ...[
                 Align(
                   alignment: Alignment.topRight,
                   child: Container(
@@ -512,6 +514,7 @@ class EventTimelineViewScreenState
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         );
@@ -737,9 +740,10 @@ class EventTimelineViewScreenState
         if (!_hasCompletedFirstLoad) return const SizedBox.shrink();
 
         final List<CustomStoryItem> storyItems =
-        (state.eventTimelineViewModel?.customStoryItems ?? const <dynamic>[])
-            .whereType<CustomStoryItem>()
-            .toList();
+            (state.eventTimelineViewModel?.customStoryItems ??
+                    const <dynamic>[])
+                .whereType<CustomStoryItem>()
+                .toList();
 
         if (storyItems.isEmpty) {
           return Container(
@@ -790,7 +794,7 @@ class EventTimelineViewScreenState
                   buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
                   onPressed: () => onTapViewAll(context),
                 ),
-                SizedBox(height: 12.h),
+                if (isCurrentUserMember) SizedBox(height: 12.h),
               ],
               if (isCurrentUserMember)
                 CustomButton(
@@ -799,14 +803,6 @@ class EventTimelineViewScreenState
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   onPressed: () => onTapCreateStory(context),
-                )
-              else
-                CustomButton(
-                  text: 'Join Memory',
-                  width: double.infinity,
-                  buttonStyle: CustomButtonStyle.fillPrimary,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  onPressed: () => onTapJoinFromTimeline(context),
                 ),
             ],
           ),
@@ -822,8 +818,8 @@ class EventTimelineViewScreenState
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-            const Text('Accept the memory invite to start creating stories'),
+            content: const Text(
+                'Accept the memory invite to start creating stories'),
             backgroundColor: appTheme.deep_purple_A100,
             duration: const Duration(seconds: 3),
           ),
@@ -942,7 +938,7 @@ class EventTimelineViewScreenState
     if (ids.isEmpty) return;
 
     final initialId =
-    (index >= 0 && index < ids.length) ? ids[index] : ids.first;
+        (index >= 0 && index < ids.length) ? ids[index] : ids.first;
 
     final feedContext = FeedStoryContext(
       feedType: 'memory_timeline',
@@ -1039,7 +1035,7 @@ class EventTimelineViewScreenState
       builder: (dialogContext) => AlertDialog(
         backgroundColor: appTheme.gray_900_01,
         shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
         title: Text(
           'Leave Memory?',
           style: TextStyleHelper.instance.title18BoldPlusJakartaSans
@@ -1087,7 +1083,7 @@ class EventTimelineViewScreenState
       builder: (dialogContext) => AlertDialog(
         backgroundColor: appTheme.gray_900_01,
         shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
         title: Text(
           'Delete Memory?',
           style: TextStyleHelper.instance.title18BoldPlusJakartaSans

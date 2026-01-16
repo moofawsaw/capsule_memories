@@ -40,7 +40,6 @@ import '../presentation/qr_code_share_screen_two_screen/qr_code_share_screen_two
 import '../presentation/qr_scanner_screen/qr_scanner_screen.dart';
 import '../presentation/qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import '../presentation/share_story_screen/share_story_screen.dart';
-import '../presentation/splash_screen/splash_screen.dart';
 import '../presentation/story_edit_screen/story_edit_screen.dart';
 import '../presentation/user_menu_screen/user_menu_screen.dart';
 import '../presentation/user_profile_screen_two_screen/user_profile_screen_two_screen.dart';

@@ -72,6 +72,8 @@ class TimelineWidget extends StatelessWidget {
   String _countdownWidthTemplate({required bool isCompact}) {
     // Reserve a fixed text width so the badge NEVER jitters as seconds tick.
     // If you expect 3-digit days, change to '888d 88:88:88'.
+    // NOTE: Template should be at least as wide as the widest possible value.
+    // "SEALED" is shorter than the template, so it will not break the fixed width.
     return isCompact ? '88d 88:88:88' : '';
   }
 
@@ -249,9 +251,29 @@ class TimelineWidget extends StatelessWidget {
         double? maxWidth,
         bool isCompact = false,
       }) {
+    // ✅ If countdown is 0 AND memory type is sealed -> show SEALED + lock.
+    // - "countdown is 0" means the time is up (endUtc <= now) OR the computed clock is 00:00:00.
+    // - "memory type is sealed" is variant == TimelineVariant.sealed.
+    final bool showSealedState =
+        variant == TimelineVariant.sealed &&
+            !endUtc.isAfter(DateTime.now().toUtc());
+
+    // If sealed state, do NOT stream; render a stable pill.
+    if (showSealedState) {
+      return _countdownBadgeShell(
+        value: 'SEALED',
+        iconData: Icons.lock_rounded,
+        maxWidth: maxWidth,
+        isCompact: isCompact,
+      );
+    }
+
+    // Existing sealed behavior: keep showing 00:00:00 when variant is sealed but endUtc is in future
+    // (should be rare, but preserves your current logic).
     if (variant == TimelineVariant.sealed) {
       return _countdownBadgeShell(
         value: '00:00:00',
+        iconData: Icons.access_time_rounded,
         maxWidth: maxWidth,
         isCompact: isCompact,
       );
@@ -262,10 +284,14 @@ class TimelineWidget extends StatelessWidget {
       builder: (context, snapshot) {
         final DateTime nowUtc = DateTime.now().toUtc();
         final Duration remaining = endUtc.difference(nowUtc);
+
+        // ✅ If countdown hits 0 and the memory type is sealed, show SEALED + lock.
+        // In active mode, keep showing 00:00:00 (your existing behavior) when it expires.
         final String clock = _formatRemainingClock(remaining);
 
         return _countdownBadgeShell(
           value: clock,
+          iconData: Icons.access_time_rounded,
           maxWidth: maxWidth,
           isCompact: isCompact,
         );
@@ -284,6 +310,7 @@ class TimelineWidget extends StatelessWidget {
 
   Widget _countdownBadgeShell({
     required String value,
+    required IconData iconData,
     double? maxWidth,
     bool isCompact = false,
   }) {
@@ -343,7 +370,7 @@ class TimelineWidget extends StatelessWidget {
           mainAxisSize: MainAxisSize.min, // keep contents centered as a group
           children: [
             Icon(
-              Icons.access_time_rounded,
+              iconData,
               size: iconSize,
               color: appTheme.gray_50.withAlpha(220),
             ),
@@ -458,7 +485,7 @@ class TimelineWidget extends StatelessWidget {
             Positioned(
               left: padding,
               right: padding,
-              bottom: 34.h,
+              bottom: 6.h,
               child: Center(
                 child: _buildCountdownBadge(
                   endUtc,
@@ -751,7 +778,6 @@ class _TimelineStoryWidget extends StatelessWidget {
     );
   }
 
-
   Widget _buildAvatar() {
     final String url = item.userAvatar.trim();
 
@@ -824,5 +850,4 @@ class _TimelineStoryWidget extends StatelessWidget {
       ),
     );
   }
-
 }

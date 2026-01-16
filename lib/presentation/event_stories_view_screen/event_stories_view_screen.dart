@@ -1,22 +1,26 @@
+// lib/presentation/event_stories_view_screen/event_stories_view_screen.dart
+
+import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:video_player/video_player.dart';
+import '../../services/reaction_preloader.dart';
 
 import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
+import '../../core/utils/image_constant.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../services/feed_service.dart';
 import '../../services/supabase_service.dart';
+import '../../theme/text_style_helper.dart';
 import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/story_reactions.dart';
 import '../report_story_screen/report_story_screen.dart';
-
-// lib/presentation/event_stories_view_screen/event_stories_view_screen.dart
 
 /// Enum for different haptic feedback types
 enum HapticFeedbackType {
@@ -33,7 +37,7 @@ class EventStoriesViewScreen extends ConsumerStatefulWidget {
 }
 
 class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   String? _initialStoryId;
   String? _feedType;
   List<String> _storyIds = [];
@@ -83,9 +87,33 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   // ✅ Prevent tap-through when any modal/sheet is open
   bool _isAnyModalOpen = false;
 
+  // ✅ NEW: For happening_now/trending, show a SINGLE timer bar (not multi-segment)
+  bool get _useSingleTimerBar =>
+      _feedType == 'happening_now' || _feedType == 'trending';
+
+  // ===== NEW: Prefetch window (±3) and race protection =====
+  static const int _prefetchRadius = 3;
+  final Map<int, Map<String, dynamic>> _prefetchDataByIndex = {};
+  final Map<int, VideoPlayerController> _prefetchVideoByIndex = {};
+  final Set<int> _prefetchInitializedVideoIndex = {};
+  final Set<int> _prefetchInFlight = {};
+  int _loadToken = 0;
+
+  // ===== NEW: Tap zone tuning + tap debounce =====
+  static const int _tapDebounceMs = 220;
+  bool _tapLocked = false;
+
+  // ===== NEW: Pause overlay visibility (show play button when paused) =====
+  bool get _shouldShowPlayOverlay =>
+      _isPaused &&
+          !_isAnyModalOpen &&
+          !_isTransitioning &&
+          _currentStoryData != null;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     // Initialize timer controller
     _timerController = AnimationController(
@@ -96,7 +124,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     // Initialize crossfade controller (100-150ms as per requirements)
     _crossfadeController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 120), // 120ms for smooth crossfade
+      duration: const Duration(milliseconds: 120),
     );
 
     _crossfadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -123,18 +151,11 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _loadAllLatestStories();
       } else if (args is FeedStoryContext) {
         print('🔍 DEBUG: Received FeedStoryContext');
-        _feedType = args.feedType;
-        _initialStoryId = args.initialStoryId;
-        _storyIds = args.storyIds;
-        _currentIndex = _storyIds.indexOf(args.initialStoryId);
+        print('🔍 DEBUG: Feed type: ${args.feedType}');
+        print('🔍 DEBUG: Story IDs count: ${args.storyIds.length}');
 
-        if (_currentIndex == -1) {
-          _currentIndex = 0;
-        }
-
-        _startingIndex = _currentIndex;
-        _pageController = PageController(initialPage: _currentIndex);
-        _loadStoryAtIndex(_currentIndex);
+        // ✅ Fetch appropriate story list when feedType == happening_now (and keep args.storyIds for others)
+        _loadStoriesFromContext(args);
       } else {
         setState(() {
           _isLoading = false;
@@ -146,6 +167,80 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _markStoryAsViewed();
     });
+  }
+
+  // ===== NEW: Ensure playback stops on lifecycle changes =====
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Always stop playback when app is not active to prevent background audio.
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _pausePlaybackForModal(); // pauses without hard reset
+    }
+    super.didChangeAppLifecycleState(state);
+  }
+
+  /// ✅ NEW: Load stories list based on FeedStoryContext feedType
+  Future<void> _loadStoriesFromContext(FeedStoryContext args) async {
+    try {
+      setState(() => _isLoading = true);
+
+      _feedType = args.feedType;
+      _initialStoryId = args.initialStoryId;
+
+      if (_feedType == 'happening_now') {
+        _storyIds = await _feedService.fetchHappeningNowStoryIds();
+        print(
+            '🔍 DEBUG: Fetched ${_storyIds.length} stories from happening now feed');
+      } else if (_feedType == 'trending') {
+        // If you have a trending endpoint later, swap it here.
+        _storyIds = args.storyIds;
+      } else {
+        _storyIds = args.storyIds;
+      }
+
+      if (_initialStoryId == null || _initialStoryId!.isEmpty) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'No story ID provided';
+        });
+        return;
+      }
+
+      print('🔍 DEBUG: Story IDs: $_storyIds');
+      print('🔍 DEBUG: Initial story ID: $_initialStoryId');
+
+      _currentIndex = _storyIds.indexOf(_initialStoryId!);
+
+      print('🔍 DEBUG: Initial story index in feed: $_currentIndex');
+
+      if (_currentIndex == -1) {
+        print(
+            '⚠️ WARNING: Initial story not found in list, defaulting to index 0');
+        _currentIndex = 0;
+      }
+
+      _startingIndex = _currentIndex;
+      _pageController = PageController(initialPage: _currentIndex);
+
+      await _loadStoryAtIndex(_currentIndex);
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+
+      print(
+          '✅ DEBUG: Initial story loaded at index $_currentIndex (starting from $_startingIndex)');
+    } catch (e) {
+      print('❌ ERROR loading stories from context: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Error loading stories: ${e.toString()}';
+      });
+    }
   }
 
   /// NEW METHOD: Load all latest stories from feed (not grouped by memory)
@@ -161,14 +256,12 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     try {
       setState(() => _isLoading = true);
 
-      // Fetch ALL latest stories from database (chronological order, not memory-grouped)
       _storyIds = await _feedService.fetchLatestStoryIds();
 
       print('🔍 DEBUG: Fetched ${_storyIds.length} stories from latest feed');
       print('🔍 DEBUG: Story IDs: $_storyIds');
       print('🔍 DEBUG: Initial story ID: $_initialStoryId');
 
-      // Find the index of the initial story in the FULL feed array
       _currentIndex = _storyIds.indexOf(_initialStoryId!);
 
       print('🔍 DEBUG: Initial story index in full feed: $_currentIndex');
@@ -179,13 +272,10 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _currentIndex = 0;
       }
 
-      // Store starting index for progress bar calculation
       _startingIndex = _currentIndex;
 
-      // Initialize PageController with the current index
       _pageController = PageController(initialPage: _currentIndex);
 
-      // Load the initial story
       await _loadStoryAtIndex(_currentIndex);
 
       print(
@@ -199,7 +289,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
-  // Keep existing _loadStoriesForMemory for backward compatibility but not used for /memories feed
   Future<void> _loadStoriesForMemory() async {
     if (_initialStoryId == null) {
       setState(() {
@@ -212,17 +301,14 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     try {
       setState(() => _isLoading = true);
 
-      // Get memory_id from the initial story
       final storyWithMemory = await _getStoryWithMemoryId(_initialStoryId!);
       final memoryId = storyWithMemory?['memory_id'] as String?;
 
       if (memoryId == null) {
-        // Fallback to single story if memory_id not available
         _storyIds = [_initialStoryId!];
         _currentIndex = 0;
         _startingIndex = 0;
       } else {
-        // Fetch all stories from this memory
         _storyIds = await _feedService.fetchMemoryStoryIds(memoryId);
 
         print(
@@ -230,7 +316,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         print('🔍 DEBUG: Story IDs: $_storyIds');
         print('🔍 DEBUG: Initial story ID: $_initialStoryId');
 
-        // Find the index of the initial story
         _currentIndex = _storyIds.indexOf(_initialStoryId!);
 
         print('🔍 DEBUG: Initial story index: $_currentIndex');
@@ -241,14 +326,11 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           _currentIndex = 0;
         }
 
-        // Store starting index for progress bar calculation
         _startingIndex = _currentIndex;
       }
 
-      // Initialize PageController with the current index
       _pageController = PageController(initialPage: _currentIndex);
 
-      // Load the initial story
       await _loadStoryAtIndex(_currentIndex);
 
       print(
@@ -280,6 +362,122 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
+  // ===== NEW: Prefetch window control =====
+
+  void _cleanupPrefetchWindow(int centerIndex) {
+    final minKeep = centerIndex - _prefetchRadius;
+    final maxKeep = centerIndex + _prefetchRadius;
+
+    final indicesToRemove = <int>[];
+    for (final idx in _prefetchDataByIndex.keys) {
+      if (idx < minKeep || idx > maxKeep) indicesToRemove.add(idx);
+    }
+    for (final idx in indicesToRemove) {
+      _prefetchDataByIndex.remove(idx);
+    }
+
+    final videoIndicesToRemove = <int>[];
+    for (final idx in _prefetchVideoByIndex.keys) {
+      if (idx < minKeep || idx > maxKeep) videoIndicesToRemove.add(idx);
+    }
+    for (final idx in videoIndicesToRemove) {
+      final ctrl = _prefetchVideoByIndex.remove(idx);
+      _prefetchInitializedVideoIndex.remove(idx);
+      try {
+        ctrl?.pause();
+        ctrl?.dispose();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _prefetchWindowAround(int centerIndex) async {
+    if (_storyIds.isEmpty) return;
+
+    _cleanupPrefetchWindow(centerIndex);
+
+    final minIndex =
+    (centerIndex - _prefetchRadius).clamp(0, _storyIds.length - 1);
+    final maxIndex =
+    (centerIndex + _prefetchRadius).clamp(0, _storyIds.length - 1);
+
+    // Fire-and-forget prefetches (but avoid duplicates)
+    for (int i = minIndex; i <= maxIndex; i++) {
+      final id = _storyIds[i];
+
+      // ✅ Preload reactions for the whole window
+      ReactionPreloader.instance.preload(id);
+
+      if (i == centerIndex) continue;
+      _prefetchIndex(i);
+    }
+  }
+
+  Future<void> _prefetchIndex(int index) async {
+    if (index < 0 || index >= _storyIds.length) return;
+    if (_prefetchInFlight.contains(index)) return;
+
+    // Already have data?
+    if (_prefetchDataByIndex.containsKey(index)) {
+      final cached = _prefetchDataByIndex[index];
+      final mediaType = cached?['media_type'] as String? ?? 'image';
+      final mediaUrl = cached?['media_url'] as String?;
+      if (mediaType == 'video' &&
+          mediaUrl != null &&
+          mediaUrl.isNotEmpty &&
+          !_prefetchVideoByIndex.containsKey(index)) {
+        // warm video controller (handled below)
+      } else if (mediaType == 'image' &&
+          mediaUrl != null &&
+          mediaUrl.isNotEmpty) {
+        // image cache warm is optional (handled below)
+      }
+    }
+
+    _prefetchInFlight.add(index);
+
+    try {
+      final storyId = _storyIds[index];
+
+      // ✅ Preload reactions in the same window as media
+      ReactionPreloader.instance.preload(storyId);
+
+      final data = _prefetchDataByIndex[index] ??
+          await _feedService.fetchStoryDetails(storyId);
+
+      if (data == null) {
+        _prefetchInFlight.remove(index);
+        return;
+      }
+
+      _prefetchDataByIndex[index] = data;
+
+      final mediaType = data['media_type'] as String? ?? 'image';
+      final mediaUrl = data['media_url'] as String?;
+
+      if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
+        if (!_prefetchVideoByIndex.containsKey(index)) {
+          final ctrl = VideoPlayerController.networkUrl(Uri.parse(mediaUrl));
+          await ctrl.initialize();
+          ctrl.setLooping(false);
+          ctrl.setVolume(0.0); // keep muted until promoted to current slot
+          _prefetchVideoByIndex[index] = ctrl;
+          _prefetchInitializedVideoIndex.add(index);
+        }
+      } else if (mediaType == 'image' &&
+          mediaUrl != null &&
+          mediaUrl.isNotEmpty) {
+        if (mounted) {
+          await precacheImage(CachedNetworkImageProvider(mediaUrl), context);
+        }
+      }
+    } catch (e) {
+      print('⚠️ WARNING: Prefetch error (index $index): $e');
+    } finally {
+      _prefetchInFlight.remove(index);
+    }
+  }
+
+  // ===== UPDATED: Main loader uses ±3 prefetch cache first =====
   Future<void> _loadStoryAtIndex(int index) async {
     if (index < 0 || index >= _storyIds.length) {
       print(
@@ -287,35 +485,46 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       return;
     }
 
+    // Token prevents late async completions from mutating state after a newer request
+    final int token = ++_loadToken;
+
     try {
       print(
           '🔄 DEBUG: Loading story at index $index (ID: ${_storyIds[index]})');
 
-      // Reset timer
+      // Reset timer for new story (do not auto-play if paused)
       _timerController?.stop();
       _timerController?.reset();
 
       final storyId = _storyIds[index];
 
-      // Check if we have prefetched next story data
-      Map<String, dynamic>? storyData;
-      VideoPlayerController? videoController;
-      bool isVideoInitialized = false;
+      // ✅ Always warm reactions for the story we’re loading now
+      ReactionPreloader.instance.preload(storyId);
 
-      if (_nextStoryData != null && _nextStoryData!['id'] == storyId) {
-        print('✅ DEBUG: Using prefetched data for story $storyId');
+      // Pull from prefetch window if available
+      Map<String, dynamic>? storyData = _prefetchDataByIndex[index];
+      VideoPlayerController? prefetchedVideo = _prefetchVideoByIndex[index];
+      bool prefetchedVideoInitialized =
+      _prefetchInitializedVideoIndex.contains(index);
+
+      // Otherwise fall back to old "next slot" if it matches
+      if (storyData == null &&
+          _nextStoryData != null &&
+          _nextStoryData!['id'] == storyId) {
+        print('✅ DEBUG: Using prefetched NEXT-slot data for story $storyId');
         storyData = _nextStoryData;
-        videoController = _nextVideoController;
-        isVideoInitialized = _isNextVideoInitialized;
+        prefetchedVideo = _nextVideoController;
+        prefetchedVideoInitialized = _isNextVideoInitialized;
 
-        // Clear next slot
         _nextStoryData = null;
         _nextVideoController = null;
         _isNextVideoInitialized = false;
-      } else {
-        print('🔄 DEBUG: Fetching story data from service');
-        storyData = await _feedService.fetchStoryDetails(storyId);
       }
+
+      // Otherwise fetch normally
+      storyData ??= await _feedService.fetchStoryDetails(storyId);
+
+      if (!mounted || token != _loadToken) return;
 
       if (storyData == null) {
         print('❌ ERROR: Story data is null for ID $storyId');
@@ -328,79 +537,91 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       // Fetch memory category information
       final memoryId = storyData['memory_id'] as String?;
       if (memoryId != null && memoryId.isNotEmpty) {
-        _memoryId = memoryId; // set immediately (no await needed)
+        _memoryId = memoryId;
         await _fetchMemoryCategory(memoryId);
+        if (!mounted || token != _loadToken) return;
       }
 
-      // CRITICAL: If this is first load, set as current directly
+      // First story load: assign directly
       if (_currentStoryData == null) {
         _currentStoryData = storyData;
-        _currentVideoController = videoController;
-        _isCurrentVideoInitialized = isVideoInitialized;
+        _currentVideoController = prefetchedVideo;
+        _isCurrentVideoInitialized = prefetchedVideoInitialized;
 
         setState(() {
           _currentIndex = index;
           _isLoading = false;
-          _isPaused = false;
           _initialStoryId = storyId;
         });
 
         await _markStoryAsViewed();
+        await _startCurrentStoryPlaybackIfAllowed();
 
-        // Initialize video if needed
-        final mediaType = storyData['media_type'] as String? ?? 'image';
-        final mediaUrl = storyData['media_url'] as String?;
-
-        if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
-          if (_currentVideoController == null || !_isCurrentVideoInitialized) {
-            await _initializeVideoPlayer(mediaUrl, isCurrentSlot: true);
-          } else {
-            _currentVideoController!.setVolume(_isMuted ? 0.0 : 1.0);
-            _currentVideoController!.play();
-
-            final videoDuration = _currentVideoController!.value.duration;
-            _timerController?.duration = videoDuration;
-            _timerController?.forward();
-          }
-        } else {
-          _timerController?.duration = _imageDuration;
-          _timerController?.forward();
-        }
-
-        // Prefetch next story
-        _prefetchNextStory(index);
+        // Prefetch ±3 around
+        _prefetchWindowAround(index);
         return;
       }
 
-      // DUAL-SLOT CROSSFADE TRANSITION
+      // Transition path: stage next slot then crossfade
       _nextStoryData = storyData;
-      _nextVideoController = videoController;
-      _isNextVideoInitialized = isVideoInitialized;
+      _nextVideoController = prefetchedVideo;
+      _isNextVideoInitialized = prefetchedVideoInitialized;
 
-      // Initialize video in next slot if needed and not prefetched
+      // Warm next slot media if needed
       final mediaType = storyData['media_type'] as String? ?? 'image';
       final mediaUrl = storyData['media_url'] as String?;
 
       if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
         if (_nextVideoController == null || !_isNextVideoInitialized) {
           await _initializeVideoPlayer(mediaUrl, isCurrentSlot: false);
+          if (!mounted || token != _loadToken) return;
         }
       } else if (mediaType == 'image' &&
           mediaUrl != null &&
           mediaUrl.isNotEmpty) {
-        // Ensure image is precached before transition
         await precacheImage(CachedNetworkImageProvider(mediaUrl), context);
+        if (!mounted || token != _loadToken) return;
       }
 
-      // Perform crossfade transition
       await _performCrossfadeTransition(index, storyId);
+
+      // Prefetch ±3 around new center
+      _prefetchWindowAround(index);
 
       print('✅ DEBUG: Successfully transitioned to story at index $index');
     } catch (e) {
       print('❌ ERROR loading story at index $index: $e');
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Error loading story: ${e.toString()}';
       });
+    }
+  }
+
+  Future<void> _startCurrentStoryPlaybackIfAllowed() async {
+    if (!mounted) return;
+
+    // If paused or modal open or transitioning, do not auto-start.
+    if (_isPaused || _isAnyModalOpen || _isTransitioning) return;
+
+    final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+    final mediaUrl = _currentStoryData?['media_url'] as String?;
+
+    if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
+      if (_currentVideoController == null || !_isCurrentVideoInitialized) {
+        await _initializeVideoPlayer(mediaUrl, isCurrentSlot: true);
+        return;
+      }
+
+      _currentVideoController!.setVolume(_isMuted ? 0.0 : 1.0);
+      await _currentVideoController!.play();
+
+      final videoDuration = _currentVideoController!.value.duration;
+      _timerController?.duration = videoDuration;
+      _timerController?.forward();
+    } else {
+      _timerController?.duration = _imageDuration;
+      _timerController?.forward();
     }
   }
 
@@ -413,6 +634,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
     try {
       _isTransitioning = true;
+
+      // Stop progress during transition
+      _timerController?.stop();
 
       _crossfadeController?.reset();
 
@@ -429,24 +653,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
       await _markStoryAsViewed();
 
-      // Start playback on new current story
-      final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
-
-      if (mediaType == 'video' &&
-          _currentVideoController != null &&
-          _isCurrentVideoInitialized) {
-        _currentVideoController!.setVolume(_isMuted ? 0.0 : 1.0);
-        _currentVideoController!.play();
-
-        final videoDuration = _currentVideoController!.value.duration;
-        _timerController?.duration = videoDuration;
-        _timerController?.forward();
-      } else {
-        _timerController?.duration = _imageDuration;
-        _timerController?.forward();
-      }
-
-      _prefetchNextStory(newIndex);
+      // Start playback only if not paused / not modal
+      await _startCurrentStoryPlaybackIfAllowed();
 
       print('✅ DEBUG: Crossfade transition completed');
     } catch (e) {
@@ -458,8 +666,10 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   /// Swaps next media slot to current and disposes old current
   Future<void> _swapMediaSlots() async {
     if (_currentVideoController != null) {
-      await _currentVideoController!.pause();
-      await _currentVideoController!.dispose();
+      try {
+        await _currentVideoController!.pause();
+        await _currentVideoController!.dispose();
+      } catch (_) {}
     }
 
     _currentStoryData = _nextStoryData;
@@ -471,62 +681,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     _isNextVideoInitialized = false;
 
     setState(() {});
-
     print('✅ DEBUG: Media slots swapped, old media disposed');
-  }
-
-  /// Prefetch next story media in background
-  Future<void> _prefetchNextStory(int currentIndex) async {
-    if (_isPrefetching || currentIndex >= _storyIds.length - 1) {
-      return;
-    }
-
-    try {
-      _isPrefetching = true;
-      final nextIndex = currentIndex + 1;
-      final nextStoryId = _storyIds[nextIndex];
-
-      print(
-          '🔄 DEBUG: Prefetching next story at index $nextIndex (ID: $nextStoryId)');
-
-      final nextStoryData = await _feedService.fetchStoryDetails(nextStoryId);
-
-      if (nextStoryData == null) {
-        print('⚠️ WARNING: Failed to prefetch story $nextStoryId');
-        _isPrefetching = false;
-        return;
-      }
-
-      final mediaType = nextStoryData['media_type'] as String? ?? 'image';
-      final mediaUrl = nextStoryData['media_url'] as String?;
-
-      if (mediaType == 'video' && mediaUrl != null && mediaUrl.isNotEmpty) {
-        print('📹 DEBUG: Prefetching video controller');
-        final prefetchController =
-        VideoPlayerController.networkUrl(Uri.parse(mediaUrl));
-        await prefetchController.initialize();
-        prefetchController.setLooping(false);
-
-        _nextVideoController = prefetchController;
-        _isNextVideoInitialized = true;
-
-        print('✅ DEBUG: Video prefetched successfully');
-      } else if (mediaType == 'image' &&
-          mediaUrl != null &&
-          mediaUrl.isNotEmpty) {
-        print('🖼️ DEBUG: Prefetching image');
-        await precacheImage(CachedNetworkImageProvider(mediaUrl), context);
-        print('✅ DEBUG: Image prefetched successfully');
-      }
-
-      _nextStoryData = nextStoryData;
-      _isPrefetching = false;
-
-      print('✅ DEBUG: Story $nextStoryId prefetched successfully');
-    } catch (e) {
-      print('⚠️ WARNING: Error prefetching next story: $e');
-      _isPrefetching = false;
-    }
   }
 
   /// NEW METHOD: Fetch memory category data
@@ -573,6 +728,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
+  // ===== UPDATED: Keep a real listener reference (removeListener(() {}) does nothing) =====
+  VoidCallback? _currentVideoEndListener;
+
   Future<void> _initializeVideoPlayer(String videoUrl,
       {required bool isCurrentSlot}) async {
     try {
@@ -583,39 +741,59 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       controller.setLooping(false);
 
       if (isCurrentSlot) {
+        // Remove previous listener cleanly
+        if (_currentVideoController != null && _currentVideoEndListener != null) {
+          try {
+            _currentVideoController!.removeListener(_currentVideoEndListener!);
+          } catch (_) {}
+        }
+
         _currentVideoController = controller;
         _isCurrentVideoInitialized = true;
 
         final videoDuration = controller.value.duration;
         _timerController?.duration = videoDuration;
 
-        controller.play();
-        _timerController?.forward();
+        // Add end listener with stable reference
+        _currentVideoEndListener = () {
+          final c = _currentVideoController;
+          if (c == null) return;
+          if (!c.value.isInitialized) return;
 
-        controller.addListener(() {
-          if (controller.value.position >= controller.value.duration) {
+          final pos = c.value.position;
+          final dur = c.value.duration;
+          if (dur != Duration.zero && pos >= dur) {
             if (!_isPaused && !_isTransitioning && !_isAnyModalOpen) {
               _goToNextStory();
             }
           }
-        });
+        };
+        controller.addListener(_currentVideoEndListener!);
+
+        // Auto-play only if allowed
+        if (!_isPaused && !_isAnyModalOpen && !_isTransitioning) {
+          controller.play();
+          _timerController?.forward();
+        }
       } else {
         _nextVideoController = controller;
         _isNextVideoInitialized = true;
       }
 
-      setState(() {});
+      if (mounted) setState(() {});
 
       print(
           '✅ DEBUG: Video initialized in ${isCurrentSlot ? 'current' : 'next'} slot');
     } catch (e) {
       print('❌ ERROR initializing video player: $e');
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Failed to load video';
       });
     }
   }
 
+  // ===== UPDATED: Navigation uses PageController, but we keep physics locked; tap zones call these =====
   void _goToNextStory() {
     if (_isAnyModalOpen) return;
 
@@ -623,7 +801,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       _triggerHapticFeedback(HapticFeedbackType.medium);
 
       _pageController?.nextPage(
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 260),
         curve: Curves.easeInOut,
       );
     } else {
@@ -642,7 +820,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       _triggerHapticFeedback(HapticFeedbackType.medium);
 
       _pageController?.previousPage(
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 260),
         curve: Curves.easeInOut,
       );
     }
@@ -656,13 +834,16 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _timerController?.stop();
         _currentVideoController?.pause();
       } else {
-        _timerController?.forward();
-        final mediaType =
-            _currentStoryData?['media_type'] as String? ?? 'image';
-        if (mediaType == 'video' &&
-            _currentVideoController != null &&
-            _isCurrentVideoInitialized) {
-          _currentVideoController?.play();
+        // Resume only if not blocked
+        if (!_isAnyModalOpen && !_isTransitioning) {
+          _timerController?.forward();
+          final mediaType =
+              _currentStoryData?['media_type'] as String? ?? 'image';
+          if (mediaType == 'video' &&
+              _currentVideoController != null &&
+              _isCurrentVideoInitialized) {
+            _currentVideoController?.play();
+          }
         }
       }
     });
@@ -677,7 +858,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     });
   }
 
-  /// Triggers haptic vibration feedback
   Future<void> _triggerHapticFeedback(HapticFeedbackType type) async {
     try {
       final hasVibrator = await Vibration.hasVibrator() ?? false;
@@ -699,13 +879,10 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
-  /// Shares the current story with native share sheet
-  /// Shares the current story using the web URL (OG preview),
-  /// NOT an attached file (attachments cause iMessage to open camera/MMS UI).
   Future<void> _shareStory() async {
-    // Prefer share_code for shorter URLs, fallback to storyId (UUID)
     final shareCode = _currentStoryData?['share_code'] as String?;
-    final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : _initialStoryId;
+    final storyId =
+    _storyIds.isNotEmpty ? _storyIds[_currentIndex] : _initialStoryId;
 
     final shareIdentifier = shareCode ?? storyId;
 
@@ -715,15 +892,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
 
     try {
-      // Always share the web URL so iMessage/WhatsApp/etc. render OG tags.
       final shareUrl = 'https://share.capapp.co/$shareIdentifier';
 
-
-      await Share.share(
-        shareUrl, // ✅ URL only (no caption)
-        // Optional: you can remove subject too if you want it even "cleaner"
-        // subject: 'Story on Capsule',
-      );
+      await Share.share(shareUrl);
 
       debugPrint('✅ DEBUG: Shared story link: $shareUrl');
     } catch (e) {
@@ -746,25 +917,48 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _performHardMediaReset();
     _timerController?.dispose();
     _crossfadeController?.dispose();
     _pageController?.dispose();
+
+    // Dispose prefetch controllers
+    for (final ctrl in _prefetchVideoByIndex.values) {
+      try {
+        ctrl.pause();
+        ctrl.dispose();
+      } catch (_) {}
+    }
+    _prefetchVideoByIndex.clear();
+    _prefetchDataByIndex.clear();
+    _prefetchInitializedVideoIndex.clear();
+    _prefetchInFlight.clear();
+    for (final id in _storyIds) {
+      ReactionPreloader.instance.clearStory(id);
+    }
     super.dispose();
   }
 
   void _performHardMediaReset() {
     try {
+      _loadToken++; // invalidate any in-flight loads
       _timerController?.stop();
       _timerController?.reset();
       _crossfadeController?.stop();
       _crossfadeController?.reset();
 
       if (_currentVideoController != null) {
+        try {
+          if (_currentVideoEndListener != null) {
+            _currentVideoController!.removeListener(_currentVideoEndListener!);
+          }
+        } catch (_) {}
+        _currentVideoEndListener = null;
+
         _currentVideoController!.pause();
         _currentVideoController!.setVolume(0.0);
         _currentVideoController!.seekTo(Duration.zero);
-        _currentVideoController!.removeListener(() {});
         _currentVideoController!.dispose();
         _currentVideoController = null;
         _isCurrentVideoInitialized = false;
@@ -774,7 +968,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _nextVideoController!.pause();
         _nextVideoController!.setVolume(0.0);
         _nextVideoController!.seekTo(Duration.zero);
-        _nextVideoController!.removeListener(() {});
         _nextVideoController!.dispose();
         _nextVideoController = null;
         _isNextVideoInitialized = false;
@@ -783,6 +976,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       _currentStoryData = null;
       _nextStoryData = null;
       _isPrefetching = false;
+      _isTransitioning = false;
 
       print(
           '✅ HARD RESET: All media players (dual slots) stopped and disposed');
@@ -794,10 +988,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   Future<void> _navigateToTimeline(MemoryNavArgs navArgs) async {
     final wasPausedBefore = _isPaused;
 
-    // Pause without destroying state (do NOT hard reset)
     _pausePlaybackForModal();
     setState(() {
-      _isAnyModalOpen = true; // blocks tap-through while navigating
+      _isAnyModalOpen = true;
     });
 
     await Navigator.pushNamed(
@@ -812,11 +1005,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       _isAnyModalOpen = false;
     });
 
-    // Resume the story where the user left off
     _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
   }
 
-  /// Mark the current story as viewed in the database
   Future<void> _markStoryAsViewed() async {
     try {
       final client = Supabase.instance.client;
@@ -883,7 +1074,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
     await showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // allows the sheet to grow and handle keyboard
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withAlpha(180),
       builder: (sheetContext) {
@@ -937,7 +1128,10 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
               CustomButton(
                 text: 'Go Back',
                 width: 200.h,
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  _performHardMediaReset();
+                  Navigator.pop(context);
+                },
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
               ),
@@ -947,80 +1141,164 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       );
     }
 
-    return Scaffold(
-      backgroundColor: appTheme.blackCustom,
-      extendBodyBehindAppBar: true,
-      body: GestureDetector(
-        onVerticalDragStart: (details) {
-          if (_isAnyModalOpen) return;
-          setState(() {
-            _dragStartY = details.globalPosition.dy;
-            _dragCurrentY = details.globalPosition.dy;
-            _isDragging = true;
-          });
-        },
-        onVerticalDragUpdate: (details) {
-          if (_isAnyModalOpen) return;
-          setState(() {
-            _dragCurrentY = details.globalPosition.dy;
-          });
-        },
-        onVerticalDragEnd: (details) async {
-          if (_isAnyModalOpen) return;
+    return WillPopScope(
+      onWillPop: () async {
+        // ✅ Hard stop on back
+        _performHardMediaReset();
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: appTheme.blackCustom,
+        extendBodyBehindAppBar: true,
+        body: GestureDetector(
+          onVerticalDragStart: (details) {
+            if (_isAnyModalOpen) return;
+            setState(() {
+              _dragStartY = details.globalPosition.dy;
+              _dragCurrentY = details.globalPosition.dy;
+              _isDragging = true;
+            });
+          },
+          onVerticalDragUpdate: (details) {
+            if (_isAnyModalOpen) return;
+            setState(() {
+              _dragCurrentY = details.globalPosition.dy;
+            });
+          },
+          onVerticalDragEnd: (details) async {
+            if (_isAnyModalOpen) return;
 
-          final dragDistance = _dragCurrentY - _dragStartY;
-          final velocity = details.primaryVelocity ?? 0;
+            final dragDistance = _dragCurrentY - _dragStartY;
+            final velocity = details.primaryVelocity ?? 0;
 
-          if (dragDistance > 100 || velocity > 500) {
-            _triggerHapticFeedback(HapticFeedbackType.medium);
-            _performHardMediaReset();
-            Navigator.of(context).pop();
-          }
+            if (dragDistance > 100 || velocity > 500) {
+              _triggerHapticFeedback(HapticFeedbackType.medium);
+              _performHardMediaReset();
+              Navigator.of(context).pop();
+            }
 
-          setState(() {
-            _isDragging = false;
-            _dragStartY = 0.0;
-            _dragCurrentY = 0.0;
-          });
-        },
-        child: AnimatedContainer(
-          duration: Duration(milliseconds: 200),
-          transform: Matrix4.translationValues(
-            0,
-            _isDragging
-                ? (_dragCurrentY - _dragStartY).clamp(0, double.infinity)
-                : 0,
-            0,
-          ),
-          child: PageView.builder(
-            controller: _pageController,
-            physics: NeverScrollableScrollPhysics(),
-            itemCount: _storyIds.length,
-            onPageChanged: (index) {
-              _loadStoryAtIndex(index);
-            },
-            itemBuilder: (context, index) {
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  _buildDualMediaLayers(),
-                  _buildGradientOverlays(),
-                  _buildTapZones(),
-                  SafeArea(
-                    child: Column(
-                      children: [
-                        _buildTimerBars(),
-                        _buildTopBar(),
-                        Spacer(),
-                        _buildBottomInfo(),
-                      ],
+            setState(() {
+              _isDragging = false;
+              _dragStartY = 0.0;
+              _dragCurrentY = 0.0;
+            });
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            transform: Matrix4.translationValues(
+              0,
+              _isDragging
+                  ? (_dragCurrentY - _dragStartY).clamp(0, double.infinity)
+                  : 0,
+              0,
+            ),
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _storyIds.length,
+              onPageChanged: (index) {
+                _loadStoryAtIndex(index);
+              },
+              itemBuilder: (context, index) {
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildDualMediaLayers(),
+                    _buildGradientOverlays(),
+
+                    // ✅ Tap zones (narrower) + pause overlay
+                    _buildTapZones(),
+                    if (_shouldShowPlayOverlay) _buildPlayOverlay(),
+
+                    SafeArea(
+                      child: Column(
+                        children: [
+                          // ✅ UPDATED: single timer bar for happening_now/trending,
+                          // otherwise the original multi-segment bars
+                          _useSingleTimerBar ? _buildSingleTimerBar() : _buildTimerBars(),
+                          _buildTopBar(),
+                          const Spacer(),
+                          _buildBottomInfo(),
+                        ],
+                      ),
                     ),
-                  ),
-                  _buildTappableUserProfile(),
-                ],
-              );
-            },
+
+                    // user profile taps
+                    _buildTappableUserProfile(),
+
+                    // ✅ Photo-only indicator
+                    _buildMediaTypeIndicator(),
+                  ],
+                );
+              },
+            ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlayOverlay() {
+    return IgnorePointer(
+      ignoring: false,
+      child: Center(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            if (_isAnyModalOpen) return;
+            _triggerHapticFeedback(HapticFeedbackType.selection);
+            _togglePauseResume();
+          },
+          child: Container(
+            width: 68.h,
+            height: 68.h,
+            decoration: BoxDecoration(
+              color: appTheme.blackCustom.withAlpha(140),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: appTheme.whiteCustom.withAlpha(60),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              Icons.play_arrow_rounded,
+              color: appTheme.whiteCustom,
+              size: 44.h,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaTypeIndicator() {
+    final mediaType = _currentStoryData?['media_type'] as String? ?? 'image';
+    if (mediaType != 'image') return const SizedBox.shrink();
+
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 74.h,
+      right: 16.h,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: appTheme.blackCustom.withAlpha(140),
+          borderRadius: BorderRadius.circular(16.h),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.photo_outlined,
+              size: 16.h,
+              color: appTheme.whiteCustom.withAlpha(220),
+            ),
+            SizedBox(width: 6.h),
+            Text(
+              'Photo',
+              style: TextStyleHelper.instance.body12RegularPlusJakartaSans
+                  .copyWith(color: appTheme.whiteCustom.withAlpha(220)),
+            ),
+          ],
         ),
       ),
     );
@@ -1044,7 +1322,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     );
   }
 
-  /// Builds a single media layer (image or video)
   Widget _buildMediaLayer(Map<String, dynamic> storyData,
       VideoPlayerController? controller, bool isInitialized) {
     final mediaUrl = storyData['media_url'] as String?;
@@ -1112,7 +1389,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     );
   }
 
-  /// Builds transparent tap zones for story navigation
+  // ===== UPDATED: Tap zones narrower + debounced + no accidental edges =====
   Widget _buildTapZones() {
     return SafeArea(
       child: Column(
@@ -1132,6 +1409,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                 if (_isAnyModalOpen) return;
                 setState(() {
                   _isPaused = false;
+                });
+                // Resume only if not blocked
+                if (!_isAnyModalOpen && !_isTransitioning) {
                   _timerController?.forward();
 
                   final mediaType =
@@ -1141,39 +1421,62 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                       _isCurrentVideoInitialized) {
                     _currentVideoController?.play();
                   }
-                });
+                }
               },
               child: Row(
                 children: [
+                  // Left zone: 22%
                   Expanded(
-                    flex: 35,
+                    flex: 22,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTap: () {
+                      onTap: () async {
                         if (_isAnyModalOpen) return;
+                        if (_tapLocked) return;
+                        _tapLocked = true;
+                        Future.delayed(
+                          const Duration(milliseconds: _tapDebounceMs),
+                              () => _tapLocked = false,
+                        );
                         _goToPreviousStory();
                       },
                       child: Container(color: appTheme.transparentCustom),
                     ),
                   ),
+
+                  // Center zone: 56% (pause/resume)
                   Expanded(
-                    flex: 30,
+                    flex: 56,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTap: () {
+                      onTap: () async {
                         if (_isAnyModalOpen) return;
+                        if (_tapLocked) return;
+                        _tapLocked = true;
+                        Future.delayed(
+                          const Duration(milliseconds: _tapDebounceMs),
+                              () => _tapLocked = false,
+                        );
                         _triggerHapticFeedback(HapticFeedbackType.selection);
                         _togglePauseResume();
                       },
                       child: Container(color: appTheme.transparentCustom),
                     ),
                   ),
+
+                  // Right zone: 22%
                   Expanded(
-                    flex: 35,
+                    flex: 22,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
-                      onTap: () {
+                      onTap: () async {
                         if (_isAnyModalOpen) return;
+                        if (_tapLocked) return;
+                        _tapLocked = true;
+                        Future.delayed(
+                          const Duration(milliseconds: _tapDebounceMs),
+                              () => _tapLocked = false,
+                        );
                         _goToNextStory();
                       },
                       child: Container(color: appTheme.transparentCustom),
@@ -1184,6 +1487,29 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// ✅ NEW: Single story progress bar (for happening_now / trending)
+  Widget _buildSingleTimerBar() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 8.h),
+      child: SizedBox(
+        height: 3.h,
+        child: AnimatedBuilder(
+          animation: _timerController!,
+          builder: (context, child) {
+            final progress = _timerController?.value ?? 0.0;
+
+            return LinearProgressIndicator(
+              value: progress.clamp(0.0, 1.0),
+              backgroundColor: appTheme.whiteCustom.withAlpha(77),
+              valueColor: AlwaysStoppedAnimation<Color>(appTheme.whiteCustom),
+              minHeight: 3.h,
+            );
+          },
+        ),
       ),
     );
   }
@@ -1246,7 +1572,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
             ),
           ),
         ),
-        Spacer(),
+        const Spacer(),
         Container(
           height: 150.h,
           decoration: BoxDecoration(
@@ -1267,11 +1593,27 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
   /// Builds tappable user profile section positioned on top layer to ensure tap detection
   Widget _buildTappableUserProfile() {
-    final userName =
-        _currentStoryData?['user_name'] as String? ?? 'Unknown User';
+    final userName = _currentStoryData?['user_name'] as String? ?? 'Unknown User';
     final userAvatar = _currentStoryData?['user_avatar'] as String?;
-    final userId = _currentStoryData?['user_id'] as String?;
+    final storyOwnerId = _currentStoryData?['user_id'] as String?;
     final memoryTitle = _currentStoryData?['memory_title'] as String?;
+
+    void _goToStoryOwnerProfile() {
+      if (_isAnyModalOpen) return;
+
+      if (storyOwnerId == null || storyOwnerId.isEmpty) {
+        print('⚠️ WARNING: storyOwnerId is null or empty, cannot navigate');
+        return;
+      }
+
+      print('🔍 DEBUG: Navigating to story owner profile - userId: $storyOwnerId');
+
+      Navigator.pushNamed(
+        context,
+        AppRoutes.appProfileUser,
+        arguments: {'userId': storyOwnerId},
+      );
+    }
 
     return Positioned(
       top: MediaQuery.of(context).padding.top + 20.h,
@@ -1283,19 +1625,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                if (_isAnyModalOpen) return;
-                print('🔍 DEBUG: User avatar tapped - userId: $userId');
-                if (userId != null && userId.isNotEmpty) {
-                  Navigator.pushNamed(
-                    context,
-                    AppRoutes.appProfileUser,
-                    arguments: {'userId': userId},
-                  );
-                } else {
-                  print('⚠️ WARNING: userId is null or empty, cannot navigate');
-                }
-              },
+              onTap: _goToStoryOwnerProfile,
               child: Container(
                 width: 40.h,
                 height: 40.h,
@@ -1320,20 +1650,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                 children: [
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () {
-                      if (_isAnyModalOpen) return;
-                      print('🔍 DEBUG: User name tapped - userId: $userId');
-                      if (userId != null && userId.isNotEmpty) {
-                        Navigator.pushNamed(
-                          context,
-                          AppRoutes.appProfileUser,
-                          arguments: {'userId': userId},
-                        );
-                      } else {
-                        print(
-                            '⚠️ WARNING: userId is null or empty, cannot navigate');
-                      }
-                    },
+                    onTap: _goToStoryOwnerProfile,
                     child: Text(
                       userName,
                       style: TextStyleHelper.instance.body16BoldPlusJakartaSans
@@ -1348,13 +1665,16 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                       onTap: () async {
                         if (_isAnyModalOpen) return;
 
-                        final resolvedMemoryId =
-                            _memoryId ?? (_currentStoryData?['memory_id'] as String?);
+                        final resolvedMemoryId = _memoryId ??
+                            (_currentStoryData?['memory_id'] as String?);
 
-                        print('🔍 DEBUG: Memory title tapped - memoryId: $resolvedMemoryId');
+                        print(
+                            '🔍 DEBUG: Memory title tapped - memoryId: $resolvedMemoryId');
 
-                        if (resolvedMemoryId == null || resolvedMemoryId.isEmpty) {
-                          print('⚠️ WARNING: resolvedMemoryId is null/empty, cannot navigate');
+                        if (resolvedMemoryId == null ||
+                            resolvedMemoryId.isEmpty) {
+                          print(
+                              '⚠️ WARNING: resolvedMemoryId is null/empty, cannot navigate');
                           return;
                         }
 
@@ -1363,16 +1683,19 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                           snapshot: MemorySnapshot(
                             title: memoryTitle,
                             date: _currentStoryData?['memory_date'] as String? ??
-                                _formatDate(_currentStoryData?['created_at'] as String?),
-                            location: _currentStoryData?['memory_location'] as String?,
+                                _formatDate(
+                                    _currentStoryData?['created_at'] as String?),
+                            location:
+                            _currentStoryData?['memory_location'] as String?,
                             categoryIcon: _memoryCategoryIcon,
                             participantAvatars: null,
-                            isPrivate: _currentStoryData?['memory_visibility'] == 'private',
+                            isPrivate:
+                            _currentStoryData?['memory_visibility'] ==
+                                'private',
                           ),
                         );
 
                         await _navigateToTimeline(navArgs);
-
                       },
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1480,7 +1803,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                   );
 
                   await _navigateToTimeline(navArgs);
-
                 }
               },
               child: Container(
@@ -1886,8 +2208,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
-// ✅ Updated: pauses immediately, does NOT resume until the chosen action finishes.
-// ✅ Share keeps video paused while native share sheet is open.
+  // ✅ Updated: pauses immediately, does NOT resume until the chosen action finishes.
+  // ✅ Share keeps video paused while native share sheet is open.
   Future<void> _showMoreOptions() async {
     final wasPausedBefore = _isPaused;
 
@@ -1900,7 +2222,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       _isAnyModalOpen = true;
     }
 
-    // Return an action from the bottom sheet so we can decide what to do AFTER it closes.
     final action = await showModalBottomSheet<String>(
       context: context,
       useRootNavigator: true,
@@ -1939,27 +2260,20 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
     if (!mounted) return;
 
-    // Keep modal-open state while we perform the action (esp. share sheet).
-    // Only clear + resume after action finishes.
     try {
       if (action == 'report') {
-        // Give the sheet a beat to animate out cleanly
         await Future.delayed(const Duration(milliseconds: 80));
         _pausePlaybackForModal();
         await _openReportStoryModal(wasPausedBefore: wasPausedBefore);
-        // _openReportStoryModal already resumes when it closes
         return;
       }
 
       if (action == 'share') {
-        // keep paused
         _pausePlaybackForModal();
         setState(() => _isAnyModalOpen = true);
 
-        // ✅ wait for the bottom sheet route to be fully removed
         await Future<void>.delayed(Duration.zero);
         await Future<void>.delayed(const Duration(milliseconds: 10));
-        // or: await WidgetsBinding.instance.endOfFrame;
 
         await _shareStory();
 
@@ -1969,14 +2283,11 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         return;
       }
 
-
-      // User dismissed the sheet without action
       setState(() {
         _isAnyModalOpen = false;
       });
       _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
     } catch (_) {
-      // Safety: never leave modal flag stuck
       if (!mounted) return;
       setState(() {
         _isAnyModalOpen = false;

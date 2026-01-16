@@ -87,6 +87,28 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
       ),
     );
   }
+  TextSpan _buildWindowSpan(DateTime dt) {
+    final local = dt.toLocal();
+
+    final String monthDay = DateFormat('MMM d').format(local); // bold
+    final String time = DateFormat(' • h:mm a').format(local); // regular
+
+    return TextSpan(
+      children: [
+        TextSpan(
+          text: monthDay,
+          style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300, height: 1.25),
+        ),
+        TextSpan(
+          text: time,
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300, height: 1.25),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildContent(BuildContext context) {
     return Consumer(
@@ -128,17 +150,26 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
                           .copyWith(color: appTheme.gray_50),
                     ),
                     SizedBox(height: 6.h),
-                    Text(
-                      '${_formatReadableDateTime(start)}  →  ${_formatReadableDateTime(end)}',
-                      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                          .copyWith(color: appTheme.blue_gray_300, height: 1.25),
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          _buildWindowSpan(start),
+                          TextSpan(
+                            text: '  →  ',
+                            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                                .copyWith(color: appTheme.blue_gray_300, height: 1.25),
+                          ),
+                          _buildWindowSpan(end),
+                        ],
+                      ),
                     ),
+
                     SizedBox(height: 6.h),
-                    Text(
-                      '(${_formatReadableDate(start)} to ${_formatReadableDate(end)})',
-                      style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                          .copyWith(color: appTheme.blue_gray_300, height: 1.25),
-                    ),
+                    // Text(
+                    //   '(${_formatReadableDate(start)} to ${_formatReadableDate(end)})',
+                    //   style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                    //       .copyWith(color: appTheme.blue_gray_300, height: 1.25),
+                    // ),
                   ],
                 ),
               ),

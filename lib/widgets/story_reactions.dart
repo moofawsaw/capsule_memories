@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 
 import '../constants/reactions.dart';
 import '../services/reaction_service.dart';
+import '../services/reaction_preloader.dart';
 import '../core/app_export.dart';
 
 class StoryReactionsWidget extends StatefulWidget {
@@ -20,9 +21,11 @@ class StoryReactionsWidget extends StatefulWidget {
 
 class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
   final _reactionService = ReactionService();
+
   Map<String, int> _counts = {};
   Map<String, int> _userTapCounts = {};
   bool _loading = true;
+
   final Map<String, GlobalKey> _reactionKeys = {};
 
   // Queue for pending database operations
@@ -32,56 +35,66 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
   @override
   void initState() {
     super.initState();
-    _loadReactions();
+
     for (final reaction in Reactions.all) {
       _reactionKeys[reaction.id] = GlobalKey();
     }
+
+    _primeFromCacheAndFetch();
   }
 
   @override
   void didUpdateWidget(StoryReactionsWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.storyId != widget.storyId) {
-      _loadReactions();
+      _primeFromCacheAndFetch();
     }
   }
 
-  Future<void> _loadReactions() async {
-    setState(() => _loading = true);
-    try {
-      final counts = await _reactionService.getReactionCounts(widget.storyId);
+  void _primeFromCacheAndFetch() {
+    // 1) Show cache immediately (if available)
+    final cached = ReactionPreloader.instance.getCached(widget.storyId);
+    if (cached != null) {
+      _counts = Map<String, int>.from(cached.counts);
+      _userTapCounts = Map<String, int>.from(cached.userTapCounts);
+      _loading = false;
+      if (mounted) setState(() {});
+    } else {
+      _loading = true;
+      if (mounted) setState(() {});
+    }
 
-      final userTapCounts = <String, int>{};
-      for (final type in Reactions.all) {
-        final userCount =
-        await _reactionService.getUserTapCount(widget.storyId, type.id);
-        if (userCount > 0) {
-          userTapCounts[type.id] = userCount;
-        }
-      }
+    // 2) Fetch (deduped). If cache was stale, this refreshes quickly.
+    _loadReactionsFast();
+  }
+
+  Future<void> _loadReactionsFast() async {
+    try {
+      final snap = await ReactionPreloader.instance.fetch(widget.storyId);
+      if (!mounted) return;
 
       setState(() {
-        _counts = counts;
-        _userTapCounts = userTapCounts;
+        _counts = Map<String, int>.from(snap.counts);
+        _userTapCounts = Map<String, int>.from(snap.userTapCounts);
         _loading = false;
       });
     } catch (e) {
       print('❌ ERROR loading reactions: $e');
+      if (!mounted) return;
       setState(() => _loading = false);
     }
   }
 
   Future<void> _onReactionTap(ReactionType reaction) async {
-    // Check if user has reached max taps
     final currentUserTaps = _userTapCounts[reaction.id] ?? 0;
     if (currentUserTaps >= ReactionService.maxTapsPerUser) {
-      // Stronger haptic for "blocked" action
       await HapticFeedback.mediumImpact();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              'Max ${ReactionService.maxTapsPerUser} taps reached for ${reaction.display}'),
+            'Max ${ReactionService.maxTapsPerUser} taps reached for ${reaction.display}',
+          ),
           duration: const Duration(seconds: 1),
           backgroundColor: appTheme.colorFF3A3A,
         ),
@@ -89,19 +102,24 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
       return;
     }
 
-    // HAPTIC: immediate tactile response on valid tap
     await HapticFeedback.lightImpact();
 
-    // Immediate visual feedback - show animation
     _showFloatingReaction(reaction);
 
-    // Immediate counter update - no await
+    // Optimistic UI update
     setState(() {
       _counts[reaction.id] = (_counts[reaction.id] ?? 0) + 1;
       _userTapCounts[reaction.id] = (_userTapCounts[reaction.id] ?? 0) + 1;
     });
 
-    // Queue database operation without blocking
+    // Keep cache aligned so next open is instant
+    ReactionPreloader.instance.upsertLocal(
+      storyId: widget.storyId,
+      reactionType: reaction.id,
+      deltaTotal: 1,
+      deltaUser: 1,
+    );
+
     _queueReactionOperation(reaction);
   }
 
@@ -116,7 +134,8 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
         widget.onReactionAdded?.call();
       }
       return success;
-    }).catchError((e) {
+    })
+        .catchError((e) {
       print('❌ ERROR adding reaction: $e');
       return false;
     });
@@ -141,9 +160,6 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
     }
 
     _isProcessingQueue = false;
-
-    // REMOVED: await _loadReactions() - this was causing widget to reload
-    // Optimistic UI updates are sufficient; no need to sync back from server on every tap
   }
 
   void _showFloatingReaction(ReactionType reaction) {
@@ -158,18 +174,14 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
     final overlayState = Overlay.of(context);
     late OverlayEntry overlayEntry;
 
-    // Enhanced random offsets for more spread during rapid-fire
     final now = DateTime.now();
     final randomSeed = now.microsecond;
-    final horizontalOffset = ((randomSeed % 80) - 40.0); // Range: -40 to +40
-    final verticalOffset =
-        ((randomSeed ~/ 100) % 30) - 15.0; // Range: -15 to +15
-    final rotationOffset =
-        ((randomSeed ~/ 200) % 60) - 30.0; // Range: -30 to +30 degrees
+    final horizontalOffset = ((randomSeed % 80) - 40.0);
+    final verticalOffset = ((randomSeed ~/ 100) % 30) - 15.0;
+    final rotationOffset = ((randomSeed ~/ 200) % 60) - 30.0;
 
-    // Slight variation in animation duration for more organic feel
     final baseDuration = 1500;
-    final durationVariation = (randomSeed % 300) - 150; // ±150ms variation
+    final durationVariation = (randomSeed % 300) - 150;
     final animationDuration = baseDuration + durationVariation;
 
     overlayEntry = OverlayEntry(
@@ -206,7 +218,6 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Top row: Text-only reactions (LOL, HOTT, WILD, OMG) - Full width distributed evenly
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: Reactions.textReactions.map((reaction) {
@@ -219,7 +230,6 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
           }).toList(),
         ),
         SizedBox(height: 12.h),
-        // Bottom row: Emoji-only reactions with larger size - Full width distributed evenly
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: Reactions.emojiReactions.map((reaction) {
@@ -239,7 +249,6 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
       {required bool isTextReaction}) {
     final count = _counts[reaction.id] ?? 0;
     final userTaps = _userTapCounts[reaction.id] ?? 0;
-    final hasUserReacted = userTaps > 0;
     final isMaxedOut = userTaps >= ReactionService.maxTapsPerUser;
 
     return GestureDetector(
@@ -351,7 +360,6 @@ class _FloatingReactionAnimationState extends State<FloatingReactionAnimation>
       vsync: this,
     );
 
-    // Upward movement animation (150 pixels up)
     _positionAnimation = Tween<double>(
       begin: 0.0,
       end: -150.0,
@@ -360,7 +368,6 @@ class _FloatingReactionAnimationState extends State<FloatingReactionAnimation>
       curve: Curves.easeOut,
     ));
 
-    // Scale animation: grow then shrink
     _scaleAnimation = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween<double>(begin: 1.0, end: 1.5)
@@ -374,16 +381,14 @@ class _FloatingReactionAnimationState extends State<FloatingReactionAnimation>
       ),
     ]).animate(_controller);
 
-    // Rotation animation for more dynamic movement
     _rotationAnimation = Tween<double>(
-      begin: widget.rotationDegrees * 3.14159 / 180, // Convert to radians
-      end: 0.0, // Rotate back to normal
+      begin: widget.rotationDegrees * 3.14159 / 180,
+      end: 0.0,
     ).animate(CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOut,
     ));
 
-    // Fade out animation (starts fading after 50% of animation)
     _opacityAnimation = Tween<double>(
       begin: 1.0,
       end: 0.0,

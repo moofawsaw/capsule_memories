@@ -1,7 +1,17 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+class ReactionSnapshotResult {
+  final Map<String, int> counts;
+  final Map<String, int> userTapCounts;
+
+  const ReactionSnapshotResult({
+    required this.counts,
+    required this.userTapCounts,
+  });
+}
+
 class ReactionService {
-  final _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = Supabase.instance.client;
   static const int maxTapsPerUser = 10;
 
   /// Add or update a reaction (upsert based on user + story + type)
@@ -29,9 +39,8 @@ class ReactionService {
 
         // Check if user has reached max taps
         if (currentTaps >= maxTapsPerUser) {
-          print(
-              '⚠️ Max taps ($maxTapsPerUser) reached for reaction $reactionType');
-          return false; // Cannot add more taps
+          print('⚠️ Max taps ($maxTapsPerUser) reached for reaction $reactionType');
+          return false;
         }
 
         // Calculate new tap count (don't exceed max)
@@ -139,6 +148,51 @@ class ReactionService {
     } catch (e) {
       print('❌ ERROR removing reaction: $e');
       rethrow;
+    }
+  }
+
+  /// FAST PATH:
+  /// - 1 query for totals (sum tap_count grouped in Dart)
+  /// - 1 query for current user's taps for the story (all types at once)
+  Future<ReactionSnapshotResult> getReactionSnapshot(String storyId) async {
+    final userId = _supabase.auth.currentUser?.id;
+
+    try {
+      // Query #1: all reactions for the story (totals)
+      final allRows = await _supabase
+          .from('reactions')
+          .select('reaction_type, tap_count')
+          .eq('story_id', storyId);
+
+      final counts = <String, int>{};
+      for (final row in allRows) {
+        final type = row['reaction_type'] as String;
+        final taps = (row['tap_count'] ?? 0) as int;
+        counts[type] = (counts[type] ?? 0) + taps;
+      }
+
+      // Query #2: current user's reactions for the story
+      final userTapCounts = <String, int>{};
+      if (userId != null) {
+        final userRows = await _supabase
+            .from('reactions')
+            .select('reaction_type, tap_count')
+            .eq('story_id', storyId)
+            .eq('user_id', userId);
+
+        for (final row in userRows) {
+          final type = row['reaction_type'] as String;
+          final taps = (row['tap_count'] ?? 0) as int;
+          if (taps > 0) {
+            userTapCounts[type] = taps;
+          }
+        }
+      }
+
+      return ReactionSnapshotResult(counts: counts, userTapCounts: userTapCounts);
+    } catch (e) {
+      print('❌ ERROR getReactionSnapshot: $e');
+      return const ReactionSnapshotResult(counts: {}, userTapCounts: {});
     }
   }
 }

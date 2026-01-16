@@ -731,10 +731,13 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           child: Row(
             children: [
               Expanded(
-                child: CustomButton(
-                  text: 'Cancel',
+                child: TextButton(
                   onPressed: () => Navigator.pop(context),
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  child: Text(
+                    'Cancel',
+                    style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300),
+                  ),
                 ),
               ),
               SizedBox(width: 12.h),

@@ -431,7 +431,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     if (hasUrl) {
       if (_cachedAvatarUrl != avatarUrl || _cachedAvatarProvider == null) {
         _cachedAvatarUrl = avatarUrl;
-        _cachedAvatarProvider = CachedNetworkImageProvider(avatarUrl!);
+        _cachedAvatarProvider = CachedNetworkImageProvider(avatarUrl);
       }
     } else {
       _cachedAvatarUrl = null;
