@@ -64,14 +64,12 @@ class CustomStoryCard extends StatelessWidget {
               Positioned.fill(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8.h),
-                  child: CustomImageView(
+                  child: _CoverImage(
                     imagePath: backgroundImage,
-                    fit: BoxFit.cover,
-                    // ✅ do NOT pass infinity; Positioned.fill gives size via constraints
-                    // width/height intentionally omitted
                   ),
                 ),
               ),
+
 
               // ✅ Delete button overlay (top-right)
               if (showDelete)
@@ -201,6 +199,45 @@ class CustomStoryCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+/// Forces true cover behavior for story card backgrounds (prevents stretching).
+class _CoverImage extends StatelessWidget {
+  final String imagePath;
+
+  const _CoverImage({
+    Key? key,
+    required this.imagePath,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isNetwork = imagePath.startsWith('http');
+
+    if (isNetwork) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => Container(
+          color: appTheme.gray_900_02,
+          child: Icon(
+            Icons.image_not_supported_outlined,
+            color: appTheme.blue_gray_300,
+          ),
+        ),
+      );
+    }
+
+    return Image.asset(
+      imagePath,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+      width: double.infinity,
+      height: double.infinity,
     );
   }
 }

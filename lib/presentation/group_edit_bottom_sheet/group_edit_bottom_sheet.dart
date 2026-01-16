@@ -1,4 +1,7 @@
+import 'package:intl/intl.dart';
+
 import '../../core/app_export.dart';
+import '../../services/groups_service.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
@@ -9,8 +12,13 @@ import 'notifier/group_edit_notifier.dart';
 
 class GroupEditBottomSheet extends ConsumerStatefulWidget {
   final GroupModel group;
+  final bool isReadOnlyMode;
 
-  const GroupEditBottomSheet({Key? key, required this.group}) : super(key: key);
+  const GroupEditBottomSheet({
+    Key? key,
+    required this.group,
+    this.isReadOnlyMode = false,
+  }) : super(key: key);
 
   @override
   GroupEditBottomSheetState createState() => GroupEditBottomSheetState();
@@ -38,6 +46,15 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
+    final isCreator = currentUserId == widget.group.creatorId;
+
+    // Show read-only mode for non-creators or when explicitly set
+    if (widget.isReadOnlyMode || !isCreator) {
+      return _buildReadOnlyView(context);
+    }
+
+    // Existing creator edit view
     return Container(
       decoration: BoxDecoration(
         color: appTheme.gray_900_02,
@@ -76,6 +93,237 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildReadOnlyView(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_02,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24.h),
+          topRight: Radius.circular(24.h),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildDragHandle(context),
+          _buildReadOnlyHeader(context),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 16.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 20.h),
+                  _buildGroupTitleSection(context),
+                  SizedBox(height: 16.h),
+                  _buildCreationDateSection(context),
+                  SizedBox(height: 24.h),
+                  _buildReadOnlyMembersSection(context),
+                  SizedBox(height: 24.h),
+                ],
+              ),
+            ),
+          ),
+          _buildLeaveGroupButton(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyHeader(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Group Details',
+            style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
+          ),
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: CustomImageView(
+              imagePath: ImageConstant.imgIcon14x14,
+              height: 24.h,
+              width: 24.h,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupTitleSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Group Name',
+          style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+              .copyWith(color: appTheme.gray_50.withAlpha(153)),
+        ),
+        SizedBox(height: 8.h),
+        Text(
+          widget.group.name ?? 'Unnamed Group',
+          style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCreationDateSection(BuildContext context) {
+    final createdAt = widget.group.createdAt;
+    final formattedDate = createdAt != null
+        ? DateFormat('MMMM d, yyyy').format(createdAt)
+        : 'Unknown';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Created On',
+          style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+              .copyWith(color: appTheme.gray_50.withAlpha(153)),
+        ),
+        SizedBox(height: 8.h),
+        Text(
+          formattedDate,
+          style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReadOnlyMembersSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(groupEditNotifier);
+
+        if (state.isLoadingMembers) {
+          return Center(
+            child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Members (${state.currentMembers.length})',
+              style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+            SizedBox(height: 12.h),
+            ...state.currentMembers.map((member) {
+              final isCreator = member['id'] == widget.group.creatorId;
+
+              return Container(
+                margin: EdgeInsets.only(bottom: 8.h),
+                padding: EdgeInsets.all(12.h),
+                decoration: BoxDecoration(
+                  color: appTheme.gray_50.withAlpha(13),
+                  borderRadius: BorderRadius.circular(12.h),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40.h,
+                      height: 40.h,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: DecorationImage(
+                          image: NetworkImage(
+                            member['avatar']?.isNotEmpty == true
+                                ? member['avatar']
+                                : 'https://via.placeholder.com/150',
+                          ),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.h),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                member['name'] ?? 'Unknown',
+                                style: TextStyleHelper
+                                    .instance.body14MediumPlusJakartaSans
+                                    .copyWith(color: appTheme.gray_50),
+                              ),
+                              if (isCreator)
+                                Container(
+                                  margin: EdgeInsets.only(left: 8.h),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8.h,
+                                    vertical: 2.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: appTheme.deep_purple_A100,
+                                    borderRadius: BorderRadius.circular(4.h),
+                                  ),
+                                  child: Text(
+                                    'Creator',
+                                    style: TextStyleHelper
+                                        .instance.body10BoldPlusJakartaSans
+                                        .copyWith(color: appTheme.gray_50),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          Text(
+                            '@${member['username'] ?? ''}',
+                            style: TextStyleHelper
+                                .instance.body12MediumPlusJakartaSans
+                                .copyWith(
+                                    color: appTheme.gray_50.withAlpha(153)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildLeaveGroupButton(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(groupEditNotifier);
+
+        return Container(
+          padding: EdgeInsets.all(16.h),
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02,
+            border: Border(
+              top: BorderSide(
+                color: appTheme.gray_50.withAlpha(26),
+                width: 1,
+              ),
+            ),
+          ),
+          child: CustomButton(
+            text: state.isSaving ? 'Leaving...' : 'Leave Group',
+            onPressed: state.isSaving ? null : () => _handleLeaveGroup(context),
+            buttonStyle: CustomButtonStyle.fillRed,
+            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+          ),
+        );
+      },
     );
   }
 
@@ -474,6 +722,70 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           backgroundColor: appTheme.deep_purple_A100,
         ),
       );
+    }
+  }
+
+  Future<void> _handleLeaveGroup(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: appTheme.gray_900_02,
+        title: Text(
+          'Leave Group',
+          style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+        content: Text(
+          'Are you sure you want to leave "${widget.group.name}"? You will need to be re-invited to join again.',
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Leave',
+              style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                  .copyWith(color: appTheme.red_500),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      ref.read(groupEditNotifier.notifier).setLoading(true);
+
+      final success = await GroupsService.leaveGroup(widget.group.id ?? '');
+
+      if (mounted) {
+        ref.read(groupEditNotifier.notifier).setLoading(false);
+
+        if (success) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('You have left the group'),
+              backgroundColor: appTheme.deep_purple_A100,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to leave group. Please try again.'),
+              backgroundColor: appTheme.red_500,
+            ),
+          );
+        }
+      }
     }
   }
 }

@@ -10,6 +10,7 @@ class CustomGroupCard extends StatelessWidget {
     this.onDeleteTap,
     this.onLeaveTap,
     this.onEditTap,
+    this.onInfoTap,
     this.backgroundColor,
     this.borderRadius,
     this.padding,
@@ -30,6 +31,9 @@ class CustomGroupCard extends StatelessWidget {
 
   /// Callback for the edit action button (for creators)
   final VoidCallback? onEditTap;
+
+  /// Callback for the info action button (for non-creators)
+  final VoidCallback? onInfoTap;
 
   /// Background color of the card
   final Color? backgroundColor;
@@ -198,6 +202,17 @@ class CustomGroupCard extends StatelessWidget {
               imagePath: ImageConstant.imgEdit,
               height: 26.h,
               width: 26.h,
+            ),
+          ),
+          SizedBox(width: 12.h),
+        ],
+        if (groupData.isCreator != true && onInfoTap != null) ...[
+          GestureDetector(
+            onTap: onInfoTap,
+            child: Icon(
+              Icons.info_outline,
+              size: 26.h,
+              color: appTheme.gray_50,
             ),
           ),
           SizedBox(width: 12.h),

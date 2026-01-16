@@ -320,6 +320,18 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     _fetchMemberCount();
     _fetchMemberAvatars(); // ✅ NEW
   }
+  bool _canCreateStoryForThisMemory() {
+    final raw = (widget.memory.state ?? '').toLowerCase().trim();
+
+    // If state is explicitly sealed, don't allow.
+    if (raw == 'sealed') return false;
+
+    // If state is explicitly open, allow.
+    if (raw == 'open') return true;
+
+    // If state is missing/unknown, default to allow (keeps UX consistent).
+    return true;
+  }
 
   void _deriveOwnershipFast() {
     final currentUser = SupabaseService.instance.client?.auth.currentUser;
@@ -717,21 +729,40 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   }
 
   Widget _buildJoinedEmptyContentCompact() {
+    final bool canCreate = _canCreateStoryForThisMemory();
+
     return Column(
       children: [
         Text(
           'No stories yet',
-          style: TextStyleHelper.instance.title16BoldPlusJakartaSans.copyWith(color: appTheme.gray_50),
+          style: TextStyleHelper.instance.title16BoldPlusJakartaSans.copyWith(
+            color: appTheme.gray_50,
+          ),
         ),
         SizedBox(height: 6.h),
         Text(
-          'Check back soon',
-          style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(color: appTheme.blue_gray_300),
+          canCreate ? 'Be the first to add one' : 'This memory is sealed',
+          style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
+            color: appTheme.blue_gray_300,
+          ),
           textAlign: TextAlign.center,
         ),
+        if (canCreate) ...[
+          SizedBox(height: 12.h),
+          CustomButton(
+            text: 'Create Story',
+            leftIcon: ImageConstant.imgPlayCircle,
+            onPressed: _onCreateStoryTap,
+            buttonStyle: CustomButtonStyle.fillPrimary,
+            buttonTextStyle: CustomButtonTextStyle.bodySmall,
+            height: 38.h,
+            padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
+          ),
+        ],
       ],
     );
   }
+
 
   Widget _buildMemoryTimeline() {
     return SizedBox(
@@ -776,6 +807,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         ),
       );
     }
+
 
     final DateTime start = _memoryStartTime ?? _parseMemoryStartTime();
     final DateTime end = _memoryEndTime ?? _parseMemoryEndTime();
@@ -1009,19 +1041,20 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       child: Stack(
         clipBehavior: Clip.none,
         children: List.generate(count, (index) {
+          final String src = profileImages[index];
+
           return Positioned(
             right: (index * 24).h,
             top: 0,
             bottom: 0,
             child: SizedBox(
-              height: 36.h,
               width: 36.h,
-              child: CustomImageView(
-                imagePath: profileImages[index],
-                height: 36.h,
-                width: 36.h,
-                isCircular: true,
-                fit: BoxFit.cover,
+              height: 36.h,
+              child: ClipOval(
+                child: _AvatarImage(
+                  imagePath: src,
+                  size: 36.h,
+                ),
               ),
             ),
           );
@@ -1033,4 +1066,51 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   Widget _buildMemoryFooter(BuildContext context) {
     return const SizedBox();
   }
+
 }
+/// Forces true cover behavior, no stretching.
+/// Forces true cover behavior, no stretching.
+class _AvatarImage extends StatelessWidget {
+  final String imagePath;
+  final double size;
+
+  const _AvatarImage({
+    Key? key,
+    required this.imagePath,
+    required this.size,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isNetwork = imagePath.startsWith('http');
+
+    if (isNetwork) {
+      return Image.network(
+        imagePath,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        alignment: Alignment.center,
+        errorBuilder: (_, __, ___) => Container(
+          width: size,
+          height: size,
+          color: appTheme.gray_900_02,
+          child: Icon(
+            Icons.person,
+            size: (size * 0.55),
+            color: appTheme.blue_gray_300,
+          ),
+        ),
+      );
+    }
+
+    return Image.asset(
+      imagePath,
+      width: size,
+      height: size,
+      fit: BoxFit.cover,
+      alignment: Alignment.center,
+    );
+  }
+}
+

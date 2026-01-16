@@ -673,13 +673,24 @@ class _TimelineStoryWidget extends StatelessWidget {
             ? CachedNetworkImage(
           imageUrl: url,
           key: ValueKey('story_thumbnail_${item.storyId}_${url.hashCode}'),
-          fit: BoxFit.cover,
           memCacheWidth: 200,
           memCacheHeight: 280,
           maxHeightDiskCache: 400,
           maxWidthDiskCache: 280,
           fadeInDuration: const Duration(milliseconds: 200),
           fadeOutDuration: const Duration(milliseconds: 100),
+          // ✅ Force true cover at paint time
+          imageBuilder: (context, imageProvider) {
+            return Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: imageProvider,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                ),
+              ),
+            );
+          },
           placeholder: (context, url) => Container(
             color: const Color(0xFF2A2A3A),
             alignment: Alignment.center,
@@ -717,6 +728,7 @@ class _TimelineStoryWidget extends StatelessWidget {
     );
   }
 
+
   Widget _buildAvatar() {
     final String url = item.userAvatar.trim();
 
@@ -734,13 +746,24 @@ class _TimelineStoryWidget extends StatelessWidget {
               ? CachedNetworkImage(
             imageUrl: url,
             key: ValueKey('avatar_${item.storyId}_${url.hashCode}'),
-            fit: BoxFit.cover,
             memCacheWidth: 80,
             memCacheHeight: 80,
             maxHeightDiskCache: 120,
             maxWidthDiskCache: 120,
             fadeInDuration: const Duration(milliseconds: 200),
             fadeOutDuration: const Duration(milliseconds: 100),
+            // ✅ Force true cover at paint time
+            imageBuilder: (context, imageProvider) {
+              return Container(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: imageProvider,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.center,
+                  ),
+                ),
+              );
+            },
             placeholder: (context, url) => Container(
               color: const Color(0xFF2A2A3A),
               alignment: Alignment.center,
@@ -778,4 +801,5 @@ class _TimelineStoryWidget extends StatelessWidget {
       ),
     );
   }
+
 }

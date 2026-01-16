@@ -1,6 +1,6 @@
 import '../../../core/app_export.dart';
-import '../../../services/groups_service.dart';
 import '../../../services/friends_service.dart';
+import '../../../services/groups_service.dart';
 import '../../groups_management_screen/models/groups_management_model.dart';
 import '../models/group_edit_model.dart';
 
@@ -182,5 +182,9 @@ class GroupEditNotifier extends StateNotifier<GroupEditModel> {
       );
       return false;
     }
+  }
+
+  void setLoading(bool loading) {
+    state = state.copyWith(isSaving: loading);
   }
 }

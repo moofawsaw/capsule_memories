@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 import '../constants/reactions.dart';
 import '../services/reaction_service.dart';
 import '../core/app_export.dart';
@@ -52,7 +54,7 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
       final userTapCounts = <String, int>{};
       for (final type in Reactions.all) {
         final userCount =
-            await _reactionService.getUserTapCount(widget.storyId, type.id);
+        await _reactionService.getUserTapCount(widget.storyId, type.id);
         if (userCount > 0) {
           userTapCounts[type.id] = userCount;
         }
@@ -69,10 +71,13 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
     }
   }
 
-  void _onReactionTap(ReactionType reaction) {
+  Future<void> _onReactionTap(ReactionType reaction) async {
     // Check if user has reached max taps
     final currentUserTaps = _userTapCounts[reaction.id] ?? 0;
     if (currentUserTaps >= ReactionService.maxTapsPerUser) {
+      // Stronger haptic for "blocked" action
+      await HapticFeedback.mediumImpact();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -83,6 +88,9 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
       );
       return;
     }
+
+    // HAPTIC: immediate tactile response on valid tap
+    await HapticFeedback.lightImpact();
 
     // Immediate visual feedback - show animation
     _showFloatingReaction(reaction);
@@ -143,7 +151,7 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
     if (key?.currentContext == null) return;
 
     final RenderBox renderBox =
-        key!.currentContext!.findRenderObject() as RenderBox;
+    key!.currentContext!.findRenderObject() as RenderBox;
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
@@ -248,58 +256,58 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
         ),
         child: isTextReaction
             ? Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Opacity(
-                    opacity: isMaxedOut ? 0.5 : 1.0,
-                    child: Text(
-                      reaction.display,
-                      style: TextStyle(
-                        fontSize: 16.fSize,
-                        fontWeight: FontWeight.bold,
-                        color: appTheme.whiteCustom,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  SizedBox(width: 6.h),
-                  Text(
-                    count.toString(),
-                    style: TextStyle(
-                      fontSize: 12.fSize,
-                      fontWeight: FontWeight.bold,
-                      color: appTheme.whiteCustom.withAlpha(179),
-                    ),
-                  ),
-                ],
-              )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Opacity(
-                    opacity: isMaxedOut ? 0.5 : 1.0,
-                    child: Text(
-                      reaction.display,
-                      style: TextStyle(
-                        fontSize: 32.fSize,
-                        fontWeight: FontWeight.normal,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    count.toString(),
-                    style: TextStyle(
-                      fontSize: 14.fSize,
-                      fontWeight: FontWeight.bold,
-                      color: appTheme.whiteCustom.withAlpha(179),
-                    ),
-                  ),
-                ],
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Opacity(
+              opacity: isMaxedOut ? 0.5 : 1.0,
+              child: Text(
+                reaction.display,
+                style: TextStyle(
+                  fontSize: 16.fSize,
+                  fontWeight: FontWeight.bold,
+                  color: appTheme.whiteCustom,
+                ),
+                textAlign: TextAlign.center,
               ),
+            ),
+            SizedBox(width: 6.h),
+            Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 12.fSize,
+                fontWeight: FontWeight.bold,
+                color: appTheme.whiteCustom.withAlpha(179),
+              ),
+            ),
+          ],
+        )
+            : Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Opacity(
+              opacity: isMaxedOut ? 0.5 : 1.0,
+              child: Text(
+                reaction.display,
+                style: TextStyle(
+                  fontSize: 32.fSize,
+                  fontWeight: FontWeight.normal,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 14.fSize,
+                fontWeight: FontWeight.bold,
+                color: appTheme.whiteCustom.withAlpha(179),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -247,6 +247,7 @@ class _MemoryInviteNotificationCardState
     final data = widget.notification['data'] as Map<String, dynamic>?;
     final actionTaken = data?['action_taken'] as String?;
     final actionDate = data?['action_date'] as String?;
+    final memoryId = data?['memory_id'] as String?;
 
     final inviterName = data?['inviter_name'] as String? ??
         widget.notification['enriched_data']?['inviter_name'] as String? ??
@@ -260,181 +261,207 @@ class _MemoryInviteNotificationCardState
       timestamp = DateTime.parse(widget.notification['created_at'] as String);
     }
 
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 20.h),
-      padding: EdgeInsets.all(16.h),
-      decoration: BoxDecoration(
-        color: isRead
-            ? Colors.transparent
-            : appTheme.deep_purple_A100.withAlpha(20),
-        borderRadius: BorderRadius.circular(12.h),
-        border: Border.all(
-          color: appTheme.deep_purple_A100.withAlpha(50),
-          width: 1,
+    return GestureDetector(
+      onTap: memoryId != null
+          ? () {
+              debugPrint(
+                  '🎯 Memory invite notification tapped - navigating to memory: $memoryId');
+              widget.onNavigateToMemory(memoryId);
+            }
+          : null,
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 20.h),
+        padding: EdgeInsets.all(16.h),
+        decoration: BoxDecoration(
+          color: isRead
+              ? Colors.transparent
+              : appTheme.deep_purple_A100.withAlpha(20),
+          borderRadius: BorderRadius.circular(12.h),
+          border: Border.all(
+            color: appTheme.deep_purple_A100.withAlpha(50),
+            width: 1,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row with icon and title
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8.h),
-                decoration: BoxDecoration(
-                  color: appTheme.deep_purple_A100.withAlpha(30),
-                  borderRadius: BorderRadius.circular(8.h),
-                ),
-                child: Icon(
-                  Icons.mail_outline,
-                  color: appTheme.deep_purple_A100,
-                  size: 24.h,
-                ),
-              ),
-              SizedBox(width: 12.h),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Memory Invitation',
-                      style: TextStyleHelper.instance.title18BoldPlusJakartaSans
-                          .copyWith(
-                        color:
-                            isRead ? appTheme.blue_gray_300 : appTheme.gray_50,
-                      ),
-                    ),
-                    if (timestamp != null)
-                      Text(
-                        _formatTimestamp(timestamp),
-                        style: TextStyleHelper
-                            .instance.body12RegularPlusJakartaSans
-                            .copyWith(
-                          color: appTheme.blue_gray_300.withAlpha(153),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12.h),
-          // Invite message
-          Text(
-            actionTaken != null
-                ? 'Invitation from $inviterName to join "$memoryTitle"'
-                : '$inviterName invited you to join "$memoryTitle"',
-            style:
-                TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
-              color: isRead ? appTheme.blue_gray_300 : appTheme.blue_gray_300,
-            ),
-          ),
-          SizedBox(height: 16.h),
-          // Show badge if action was taken, otherwise show buttons
-          if (actionTaken != null && actionDate != null)
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: actionTaken == 'accepted'
-                    ? Colors.green.withAlpha(30)
-                    : Colors.grey.withAlpha(30),
-                borderRadius: BorderRadius.circular(8.h),
-                border: Border.all(
-                  color: actionTaken == 'accepted'
-                      ? Colors.green.withAlpha(80)
-                      : Colors.grey.withAlpha(80),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    actionTaken == 'accepted'
-                        ? Icons.check_circle
-                        : Icons.cancel,
-                    size: 18.h,
-                    color:
-                        actionTaken == 'accepted' ? Colors.green : Colors.grey,
-                  ),
-                  SizedBox(width: 8.h),
-                  Text(
-                    actionTaken == 'accepted' ? 'Accepted' : 'Declined',
-                    style: TextStyle(
-                      color: actionTaken == 'accepted'
-                          ? Colors.green
-                          : Colors.grey,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                    ),
-                  ),
-                  SizedBox(width: 8.h),
-                  Text(
-                    '• ${_formatActionDate(actionDate)}',
-                    style: TextStyle(
-                      color: (actionTaken == 'accepted'
-                              ? Colors.green
-                              : Colors.grey)
-                          .withAlpha(180),
-                      fontSize: 12.sp,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else if (actionTaken == null)
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row with icon and title
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isLoading ? null : _handleDecline,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: appTheme.blue_gray_300,
-                      side: BorderSide(color: appTheme.blue_gray_300),
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.h),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? SizedBox(
-                            height: 16.h,
-                            width: 16.h,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: appTheme.blue_gray_300,
-                            ),
-                          )
-                        : const Text('Decline'),
+                Container(
+                  padding: EdgeInsets.all(8.h),
+                  decoration: BoxDecoration(
+                    color: appTheme.deep_purple_A100.withAlpha(30),
+                    borderRadius: BorderRadius.circular(8.h),
+                  ),
+                  child: Icon(
+                    Icons.mail_outline,
+                    color: appTheme.deep_purple_A100,
+                    size: 24.h,
                   ),
                 ),
                 SizedBox(width: 12.h),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleAccept,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: appTheme.deep_purple_A100,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Memory Invitation',
+                        style: TextStyleHelper
+                            .instance.title18BoldPlusJakartaSans
+                            .copyWith(
+                          color: isRead
+                              ? appTheme.blue_gray_300
+                              : appTheme.gray_50,
+                        ),
                       ),
-                    ),
-                    child: _isLoading
-                        ? SizedBox(
-                            height: 16.h,
-                            width: 16.h,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('Accept'),
+                      if (timestamp != null)
+                        Text(
+                          _formatTimestamp(timestamp),
+                          style: TextStyleHelper
+                              .instance.body12RegularPlusJakartaSans
+                              .copyWith(
+                            color: appTheme.blue_gray_300.withAlpha(153),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
             ),
-        ],
+            SizedBox(height: 12.h),
+            // Invite message
+            Text(
+              actionTaken != null
+                  ? 'Invitation from $inviterName to join "$memoryTitle"'
+                  : '$inviterName invited you to join "$memoryTitle"',
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                  .copyWith(
+                color: isRead ? appTheme.blue_gray_300 : appTheme.blue_gray_300,
+              ),
+            ),
+            SizedBox(height: 16.h),
+            // Show badge if action was taken, otherwise show buttons
+            if (actionTaken != null && actionDate != null)
+              Row(
+                children: [
+                  Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
+                    decoration: BoxDecoration(
+                      color: actionTaken == 'accepted'
+                          ? Colors.green.withAlpha(30)
+                          : Colors.grey.withAlpha(30),
+                      borderRadius: BorderRadius.circular(8.h),
+                      border: Border.all(
+                        color: actionTaken == 'accepted'
+                            ? Colors.green.withAlpha(80)
+                            : Colors.grey.withAlpha(80),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          actionTaken == 'accepted'
+                              ? Icons.check_circle
+                              : Icons.cancel,
+                          size: 18.h,
+                          color: actionTaken == 'accepted'
+                              ? Colors.green
+                              : Colors.grey,
+                        ),
+                        SizedBox(width: 8.h),
+                        Text(
+                          actionTaken == 'accepted' ? 'Accepted' : 'Declined',
+                          style: TextStyle(
+                            color: actionTaken == 'accepted'
+                                ? Colors.green
+                                : Colors.grey,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14.sp,
+                          ),
+                        ),
+                        SizedBox(width: 8.h),
+                        Text(
+                          '• ${_formatActionDate(actionDate)}',
+                          style: TextStyle(
+                            color: (actionTaken == 'accepted'
+                                    ? Colors.green
+                                    : Colors.grey)
+                                .withAlpha(180),
+                            fontSize: 12.sp,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (actionTaken == 'accepted' && memoryId != null)
+                    Padding(
+                      padding: EdgeInsets.only(left: 8.h),
+                      child: Icon(
+                        Icons.arrow_forward_ios,
+                        size: 16.h,
+                        color: Colors.green.withAlpha(180),
+                      ),
+                    ),
+                ],
+              )
+            else if (actionTaken == null)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isLoading ? null : _handleDecline,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: appTheme.blue_gray_300,
+                        side: BorderSide(color: appTheme.blue_gray_300),
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.h),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? SizedBox(
+                              height: 16.h,
+                              width: 16.h,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: appTheme.blue_gray_300,
+                              ),
+                            )
+                          : const Text('Decline'),
+                    ),
+                  ),
+                  SizedBox(width: 12.h),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleAccept,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: appTheme.deep_purple_A100,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.h),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? SizedBox(
+                              height: 16.h,
+                              width: 16.h,
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Accept'),
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

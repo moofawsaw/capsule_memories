@@ -1,5 +1,3 @@
-// lib/presentation/event_timeline_view_screen/event_timeline_view_screen.dart
-
 import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
@@ -8,12 +6,14 @@ import '../../widgets/custom_button_skeleton.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/timeline_widget.dart';
-import '../memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import '../memory_details_screen/memory_details_screen.dart';
+import '../memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
 import '../qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import './notifier/event_timeline_view_notifier.dart';
 import './widgets/timeline_story_widget.dart';
+
+// lib/presentation/event_timeline_view_screen/event_timeline_view_screen.dart
 
 class EventTimelineViewScreen extends ConsumerStatefulWidget {
   EventTimelineViewScreen({Key? key}) : super(key: key);
@@ -230,8 +230,8 @@ class _StoriesSkeletonRow extends StatelessWidget {
   }
 }
 
-class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen>
-    with WidgetsBindingObserver {
+class EventTimelineViewScreenState
+    extends ConsumerState<EventTimelineViewScreen> with WidgetsBindingObserver {
   late final ProviderSubscription<EventTimelineViewState> _firstLoadSub;
 
   bool _hasCompletedFirstLoad = false;
@@ -264,7 +264,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
             NavigatorService.popAndPushNamed(AppRoutes.appMemories);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Please select a memory to view its timeline'),
+                content:
+                    const Text('Please select a memory to view its timeline'),
                 backgroundColor: appTheme.deep_purple_A100,
                 duration: const Duration(seconds: 3),
               ),
@@ -274,16 +275,20 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         return;
       }
 
-      ref.read(eventTimelineViewNotifier.notifier).initializeFromMemory(navArgs);
+      ref
+          .read(eventTimelineViewNotifier.notifier)
+          .initializeFromMemory(navArgs);
     });
 
     _firstLoadSub = ref.listenManual<EventTimelineViewState>(
       eventTimelineViewNotifier,
-          (prev, next) {
+      (prev, next) {
         final prevLoading = prev?.isLoading ?? false;
         final nextLoading = next.isLoading ?? false;
 
-        if (!_hasCompletedFirstLoad && prevLoading == true && nextLoading == false) {
+        if (!_hasCompletedFirstLoad &&
+            prevLoading == true &&
+            nextLoading == false) {
           if (mounted) {
             setState(() => _hasCompletedFirstLoad = true);
           } else {
@@ -308,7 +313,9 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     if (state == AppLifecycleState.resumed) {
       final memoryId = ref.read(eventTimelineViewNotifier).memoryId;
       if (memoryId != null) {
-        ref.read(eventTimelineViewNotifier.notifier).validateMemoryData(memoryId);
+        ref
+            .read(eventTimelineViewNotifier.notifier)
+            .validateMemoryData(memoryId);
       }
     }
   }
@@ -339,7 +346,9 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
           onRefresh: () async {
             final memoryId = ref.read(eventTimelineViewNotifier).memoryId;
             if (memoryId != null) {
-              await ref.read(eventTimelineViewNotifier.notifier).validateMemoryData(memoryId);
+              await ref
+                  .read(eventTimelineViewNotifier.notifier)
+                  .validateMemoryData(memoryId);
             }
           },
           color: appTheme.deep_purple_A100,
@@ -354,15 +363,15 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                 SizedBox(height: 18.h),
                 effectiveLoading
                     ? Container(
-                  margin: EdgeInsets.symmetric(horizontal: 24.h),
-                  child: Column(
-                    children: [
-                      CustomButtonSkeleton(),
-                      SizedBox(height: 12.h),
-                      CustomButtonSkeleton(),
-                    ],
-                  ),
-                )
+                        margin: EdgeInsets.symmetric(horizontal: 24.h),
+                        child: Column(
+                          children: [
+                            CustomButtonSkeleton(),
+                            SizedBox(height: 12.h),
+                            CustomButtonSkeleton(),
+                          ],
+                        ),
+                      )
                     : _buildActionButtons(context),
                 SizedBox(height: 20.h),
               ],
@@ -387,16 +396,20 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
 
     return CustomEventCard(
       isLoading: effectiveLoading,
-      eventTitle: effectiveLoading ? null : state.eventTimelineViewModel?.eventTitle,
-      eventDate: effectiveLoading ? null : state.eventTimelineViewModel?.eventDate,
+      eventTitle:
+          effectiveLoading ? null : state.eventTimelineViewModel?.eventTitle,
+      eventDate:
+          effectiveLoading ? null : state.eventTimelineViewModel?.eventDate,
       eventLocation: effectiveLoading
           ? null
           : state.eventTimelineViewModel?.timelineDetail?.centerLocation,
-      isPrivate: effectiveLoading ? null : state.eventTimelineViewModel?.isPrivate,
+      isPrivate:
+          effectiveLoading ? null : state.eventTimelineViewModel?.isPrivate,
       iconButtonImagePath:
-      effectiveLoading ? null : state.eventTimelineViewModel?.categoryIcon,
-      participantImages:
-      effectiveLoading ? null : state.eventTimelineViewModel?.participantImages,
+          effectiveLoading ? null : state.eventTimelineViewModel?.categoryIcon,
+      participantImages: effectiveLoading
+          ? null
+          : state.eventTimelineViewModel?.participantImages,
       onBackTap: () => onTapBackButton(context),
       onIconButtonTap: () => onTapEventOptions(context),
       onAvatarTap: () => onTapAvatars(context),
@@ -413,12 +426,10 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         final isLoading = state.isLoading ?? false;
         final hasSnapshot = state.eventTimelineViewModel != null;
 
-        // If snapshot exists but we're refreshing, show the timeline skeleton block only.
         if (isLoading && hasSnapshot) {
           return const _OpenTimelineSkeletonSection();
         }
 
-        // If no snapshot, do nothing here (build() handled the full skeleton)
         if (!hasSnapshot) {
           return const SizedBox.shrink();
         }
@@ -497,10 +508,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
   Widget _buildTimelineWidget(BuildContext context) {
     final state = ref.watch(eventTimelineViewNotifier);
 
-    // Keep your first-load gating if you want (prevents showing partial UI)
     if (!_hasCompletedFirstLoad) return const SizedBox.shrink();
 
-    // ✅ MATCH SEALED: pull from the snapshot's timelineDetail
     final timelineDetail = state.eventTimelineViewModel?.timelineDetail;
 
     final List<TimelineStoryItem> timelineStories =
@@ -509,7 +518,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     final memoryStartTime = timelineDetail?.memoryStartTime;
     final memoryEndTime = timelineDetail?.memoryEndTime;
 
-    // If start/end missing OR no stories, use your existing empty state
     if (memoryStartTime == null || memoryEndTime == null) {
       return _buildTimelineEmptyState(context);
     }
@@ -538,7 +546,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       },
     );
   }
-
 
   // Timeline Empty State UI (3 Pieces)
   Widget _buildDateMarkerSkeletonCompact() {
@@ -570,6 +577,7 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       ],
     );
   }
+
   Widget _buildTimelineSkeletonCompact() {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
@@ -595,7 +603,11 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       ),
     );
   }
+
   Widget _buildTimelineEmptyState(BuildContext context) {
+    final state = ref.watch(eventTimelineViewNotifier);
+    final isCurrentUserMember = state.isCurrentUserMember ?? false;
+
     return Center(
       child: Container(
         padding: EdgeInsets.all(24.h),
@@ -617,7 +629,9 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
             SizedBox(height: 6.h),
 
             Text(
-              'Start creating stories to build your memory timeline',
+              isCurrentUserMember
+                  ? 'Start creating stories to build your memory timeline'
+                  : 'Join this memory to start creating stories',
               style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                   .copyWith(color: appTheme.blue_gray_300),
               textAlign: TextAlign.center,
@@ -625,22 +639,32 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
 
             SizedBox(height: 18.h),
 
-            CustomButton(
-              text: 'Create Story',
-              leftIcon: ImageConstant.imgIcon20x20,
-              onPressed: () => onTapCreateStory(context),
-              buttonStyle: CustomButtonStyle.fillPrimary,
-              buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-              height: 40.h,
-              width: 180.h,
-              padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 10.h),
-            ),
+            if (isCurrentUserMember)
+              CustomButton(
+                text: 'Create Story',
+                leftIcon: ImageConstant.imgIcon20x20,
+                onPressed: () => onTapCreateStory(context),
+                buttonStyle: CustomButtonStyle.fillPrimary,
+                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                height: 40.h,
+                width: 180.h,
+                padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 10.h),
+              )
+            else
+              CustomButton(
+                text: 'Join Memory',
+                onPressed: () => onTapJoinFromTimeline(context),
+                buttonStyle: CustomButtonStyle.fillPrimary,
+                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                height: 40.h,
+                width: 180.h,
+                padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 10.h),
+              ),
           ],
         ),
       ),
     );
   }
-
 
   Widget _buildStoriesSection(BuildContext context) {
     return SizedBox(
@@ -699,9 +723,10 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
         if (!_hasCompletedFirstLoad) return const SizedBox.shrink();
 
         final List<CustomStoryItem> storyItems =
-        (state.eventTimelineViewModel?.customStoryItems ?? const <dynamic>[])
-            .whereType<CustomStoryItem>()
-            .toList();
+            (state.eventTimelineViewModel?.customStoryItems ??
+                    const <dynamic>[])
+                .whereType<CustomStoryItem>()
+                .toList();
 
         if (storyItems.isEmpty) {
           return Container(
@@ -735,8 +760,6 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
         final isCurrentUserMember = state.isCurrentUserMember ?? false;
-        final isCurrentUserCreator = state.isCurrentUserCreator ?? false;
-        final memoryId = state.eventTimelineViewModel?.memoryId;
 
         final storyCount =
             state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
@@ -756,20 +779,46 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                 ),
                 SizedBox(height: 12.h),
               ],
-              if (isCurrentUserMember) ...[
+              if (isCurrentUserMember)
                 CustomButton(
                   text: 'Create Story',
                   width: double.infinity,
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   onPressed: () => onTapCreateStory(context),
+                )
+              else
+                CustomButton(
+                  text: 'Join Memory',
+                  width: double.infinity,
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  onPressed: () => onTapJoinFromTimeline(context),
                 ),
-              ],
             ],
           ),
         );
       },
     );
+  }
+
+  void onTapJoinFromTimeline(BuildContext context) {
+    // Navigate back to notifications screen where they can accept the invite
+    NavigatorService.popAndPushNamed(AppRoutes.appNotifications);
+
+    // Show helpful message
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Accept the memory invite to start creating stories'),
+            backgroundColor: appTheme.deep_purple_A100,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
   }
 
   void _onJoinMemory(BuildContext context, String memoryId) async {
@@ -864,7 +913,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
   void onTapEventOptions(BuildContext context) {}
 
   void onTapTimelineOptions(BuildContext context) {
-    final memoryId = ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
+    final memoryId =
+        ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
     if (memoryId == null) return;
 
     showModalBottomSheet(
@@ -880,7 +930,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
     final ids = notifier.currentMemoryStoryIds;
     if (ids.isEmpty) return;
 
-    final initialId = (index >= 0 && index < ids.length) ? ids[index] : ids.first;
+    final initialId =
+        (index >= 0 && index < ids.length) ? ids[index] : ids.first;
 
     final feedContext = FeedStoryContext(
       feedType: 'memory_timeline',
@@ -892,7 +943,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
   }
 
   void onTapViewAll(BuildContext context) {
-    final memoryId = ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
+    final memoryId =
+        ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
     if (memoryId == null) return;
 
     NavigatorService.pushNamed(
@@ -940,12 +992,14 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => MemoryMembersScreen(memoryId: memoryId, memoryTitle: memoryTitle),
+      builder: (_) =>
+          MemoryMembersScreen(memoryId: memoryId, memoryTitle: memoryTitle),
     );
   }
 
   void onTapEditMemory(BuildContext context) {
-    final memoryId = ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
+    final memoryId =
+        ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
     if (memoryId == null) return;
 
     showModalBottomSheet(
@@ -973,7 +1027,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: appTheme.gray_900_01,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
         title: Text(
           'Leave Memory?',
           style: TextStyleHelper.instance.title18BoldPlusJakartaSans
@@ -1020,7 +1075,8 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: appTheme.gray_900_01,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
         title: Text(
           'Delete Memory?',
           style: TextStyleHelper.instance.title18BoldPlusJakartaSans
@@ -1048,12 +1104,15 @@ class EventTimelineViewScreenState extends ConsumerState<EventTimelineViewScreen
                 context: context,
                 barrierDismissible: false,
                 builder: (_) => Center(
-                  child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
+                  child: CircularProgressIndicator(
+                      color: appTheme.deep_purple_A100),
                 ),
               );
 
               try {
-                await ref.read(eventTimelineViewNotifier.notifier).deleteMemory(memoryId);
+                await ref
+                    .read(eventTimelineViewNotifier.notifier)
+                    .deleteMemory(memoryId);
 
                 if (context.mounted) Navigator.pop(context);
 

@@ -1,8 +1,8 @@
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../widgets/custom_button.dart';
 import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_group_card.dart';
-import '../../widgets/custom_button.dart';
 import '../../widgets/custom_group_invitation_card.dart';
 import '../../widgets/custom_image_view.dart';
 import '../create_group_screen/create_group_screen.dart';
@@ -117,12 +117,14 @@ class GroupsManagementScreenState
                 // New button with styled design
                 CustomButton(
                   text: 'New',
-                  leftIcon: ImageConstant.imgIcon20x20, // same as screenshot; remove if not desired
+                  leftIcon: ImageConstant
+                      .imgIcon20x20, // same as screenshot; remove if not desired
                   onPressed: () => onTapNewGroup(context),
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   height: 38.h,
-                  padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
                 ),
 
                 SizedBox(width: 8.h),
@@ -267,6 +269,9 @@ class GroupsManagementScreenState
                     !isCreator ? () => onTapLeaveGroup(context, group) : null,
                 onEditTap:
                     isCreator ? () => onTapEditGroup(context, group) : null,
+                onInfoTap: !isCreator
+                    ? () => onTapViewGroupInfo(context, group)
+                    : null,
               ),
             );
           }).toList(),
@@ -390,5 +395,20 @@ class GroupsManagementScreenState
         ),
       ),
     );
+  }
+
+  /// View group info for non-creator members
+  void onTapViewGroupInfo(BuildContext context, GroupModel group) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: appTheme.transparentCustom,
+      builder: (context) => GroupEditBottomSheet(
+        group: group,
+        isReadOnlyMode: true,
+      ),
+    );
+
+    ref.read(groupsManagementNotifier.notifier).refresh();
   }
 }
