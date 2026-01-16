@@ -7,6 +7,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
+import '../../widgets/custom_user_status_row.dart';
 import '../groups_management_screen/models/groups_management_model.dart';
 import 'notifier/group_edit_notifier.dart';
 
@@ -204,6 +205,8 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(groupEditNotifier);
+        final currentUserId =
+            SupabaseService.instance.client?.auth.currentUser?.id;
 
         if (state.isLoadingMembers) {
           return Center(
@@ -211,87 +214,64 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           );
         }
 
+        // Sort members: Creator first, then current user (if not creator), then others
+        final sortedMembers =
+            List<Map<String, dynamic>>.from(state.currentMembers);
+        sortedMembers.sort((a, b) {
+          final aIsCreator = a['id'] == widget.group.creatorId;
+          final bIsCreator = b['id'] == widget.group.creatorId;
+          final aIsCurrentUser = a['id'] == currentUserId;
+          final bIsCurrentUser = b['id'] == currentUserId;
+
+          // Creator always first
+          if (aIsCreator && !bIsCreator) return -1;
+          if (!aIsCreator && bIsCreator) return 1;
+
+          // If neither is creator, current user comes first
+          if (!aIsCreator && !bIsCreator) {
+            if (aIsCurrentUser && !bIsCurrentUser) return -1;
+            if (!aIsCurrentUser && bIsCurrentUser) return 1;
+          }
+
+          return 0;
+        });
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Members (${state.currentMembers.length})',
+              'Members (${sortedMembers.length})',
               style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                   .copyWith(color: appTheme.gray_50),
             ),
             SizedBox(height: 12.h),
-            ...state.currentMembers.map((member) {
+            ...sortedMembers.map((member) {
               final isCreator = member['id'] == widget.group.creatorId;
+              final isCurrentUser = member['id'] == currentUserId;
 
-              return Container(
+              // Build status text with multiple badges
+              String? statusText;
+              if (isCreator && isCurrentUser) {
+                statusText = 'Creator • You';
+              } else if (isCreator) {
+                statusText = 'Creator';
+              } else if (isCurrentUser) {
+                statusText = 'You';
+              }
+
+              return CustomUserStatusRow(
+                profileImagePath: member['avatar']?.isNotEmpty == true
+                    ? member['avatar']
+                    : ImageConstant.imgEllipse826x26,
+                userName: member['name'] ?? 'Unknown',
+                statusText: statusText,
+                statusBackgroundColor: (isCreator || isCurrentUser)
+                    ? appTheme.deep_purple_A100.withAlpha(51)
+                    : null,
+                statusTextColor: (isCreator || isCurrentUser)
+                    ? appTheme.deep_purple_A100
+                    : null,
                 margin: EdgeInsets.only(bottom: 8.h),
-                padding: EdgeInsets.all(12.h),
-                decoration: BoxDecoration(
-                  color: appTheme.gray_50.withAlpha(13),
-                  borderRadius: BorderRadius.circular(12.h),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40.h,
-                      height: 40.h,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: NetworkImage(
-                            member['avatar']?.isNotEmpty == true
-                                ? member['avatar']
-                                : 'https://via.placeholder.com/150',
-                          ),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12.h),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                member['name'] ?? 'Unknown',
-                                style: TextStyleHelper
-                                    .instance.body14MediumPlusJakartaSans
-                                    .copyWith(color: appTheme.gray_50),
-                              ),
-                              if (isCreator)
-                                Container(
-                                  margin: EdgeInsets.only(left: 8.h),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8.h,
-                                    vertical: 2.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: appTheme.deep_purple_A100,
-                                    borderRadius: BorderRadius.circular(4.h),
-                                  ),
-                                  child: Text(
-                                    'Creator',
-                                    style: TextStyleHelper
-                                        .instance.body10BoldPlusJakartaSans
-                                        .copyWith(color: appTheme.gray_50),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          Text(
-                            '@${member['username'] ?? ''}',
-                            style: TextStyleHelper
-                                .instance.body12MediumPlusJakartaSans
-                                .copyWith(
-                                    color: appTheme.gray_50.withAlpha(153)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
               );
             }).toList(),
           ],
@@ -400,87 +380,72 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           );
         }
 
+        // Sort members: Creator first, then current user (if not creator), then others
+        final sortedMembers =
+            List<Map<String, dynamic>>.from(state.currentMembers);
+        sortedMembers.sort((a, b) {
+          final aIsCreator = a['id'] == widget.group.creatorId;
+          final bIsCreator = b['id'] == widget.group.creatorId;
+          final aIsCurrentUser = a['id'] == currentUserId;
+          final bIsCurrentUser = b['id'] == currentUserId;
+
+          // Creator always first
+          if (aIsCreator && !bIsCreator) return -1;
+          if (!aIsCreator && bIsCreator) return 1;
+
+          // If neither is creator, current user comes first
+          if (!aIsCreator && !bIsCreator) {
+            if (aIsCurrentUser && !bIsCurrentUser) return -1;
+            if (!aIsCurrentUser && bIsCurrentUser) return 1;
+          }
+
+          return 0;
+        });
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Members (${state.currentMembers.length})',
+              'Members (${sortedMembers.length})',
               style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                   .copyWith(color: appTheme.gray_50),
             ),
             SizedBox(height: 12.h),
-            ...state.currentMembers.map((member) {
+            ...sortedMembers.map((member) {
               final isCreator = member['id'] == widget.group.creatorId;
               final isCurrentUser = member['id'] == currentUserId;
 
+              // Build status text with multiple badges
+              String? statusText;
+              if (isCreator && isCurrentUser) {
+                statusText = 'Creator • You';
+              } else if (isCreator) {
+                statusText = 'Creator';
+              } else if (isCurrentUser) {
+                statusText = 'You';
+              }
+
               return Container(
                 margin: EdgeInsets.only(bottom: 8.h),
-                padding: EdgeInsets.all(12.h),
-                decoration: BoxDecoration(
-                  color: appTheme.gray_50.withAlpha(13),
-                  borderRadius: BorderRadius.circular(12.h),
-                ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 40.h,
-                      height: 40.h,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: NetworkImage(
-                            member['avatar']?.isNotEmpty == true
-                                ? member['avatar']
-                                : 'https://via.placeholder.com/150',
-                          ),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 12.h),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                member['name'] ?? 'Unknown',
-                                style: TextStyleHelper
-                                    .instance.body14MediumPlusJakartaSans
-                                    .copyWith(color: appTheme.gray_50),
-                              ),
-                              if (isCreator)
-                                Container(
-                                  margin: EdgeInsets.only(left: 8.h),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8.h,
-                                    vertical: 2.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: appTheme.deep_purple_A100,
-                                    borderRadius: BorderRadius.circular(4.h),
-                                  ),
-                                  child: Text(
-                                    'Creator',
-                                    style: TextStyleHelper
-                                        .instance.body10BoldPlusJakartaSans
-                                        .copyWith(color: appTheme.gray_50),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          Text(
-                            '@${member['username'] ?? ''}',
-                            style: TextStyleHelper
-                                .instance.body12MediumPlusJakartaSans
-                                .copyWith(
-                                    color: appTheme.gray_50.withAlpha(153)),
-                          ),
-                        ],
+                      child: CustomUserStatusRow(
+                        profileImagePath: member['avatar']?.isNotEmpty == true
+                            ? member['avatar']
+                            : ImageConstant.imgEllipse826x26,
+                        userName: member['name'] ?? 'Unknown',
+                        statusText: statusText,
+                        statusBackgroundColor: (isCreator || isCurrentUser)
+                            ? appTheme.deep_purple_A100.withAlpha(51)
+                            : null,
+                        statusTextColor: (isCreator || isCurrentUser)
+                            ? appTheme.deep_purple_A100
+                            : null,
                       ),
                     ),
-                    if (!isCreator && !isCurrentUser)
+                    if (!isCreator && !isCurrentUser) ...[
+                      SizedBox(width: 8.h),
                       GestureDetector(
                         onTap: () => _showRemoveMemberDialog(
                             context, member['id'], member['name']),
@@ -497,6 +462,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
                           ),
                         ),
                       ),
+                    ],
                   ],
                 ),
               );
