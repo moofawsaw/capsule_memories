@@ -157,6 +157,14 @@ class AppRoutes {
         return PostStoryScreen();
       case appStoryView:
         return const EventStoriesViewScreen();
+      case appTimeline:
+        final args = _argsMap(settings);
+        final memoryId = args['memoryId'] as String? ?? args['id'] as String?;
+        final initialStoryId = args['initialStoryId'] as String?; // NEW
+        return EventTimelineViewScreen(
+          memoryId: memoryId,
+          initialStoryId: initialStoryId, // NEW
+        );
 
     // App tabs/screens
       case appFeed:

@@ -190,7 +190,7 @@ class MyApp extends ConsumerWidget {
       theme: ThemeHelper().lightTheme(),
       darkTheme: ThemeHelper().darkTheme(),
       themeMode: themeMode,
-      title: 'capsule_memories',
+      title: 'Capsule',
       builder: (context, child) {
         ThemeHelper().setThemeMode(themeMode);
 

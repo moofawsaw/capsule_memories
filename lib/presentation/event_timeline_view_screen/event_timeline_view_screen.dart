@@ -17,11 +17,18 @@ import './widgets/timeline_story_widget.dart';
 
 class EventTimelineViewScreen extends ConsumerStatefulWidget {
   final String? memoryId;
-  const EventTimelineViewScreen({this.memoryId, super.key});
+  final String? initialStoryId;
+
+  const EventTimelineViewScreen({
+    super.key,
+    this.memoryId,
+    this.initialStoryId,
+  });
 
   @override
   EventTimelineViewScreenState createState() => EventTimelineViewScreenState();
 }
+
 
 // ============================
 // SKELETONS (MATCH SEALED VIEW)
@@ -233,11 +240,15 @@ class _StoriesSkeletonRow extends StatelessWidget {
 
 class EventTimelineViewScreenState
     extends ConsumerState<EventTimelineViewScreen> with WidgetsBindingObserver {
+
+  String? _pendingInitialStoryId;
+
   late final ProviderSubscription<EventTimelineViewState> _firstLoadSub;
 
   bool _hasCompletedFirstLoad = false;
   bool _booting = true;
 
+  @override
   @override
   void initState() {
     super.initState();
@@ -253,12 +264,8 @@ class EventTimelineViewScreenState
       // ✅ Priority 1: constructor memoryId (deep link / notification)
       MemoryNavArgs? navArgs;
 
-      // ✅ FIX: MemoryNavArgs.fromMap expects 'id', not 'memoryId'
-      // Best: use constructor directly.
       if (widget.memoryId != null && widget.memoryId!.isNotEmpty) {
         navArgs = MemoryNavArgs(memoryId: widget.memoryId!);
-        // Alternatively, if you want to use fromMap:
-        // navArgs = MemoryNavArgs.fromMap({'id': widget.memoryId});
       }
 
       // ✅ Priority 2: route arguments (existing behavior)
@@ -274,14 +281,24 @@ class EventTimelineViewScreenState
         }
       }
 
+      // ✅ Capture initialStoryId from widget or navArgs (MUST happen before any early return)
+      String? initialStoryId = widget.initialStoryId;
+      if (initialStoryId == null || initialStoryId.isEmpty) {
+        final candidate = navArgs?.initialStoryId;
+        if (candidate != null && candidate.isNotEmpty) {
+          initialStoryId = candidate;
+        }
+      }
+      _pendingInitialStoryId = initialStoryId;
+
+      // ✅ Validate navArgs
       if (navArgs == null || !navArgs.isValid) {
         Future.delayed(const Duration(milliseconds: 100), () {
           if (mounted) {
             NavigatorService.popAndPushNamed(AppRoutes.appMemories);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content:
-                    const Text('Please select a memory to view its timeline'),
+                content: const Text('Please select a memory to view its timeline'),
                 backgroundColor: appTheme.deep_purple_A100,
                 duration: const Duration(seconds: 3),
               ),
@@ -291,22 +308,26 @@ class EventTimelineViewScreenState
         return;
       }
 
-      ref
-          .read(eventTimelineViewNotifier.notifier)
-          .initializeFromMemory(navArgs);
+      ref.read(eventTimelineViewNotifier.notifier).initializeFromMemory(navArgs);
     });
 
     _firstLoadSub = ref.listenManual<EventTimelineViewState>(
       eventTimelineViewNotifier,
-      (prev, next) {
+          (prev, next) {
         final prevLoading = prev?.isLoading ?? false;
         final nextLoading = next.isLoading ?? false;
 
-        if (!_hasCompletedFirstLoad &&
-            prevLoading == true &&
-            nextLoading == false) {
+        if (!_hasCompletedFirstLoad && prevLoading == true && nextLoading == false) {
           if (mounted) {
             setState(() => _hasCompletedFirstLoad = true);
+
+            // ✅ Auto-open story viewer if we have a pending story ID
+            if (_pendingInitialStoryId != null && _pendingInitialStoryId!.isNotEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _openStoryFromDeepLink(_pendingInitialStoryId!);
+                _pendingInitialStoryId = null;
+              });
+            }
           } else {
             _hasCompletedFirstLoad = true;
           }
@@ -320,6 +341,27 @@ class EventTimelineViewScreenState
     _firstLoadSub.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+  void _openStoryFromDeepLink(String storyId) {
+    final notifier = ref.read(eventTimelineViewNotifier.notifier);
+    final storyIds = notifier.currentMemoryStoryIds;
+
+    if (storyIds.isEmpty) {
+      debugPrint('⚠️ No stories loaded yet for deep link');
+      return;
+    }
+
+    final feedContext = FeedStoryContext(
+      feedType: 'memory_timeline',
+      storyIds: storyIds,
+      initialStoryId: storyId,
+    );
+
+    Navigator.pushNamed(
+      context,
+      AppRoutes.appStoryView,
+      arguments: feedContext,
+    );
   }
 
   @override

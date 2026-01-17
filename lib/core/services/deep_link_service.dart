@@ -125,6 +125,30 @@ class DeepLinkService with WidgetsBindingObserver {
     }
 
     // ---------- MEMORY ----------
+
+    // In _handleDeepLink(), add BEFORE existing memory handlers:
+// Add new helper method (near other URL helpers):
+    bool _isCapsuleMemoryStoryLink(Uri uri) =>
+        uri.scheme == 'capsule' &&
+            uri.pathSegments.length >= 4 &&
+            uri.pathSegments[0] == 'memory' &&
+            uri.pathSegments[2] == 'story';
+
+
+// ---------- MEMORY + STORY (opens story within memory context) ----------
+    if (_isCapsuleMemoryStoryLink(uri)) {
+      final memoryId = uri.pathSegments[1];  // memory/{memoryId}/story/{storyId}
+      final storyId = uri.pathSegments[3];
+      debugPrint('📦 Memory+Story deep link: memory=$memoryId, story=$storyId');
+
+      _queueNavigation(
+        AppRoutes.appTimeline,
+        MemoryNavArgs(memoryId: memoryId, initialStoryId: storyId).toMap(),
+      );
+      return;
+    }
+
+
     if (_isCapappMemoryLink(uri)) {
       final memoryId = uri.pathSegments[1];
       debugPrint('📦 Memory deep link: $memoryId');

@@ -277,10 +277,6 @@ class _MemoryInviteNotificationCardState
               ? Colors.transparent
               : appTheme.deep_purple_A100.withAlpha(20),
           borderRadius: BorderRadius.circular(12.h),
-          border: Border.all(
-            color: appTheme.deep_purple_A100.withAlpha(50),
-            width: 1,
-          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,12 +349,6 @@ class _MemoryInviteNotificationCardState
                           ? Colors.green.withAlpha(30)
                           : Colors.grey.withAlpha(30),
                       borderRadius: BorderRadius.circular(8.h),
-                      border: Border.all(
-                        color: actionTaken == 'accepted'
-                            ? Colors.green.withAlpha(80)
-                            : Colors.grey.withAlpha(80),
-                        width: 1,
-                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

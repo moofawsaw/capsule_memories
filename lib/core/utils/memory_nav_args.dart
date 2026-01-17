@@ -3,26 +3,18 @@
 /// This ensures consistent, type-safe memory data transfer throughout the app.
 /// Required memory ID prevents silent failures with dummy data.
 class MemoryNavArgs {
-  /// Required: Memory ID for database queries
   final String memoryId;
-
-  /// Optional: Memory snapshot for immediate display while loading full data
   final MemorySnapshot? snapshot;
+  final String? initialStoryId; // NEW: For deep link story navigation
 
   MemoryNavArgs({
     required this.memoryId,
     this.snapshot,
+    this.initialStoryId, // NEW
   });
 
-  /// Validate that memory ID is non-empty
   bool get isValid => memoryId.isNotEmpty;
 
-  /// Create from Map (for ModalRoute arguments)
-  ///
-  /// Supports multiple keys for backward compatibility:
-  /// - memoryId (preferred)
-  /// - id (legacy)
-  /// - memory_id (legacy)
   factory MemoryNavArgs.fromMap(Map<String, dynamic> map) {
     final String id =
         (map['memoryId'] as String?) ??
@@ -35,17 +27,16 @@ class MemoryNavArgs {
       snapshot: map['snapshot'] is Map<String, dynamic>
           ? MemorySnapshot.fromMap(map['snapshot'] as Map<String, dynamic>)
           : null,
+      initialStoryId: map['initialStoryId'] as String?, // NEW
     );
   }
 
-  /// Convert to Map (for navigation)
-  ///
-  /// Emits both keys for compatibility across older call sites.
   Map<String, dynamic> toMap() {
     return {
       'memoryId': memoryId,
-      'id': memoryId, // legacy compatibility
+      'id': memoryId,
       if (snapshot != null) 'snapshot': snapshot!.toMap(),
+      if (initialStoryId != null) 'initialStoryId': initialStoryId, // NEW
     };
   }
 }
