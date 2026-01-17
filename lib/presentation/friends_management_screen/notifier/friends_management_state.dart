@@ -14,11 +14,22 @@ class FriendsManagementState extends Equatable {
   final bool isCameraActive;
   final String? errorMessage;
   final String? successMessage;
+
   final String searchQuery;
-  final List<FriendModel>? filteredFriendsList;
-  final List<SentRequestModel>? filteredSentRequestsList;
-  final List<IncomingRequestModel>? filteredIncomingRequestsList;
-  final List<SearchUserModel>? searchResults;
+
+  // ✅ Base lists (source of truth)
+  final List<FriendModel> friendsList;
+  final List<SentRequestModel> sentRequestsList;
+  final List<IncomingRequestModel> incomingRequestsList;
+
+  // ✅ What UI shows (we keep these identical to base lists)
+  final List<FriendModel> filteredFriendsList;
+  final List<SentRequestModel> filteredSentRequestsList;
+  final List<IncomingRequestModel> filteredIncomingRequestsList;
+
+  // ✅ Search autosuggest results (NEW USERS ONLY)
+  final List<SearchUserModel> searchResults;
+
   final bool isSearching;
 
   const FriendsManagementState({
@@ -28,10 +39,13 @@ class FriendsManagementState extends Equatable {
     this.errorMessage,
     this.successMessage,
     this.searchQuery = '',
-    this.filteredFriendsList,
-    this.filteredSentRequestsList,
-    this.filteredIncomingRequestsList,
-    this.searchResults,
+    this.friendsList = const [],
+    this.sentRequestsList = const [],
+    this.incomingRequestsList = const [],
+    this.filteredFriendsList = const [],
+    this.filteredSentRequestsList = const [],
+    this.filteredIncomingRequestsList = const [],
+    this.searchResults = const [],
     this.isSearching = false,
   });
 
@@ -42,6 +56,9 @@ class FriendsManagementState extends Equatable {
     String? errorMessage,
     String? successMessage,
     String? searchQuery,
+    List<FriendModel>? friendsList,
+    List<SentRequestModel>? sentRequestsList,
+    List<IncomingRequestModel>? incomingRequestsList,
     List<FriendModel>? filteredFriendsList,
     List<SentRequestModel>? filteredSentRequestsList,
     List<IncomingRequestModel>? filteredIncomingRequestsList,
@@ -55,11 +72,14 @@ class FriendsManagementState extends Equatable {
       errorMessage: errorMessage ?? this.errorMessage,
       successMessage: successMessage ?? this.successMessage,
       searchQuery: searchQuery ?? this.searchQuery,
+      friendsList: friendsList ?? this.friendsList,
+      sentRequestsList: sentRequestsList ?? this.sentRequestsList,
+      incomingRequestsList: incomingRequestsList ?? this.incomingRequestsList,
       filteredFriendsList: filteredFriendsList ?? this.filteredFriendsList,
       filteredSentRequestsList:
-          filteredSentRequestsList ?? this.filteredSentRequestsList,
+      filteredSentRequestsList ?? this.filteredSentRequestsList,
       filteredIncomingRequestsList:
-          filteredIncomingRequestsList ?? this.filteredIncomingRequestsList,
+      filteredIncomingRequestsList ?? this.filteredIncomingRequestsList,
       searchResults: searchResults ?? this.searchResults,
       isSearching: isSearching ?? this.isSearching,
     );
@@ -67,16 +87,19 @@ class FriendsManagementState extends Equatable {
 
   @override
   List<Object?> get props => [
-        isLoading,
-        isQRScannerActive,
-        isCameraActive,
-        errorMessage,
-        successMessage,
-        searchQuery,
-        filteredFriendsList,
-        filteredSentRequestsList,
-        filteredIncomingRequestsList,
-        searchResults,
-        isSearching,
-      ];
+    isLoading,
+    isQRScannerActive,
+    isCameraActive,
+    errorMessage,
+    successMessage,
+    searchQuery,
+    friendsList,
+    sentRequestsList,
+    incomingRequestsList,
+    filteredFriendsList,
+    filteredSentRequestsList,
+    filteredIncomingRequestsList,
+    searchResults,
+    isSearching,
+  ];
 }

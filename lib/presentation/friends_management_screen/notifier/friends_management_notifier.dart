@@ -1,3 +1,5 @@
+// lib/presentation/friends_management_screen/notifier/friends_management_notifier.dart
+
 import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -5,96 +7,133 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/app_export.dart';
 import '../../../services/friends_data_provider.dart';
+import '../../../services/supabase_service.dart';
 import '../models/friends_management_model.dart';
-import './friends_management_state.dart';
+import 'friends_management_state.dart';
 
-final friendsManagementNotifier = NotifierProvider.autoDispose<
-    FriendsManagementNotifier, FriendsManagementState>(
-  () => FriendsManagementNotifier(),
+final friendsManagementNotifier =
+NotifierProvider.autoDispose<FriendsManagementNotifier, FriendsManagementState>(
+      () => FriendsManagementNotifier(),
 );
 
-class FriendsManagementNotifier
-    extends AutoDisposeNotifier<FriendsManagementState> {
+class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementState> {
   final FriendsDataProvider _friendsProvider = FriendsDataProvider();
   final FriendsDataProvider _friendsService = FriendsDataProvider();
+
   StreamSubscription<List<FriendItem>>? _friendsSubscription;
   StreamSubscription<List<FriendRequestItem>>? _incomingRequestsSubscription;
   StreamSubscription<List<FriendRequestItem>>? _sentRequestsSubscription;
 
   final TextEditingController searchController = TextEditingController();
-  String _searchQuery = '';
+  Timer? _debounce;
+
   CameraController? _cameraController;
+  bool _didInit = false;
 
   @override
   FriendsManagementState build() {
-    initialize();
-    searchController.addListener(_onSearchTextChanged);
-    return FriendsManagementState();
+    if (!_didInit) {
+      _didInit = true;
+      initialize();
+      searchController.addListener(_onSearchTextChanged);
+    }
+
+    ref.onDispose(() async {
+      _debounce?.cancel();
+
+      searchController.removeListener(_onSearchTextChanged);
+      searchController.dispose();
+
+      await _friendsSubscription?.cancel();
+      await _incomingRequestsSubscription?.cancel();
+      await _sentRequestsSubscription?.cancel();
+
+      await closeCamera();
+    });
+
+    return const FriendsManagementState();
   }
 
   Future<void> initialize() async {
     state = state.copyWith(isLoading: true);
 
     try {
-      // Initialize friends data provider with real-time subscriptions
       _friendsProvider.initialize();
 
-      // Subscribe to friends stream
+      // Friends
+      await _friendsSubscription?.cancel();
       _friendsSubscription = _friendsProvider.friendsStream.listen((friends) {
-        final friendsList = friends
-            .map((f) => FriendModel(
-                  id: f.id,
-                  userName: f.userName,
-                  displayName: f.displayName,
-                  profileImagePath: f.profileImagePath,
-                  friendshipId: f.friendshipId,
-                ))
+        final list = friends
+            .map(
+              (f) => FriendModel(
+            id: f.id,
+            userName: f.userName,
+            displayName: f.displayName,
+            profileImagePath: f.profileImagePath,
+            friendshipId: f.friendshipId,
+          ),
+        )
             .toList();
 
         state = state.copyWith(
-          filteredFriendsList: friendsList.cast<FriendModel>(),
+          friendsList: list,
+          filteredFriendsList: list,
         );
       });
 
-      // Subscribe to incoming requests stream
+      // Incoming requests
+      await _incomingRequestsSubscription?.cancel();
       _incomingRequestsSubscription =
           _friendsProvider.incomingRequestsStream.listen((requests) {
-        final incomingRequests = requests
-            .map((r) => IncomingRequestModel(
-                  id: r.id,
-                  userId: r.userId,
-                  userName: r.userName,
-                  displayName: r.displayName,
-                  profileImagePath: r.profileImagePath,
-                  bio: r.bio,
-                ))
-            .toList();
+            final list = requests
+                .map(
+                  (r) => IncomingRequestModel(
+                id: r.id,
+                userId: r.userId,
+                userName: r.userName,
+                displayName: r.displayName,
+                profileImagePath: r.profileImagePath,
+                bio: r.bio,
+              ),
+            )
+                .toList();
 
-        state = state.copyWith(
-          filteredIncomingRequestsList: incomingRequests.cast<IncomingRequestModel>(),
-        );
-      });
+            state = state.copyWith(
+              incomingRequestsList: list,
+              filteredIncomingRequestsList: list,
+            );
+          });
 
-      // Subscribe to sent requests stream
+      // Sent requests
+      await _sentRequestsSubscription?.cancel();
       _sentRequestsSubscription =
           _friendsProvider.sentRequestsStream.listen((requests) {
-        final sentRequests = requests
-            .map((r) => SentRequestModel(
-                  id: r.id,
-                  userId: r.userId,
-                  userName: r.userName,
-                  displayName: r.displayName,
-                  profileImagePath: r.profileImagePath,
-                  status: r.status,
-                ))
-            .toList();
+            final list = requests
+                .map(
+                  (r) => SentRequestModel(
+                id: r.id,
+                userId: r.userId,
+                userName: r.userName,
+                displayName: r.displayName,
+                profileImagePath: r.profileImagePath,
+                status: r.status,
+              ),
+            )
+                .toList();
 
-        state = state.copyWith(
-          filteredSentRequestsList: sentRequests.cast<SentRequestModel>(),
-        );
-      });
+            state = state.copyWith(
+              sentRequestsList: list,
+              filteredSentRequestsList: list,
+            );
+          });
 
       state = state.copyWith(isLoading: false);
+
+      // If user already typed something, rerun search
+      final q = state.searchQuery.trim();
+      if (q.isNotEmpty) {
+        await _searchUsersSmart(q);
+      }
     } catch (e) {
       debugPrint('Error initializing friends data: $e');
       state = state.copyWith(
@@ -105,120 +144,178 @@ class FriendsManagementNotifier
   }
 
   void _onSearchTextChanged() {
-    final query = searchController.text;
-    onSearchChanged(query);
+    onSearchChanged(searchController.text);
   }
 
+  // ✅ Search ONLY for new users (does NOT filter friends / requests)
   void onSearchChanged(String query) {
-    _searchQuery = query;
-    state = state.copyWith(
-      searchQuery: query,
-    );
+    state = state.copyWith(searchQuery: query);
 
-    if (query.isEmpty) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      _debounce?.cancel();
       state = state.copyWith(
-        searchResults: [],
+        searchResults: const [],
         isSearching: false,
       );
-      _filterFriends(query);
-    } else {
-      _searchUsers(query);
+      return;
     }
+
+    _debounce?.cancel();
+    state = state.copyWith(isSearching: true);
+
+    _debounce = Timer(const Duration(milliseconds: 250), () async {
+      await _searchUsersSmart(trimmed);
+    });
   }
 
-  Future<void> _searchUsers(String query) async {
+  String _normalizeFriendshipStatus(dynamic raw) {
+    final s = (raw ?? '').toString().toLowerCase();
+    if (s == 'friends') return 'friends';
+    if (s.startsWith('pending')) return 'pending';
+    if (s == 'requested') return 'pending';
+    return 'none';
+  }
+
+  Future<void> _searchUsersSmart(String query) async {
+    final snapshotQuery = query.trim();
+    state = state.copyWith(isSearching: true);
+
     try {
+      final client = SupabaseService.instance.client;
+      final currentUser = client?.auth.currentUser;
+      if (client == null || currentUser == null) {
+        state = state.copyWith(isSearching: false, searchResults: const []);
+        return;
+      }
+
+      // ✅ Try multiple param shapes so you don’t get stuck on signature mismatch
+      final paramAttempts = <Map<String, dynamic>>[
+        {
+          'p_query': snapshotQuery,
+          'p_limit': 10,
+          'p_user_id': currentUser.id,
+        },
+        {
+          'query_text': snapshotQuery,
+          'limit_n': 10,
+          'current_user_id': currentUser.id,
+        },
+        {
+          'search_query': snapshotQuery,
+          'limit': 10,
+          'current_user_id': currentUser.id,
+        },
+        {
+          'query': snapshotQuery,
+          'limit': 10,
+          'user_id': currentUser.id,
+        },
+        {
+          'query': snapshotQuery,
+          'limit': 10,
+        },
+      ];
+
+      List<dynamic>? rows;
+
+      Object? lastError;
+      for (final params in paramAttempts) {
+        try {
+          final res = await client.rpc('search_users_smart', params: params);
+          rows = (res as List?)?.cast<dynamic>();
+          if (rows != null) break;
+        } catch (e) {
+          lastError = e;
+        }
+      }
+
+      if (rows == null) {
+        debugPrint('search_users_smart failed: $lastError');
+        if (state.searchQuery.trim() == snapshotQuery) {
+          state = state.copyWith(isSearching: false, searchResults: const []);
+        }
+        return;
+      }
+
+      // If user typed more while waiting, ignore stale results
+      if (state.searchQuery.trim() != snapshotQuery) return;
+
+      final results = rows.map((r) {
+        final m = (r as Map).cast<String, dynamic>();
+
+        final id = (m['id'] ?? '').toString();
+        final username = (m['username'] ?? '').toString();
+        final displayName = (m['display_name'] ?? '').toString();
+        final avatarUrl = (m['avatar_url'] ?? '').toString();
+        final bio = (m['bio'] ?? '').toString();
+
+        // expected field from your function
+        final friendshipRaw =
+            m['friendship_status'] ?? m['friend_status'] ?? m['status'] ?? 'none';
+
+        return SearchUserModel(
+          id: id,
+          userName: username,
+          displayName: displayName.isNotEmpty ? displayName : username,
+          profileImagePath: avatarUrl,
+          bio: bio,
+          friendshipStatus: _normalizeFriendshipStatus(friendshipRaw),
+        );
+      }).toList();
+
       state = state.copyWith(
-        isSearching: true,
-      );
-
-      final usersData = await _friendsService.searchUsers(query);
-
-      // Get friendship status for each user
-      final searchResults = await Future.wait(
-        usersData.map((user) async {
-          final status =
-              await _friendsService.checkFriendshipStatus(user['id']);
-          return SearchUserModel(
-            id: user['id'] ?? '',
-            userName: user['username'] ?? '',
-            displayName: user['display_name'] ?? user['username'] ?? '',
-            profileImagePath: user['avatar_url'] ?? '',
-            bio: user['bio'] ?? '',
-            friendshipStatus: status,
-          );
-        }),
-      );
-
-      state = state.copyWith(
-        searchResults: searchResults.cast<SearchUserModel>(),
+        searchResults: results,
         isSearching: false,
       );
     } catch (e) {
-      debugPrint('Error searching users: $e');
-      state = state.copyWith(
-        errorMessage: 'Failed to search users',
-        isSearching: false,
-      );
+      debugPrint('Error searching users (smart): $e');
+      if (state.searchQuery.trim() == snapshotQuery) {
+        state = state.copyWith(
+          errorMessage: 'Failed to search users',
+          isSearching: false,
+          searchResults: const [],
+        );
+      }
     }
   }
 
-  void _filterFriends(String query) {
-    if (query.isEmpty) {
-      state = state.copyWith(
-        filteredFriendsList: state.filteredFriendsList,
-        filteredSentRequestsList:
-            state.filteredSentRequestsList,
-        filteredIncomingRequestsList:
-            state.filteredIncomingRequestsList,
-      );
-    } else {
-      final filteredFriends = state.filteredFriendsList
-          ?.where((friend) =>
-              (friend.userName?.toLowerCase().contains(query.toLowerCase()) ??
-                  false) ||
-              (friend.displayName
-                      ?.toLowerCase()
-                      .contains(query.toLowerCase()) ??
-                  false))
-          .toList();
+  // ✅ Optimistic update from UI
+  void updateSearchUserStatus(String userId, String status) {
+    final current = state.searchResults;
+    final updated = current.map((u) {
+      if ((u.id ?? '') == userId) {
+        return u.copyWith(friendshipStatus: status);
+      }
+      return u;
+    }).toList();
 
-      final filteredSentRequests = state
-          .filteredSentRequestsList
-          ?.where((request) =>
-              (request.userName?.toLowerCase().contains(query.toLowerCase()) ??
-                  false) ||
-              (request.displayName
-                      ?.toLowerCase()
-                      .contains(query.toLowerCase()) ??
-                  false))
-          .toList();
+    state = state.copyWith(searchResults: updated);
+  }
 
-      final filteredIncomingRequests = state
-          .filteredIncomingRequestsList
-          ?.where((request) =>
-              (request.userName?.toLowerCase().contains(query.toLowerCase()) ??
-                  false) ||
-              (request.displayName
-                      ?.toLowerCase()
-                      .contains(query.toLowerCase()) ??
-                  false))
-          .toList();
+  // ✅ Called when tapping "Add Friend"
+  Future<void> sendFriendRequest(String targetUserId) async {
+    try {
+      if (targetUserId.trim().isEmpty) return;
 
-      state = state.copyWith(
-        filteredFriendsList: filteredFriends,
-        filteredSentRequestsList: filteredSentRequests,
-        filteredIncomingRequestsList: filteredIncomingRequests,
-      );
+      final success = await _friendsService.addFriendRequest(targetUserId, '');
+
+      if (success) {
+        updateSearchUserStatus(targetUserId, 'pending');
+
+        // Ensure Sent Requests updates quickly (if your provider supports it)
+        try {
+          await _friendsProvider.refreshAllData();
+        } catch (_) {
+          // ignore if refreshAllData doesn't exist
+        }
+      } else {
+        state = state.copyWith(errorMessage: 'Failed to send friend request');
+      }
+    } catch (e) {
+      debugPrint('Error sending friend request: $e');
+      state = state.copyWith(errorMessage: 'Failed to send friend request');
     }
-  }
-
-  void onFriendTap(String friendId) {
-    // Navigate to friend's profile or show options
-  }
-
-  void onFriendActionTap(String friendId) {
-    // Show friend management options
   }
 
   Future<void> onRemoveSentRequest(String requestId) async {
@@ -226,37 +323,30 @@ class FriendsManagementNotifier
       final success = await _friendsService.cancelSentRequest(requestId);
 
       if (success) {
-        final updatedList = state.filteredSentRequestsList
-            ?.where((request) => request.id != requestId)
+        final updated = state.filteredSentRequestsList
+            .where((request) => request.id != requestId)
             .toList();
 
         state = state.copyWith(
-          filteredSentRequestsList: updatedList,
+          sentRequestsList: updated,
+          filteredSentRequestsList: updated,
         );
-
-        _filterFriends(_searchQuery);
       }
     } catch (e) {
       debugPrint('Error removing sent request: $e');
-      state = state.copyWith(
-        errorMessage: 'Failed to cancel request',
-      );
+      state = state.copyWith(errorMessage: 'Failed to cancel request');
     }
   }
 
   Future<void> onAcceptIncomingRequest(String requestId) async {
     try {
       final success = await _friendsService.acceptFriendRequest(requestId);
-
       if (success) {
-        // Refresh all friends data to get updated lists
         await initialize();
       }
     } catch (e) {
       debugPrint('Error accepting request: $e');
-      state = state.copyWith(
-        errorMessage: 'Failed to accept request',
-      );
+      state = state.copyWith(errorMessage: 'Failed to accept request');
     }
   }
 
@@ -265,21 +355,18 @@ class FriendsManagementNotifier
       final success = await _friendsService.declineFriendRequest(requestId);
 
       if (success) {
-        final updatedList = state.filteredIncomingRequestsList
-            ?.where((request) => request.id != requestId)
+        final updated = state.filteredIncomingRequestsList
+            .where((request) => request.id != requestId)
             .toList();
 
         state = state.copyWith(
-          filteredIncomingRequestsList: updatedList,
+          incomingRequestsList: updated,
+          filteredIncomingRequestsList: updated,
         );
-
-        _filterFriends(_searchQuery);
       }
     } catch (e) {
       debugPrint('Error declining request: $e');
-      state = state.copyWith(
-        errorMessage: 'Failed to decline request',
-      );
+      state = state.copyWith(errorMessage: 'Failed to decline request');
     }
   }
 
@@ -288,21 +375,18 @@ class FriendsManagementNotifier
       final success = await _friendsService.removeFriend(friendshipId);
 
       if (success) {
-        final updatedList = state.filteredFriendsList
-            ?.where((friend) => friend.friendshipId != friendshipId)
+        final updated = state.filteredFriendsList
+            .where((friend) => friend.friendshipId != friendshipId)
             .toList();
 
         state = state.copyWith(
-          filteredFriendsList: updatedList,
+          friendsList: updated,
+          filteredFriendsList: updated,
         );
-
-        _filterFriends(_searchQuery);
       }
     } catch (e) {
       debugPrint('Error removing friend: $e');
-      state = state.copyWith(
-        errorMessage: 'Failed to remove friend',
-      );
+      state = state.copyWith(errorMessage: 'Failed to remove friend');
     }
   }
 
@@ -310,34 +394,25 @@ class FriendsManagementNotifier
     try {
       final status = await Permission.camera.request();
       if (status.isGranted) {
-        // Initialize QR scanner
-        state = state.copyWith(
-          isQRScannerActive: true,
-        );
-        // QR scanning logic would be implemented here
+        state = state.copyWith(isQRScannerActive: true);
       } else {
         state = state.copyWith(
           errorMessage: 'Camera permission is required for QR scanning',
         );
       }
     } catch (e) {
-      state = state.copyWith(
-        errorMessage: 'Failed to open QR scanner',
-      );
+      state = state.copyWith(errorMessage: 'Failed to open QR scanner');
     }
   }
 
   Future<void> onCameraTap() async {
     try {
-      // Check if user has previously granted/denied permission
       final prefs = await SharedPreferences.getInstance();
       final hasAskedBefore = prefs.getBool('camera_permission_asked') ?? false;
 
-      // Request camera permission
       PermissionStatus cameraStatus = await Permission.camera.status;
 
       if (cameraStatus.isDenied && !hasAskedBefore) {
-        // First time asking - request permission
         cameraStatus = await Permission.camera.request();
         await prefs.setBool('camera_permission_asked', true);
 
@@ -347,7 +422,6 @@ class FriendsManagementNotifier
           await prefs.setBool('camera_permission_permanently_denied', true);
         }
       } else if (cameraStatus.isDenied) {
-        // User has been asked before - request again
         cameraStatus = await Permission.camera.request();
 
         if (cameraStatus.isGranted) {
@@ -359,18 +433,14 @@ class FriendsManagementNotifier
       }
 
       if (cameraStatus.isGranted) {
-        // Permission granted - initialize camera
         final cameras = await availableCameras();
         if (cameras.isEmpty) {
-          state = state.copyWith(
-            errorMessage: 'No cameras available on this device',
-          );
+          state = state.copyWith(errorMessage: 'No cameras available on this device');
           return;
         }
 
-        // Use rear camera for scanning
         final camera = cameras.firstWhere(
-          (cam) => cam.lensDirection == CameraLensDirection.back,
+              (cam) => cam.lensDirection == CameraLensDirection.back,
           orElse: () => cameras.first,
         );
 
@@ -382,17 +452,13 @@ class FriendsManagementNotifier
 
         await _cameraController!.initialize();
 
-        state = state.copyWith(
-          isCameraActive: true,
-        );
+        state = state.copyWith(isCameraActive: true);
       } else if (cameraStatus.isPermanentlyDenied) {
-        // User permanently denied - show settings dialog
         state = state.copyWith(
           errorMessage:
-              'Camera permission is required for scanning. Please enable it in app settings.',
+          'Camera permission is required for scanning. Please enable it in app settings.',
         );
       } else {
-        // User denied permission
         state = state.copyWith(
           errorMessage: 'Camera permission is required to scan QR codes',
         );
@@ -406,132 +472,7 @@ class FriendsManagementNotifier
     }
   }
 
-  Future<Map<String, dynamic>> processScannedQRCode(String qrCode) async {
-    try {
-      debugPrint('Processing QR code: $qrCode');
-
-      // Parse the QR code data - expecting format: capsule://friend-request/USER_ID
-      final uri = Uri.tryParse(qrCode);
-
-      if (uri == null ||
-          uri.scheme != 'capsule' ||
-          uri.host != 'friend-request') {
-        state = state.copyWith(
-          errorMessage:
-              'Invalid QR code format. Please scan a valid friend request QR code.',
-        );
-        return {
-          'success': false,
-          'message':
-              'Invalid QR code format. Please scan a valid friend request QR code.',
-          'type': 'error'
-        };
-      }
-
-      final userId =
-          uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
-
-      if (userId == null || userId.isEmpty) {
-        state = state.copyWith(
-          errorMessage: 'Invalid user ID in QR code.',
-        );
-        return {
-          'success': false,
-          'message': 'Invalid user ID in QR code.',
-          'type': 'error'
-        };
-      }
-
-      // Check if user is already a friend or has pending request
-      final friendshipStatus =
-          await _friendsService.checkFriendshipStatus(userId);
-
-      if (friendshipStatus == 'friends') {
-        state = state.copyWith(
-          errorMessage: 'You are already friends with this user.',
-        );
-        return {
-          'success': false,
-          'message': 'You are already friends with this user.',
-          'type': 'error'
-        };
-      }
-
-      if (friendshipStatus == 'pending_sent') {
-        state = state.copyWith(
-          errorMessage: 'Friend request already sent to this user.',
-        );
-        return {
-          'success': false,
-          'message': 'Friend request already sent to this user.',
-          'type': 'error'
-        };
-      }
-
-      if (friendshipStatus == 'pending_received') {
-        state = state.copyWith(
-          errorMessage:
-              'This user has already sent you a friend request. Check your incoming requests.',
-        );
-        return {
-          'success': false,
-          'message':
-              'This user has already sent you a friend request. Check your incoming requests.',
-          'type': 'error'
-        };
-      }
-
-      // Get the user's display name for the success message
-      final userData = await _friendsService.searchUsers('');
-      final targetUser = userData.firstWhere(
-        (user) => user['id'] == userId,
-        orElse: () => {'display_name': 'user'},
-      );
-      final displayName =
-          targetUser['display_name'] ?? targetUser['username'] ?? 'user';
-
-      // Send friend request - pass empty string as second parameter
-      final success = await _friendsService.addFriendRequest(userId, '');
-
-      if (success) {
-        final successMessage =
-            'Success! You have added $displayName as a friend';
-
-        state = state.copyWith(
-          successMessage: successMessage,
-        );
-
-        // Explicitly refresh all friends data to show the new sent request
-        await _friendsProvider.refreshAllData();
-
-        // Also reinitialize to ensure real-time subscriptions are active
-        await initialize();
-
-        return {'success': true, 'message': successMessage, 'type': 'friend'};
-      } else {
-        state = state.copyWith(
-          errorMessage: 'Failed to send friend request. Please try again.',
-        );
-        return {
-          'success': false,
-          'message': 'Failed to send friend request. Please try again.',
-          'type': 'error'
-        };
-      }
-    } catch (e) {
-      debugPrint('Error processing QR code: $e');
-      state = state.copyWith(
-        errorMessage: 'An error occurred while processing the QR code.',
-      );
-      return {
-        'success': false,
-        'message': 'An error occurred while processing the QR code.',
-        'type': 'error'
-      };
-    }
-  }
-
-  Future<void> openAppSettings() async {
+  Future<void> openDeviceAppSettings() async {
     await openAppSettings();
   }
 
@@ -544,8 +485,6 @@ class FriendsManagementNotifier
       _cameraController = null;
     }
 
-    state = state.copyWith(
-      isCameraActive: false,
-    );
+    state = state.copyWith(isCameraActive: false);
   }
 }

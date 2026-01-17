@@ -44,7 +44,21 @@ class DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen>
       if (client == null) {
         throw Exception('Supabase not initialized');
       }
-
+      // Stories don't need authentication or edge function - just navigate directly
+      if (widget.type == 'story') {
+        setState(() {
+          _message = 'Opening story...';
+          _isProcessing = false;
+        });
+        await Future.delayed(Duration(milliseconds: 500));
+        if (mounted) {
+          NavigatorService.pushNamedAndRemoveUntil(
+            AppRoutes.appStoryView,  // or whatever your story screen route is
+            arguments: {'storyId': widget.code},
+          );
+        }
+        return;
+      }
       // Check authentication
       final user = client.auth.currentUser;
       if (user == null) {
@@ -109,6 +123,8 @@ class DeepLinkHandlerScreenState extends ConsumerState<DeepLinkHandlerScreen>
 
   String _getProcessingMessage(String type) {
     switch (type) {
+      case 'story':
+        return 'Opening story...';
       case 'friend':
         return 'Processing friend invitation...';
       case 'group':

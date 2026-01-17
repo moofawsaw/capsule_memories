@@ -51,6 +51,11 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
     });
   }
 
+  Future<void> _onRefresh() async {
+    // Match MemoriesDashboard behavior: pull-to-refresh triggers notifier refresh.
+    await ref.read(groupsManagementNotifier.notifier).refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -69,24 +74,32 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                       _buildGroupsHeaderSection(context),
                       SizedBox(height: 16.h),
 
-                      // Scrollable content (no RefreshIndicator)
+                      // ✅ Pull-to-refresh (matches MemoriesDashboard pattern)
                       Expanded(
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: Column(
-                            children: [
-                              SizedBox(height: 12.h),
+                        child: RefreshIndicator(
+                          color: appTheme.deep_purple_A100,
+                          backgroundColor: appTheme.gray_900_01,
+                          displacement: 30,
+                          onRefresh: _onRefresh,
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            child: Column(
+                              children: [
+                                SizedBox(height: 12.h),
 
-                              // Invites (if any)
-                              _buildInvitesSection(context),
-                              _buildGroupInvitationList(context),
+                                // Invites (if any)
+                                _buildInvitesSection(context),
+                                _buildGroupInvitationList(context),
 
-                              // Groups
-                              SizedBox(height: 16.h),
-                              _buildGroupsList(context),
+                                // Groups
+                                SizedBox(height: 16.h),
+                                _buildGroupsList(context),
 
-                              SizedBox(height: 24.h),
-                            ],
+                                SizedBox(height: 24.h),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -231,8 +244,9 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
           return Padding(
             padding: EdgeInsets.only(top: 30.h),
             child: Center(
-              child:
-              CircularProgressIndicator(color: appTheme.deep_purple_A100),
+              child: CircularProgressIndicator(
+                color: appTheme.deep_purple_A100,
+              ),
             ),
           );
         }

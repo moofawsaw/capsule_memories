@@ -11,11 +11,9 @@ import '../../services/reaction_preloader.dart';
 
 import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
-import '../../core/utils/image_constant.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../services/feed_service.dart';
 import '../../services/supabase_service.dart';
-import '../../theme/text_style_helper.dart';
 import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
@@ -798,7 +796,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     if (_isAnyModalOpen) return;
 
     if (_currentIndex < _storyIds.length - 1) {
-      _triggerHapticFeedback(HapticFeedbackType.medium);
+      _triggerHapticFeedback(HapticFeedbackType.light);
 
       _pageController?.nextPage(
         duration: const Duration(milliseconds: 260),
@@ -817,7 +815,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     if (_isAnyModalOpen) return;
 
     if (_currentIndex > 0) {
-      _triggerHapticFeedback(HapticFeedbackType.medium);
+      _triggerHapticFeedback(HapticFeedbackType.light);
 
       _pageController?.previousPage(
         duration: const Duration(milliseconds: 260),

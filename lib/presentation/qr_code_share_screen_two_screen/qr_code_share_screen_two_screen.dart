@@ -2,9 +2,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../services/avatar_state_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'notifier/qr_code_share_screen_two_notifier.dart';
 
 class QRCodeShareScreenTwoScreen extends ConsumerStatefulWidget {
@@ -377,19 +375,6 @@ class QRCodeShareScreenTwoScreenState
         return Row(
           spacing: 12.h,
           children: [
-            Expanded(
-              child: CustomButton(
-                text: 'Download QR',
-                leftIcon: ImageConstant.imgIcon15,
-                onPressed: () => onTapDownloadQR(context),
-                buttonStyle: CustomButtonStyle.fillDark,
-                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 22.h,
-                  vertical: 12.h,
-                ),
-              ),
-            ),
             Expanded(
               child: CustomButton(
                 text: 'Share Link',

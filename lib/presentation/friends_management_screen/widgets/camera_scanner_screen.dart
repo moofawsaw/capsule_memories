@@ -123,7 +123,7 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
     // Process the QR code and get the result
     final result = await ref
         .read(friendsManagementNotifier.notifier)
-        .processScannedQRCode(code);
+        .processQRCode(code);
 
     if (mounted && result['success'] == true) {
       // Close camera scanner

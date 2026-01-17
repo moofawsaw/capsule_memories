@@ -1,105 +1,149 @@
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
-/** 
- * CustomProfileHeader - A reusable profile header component that displays user avatar, name, and email
- * 
- * This component provides:
- * - Circular avatar image with edit button overlay
- * - Letter avatar fallback when no image is available
- * - User name display with tap-to-edit functionality
- * - Email address display with secondary styling
- * - Edit functionality with callback support
- * - Responsive design using SizeUtils extensions
- * - Proper spacing and alignment for profile information
- */
 class CustomProfileHeader extends StatefulWidget {
   const CustomProfileHeader({
     Key? key,
     required this.avatarImagePath,
-    required this.userName,
+
+    // ✅ DB-backed fields
+    required this.displayName, // display_name
+    required this.username, // username (raw, no @ preferred)
+
+    // not rendered (kept for compatibility)
     required this.email,
+
+    // avatar edit
     this.onEditTap,
-    this.onUserNameChanged,
+
+    // ✅ editing control (current user)
+    this.allowEdit = false,
+    this.onDisplayNameChanged,
+    this.onUsernameChanged,
+
     this.margin,
-    this.allowUsernameEdit = false,
   }) : super(key: key);
 
-  /// Path to the user's avatar image
   final String avatarImagePath;
 
-  /// Display name of the user
-  final String userName;
+  final String displayName;
+  final String username;
 
-  /// Email address of the user
   final String email;
 
-  /// Callback function when edit button is tapped
   final VoidCallback? onEditTap;
 
-  /// Callback function when username is changed
-  final Function(String)? onUserNameChanged;
+  /// When true: both display name + username become editable
+  final bool allowEdit;
 
-  /// Margin around the entire component
+  /// Called with trimmed display name
+  final Function(String)? onDisplayNameChanged;
+
+  /// Called with trimmed username (RAW, no @)
+  final Function(String)? onUsernameChanged;
+
   final EdgeInsetsGeometry? margin;
-
-  /// Allow username editing (only for current user)
-  final bool allowUsernameEdit;
 
   @override
   State<CustomProfileHeader> createState() => _CustomProfileHeaderState();
 }
 
 class _CustomProfileHeaderState extends State<CustomProfileHeader> {
+  final TextEditingController _displayNameController = TextEditingController();
+  final FocusNode _displayNameFocus = FocusNode();
+  bool _editingDisplayName = false;
+
   final TextEditingController _usernameController = TextEditingController();
-  final FocusNode _usernameFocusNode = FocusNode();
-  bool _isEditingUsername = false;
+  final FocusNode _usernameFocus = FocusNode();
+  bool _editingUsername = false;
 
   @override
   void initState() {
     super.initState();
-    _usernameController.text = widget.userName;
 
-    // Listen for focus changes to save on blur
-    _usernameFocusNode.addListener(() {
-      if (!_usernameFocusNode.hasFocus && _isEditingUsername) {
+    _displayNameController.text = widget.displayName.trim();
+    _usernameController.text = _stripAt(widget.username);
+
+    _displayNameFocus.addListener(() {
+      if (!_displayNameFocus.hasFocus && _editingDisplayName) {
+        _saveDisplayName();
+      }
+    });
+
+    _usernameFocus.addListener(() {
+      if (!_usernameFocus.hasFocus && _editingUsername) {
         _saveUsername();
       }
     });
   }
 
   @override
-  void didUpdateWidget(CustomProfileHeader oldWidget) {
+  void didUpdateWidget(covariant CustomProfileHeader oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Update controller if userName changes externally
-    if (widget.userName != oldWidget.userName && !_isEditingUsername) {
-      _usernameController.text = widget.userName;
+
+    if (widget.displayName != oldWidget.displayName && !_editingDisplayName) {
+      _displayNameController.text = widget.displayName.trim();
+    }
+    if (widget.username != oldWidget.username && !_editingUsername) {
+      _usernameController.text = _stripAt(widget.username);
     }
   }
 
   @override
   void dispose() {
+    _displayNameController.dispose();
+    _displayNameFocus.dispose();
     _usernameController.dispose();
-    _usernameFocusNode.dispose();
+    _usernameFocus.dispose();
     super.dispose();
   }
 
-  void _saveUsername() {
-    final newUsername = _usernameController.text.trim();
-    if (newUsername.isNotEmpty && newUsername != widget.userName) {
-      widget.onUserNameChanged?.call(newUsername);
-    } else if (newUsername.isEmpty) {
-      // Revert to original username if empty
-      _usernameController.text = widget.userName;
-    }
+  bool get _showAvatarEdit => widget.onEditTap != null;
 
-    setState(() {
-      _isEditingUsername = false;
-    });
+  String _stripAt(String s) {
+    final t = s.trim();
+    return t.startsWith('@') ? t.substring(1) : t;
   }
 
-  /// Determines if the edit button should be displayed
-  bool get showEditButton => widget.onEditTap != null;
+  String _formatHandle(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return '';
+    return t.startsWith('@') ? t : '@$t';
+  }
+
+  void _saveDisplayName() {
+    final next = _displayNameController.text.trim();
+    final current = widget.displayName.trim();
+
+    if (next.isEmpty) {
+      _displayNameController.text = current.isNotEmpty ? current : 'User';
+      setState(() => _editingDisplayName = false);
+      return;
+    }
+
+    if (next != current) {
+      widget.onDisplayNameChanged?.call(next);
+    }
+
+    setState(() => _editingDisplayName = false);
+  }
+
+  void _saveUsername() {
+    final nextRaw = _stripAt(_usernameController.text).trim();
+    final currentRaw = _stripAt(widget.username).trim();
+
+    if (nextRaw.isEmpty) {
+      _usernameController.text = currentRaw;
+      setState(() => _editingUsername = false);
+      return;
+    }
+
+    if (nextRaw != currentRaw) {
+      widget.onUsernameChanged?.call(nextRaw);
+    }
+
+    setState(() => _editingUsername = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,44 +151,62 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
       margin: widget.margin ?? EdgeInsets.symmetric(horizontal: 68.h),
       child: Column(
         children: [
-          _buildAvatarSection(context),
-          SizedBox(height: 4.h),
-          _buildUserName(context),
-          SizedBox(height: 8.h),
-          _buildEmail(context),
+          _buildAvatar(),
+          SizedBox(height: 6.h),
+          _buildDisplayName(),
+          SizedBox(height: 6.h),
+          _buildUsername(),
         ],
       ),
     );
   }
 
-  /// Builds the avatar section with optional edit button
-  Widget _buildAvatarSection(BuildContext context) {
+  Widget _buildAvatar() {
     final size = 96.h;
+    final displayName = widget.displayName.trim();
+
+    final shouldLetter =
+        widget.avatarImagePath.isEmpty ||
+            widget.avatarImagePath == ImageConstant.imgDefaultAvatar;
 
     return SizedBox(
       width: size,
-      height: size + (showEditButton ? 6.h : 0),
+      height: size + (_showAvatarEdit ? 6.h : 0),
       child: Stack(
         children: [
-          // Avatar display - letter avatar or image
-          _shouldShowLetterAvatar()
-              ? _buildLetterAvatar(size)
+          shouldLetter
+              ? Container(
+            height: size,
+            width: size,
+            decoration: BoxDecoration(
+              color: appTheme.color3BD81E,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: size * 0.4,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          )
               : CustomImageView(
-                  imagePath: widget.avatarImagePath,
-                  height: size,
-                  width: size,
-                  fit: BoxFit.cover,
-                  radius: BorderRadius.circular(size / 2),
-                ),
-          // Edit button positioned at bottom-right
-          if (showEditButton)
+            imagePath: widget.avatarImagePath,
+            height: size,
+            width: size,
+            fit: BoxFit.cover,
+            radius: BorderRadius.circular(size / 2),
+          ),
+          if (_showAvatarEdit)
             Positioned(
               bottom: 0,
               right: 0,
               child: CustomIconButton(
                 iconPath: ImageConstant.imgEdit,
                 onTap: widget.onEditTap,
-                backgroundColor: Color(0xFFD81E29).withAlpha(59),
+                backgroundColor: const Color(0xFFD81E29).withAlpha(59),
                 borderRadius: 18.h,
                 height: 38.h,
                 width: 38.h,
@@ -156,62 +218,68 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
     );
   }
 
-  /// Builds letter avatar fallback
-  Widget _buildLetterAvatar(double size) {
-    return Container(
-      height: size,
-      width: size,
-      decoration: BoxDecoration(
-        color: appTheme.color3BD81E,
-        shape: BoxShape.circle,
-      ),
-      child: Center(
-        child: Text(
-          _getAvatarLetter(),
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: size * 0.4,
-            fontWeight: FontWeight.bold,
+  Widget _buildDisplayName() {
+    final current = widget.displayName.trim();
+
+    if (widget.allowEdit && _editingDisplayName) {
+      return SizedBox(
+        width: 260.h,
+        child: TextField(
+          controller: _displayNameController,
+          focusNode: _displayNameFocus,
+          autofocus: true,
+          textAlign: TextAlign.center,
+          style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
+              .copyWith(color: appTheme.white_A700, height: 1.29),
+          decoration: const InputDecoration(
+            border: UnderlineInputBorder(),
           ),
+          onSubmitted: (_) => _saveDisplayName(),
         ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: widget.allowEdit
+          ? () => setState(() => _editingDisplayName = true)
+          : null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              current.isNotEmpty ? current : 'User',
+              style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
+                  .copyWith(color: appTheme.white_A700, height: 1.29),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (widget.allowEdit) ...[
+            SizedBox(width: 6.h),
+            Icon(Icons.edit, size: 16.h, color: appTheme.blue_gray_300),
+          ],
+        ],
       ),
     );
   }
 
-  /// Determines if letter avatar should be shown
-  bool _shouldShowLetterAvatar() {
-    return widget.avatarImagePath.isEmpty ||
-        widget.avatarImagePath == ImageConstant.imgDefaultAvatar;
-  }
+  Widget _buildUsername() {
+    final handle = _formatHandle(widget.username);
 
-  /// Gets the first letter of user name for avatar
-  String _getAvatarLetter() {
-    return widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : '?';
-  }
-
-  /// Builds the user name text with tap-to-edit functionality
-  Widget _buildUserName(BuildContext context) {
-    if (widget.allowUsernameEdit && _isEditingUsername) {
-      return Container(
-        constraints: BoxConstraints(maxWidth: 250.h),
+    if (widget.allowEdit && _editingUsername) {
+      return SizedBox(
+        width: 260.h,
         child: TextField(
           controller: _usernameController,
-          focusNode: _usernameFocusNode,
+          focusNode: _usernameFocus,
           autofocus: true,
           textAlign: TextAlign.center,
-          style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-              .copyWith(height: 1.29),
-          decoration: InputDecoration(
-            border: UnderlineInputBorder(
-              borderSide: BorderSide(color: appTheme.color3BD81E),
-            ),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: appTheme.blue_gray_300),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: appTheme.color3BD81E, width: 2),
-            ),
-            contentPadding: EdgeInsets.symmetric(vertical: 4.h),
+          style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+          decoration: const InputDecoration(
+            border: UnderlineInputBorder(),
           ),
           onSubmitted: (_) => _saveUsername(),
         ),
@@ -219,54 +287,31 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
     }
 
     return GestureDetector(
-      onTap: widget.allowUsernameEdit
-          ? () {
-              setState(() {
-                _isEditingUsername = true;
-              });
-            }
+      onTap: widget.allowEdit
+          ? () => setState(() {
+        _editingUsername = true;
+        _usernameController.text = _stripAt(handle);
+      })
           : null,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 4.h),
-        decoration: widget.allowUsernameEdit
-            ? BoxDecoration(
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.transparent, width: 1),
-              )
-            : null,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                widget.userName,
-                style: TextStyleHelper
-                    .instance.headline24ExtraBoldPlusJakartaSans
-                    .copyWith(height: 1.29),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-              ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              handle.isNotEmpty ? handle : '@',
+              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            if (widget.allowUsernameEdit) ...[
-              SizedBox(width: 4.h),
-              Icon(
-                Icons.edit,
-                size: 16.h,
-                color: appTheme.blue_gray_300,
-              ),
-            ],
+          ),
+          if (widget.allowEdit) ...[
+            SizedBox(width: 6.h),
+            Icon(Icons.edit, size: 14.h, color: appTheme.blue_gray_300),
           ],
-        ),
+        ],
       ),
-    );
-  }
-
-  /// Builds the email text
-  Widget _buildEmail(BuildContext context) {
-    return Text(
-      widget.email,
-      style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-          .copyWith(color: appTheme.blue_gray_300, height: 1.31),
     );
   }
 }

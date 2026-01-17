@@ -17,6 +17,9 @@ class CustomStoryCard extends StatelessWidget {
     this.margin,
     this.showDelete = false,
     this.onDelete,
+
+    // ✅ NEW: optional, so you can override ONLY on /profile
+    this.borderRadius,
   }) : super(key: key);
 
   final String userName;
@@ -37,11 +40,17 @@ class CustomStoryCard extends StatelessWidget {
   final bool showDelete;
   final VoidCallback? onDelete;
 
+  // ✅ NEW: override card radius per usage (profile-only, feed can keep default)
+  final BorderRadius? borderRadius;
+
   @override
   Widget build(BuildContext context) {
     final category = categoryText != null && (categoryIcon == null)
         ? MemoryCategories.getByName(categoryText!)
         : MemoryCategories.custom;
+
+    // ✅ Single source of truth for this card's radius
+    final BorderRadius cardRadius = borderRadius ?? BorderRadius.circular(8.h);
 
     return Container(
       width: width ?? 116.h,
@@ -56,20 +65,19 @@ class CustomStoryCard extends StatelessWidget {
               color: appTheme.gray_900_02,
               width: 1,
             ),
-            borderRadius: BorderRadius.circular(8.h),
+            borderRadius: cardRadius, // ✅ updated
           ),
           child: Stack(
             children: [
-// Background story image (FULL CARD)
+              // Background story image (FULL CARD)
               Positioned.fill(
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8.h),
+                  borderRadius: cardRadius, // ✅ updated
                   child: _CoverImage(
                     imagePath: backgroundImage,
                   ),
                 ),
               ),
-
 
               // ✅ Delete button overlay (top-right)
               if (showDelete)
@@ -142,8 +150,6 @@ class CustomStoryCard extends StatelessWidget {
     );
   }
 
-
-
   Widget _buildUserInfo(BuildContext context, MemoryCategory category) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,6 +209,7 @@ class CustomStoryCard extends StatelessWidget {
     );
   }
 }
+
 /// Forces true cover behavior for story card backgrounds (prevents stretching).
 class _CoverImage extends StatelessWidget {
   final String imagePath;
@@ -252,7 +259,8 @@ class _CoverAvatar extends StatelessWidget {
     required this.imagePath,
   }) : super(key: key);
 
-  bool _isNetwork(String s) => s.trim().startsWith('http://') || s.trim().startsWith('https://');
+  bool _isNetwork(String s) =>
+      s.trim().startsWith('http://') || s.trim().startsWith('https://');
 
   @override
   Widget build(BuildContext context) {

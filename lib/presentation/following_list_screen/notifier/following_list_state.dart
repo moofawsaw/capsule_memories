@@ -7,28 +7,46 @@ class FollowingListState extends Equatable {
     this.followingListModel,
     this.selectedUser,
     this.isLoading,
+
+    // Search state
+    this.searchQuery,
+    this.searchResults,
+    this.isSearching,
   });
 
   FollowingListModel? followingListModel;
   FollowingUserModel? selectedUser;
   bool? isLoading;
 
+  String? searchQuery;
+  List<FollowingSearchUserModel>? searchResults;
+  bool? isSearching;
+
   @override
   List<Object?> get props => [
-        followingListModel,
-        selectedUser,
-        isLoading,
-      ];
+    followingListModel,
+    selectedUser,
+    isLoading,
+    searchQuery,
+    searchResults,
+    isSearching,
+  ];
 
   FollowingListState copyWith({
     FollowingListModel? followingListModel,
     FollowingUserModel? selectedUser,
     bool? isLoading,
+    String? searchQuery,
+    List<FollowingSearchUserModel>? searchResults,
+    bool? isSearching,
   }) {
     return FollowingListState(
       followingListModel: followingListModel ?? this.followingListModel,
       selectedUser: selectedUser ?? this.selectedUser,
       isLoading: isLoading ?? this.isLoading,
+      searchQuery: searchQuery ?? this.searchQuery,
+      searchResults: searchResults ?? this.searchResults,
+      isSearching: isSearching ?? this.isSearching,
     );
   }
 }

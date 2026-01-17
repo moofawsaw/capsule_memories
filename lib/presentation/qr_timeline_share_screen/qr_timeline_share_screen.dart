@@ -441,15 +441,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
   Widget _buildActionButtons(String url) {
     return Row(
       children: [
-        Expanded(
-          child: CustomButton(
-            text: 'Download QR',
-            leftIcon: ImageConstant.imgIcon15,
-            onPressed: _downloadQRCode,
-            buttonStyle: CustomButtonStyle.fillDark,
-            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-          ),
-        ),
         SizedBox(width: 12.h),
         Expanded(
           child: CustomButton(
