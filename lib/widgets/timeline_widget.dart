@@ -251,12 +251,16 @@ class TimelineWidget extends StatelessWidget {
         double? maxWidth,
         bool isCompact = false,
       }) {
-    // ✅ If countdown is 0 AND memory type is sealed -> show SEALED + lock.
-    // - "countdown is 0" means the time is up (endUtc <= now) OR the computed clock is 00:00:00.
-    // - "memory type is sealed" is variant == TimelineVariant.sealed.
+    final DateTime nowUtc = DateTime.now().toUtc();
+
+    // ✅ "Expired" means there is no time remaining (endUtc <= now).
+    final bool isExpired = !endUtc.isAfter(nowUtc);
+
+    // ✅ SEALED UI rules:
+    // - FULL: only show SEALED when the TimelineVariant is sealed (your existing behavior)
+    // - COMPACT: show SEALED when expired (even if variant is still active) so cards don't show 00:00:00
     final bool showSealedState =
-        variant == TimelineVariant.sealed &&
-            !endUtc.isAfter(DateTime.now().toUtc());
+        (variant == TimelineVariant.sealed && isExpired) || (isCompact && isExpired);
 
     // If sealed state, do NOT stream; render a stable pill.
     if (showSealedState) {
@@ -268,12 +272,12 @@ class TimelineWidget extends StatelessWidget {
       );
     }
 
-    // Existing sealed behavior: keep showing 00:00:00 when variant is sealed but endUtc is in future
-    // (should be rare, but preserves your current logic).
+    // Preserve your existing explicit sealed behavior when endUtc is still in the future.
+    // (Rare, but keeps your logic consistent.)
     if (variant == TimelineVariant.sealed) {
       return _countdownBadgeShell(
         value: '00:00:00',
-        iconData: Icons.access_time_rounded,
+        iconData: Icons.timer_3_rounded,
         maxWidth: maxWidth,
         isCompact: isCompact,
       );
@@ -282,11 +286,19 @@ class TimelineWidget extends StatelessWidget {
     return StreamBuilder<int>(
       stream: Stream.periodic(const Duration(seconds: 1), (i) => i),
       builder: (context, snapshot) {
-        final DateTime nowUtc = DateTime.now().toUtc();
-        final Duration remaining = endUtc.difference(nowUtc);
+        final DateTime nowUtcTick = DateTime.now().toUtc();
+        final Duration remaining = endUtc.difference(nowUtcTick);
 
-        // ✅ If countdown hits 0 and the memory type is sealed, show SEALED + lock.
-        // In active mode, keep showing 00:00:00 (your existing behavior) when it expires.
+        // ✅ If compact + expired, flip to SEALED UI immediately on tick.
+        if (isCompact && (remaining.inSeconds <= 0)) {
+          return _countdownBadgeShell(
+            value: 'SEALED',
+            iconData: Icons.lock_rounded,
+            maxWidth: maxWidth,
+            isCompact: isCompact,
+          );
+        }
+
         final String clock = _formatRemainingClock(remaining);
 
         return _countdownBadgeShell(
@@ -314,21 +326,30 @@ class TimelineWidget extends StatelessWidget {
     double? maxWidth,
     bool isCompact = false,
   }) {
-    // Compact pill sizing (memory cards)
+    // Heights stay height-scaled
     final double pillHeight = isCompact ? 30.h : 34.h;
+
+    // Spacing
     final double horizontalPadding = isCompact ? 12.h : 14.h;
     final double iconSize = isCompact ? 14.h : 16.h;
     final double gap = isCompact ? 6.h : 8.h;
 
-    // FULL keeps its stronger min width, COMPACT can shrink
-    final double desiredMinWidth = isCompact ? 0.0 : 150.h;
+    // 🔒 FIXED WIDTH FOR COMPACT
+    // This is the ONLY knob you need to tweak.
+    // Safe range: 180–220 depending on font/device
+    final double compactPillWidth = 100.h;
 
-    final double fallbackMaxWidth = isCompact ? 260.h : 220.h;
+    // FULL keeps its original min/max logic
+    final double desiredMinWidth = isCompact ? 0.0 : 150.h;
+    final double fallbackMaxWidth = isCompact ? compactPillWidth : 220.h;
+
     final double effectiveMaxWidth =
     (maxWidth ?? fallbackMaxWidth).clamp(0.0, 99999.0);
 
     final double effectiveMinWidth =
-    desiredMinWidth > effectiveMaxWidth ? effectiveMaxWidth : desiredMinWidth;
+    desiredMinWidth > effectiveMaxWidth
+        ? effectiveMaxWidth
+        : desiredMinWidth;
 
     final TextStyle baseStyle =
         TextStyleHelper.instance.body14BoldPlusJakartaSans;
@@ -346,14 +367,7 @@ class TimelineWidget extends StatelessWidget {
       letterSpacing: 0.2,
     );
 
-    // Template only used for compact to reserve width (no jitter)
-    final String template = _countdownWidthTemplate(isCompact: isCompact);
-
-    // Fixed text slot width so the text can be centered (and stable)
-    final double compactTextSlotWidth =
-    isCompact ? _measureTextWidth(template, textStyle) : 0.0;
-
-    return ConstrainedBox(
+    final Widget pill = ConstrainedBox(
       constraints: BoxConstraints(
         minWidth: effectiveMinWidth,
         maxWidth: effectiveMaxWidth,
@@ -367,7 +381,7 @@ class TimelineWidget extends StatelessWidget {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min, // keep contents centered as a group
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               iconData,
@@ -376,36 +390,17 @@ class TimelineWidget extends StatelessWidget {
             ),
             SizedBox(width: gap),
 
-            // COMPACT: fixed-width slot + centered stack
+            // COMPACT: centered text in fixed pill
             if (isCompact)
-              SizedBox(
-                width: compactTextSlotWidth,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Invisible template reserves constant width (prevents jitter)
-                    Opacity(
-                      opacity: 0.0,
-                      child: Text(
-                        template,
-                        maxLines: 1,
-                        overflow: TextOverflow.clip,
-                        style: textStyle,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.clip,
-                      style: textStyle,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                style: textStyle,
+                textAlign: TextAlign.center,
               )
             else
-            // FULL: allow normal layout
+            // FULL: unchanged behavior
               Flexible(
                 child: Text(
                   value,
@@ -419,6 +414,11 @@ class TimelineWidget extends StatelessWidget {
         ),
       ),
     );
+
+    // 🔒 HARD WIDTH APPLIED HERE (COMPACT ONLY)
+    return isCompact
+        ? SizedBox(width: compactPillWidth, child: pill)
+        : pill;
   }
 
   /// Markers: Start (bold), Midpoint (COUNTDOWN BADGE), End (bold)
@@ -501,8 +501,8 @@ class TimelineWidget extends StatelessWidget {
         // COMPACT view: do RAW px math (no .h) against usableWidth (also raw px),
         // then hard-trim slightly so it never kisses the left/right markers.
         final double avatarRadiusPx = _avatarSize / 2.0; // RAW px
-        const double extraPx = 14.0; // tweak 10–18
-        const double trimPx = 12.0; // increase to make badge narrower
+        const double extraPx = 25.0; // tweak 10–18 (increase to make badge narrower)
+        const double trimPx = 25.0; // increase to make badge narrower
 
         final double safeInsetPx = avatarRadiusPx + extraPx;
 

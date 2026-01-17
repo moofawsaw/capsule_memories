@@ -344,9 +344,33 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 ),
               ),
             Expanded(
-              child: Text(
-                category['name'] as String,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    category['name'] as String,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
+                      color: appTheme.gray_50,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if ((category['tagline'] as String?)?.trim().isNotEmpty == true)
+                    Padding(
+                      padding: EdgeInsets.only(top: 2.h),
+                      child: Text(
+                        category['tagline'] as String,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
+                          color: appTheme.blue_gray_300,
+                          fontSize: 10.fSize,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ],

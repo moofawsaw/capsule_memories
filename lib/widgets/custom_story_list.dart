@@ -1,5 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
+// lib/widgets/custom_story_list.dart
 
+import 'package:cached_network_image/cached_network_image.dart';
 import '../core/app_export.dart';
 
 class CustomStoryList extends StatelessWidget {
@@ -49,13 +50,16 @@ class CustomStoryList extends StatelessWidget {
   }
 
   Widget _buildStoryItem(BuildContext context, CustomStoryItem item, int index) {
-    final bg = item.backgroundImage.trim();
-    final avatar = item.profileImage.trim();
+    final String bg = item.backgroundImage.trim();
+    final String avatar = item.profileImage.trim();
 
     return GestureDetector(
       onTap: () => onStoryTap?.call(index),
       child: Container(
-        key: ValueKey('story_${item.storyId ?? index}_${item.backgroundImage}'),
+        // ✅ bg/avatar are defined right above, so this cannot be "undefined name"
+        key: ValueKey(
+          'story_${item.storyId ?? index}_${bg}_${avatar}',
+        ),
         width: 90.h,
         height: 120.h,
         decoration: BoxDecoration(
@@ -71,7 +75,6 @@ class CustomStoryList extends StatelessWidget {
                 child: _isNetworkUrl(bg)
                     ? CachedNetworkImage(
                   imageUrl: bg,
-                  key: ValueKey('story_bg_${item.storyId ?? index}'),
                   fit: BoxFit.cover,
                   placeholder: (_, __) => Container(
                     color: appTheme.gray_900_02,
@@ -115,7 +118,10 @@ class CustomStoryList extends StatelessWidget {
                           ? const Color(0xFF9CA3AF)
                           : const Color(0xFF8B5CF6),
                       border: item.isRead
-                          ? Border.all(color: const Color(0xFF9CA3AF), width: 2.h)
+                          ? Border.all(
+                        color: const Color(0xFF9CA3AF),
+                        width: 2.h,
+                      )
                           : null,
                     ),
                     child: Container(
@@ -128,7 +134,6 @@ class CustomStoryList extends StatelessWidget {
                         child: _isNetworkUrl(avatar)
                             ? CachedNetworkImage(
                           imageUrl: avatar,
-                          key: ValueKey('story_profile_${item.storyId ?? index}'),
                           fit: BoxFit.cover,
                           placeholder: (_, __) => Container(
                             color: appTheme.gray_900_02,

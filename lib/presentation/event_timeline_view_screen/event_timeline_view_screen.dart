@@ -778,8 +778,7 @@ class EventTimelineViewScreenState
         final state = ref.watch(eventTimelineViewNotifier);
         final isCurrentUserMember = state.isCurrentUserMember ?? false;
 
-        final storyCount =
-            state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
+        final storyCount = state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
         final hasStories = storyCount > 0;
 
         return Container(
@@ -788,10 +787,11 @@ class EventTimelineViewScreenState
             children: [
               if (hasStories) ...[
                 CustomButton(
-                  text: 'View All',
+                  text: 'Cinema Mode',
                   width: double.infinity,
                   buttonStyle: CustomButtonStyle.outlineDark,
                   buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
+                  leftIcon: Icons.theaters, // ✅ Material icon
                   onPressed: () => onTapViewAll(context),
                 ),
                 if (isCurrentUserMember) SizedBox(height: 12.h),
@@ -802,6 +802,7 @@ class EventTimelineViewScreenState
                   width: double.infinity,
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  leftIcon: Icons.videocam_outlined, // ✅ Material icon
                   onPressed: () => onTapCreateStory(context),
                 ),
             ],
@@ -810,6 +811,7 @@ class EventTimelineViewScreenState
       },
     );
   }
+
 
   void onTapJoinFromTimeline(BuildContext context) {
     NavigatorService.popAndPushNamed(AppRoutes.appNotifications);

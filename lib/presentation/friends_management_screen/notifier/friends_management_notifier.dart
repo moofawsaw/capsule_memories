@@ -35,6 +35,8 @@ class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementSta
     if (!_didInit) {
       _didInit = true;
       initialize();
+
+      // Keep listener approach (you can remove onChanged in the widget if you want)
       searchController.addListener(_onSearchTextChanged);
     }
 
@@ -106,26 +108,25 @@ class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementSta
 
       // Sent requests
       await _sentRequestsSubscription?.cancel();
-      _sentRequestsSubscription =
-          _friendsProvider.sentRequestsStream.listen((requests) {
-            final list = requests
-                .map(
-                  (r) => SentRequestModel(
-                id: r.id,
-                userId: r.userId,
-                userName: r.userName,
-                displayName: r.displayName,
-                profileImagePath: r.profileImagePath,
-                status: r.status,
-              ),
-            )
-                .toList();
+      _sentRequestsSubscription = _friendsProvider.sentRequestsStream.listen((requests) {
+        final list = requests
+            .map(
+              (r) => SentRequestModel(
+            id: r.id,
+            userId: r.userId,
+            userName: r.userName,
+            displayName: r.displayName,
+            profileImagePath: r.profileImagePath,
+            status: r.status,
+          ),
+        )
+            .toList();
 
-            state = state.copyWith(
-              sentRequestsList: list,
-              filteredSentRequestsList: list,
-            );
-          });
+        state = state.copyWith(
+          sentRequestsList: list,
+          filteredSentRequestsList: list,
+        );
+      });
 
       state = state.copyWith(isLoading: false);
 
@@ -169,14 +170,6 @@ class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementSta
     });
   }
 
-  String _normalizeFriendshipStatus(dynamic raw) {
-    final s = (raw ?? '').toString().toLowerCase();
-    if (s == 'friends') return 'friends';
-    if (s.startsWith('pending')) return 'pending';
-    if (s == 'requested') return 'pending';
-    return 'none';
-  }
-
   Future<void> _searchUsersSmart(String query) async {
     final snapshotQuery = query.trim();
     state = state.copyWith(isSearching: true);
@@ -184,54 +177,21 @@ class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementSta
     try {
       final client = SupabaseService.instance.client;
       final currentUser = client?.auth.currentUser;
+
       if (client == null || currentUser == null) {
         state = state.copyWith(isSearching: false, searchResults: const []);
         return;
       }
 
-      // ✅ Try multiple param shapes so you don’t get stuck on signature mismatch
-      final paramAttempts = <Map<String, dynamic>>[
-        {
-          'p_query': snapshotQuery,
-          'p_limit': 10,
-          'p_user_id': currentUser.id,
-        },
-        {
-          'query_text': snapshotQuery,
-          'limit_n': 10,
-          'current_user_id': currentUser.id,
-        },
-        {
-          'search_query': snapshotQuery,
-          'limit': 10,
-          'current_user_id': currentUser.id,
-        },
-        {
-          'query': snapshotQuery,
-          'limit': 10,
-          'user_id': currentUser.id,
-        },
-        {
-          'query': snapshotQuery,
-          'limit': 10,
-        },
-      ];
+      // ✅ Correct, single param map matching the NEW SQL signature
+      final res = await client.rpc('search_users_smart', params: {
+        'p_query': snapshotQuery,
+        'p_limit': 10,
+        'p_user_id': currentUser.id,
+      });
 
-      List<dynamic>? rows;
-
-      Object? lastError;
-      for (final params in paramAttempts) {
-        try {
-          final res = await client.rpc('search_users_smart', params: params);
-          rows = (res as List?)?.cast<dynamic>();
-          if (rows != null) break;
-        } catch (e) {
-          lastError = e;
-        }
-      }
-
-      if (rows == null) {
-        debugPrint('search_users_smart failed: $lastError');
+      if (res is! List) {
+        debugPrint('search_users_smart unexpected return type: ${res.runtimeType}');
         if (state.searchQuery.trim() == snapshotQuery) {
           state = state.copyWith(isSearching: false, searchResults: const []);
         }
@@ -241,6 +201,8 @@ class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementSta
       // If user typed more while waiting, ignore stale results
       if (state.searchQuery.trim() != snapshotQuery) return;
 
+      final rows = res.cast<dynamic>();
+
       final results = rows.map((r) {
         final m = (r as Map).cast<String, dynamic>();
 
@@ -248,19 +210,22 @@ class FriendsManagementNotifier extends AutoDisposeNotifier<FriendsManagementSta
         final username = (m['username'] ?? '').toString();
         final displayName = (m['display_name'] ?? '').toString();
         final avatarUrl = (m['avatar_url'] ?? '').toString();
-        final bio = (m['bio'] ?? '').toString();
 
-        // expected field from your function
-        final friendshipRaw =
-            m['friendship_status'] ?? m['friend_status'] ?? m['status'] ?? 'none';
+        // ✅ NEW SQL returns booleans (not friendship_status string)
+        final isFriend = m['is_friend'] == true;
+        final isPending = m['is_pending'] == true;
+
+        final status = isFriend
+            ? 'friends'
+            : (isPending ? 'pending' : 'none');
 
         return SearchUserModel(
           id: id,
           userName: username,
           displayName: displayName.isNotEmpty ? displayName : username,
           profileImagePath: avatarUrl,
-          bio: bio,
-          friendshipStatus: _normalizeFriendshipStatus(friendshipRaw),
+          bio: '', // not returned by this function
+          friendshipStatus: status,
         );
       }).toList();
 

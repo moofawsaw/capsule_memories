@@ -1,3 +1,4 @@
+// lib/presentation/feature_request_screen/notifier/feature_request_notifier.dart
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -8,9 +9,9 @@ import '../models/feature_request_model.dart';
 
 part 'feature_request_state.dart';
 
-final featureRequestNotifier = StateNotifierProvider.autoDispose<
-    FeatureRequestNotifier, FeatureRequestState>(
-  (ref) => FeatureRequestNotifier(
+final featureRequestNotifier =
+StateNotifierProvider.autoDispose<FeatureRequestNotifier, FeatureRequestState>(
+      (ref) => FeatureRequestNotifier(
     FeatureRequestState(
       featureRequestModel: FeatureRequestModel(),
     ),
@@ -25,30 +26,35 @@ class FeatureRequestNotifier extends StateNotifier<FeatureRequestState> {
   void initialize() {
     state = state.copyWith(
       featureDescriptionController: TextEditingController(),
-      isLoading: false,
-      isSubmitted: false,
-      hasError: false,
+      status: FeatureRequestStatus.idle,
+      message: null,
     );
   }
 
   String? validateFeatureDescription(String? value) {
-    if (value?.trim().isEmpty ?? true) {
-      return 'Please provide your feature request details';
-    }
+    final text = (value ?? '').trim();
+    if (text.isEmpty) return 'Please provide your feature request details';
     return null;
   }
 
-  Future<void> submitFeatureRequest() async {
-    final description = state.featureDescriptionController?.text.trim();
+  Future<void> submitFeatureRequest({String? category}) async {
+    // One-time: if already completed on this screen instance, do nothing.
+    if (state.isCompleted) return;
 
-    if (description?.isEmpty ?? true) {
-      state = state.copyWith(hasError: true);
+    final description = (state.featureDescriptionController?.text ?? '').trim();
+    final validationError = validateFeatureDescription(description);
+
+    if (validationError != null) {
+      state = state.copyWith(
+        status: FeatureRequestStatus.error,
+        message: validationError,
+      );
       return;
     }
 
     state = state.copyWith(
-      isLoading: true,
-      hasError: false,
+      status: FeatureRequestStatus.submitting,
+      message: null,
     );
 
     try {
@@ -58,55 +64,48 @@ class FeatureRequestNotifier extends StateNotifier<FeatureRequestState> {
         throw Exception('Supabase client not initialized');
       }
 
-      // Get device info
       final deviceInfo = _getDeviceInfo();
 
-      // Call Supabase Edge Function
+      // ✅ Normalize chip label -> DB-friendly values
+      final normalizedCategory = (category ?? 'Other').trim().toLowerCase();
+
       final response = await supabase.functions.invoke(
         'submit-feature-request',
         body: {
-          'title':
-              'Feature Request', // You can extract this from description or add a title field
+          'title': 'Feature Request',
           'description': description,
-          'category': 'memories', // Optional category
+          'category': normalizedCategory, // ✅ chip-driven
           'device_info': deviceInfo,
         },
       );
 
       if (response.status == 200) {
-        // Clear form on success
         state.featureDescriptionController?.clear();
 
         state = state.copyWith(
-          isLoading: false,
-          isSubmitted: true,
+          status: FeatureRequestStatus.success,
+          message:
+          'We received your submission. You should receive an email confirmation shortly.',
           featureRequestModel: state.featureRequestModel?.copyWith(
             description: description,
             submittedAt: DateTime.now(),
           ),
         );
-
-        // Reset submission state after a delay
-        Future.delayed(Duration(milliseconds: 100), () {
-          if (mounted) {
-            state = state.copyWith(isSubmitted: false);
-          }
-        });
       } else {
         throw Exception('Failed to submit feature request: ${response.status}');
       }
     } catch (e) {
-      print('❌ Error submitting feature request: $e');
       state = state.copyWith(
-        isLoading: false,
-        hasError: true,
+        status: FeatureRequestStatus.error,
+        message:
+        'We couldn’t submit your request right now. Please try again later. If it went through, you should receive an email confirmation shortly.',
       );
     }
   }
 
   Map<String, String> _getDeviceInfo() {
     String os = 'Unknown';
-    String appVersion = '1.0.0'; // You can get this from package_info_plus
+    String appVersion = '1.0.0';
 
     if (kIsWeb) {
       os = 'Web';

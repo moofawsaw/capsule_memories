@@ -509,6 +509,17 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
       },
     );
   }
+  void onTapReplayAll(BuildContext context) {
+    final state = ref.read(memoryDetailsViewNotifier);
+    final memoryId = state.memoryDetailsViewModel?.memoryId;
+
+    if (memoryId == null || memoryId.isEmpty) return;
+
+    NavigatorService.pushNamed(
+      AppRoutes.memoryTimelinePlayback,
+      arguments: memoryId,
+    );
+  }
 
   Widget _buildActionButtons(BuildContext context) {
     return Container(
@@ -516,13 +527,12 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
       child: Column(
         children: [
           CustomButton(
-            text: 'Replay All',
+            text: 'Cinema Mode',
             width: double.infinity,
             buttonStyle: CustomButtonStyle.outlineDark,
             buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-            onPressed: () {
-              ref.read(memoryDetailsViewNotifier.notifier).onReplayAllTap();
-            },
+            leftIcon: Icons.theaters, // ✅ Material icon
+            onPressed: () => onTapReplayAll(context),
           ),
           SizedBox(height: 12.h),
           CustomButton(
@@ -530,11 +540,14 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
             width: double.infinity,
             buttonStyle: CustomButtonStyle.fillPrimary,
             buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+            leftIcon: Icons.add_photo_alternate_outlined, // ✅ Material icon
             onPressed: () async {
               final state = ref.read(memoryDetailsViewNotifier);
               final memoryId = state.memoryDetailsViewModel?.memoryId;
-              final startDate = state.memoryDetailsViewModel?.timelineDetail?.memoryStartTime;
-              final endDate = state.memoryDetailsViewModel?.timelineDetail?.memoryEndTime;
+              final startDate =
+                  state.memoryDetailsViewModel?.timelineDetail?.memoryStartTime;
+              final endDate =
+                  state.memoryDetailsViewModel?.timelineDetail?.memoryEndTime;
 
               if (memoryId != null && startDate != null && endDate != null) {
                 final didUpload = await showModalBottomSheet<bool>(
@@ -554,7 +567,9 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
                 );
 
                 if (didUpload == true) {
-                  await ref.read(memoryDetailsViewNotifier.notifier).refreshMemory(memoryId);
+                  await ref
+                      .read(memoryDetailsViewNotifier.notifier)
+                      .refreshMemory(memoryId);
                 }
               }
             },
@@ -570,6 +585,7 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
       ),
     );
   }
+
 
   void _handleTimelineStoryTap(BuildContext context, String storyId) {
     final notifier = ref.read(memoryDetailsViewNotifier.notifier);

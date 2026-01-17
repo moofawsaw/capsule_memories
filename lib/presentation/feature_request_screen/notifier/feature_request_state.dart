@@ -1,42 +1,46 @@
 part of 'feature_request_notifier.dart';
 
+enum FeatureRequestStatus { idle, submitting, success, error }
+
 class FeatureRequestState extends Equatable {
   final TextEditingController? featureDescriptionController;
-  final bool? isLoading;
-  final bool? isSubmitted;
-  final bool? hasError;
+  final FeatureRequestStatus status;
+  final String? message;
   final FeatureRequestModel? featureRequestModel;
 
-  FeatureRequestState({
+  const FeatureRequestState({
     this.featureDescriptionController,
-    this.isLoading = false,
-    this.isSubmitted = false,
-    this.hasError = false,
+    this.status = FeatureRequestStatus.idle,
+    this.message,
     this.featureRequestModel,
   });
 
+  bool get isLoading => status == FeatureRequestStatus.submitting;
+  bool get isSuccess => status == FeatureRequestStatus.success;
+  bool get isError => status == FeatureRequestStatus.error;
+
+  /// “One-time” receipt behavior: once success/error happens, keep showing receipt.
+  bool get isCompleted => isSuccess || isError;
+
   @override
   List<Object?> get props => [
-        featureDescriptionController,
-        isLoading,
-        isSubmitted,
-        hasError,
-        featureRequestModel,
-      ];
+    featureDescriptionController,
+    status,
+    message,
+    featureRequestModel,
+  ];
 
   FeatureRequestState copyWith({
     TextEditingController? featureDescriptionController,
-    bool? isLoading,
-    bool? isSubmitted,
-    bool? hasError,
+    FeatureRequestStatus? status,
+    String? message,
     FeatureRequestModel? featureRequestModel,
   }) {
     return FeatureRequestState(
       featureDescriptionController:
-          featureDescriptionController ?? this.featureDescriptionController,
-      isLoading: isLoading ?? this.isLoading,
-      isSubmitted: isSubmitted ?? this.isSubmitted,
-      hasError: hasError ?? this.hasError,
+      featureDescriptionController ?? this.featureDescriptionController,
+      status: status ?? this.status,
+      message: message,
       featureRequestModel: featureRequestModel ?? this.featureRequestModel,
     );
   }

@@ -386,6 +386,18 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
                 color: appTheme.color41C124,
                 borderRadius: BorderRadius.circular(6.h),
               ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.download_rounded, color: appTheme.white_A700, size: 18.h),
+                  SizedBox(width: 8.h),
+                  Text(
+                    "Download",
+                    style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                        .copyWith(color: appTheme.white_A700),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

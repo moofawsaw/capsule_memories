@@ -205,17 +205,20 @@ class CustomGroupCard extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // ✏️ Edit (creator only)
         if (groupData.isCreator == true && onEditTap != null) ...[
           GestureDetector(
             onTap: onEditTap,
-            child: CustomImageView(
-              imagePath: ImageConstant.imgEdit,
-              height: 26.h,
-              width: 26.h,
+            child: Icon(
+              Icons.edit,
+              size: 26.h,
+              color: appTheme.gray_50,
             ),
           ),
           SizedBox(width: 12.h),
         ],
+
+        // ℹ️ Info (non-creator only)
         if (groupData.isCreator != true && onInfoTap != null) ...[
           GestureDetector(
             onTap: onInfoTap,
@@ -227,22 +230,27 @@ class CustomGroupCard extends StatelessWidget {
           ),
           SizedBox(width: 12.h),
         ],
+
+        // 🔗 QR / primary action (always)
         GestureDetector(
           onTap: onActionTap,
-          child: CustomImageView(
-            imagePath: ImageConstant.imgButtons,
-            height: 26.h,
-            width: 26.h,
+          child: Icon(
+            Icons.qr_code_2,
+            size: 26.h,
+            color: appTheme.gray_50,
           ),
         ),
+
         SizedBox(width: 19.h),
+
+        // 🗑 Delete (creator) OR 🚪 Leave (non-creator)
         if (groupData.isCreator == true)
           GestureDetector(
             onTap: onDeleteTap,
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIconRed50026x26,
-              height: 26.h,
-              width: 26.h,
+            child: Icon(
+              Icons.delete_outline,
+              size: 26.h,
+              color: appTheme.red_500,
             ),
           )
         else

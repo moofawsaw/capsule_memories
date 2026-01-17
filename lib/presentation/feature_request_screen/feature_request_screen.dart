@@ -1,7 +1,11 @@
+// lib/presentation/feature_request_screen/feature_request_screen.dart
+
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import '../../services/supabase_service.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
-import '../../widgets/custom_header_row.dart';
 import 'notifier/feature_request_notifier.dart';
 
 class FeatureRequestScreen extends ConsumerStatefulWidget {
@@ -12,39 +16,49 @@ class FeatureRequestScreen extends ConsumerStatefulWidget {
 }
 
 class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
-  bool _showConfirmation = false;
+  static const List<String> _categories = <String>[
+    'UX',
+    'Bug',
+    'Performance',
+    'Feature',
+    'Other',
+  ];
+
+  String? _selectedCategory;
+
+  // ✅ Cache local submit timestamp for receipt UI
+  DateTime? _submittedAtLocal;
 
   @override
   void initState() {
     super.initState();
 
-    // Listen once (not inside build) so we don't accidentally register multiple listeners.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listen(featureRequestNotifier, (previous, current) {
-        final wasSubmitted = (previous?.isSubmitted ?? false);
-        final isSubmitted = (current.isSubmitted ?? false);
+      ref.listen<FeatureRequestState>(featureRequestNotifier, (previous, current) {
+        final prevStatus = previous?.status ?? FeatureRequestStatus.idle;
+        final currStatus = current.status;
 
-        if (!wasSubmitted && isSubmitted) {
-          if (mounted) setState(() => _showConfirmation = true);
+        if (prevStatus == currStatus) return;
+
+        if (currStatus == FeatureRequestStatus.success) {
+          // ✅ Haptic on success
+          HapticFeedback.lightImpact();
+
+          // ✅ Capture timestamp when we first hit success (only once)
+          _submittedAtLocal ??= DateTime.now();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Feature request submitted successfully!'),
+              content: const Text('Request submitted'),
               backgroundColor: appTheme.colorFF52D1,
             ),
           );
-
-          current.featureDescriptionController?.clear();
         }
 
-
-        final hadError = (previous?.hasError ?? false);
-        final hasError = (current.hasError ?? false);
-
-        if (!hadError && hasError) {
+        if (currStatus == FeatureRequestStatus.error) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Please provide your feature request details'),
+              content: Text(current.message ?? 'Something went wrong'),
               backgroundColor: appTheme.redCustom,
             ),
           );
@@ -56,47 +70,32 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(featureRequestNotifier);
+    final showReceipt = state.isCompleted;
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.blackCustom.withAlpha(89),
-        body: SizedBox(
-          width: double.infinity,
-          height: double.infinity,
-          child: Stack(
-            alignment: Alignment.center,
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20.h, 18.h, 20.h, 18.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ✅ Remove radius around the container
-              Container(
-                width: 356.h,
-                height: 756.h,
-                decoration: BoxDecoration(
-                  color: appTheme.gray_900_02,
-                  borderRadius: BorderRadius.zero,
-                ),
-              ),
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 40.h,
-                  vertical: 66.h,
-                ),
-                child: Column(
-                  children: [
-                    _buildHeaderSection(context),
-                    SizedBox(height: 24.h),
-                    _buildSubtitleSection(context),
-                    SizedBox(height: 10.h),
+              _buildHeaderSection(context),
+              SizedBox(height: 14.h),
+              _buildSubtitleSection(context),
 
-                    // ✅ Replace input with animated confirmation on submit
-                    _buildAnimatedBodySection(context),
+              if (!showReceipt) ...[
+                SizedBox(height: 14.h),
+                _buildCategoryChipsSection(context, state),
+                SizedBox(height: 12.h),
+              ] else ...[
+                SizedBox(height: 16.h),
+              ],
 
-                    const Spacer(),
-                    _buildSubmitButton(context, state: state),
-                  ],
-                ),
-              ),
+              Expanded(child: _buildAnimatedBodySection(context, state)),
+
+              SizedBox(height: 14.h),
+              _buildSubmitButton(context, state: state),
             ],
           ),
         ),
@@ -104,28 +103,133 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     );
   }
 
-  /// Header with title + close button
   Widget _buildHeaderSection(BuildContext context) {
-    return CustomHeaderRow(
-      title: 'Feature Request',
-      onIconTap: () => onTapCloseButton(context),
-      margin: EdgeInsets.only(top: 10.h, right: 12.h, left: 16.h),
-    );
-  }
-
-  /// Subtitle text
-  Widget _buildSubtitleSection(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: Text(
-        'Have an idea to improve the app?',
-        style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-            .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+    return Container(
+      padding: EdgeInsets.only(bottom: 12.h),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: appTheme.gray_50.withAlpha(18),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          SizedBox(width: 44.h),
+          Expanded(
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline_rounded,
+                    size: 20.h,
+                    color: appTheme.deep_purple_A100,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    'Submit Request',
+                    style: TextStyleHelper.instance.title18SemiBoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 44.h,
+            height: 44.h,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12.h),
+                onTap: () => onTapCloseButton(context),
+                child: Center(
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: appTheme.gray_50,
+                    size: 22.h,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildAnimatedBodySection(BuildContext context) {
+  Widget _buildSubtitleSection(BuildContext context) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: 'Got an idea to improve ',
+            style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+          ),
+          TextSpan(
+            text: 'Capsule',
+            style: TextStyleHelper.instance.title16SemiBoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50, height: 1.31),
+          ),
+          TextSpan(
+            text: '?',
+            style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChipsSection(BuildContext context, FeatureRequestState state) {
+    final isLocked = state.isCompleted || state.isLoading;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Category',
+          style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+              .copyWith(color: appTheme.gray_50.withAlpha(220)),
+        ),
+        SizedBox(height: 10.h),
+        Wrap(
+          spacing: 10.h,
+          runSpacing: 10.h,
+          children: _categories.map((label) {
+            final selected = _selectedCategory == label;
+
+            final bg = selected
+                ? appTheme.deep_purple_A100.withAlpha(26)
+                : appTheme.gray_900;
+
+            final textColor = selected ? appTheme.gray_50 : appTheme.blue_gray_300;
+
+            return _ChipPill(
+              label: label,
+              isSelected: selected,
+              isDisabled: isLocked,
+              backgroundColor: bg,
+              textColor: textColor,
+              onTap: () {
+                if (isLocked) return;
+                setState(() {
+                  _selectedCategory = selected ? null : label;
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAnimatedBodySection(BuildContext context, FeatureRequestState state) {
+    final showReceipt = state.isCompleted;
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 260),
       switchInCurve: Curves.easeOut,
@@ -141,13 +245,16 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
         );
         return slide;
       },
-      child: _showConfirmation
-          ? _buildConfirmationSection(context, key: const ValueKey('confirm'))
+      child: showReceipt
+          ? Align(
+        key: const ValueKey('receipt_wrap'),
+        alignment: Alignment.topCenter,
+        child: _buildReceiptSection(context, state: state),
+      )
           : _buildInputSection(context, key: const ValueKey('input')),
     );
   }
 
-  /// Input text area
   Widget _buildInputSection(BuildContext context, {Key? key}) {
     final state = ref.watch(featureRequestNotifier);
 
@@ -155,64 +262,162 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
       key: key,
       controller: state.featureDescriptionController,
       hintText:
-      'Tell us your feature improvement and we\'ll talk it over with our dev team! We read every request and value the ideas of our user.',
+      'Describe what you want changed and why. If you can, include where it happens in the app.',
       maxLines: 12,
       fillColor: appTheme.gray_900,
-      borderRadius: 8.h,
-      contentPadding: EdgeInsets.only(
-        top: 16.h,
-        right: 16.h,
-        bottom: 12.h,
-        left: 16.h,
-      ),
+      borderRadius: 12.h,
+      contentPadding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 14.h),
       validator: (value) => ref
           .read(featureRequestNotifier.notifier)
           .validateFeatureDescription(value),
     );
   }
 
-  /// Confirmation UI shown after submit
-  Widget _buildConfirmationSection(BuildContext context, {Key? key}) {
+  /// ✅ Receipt UI:
+  /// - Adds timestamp line
+  /// - Shows email + "email will be sent to {email}"
+  /// - Category shown as badge
+  /// - Better hierarchy using font weights
+  Widget _buildReceiptSection(
+      BuildContext context, {
+        required FeatureRequestState state,
+      }) {
+    final isSuccess = state.status == FeatureRequestStatus.success;
+
+    final accent = isSuccess ? appTheme.colorFF52D1 : appTheme.redCustom;
+    final icon = isSuccess ? Icons.check_rounded : Icons.error_outline_rounded;
+
+    final title = isSuccess ? 'Submitted' : 'Not Submitted';
+
+    final categoryLabel = (_selectedCategory ?? 'Other').trim();
+
+    final submittedAt = _submittedAtLocal;
+    final timestampText =
+    submittedAt == null ? null : DateFormat('MMM d, yyyy • h:mm a').format(submittedAt);
+
+    // ✅ Prefer the logged-in user email from Supabase session (no extra DB calls)
+    final userEmail =
+        SupabaseService.instance.client?.auth.currentUser?.email ??
+            '';
+
+    if (!isSuccess) {
+      final body = state.message ??
+          'We couldn’t submit your request right now. Please try again later.';
+
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 18.h),
+        decoration: BoxDecoration(
+          color: appTheme.gray_900,
+          borderRadius: BorderRadius.circular(14.h),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: EdgeInsets.only(top: 2.h),
+              width: 38.h,
+              height: 38.h,
+              decoration: BoxDecoration(
+                color: accent.withAlpha(28),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: accent, size: 22.h),
+            ),
+            SizedBox(width: 12.h),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyleHelper.instance.title16SemiBoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                  SizedBox(height: 6.h),
+                  Text(
+                    body,
+                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300, height: 1.25),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ✅ Success body with better structure
+    final confirmationLine = userEmail.isNotEmpty
+        ? 'A confirmation email will be sent to $userEmail.'
+        : 'A confirmation email will be sent to your account email.';
+
+    final responseTimeLine = 'Responses usually come within 24 hours.';
+
     return Container(
-      key: key,
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 18.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
       decoration: BoxDecoration(
         color: appTheme.gray_900,
-        borderRadius: BorderRadius.circular(12.h),
-        border: Border.all(
-          color: appTheme.gray_50.withAlpha(24),
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(14.h),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
+            margin: EdgeInsets.only(top: 2.h),
             width: 38.h,
             height: 38.h,
             decoration: BoxDecoration(
-              color: appTheme.colorFF52D1.withAlpha(28),
+              color: accent.withAlpha(28),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.check_rounded,
-              color: appTheme.colorFF52D1,
-              size: 22.h,
-            ),
+            child: Icon(icon, color: accent, size: 22.h),
           ),
           SizedBox(width: 12.h),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Submitted',
-                  style: TextStyleHelper.instance.title16SemiBoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
+                // Header row: Title + Category badge
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyleHelper.instance.title16SemiBoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                      ),
+                    ),
+                    _CategoryBadge(
+                      label: categoryLabel,
+                    ),
+                  ],
                 ),
-                SizedBox(height: 4.h),
+
+                if (timestampText != null) ...[
+                  SizedBox(height: 6.h),
+                  Text(
+                    timestampText,
+                    style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300.withAlpha(180), height: 1.2),
+                  ),
+                ],
+
+                SizedBox(height: 10.h),
+
+                // Summary block
                 Text(
-                  'Thanks — we read every request and will review it with the dev team.',
+                  confirmationLine,
+                  style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50.withAlpha(235), height: 1.25),
+                ),
+                SizedBox(height: 6.h),
+                Text(
+                  responseTimeLine,
                   style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                       .copyWith(color: appTheme.blue_gray_300, height: 1.25),
                 ),
@@ -224,17 +429,17 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     );
   }
 
-  /// Submit button
-  Widget _buildSubmitButton(BuildContext context, {required dynamic state}) {
-    final isLoading = (state.isLoading ?? false);
+  Widget _buildSubmitButton(BuildContext context, {required FeatureRequestState state}) {
+    final isLoading = state.isLoading;
+    final isCompleted = state.isCompleted;
 
     return CustomButton(
-      text: _showConfirmation ? 'Done' : 'Submit Request',
+      text: isCompleted ? 'Done' : (isLoading ? 'Submitting...' : 'Submit Request'),
       width: double.infinity,
       onPressed: isLoading
           ? null
           : () {
-        if (_showConfirmation) {
+        if (isCompleted) {
           onTapCloseButton(context);
           return;
         }
@@ -246,13 +451,85 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     );
   }
 
-  /// Close button tap
   void onTapCloseButton(BuildContext context) {
     NavigatorService.goBack();
   }
 
-  /// Submit request button tap
   void onTapSubmitRequest(BuildContext context) {
-    ref.read(featureRequestNotifier.notifier).submitFeatureRequest();
+    // ✅ Reset timestamp so each fresh submission shows the right time
+    _submittedAtLocal = null;
+
+    ref.read(featureRequestNotifier.notifier).submitFeatureRequest(
+      category: _selectedCategory,
+    );
+  }
+}
+
+class _ChipPill extends StatelessWidget {
+  const _ChipPill({
+    Key? key,
+    required this.label,
+    required this.isSelected,
+    required this.isDisabled,
+    required this.backgroundColor,
+    required this.textColor,
+    required this.onTap,
+  }) : super(key: key);
+
+  final String label;
+  final bool isSelected;
+  final bool isDisabled;
+  final Color backgroundColor;
+  final Color textColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isDisabled ? null : onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              label,
+              style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                  .copyWith(color: textColor, height: 1.0),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ✅ Category badge used on receipt card
+class _CategoryBadge extends StatelessWidget {
+  const _CategoryBadge({Key? key, required this.label}) : super(key: key);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    // subtle badge
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: appTheme.deep_purple_A100.withAlpha(26),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+            .copyWith(color: appTheme.gray_50, height: 1.0),
+      ),
+    );
   }
 }

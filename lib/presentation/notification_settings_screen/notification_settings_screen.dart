@@ -1,3 +1,5 @@
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/app_export.dart';
 import '../../presentation/user_menu_screen/notifier/user_menu_notifier.dart';
 import '../../services/blocked_users_service.dart';
@@ -22,6 +24,25 @@ class NotificationSettingsScreen extends ConsumerStatefulWidget {
 
 class NotificationSettingsScreenState
     extends ConsumerState<NotificationSettingsScreen> {
+  // ===== External URLs =====
+  static const String _privacyUrl = 'https://capapp.co/privacy';
+  static const String _termsUrl = 'https://capapp.co/terms';
+  static const String _helpUrl = 'https://capapp.co/help';
+  static const String _contactUrl = 'https://capapp.co/contact';
+
+  Future<void> _openExternalUrl(String url) async {
+    final uri = Uri.parse(url);
+
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!launched) {
+      debugPrint('Could not launch $url');
+    }
+  }
+
   final BlockedUsersService _blockedUsersService = BlockedUsersService();
   List<Map<String, dynamic>> _blockedUsers = [];
   bool _isLoadingBlockedUsers = false;
@@ -186,34 +207,34 @@ class NotificationSettingsScreenState
               title: 'Memory Invites',
               description: 'Get notified when someone invites you to a memory',
               isEnabled:
-                  pushEnabled ? (state.memoryInvitesEnabled ?? true) : false,
+              pushEnabled ? (state.memoryInvitesEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                      .read(notificationSettingsNotifier.notifier)
-                      .updateMemoryInvites(value)
+                  .read(notificationSettingsNotifier.notifier)
+                  .updateMemoryInvites(value)
                   : (value) {},
             ),
             CustomNotificationOption(
               title: 'Memory Activity',
               description:
-                  'Get notified when someone posts to a memory you\'re in',
+              'Get notified when someone posts to a memory you\'re in',
               isEnabled:
-                  pushEnabled ? (state.memoryActivityEnabled ?? true) : false,
+              pushEnabled ? (state.memoryActivityEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                      .read(notificationSettingsNotifier.notifier)
-                      .updateMemoryActivity(value)
+                  .read(notificationSettingsNotifier.notifier)
+                  .updateMemoryActivity(value)
                   : (value) {},
             ),
             CustomNotificationOption(
               title: 'Memory Sealed',
               description: 'Get notified when a memory you\'re part of closes',
               isEnabled:
-                  pushEnabled ? (state.memorySealedEnabled ?? true) : false,
+              pushEnabled ? (state.memorySealedEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                      .read(notificationSettingsNotifier.notifier)
-                      .updateMemorySealed(value)
+                  .read(notificationSettingsNotifier.notifier)
+                  .updateMemorySealed(value)
                   : (value) {},
             ),
             CustomNotificationOption(
@@ -222,41 +243,41 @@ class NotificationSettingsScreenState
               isEnabled: pushEnabled ? (state.reactionsEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                      .read(notificationSettingsNotifier.notifier)
-                      .updateReactions(value)
+                  .read(notificationSettingsNotifier.notifier)
+                  .updateReactions(value)
                   : (value) {},
             ),
             CustomNotificationOption(
               title: 'New Followers',
               description: 'Get notified when someone follows you',
               isEnabled:
-                  pushEnabled ? (state.newFollowersEnabled ?? true) : false,
+              pushEnabled ? (state.newFollowersEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                      .read(notificationSettingsNotifier.notifier)
-                      .updateNewFollowers(value)
+                  .read(notificationSettingsNotifier.notifier)
+                  .updateNewFollowers(value)
                   : (value) {},
             ),
             CustomNotificationOption(
               title: 'Friend Requests',
               description: 'Get notified when someone sends a friend request',
               isEnabled:
-                  pushEnabled ? (state.friendRequestsEnabled ?? true) : false,
+              pushEnabled ? (state.friendRequestsEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                      .read(notificationSettingsNotifier.notifier)
-                      .updateFriendRequests(value)
+                  .read(notificationSettingsNotifier.notifier)
+                  .updateFriendRequests(value)
                   : (value) {},
             ),
             CustomNotificationOption(
               title: 'Group Invites',
               description: 'Get notified when invited to a group',
               isEnabled:
-                  pushEnabled ? (state.groupInvitesEnabled ?? true) : false,
+              pushEnabled ? (state.groupInvitesEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                      .read(notificationSettingsNotifier.notifier)
-                      .updateGroupInvites(value)
+                  .read(notificationSettingsNotifier.notifier)
+                  .updateGroupInvites(value)
                   : (value) {},
             ),
           ],
@@ -350,7 +371,7 @@ class NotificationSettingsScreenState
             CustomAccountOption(
               title: 'Linked Accounts',
               subtitle:
-                  _getAccountTypeLabel(userProfile?.authProvider ?? 'email'),
+              _getAccountTypeLabel(userProfile?.authProvider ?? 'email'),
               trailingText: 'Created $formattedDate',
               onTap: () {
                 // Show linked accounts details
@@ -419,15 +440,11 @@ class NotificationSettingsScreenState
       supportOptions: [
         CustomSupportOption(
           title: 'Help Center',
-          onTap: () {
-            // Open help center
-          },
+          onTap: () => _openExternalUrl(_helpUrl),
         ),
         CustomSupportOption(
           title: 'Contact Us',
-          onTap: () {
-            // Open contact us screen
-          },
+          onTap: () => _openExternalUrl(_contactUrl),
         ),
         CustomSupportOption(
           title: 'Report a Problem',
@@ -454,20 +471,16 @@ class NotificationSettingsScreenState
       aboutOptions: [
         CustomAboutOption(
           title: 'Terms of Service',
-          onTap: () {
-            // Open terms of service
-          },
+          onTap: () => _openExternalUrl(_termsUrl),
         ),
         CustomAboutOption(
           title: 'Privacy Policy',
-          onTap: () {
-            // Open privacy policy
-          },
+          onTap: () => _openExternalUrl(_privacyUrl),
         ),
         CustomAboutOption(
           title: 'Open Source Licenses',
           onTap: () {
-            // Open licenses screen
+            // keep internal or wire later
           },
         ),
       ],
@@ -480,7 +493,7 @@ class NotificationSettingsScreenState
       context: context,
       title: 'Delete Account?',
       message:
-          'This action cannot be undone. All your memories, stories, and data will be permanently deleted.',
+      'This action cannot be undone. All your memories, stories, and data will be permanently deleted.',
       confirmButtonText: 'Delete Account',
       icon: Icons.warning_rounded,
       onConfirm: () {
@@ -496,7 +509,7 @@ class NotificationSettingsScreenState
       context: context,
       title: 'Reset Password?',
       message:
-          'You will be logged out and receive an email with instructions to reset your password.',
+      'You will be logged out and receive an email with instructions to reset your password.',
       confirmButtonText: 'Reset Password',
       confirmButtonColor: appTheme.orange_600,
       icon: Icons.lock_reset_rounded,
@@ -513,7 +526,7 @@ class NotificationSettingsScreenState
       context: context,
       title: 'Unblock User?',
       message:
-          '$username will be able to see your profile and interact with you again.',
+      '$username will be able to see your profile and interact with you again.',
       confirmButtonText: 'Unblock',
       confirmButtonColor: appTheme.color3BD81E,
       icon: Icons.person_add_rounded,

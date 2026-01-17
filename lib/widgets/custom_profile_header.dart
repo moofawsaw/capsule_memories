@@ -162,43 +162,64 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
   }
 
   Widget _buildAvatar() {
-    final size = 96.h;
+    final double size = 96.h;
     final displayName = widget.displayName.trim();
 
-    final shouldLetter =
-        widget.avatarImagePath.isEmpty ||
-            widget.avatarImagePath == ImageConstant.imgDefaultAvatar;
+    final shouldLetter = widget.avatarImagePath.isEmpty ||
+        widget.avatarImagePath == ImageConstant.imgDefaultAvatar;
 
     return SizedBox(
       width: size,
       height: size + (_showAvatarEdit ? 6.h : 0),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          shouldLetter
-              ? Container(
-            height: size,
-            width: size,
-            decoration: BoxDecoration(
-              color: appTheme.color3BD81E,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size * 0.4,
-                fontWeight: FontWeight.bold,
+          // ✅ Always center the avatar in the available box
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Center(
+                child: shouldLetter
+                    ? Container(
+                  height: size,
+                  width: size,
+                  decoration: BoxDecoration(
+                    color: appTheme.color3BD81E,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    displayName.isNotEmpty
+                        ? displayName[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: size * 0.4,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+                    : SizedBox(
+                  width: size,
+                  height: size,
+                  child: CustomImageView(
+                    imagePath: widget.avatarImagePath,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+
+                    // ✅ Use true circular crop, not radius math
+                    isCircular: true,
+                  ),
+                ),
               ),
             ),
-          )
-              : CustomImageView(
-            imagePath: widget.avatarImagePath,
-            height: size,
-            width: size,
-            fit: BoxFit.cover,
-            radius: BorderRadius.circular(size / 2),
           ),
+
           if (_showAvatarEdit)
             Positioned(
               bottom: 0,

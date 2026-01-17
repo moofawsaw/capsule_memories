@@ -358,8 +358,8 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
           CustomButton(
             width: double.infinity,
             height: 56.h,
-            text: 'Suggest a Feature',
-            leftIcon: ImageConstant.imgIconDeepPurpleA10020x20,
+            text: 'Submit a Request',
+            leftIcon: Icons.lightbulb_outline, // ✅ IconData
             onPressed: () => onTapSuggestFeature(context),
             buttonStyle: CustomButtonStyle.outlineDark,
             buttonTextStyle: CustomButtonTextStyle.bodyMediumPrimary,
@@ -369,9 +369,9 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
             width: double.infinity,
             height: 56.h,
             text: 'Share the App',
-            leftIcon: ImageConstant.imgIconWhiteA70020x20,
+            leftIcon: Icons.share, // ✅ IconData
             onPressed: () => onTapShareApp(context),
-            buttonStyle: CustomButtonStyle.fillPrimary,
+            buttonStyle: CustomButtonStyle.outlineDark,
             buttonTextStyle: CustomButtonTextStyle.bodyMedium,
           ),
         ],

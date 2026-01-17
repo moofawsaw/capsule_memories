@@ -158,10 +158,6 @@ class FriendsManagementScreenState
               decoration: BoxDecoration(
                 color: appTheme.gray_900_01,
                 borderRadius: BorderRadius.circular(14.h),
-                border: Border.all(
-                  color: appTheme.gray_50.withAlpha(25),
-                  width: 1,
-                ),
               ),
               child: isSearching
                   ? Padding(

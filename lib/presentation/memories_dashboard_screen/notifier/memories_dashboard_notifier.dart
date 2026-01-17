@@ -413,6 +413,9 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     }
   }
 
+// lib/presentation/memories_dashboard_screen/notifier/memories_dashboard_notifier.dart
+// PATCH: replace ONLY the _handleStoryUpdate method with this version.
+
   void _handleStoryUpdate(PostgresChangePayload payload) {
     if (_isDisposed) return;
 
@@ -424,13 +427,15 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final storyItems = currentModel.storyItems;
       if (storyItems == null || storyItems.isEmpty) return;
 
+      final raw = payload.newRecord['thumbnail_url'] as String?;
+      final resolved = StorageUtils.resolveStoryMediaUrl(raw) ?? raw;
+
       bool found = false;
       final updatedStories = storyItems.map((story) {
         if (story.id == storyId) {
           found = true;
           return story.copyWith(
-            backgroundImage:
-            payload.newRecord['thumbnail_url'] as String? ?? story.backgroundImage,
+            backgroundImage: (resolved ?? story.backgroundImage),
           );
         }
         return story;
@@ -447,6 +452,7 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       print('❌ REALTIME: Error handling story update: $e');
     }
   }
+
 
   void _handleContributorJoin(PostgresChangePayload payload) async {
     if (_isDisposed) return;

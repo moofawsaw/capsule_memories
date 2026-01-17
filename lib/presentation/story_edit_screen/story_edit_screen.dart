@@ -377,10 +377,10 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
               width: double.infinity,
               child: CustomButton(
                 text: 'Share to $_safeMemoryName',
-                onPressed:
-                    state.isUploading ? null : () => _onShareStory(context),
+                leftIcon: Icons.ios_share_rounded, // ✅ Material icon
+                onPressed: state.isUploading ? null : () => _onShareStory(context),
                 isDisabled: state.isUploading,
-                isLoading: state.isUploading, // 🔥 loading spinner
+                isLoading: state.isUploading,
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
               ),
