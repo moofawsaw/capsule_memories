@@ -39,12 +39,7 @@ class UserProfileSkeleton extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 14.h),
       decoration: BoxDecoration(
-        // color: appTheme.gray_900_01,
         borderRadius: BorderRadius.circular(22.h),
-        border: Border.all(
-          color: appTheme.gray_900_01.withAlpha(120),
-          width: 1,
-        ),
       ),
       child: Column(
         children: [
@@ -60,11 +55,11 @@ class UserProfileSkeleton extends StatelessWidget {
           SizedBox(height: 12.h),
 
           // Display name line
-          _skeletonLine(width: 140.h, height: 14.h, radius: 10.h),
+          _skeletonLine(width: 110.h, height: 14.h, radius: 10.h),
           SizedBox(height: 8.h),
 
           // Username line
-          _skeletonLine(width: 110.h, height: 12.h, radius: 10.h),
+          _skeletonLine(width: 140.h, height: 12.h, radius: 10.h),
         ],
       ),
     );

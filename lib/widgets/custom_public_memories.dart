@@ -1063,9 +1063,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
                     imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
                     height: 29.h,
                     width: 29.h,
-
-                    // ✅ REQUIRED for SVG icons (otherwise they render black on dark)
-                    color: appTheme.gray_50, // or appTheme.deep_purple_A100
                     fit: BoxFit.contain,
                   ),
                 ),

@@ -34,6 +34,9 @@ class MemoryTimelinePlaybackScreenState
 
   Timer? _controlsTimer;
 
+  // ✅ NEW: Volume toggle state for playback screen
+  bool _isMuted = false;
+
   @override
   void initState() {
     super.initState();
@@ -57,12 +60,22 @@ class MemoryTimelinePlaybackScreenState
       final isPlaying =
           ref.read(memoryTimelinePlaybackNotifier).isPlaying ?? false;
       if (isPlaying) _startControlsTimer();
+
+      // ✅ Apply initial volume once playback loads
+      _applyVolumeToCurrentController();
     });
 
     // ✅ MUST use listenManual outside build()
     _playbackSub = ref.listenManual<MemoryTimelinePlaybackState>(
       memoryTimelinePlaybackNotifier,
           (prev, next) {
+        // ✅ If controller/story changes, re-apply mute state
+        final prevStoryId = prev?.currentStory?.storyId;
+        final nextStoryId = next.currentStory?.storyId;
+        if (prevStoryId != nextStoryId) {
+          _applyVolumeToCurrentController();
+        }
+
         final wasPlaying = prev?.isPlaying ?? false;
         final isPlaying = next.isPlaying ?? false;
 
@@ -97,7 +110,6 @@ class MemoryTimelinePlaybackScreenState
     super.dispose();
   }
 
-
   void _startControlsTimer() {
     _controlsTimer?.cancel();
     _controlsTimer = Timer(const Duration(seconds: 3), () {
@@ -130,6 +142,30 @@ class MemoryTimelinePlaybackScreenState
     }
 
     // If paused, keep overlay visible (no timer)
+  }
+
+  // ✅ NEW: Toggle mute + apply to current video controller
+  Future<void> _toggleMute() async {
+    setState(() => _isMuted = !_isMuted);
+    await _applyVolumeToCurrentController();
+  }
+
+  // ✅ NEW: Apply current mute state to the active video controller (if any)
+  Future<void> _applyVolumeToCurrentController() async {
+    final notifier = ref.read(memoryTimelinePlaybackNotifier.notifier);
+    final controller = notifier.currentVideoController;
+    if (controller == null) return;
+
+    // If not initialized yet, wait a microtask and try once.
+    if (!controller.value.isInitialized) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      final retry = notifier.currentVideoController;
+      if (retry == null || !retry.value.isInitialized) return;
+      await retry.setVolume(_isMuted ? 0.0 : 1.0);
+      return;
+    }
+
+    await controller.setVolume(_isMuted ? 0.0 : 1.0);
   }
 
   String _formatCountdown(Duration d) {
@@ -355,6 +391,10 @@ class MemoryTimelinePlaybackScreenState
           return const Center(child: CircularProgressIndicator());
         }
 
+        // ✅ Ensure current mute state is applied once controller is ready
+        // (this is safe; it only sets volume to 0 or 1)
+        controller.setVolume(_isMuted ? 0.0 : 1.0);
+
         final key = ValueKey<String>(
           state.currentStory?.storyId ?? 'story_${state.currentStoryIndex ?? 0}',
         );
@@ -482,6 +522,13 @@ class MemoryTimelinePlaybackScreenState
 
   Widget _buildTopOverlay(
       BuildContext context, MemoryTimelinePlaybackState state) {
+    final notifier = ref.read(memoryTimelinePlaybackNotifier.notifier);
+
+    // ✅ Only show volume button when we have a usable video controller
+    final showVolumeButton =
+        (state.currentStory?.mediaType == 'video') &&
+            (notifier.currentVideoController != null);
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
@@ -539,19 +586,45 @@ class MemoryTimelinePlaybackScreenState
                     ),
                   ),
                 ),
-                CustomIconButton(
-                  icon: Icons.cast,
-                  backgroundColor: state.isChromecastConnected ?? false
-                      ? appTheme.deep_purple_A100
-                      : Colors.black26,
-                  iconColor: Colors.white,
-                  height: 40.h,
-                  width: 40.h,
-                  onTap: () {
-                    ref
-                        .read(memoryTimelinePlaybackNotifier.notifier)
-                        .toggleChromecast();
-                  },
+
+                // ✅ Right side: cast + volume (stacked)
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CustomIconButton(
+                      icon: Icons.cast,
+                      backgroundColor: state.isChromecastConnected ?? false
+                          ? appTheme.deep_purple_A100
+                          : Colors.black26,
+                      iconColor: Colors.white,
+                      height: 40.h,
+                      width: 40.h,
+                      onTap: () {
+                        ref
+                            .read(memoryTimelinePlaybackNotifier.notifier)
+                            .toggleChromecast();
+                      },
+                    ),
+                    if (showVolumeButton) ...[
+                      SizedBox(height: 10.h),
+                      GestureDetector(
+                        onTap: _toggleMute,
+                        child: Container(
+                          width: 44.h,
+                          height: 44.h,
+                          decoration: BoxDecoration(
+                            color: appTheme.blackCustom.withAlpha(128),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _isMuted ? Icons.volume_off : Icons.volume_up,
+                            color: Colors.white,
+                            size: 24.h,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -671,7 +744,7 @@ class MemoryTimelinePlaybackScreenState
           spacing: 40.h,
           children: [
             CustomIconButton(
-              icon: Icons.replay_10,
+              icon: Icons.chevron_left,
               backgroundColor: Colors.black54,
               iconColor: Colors.white,
               height: 56.h,
@@ -698,7 +771,7 @@ class MemoryTimelinePlaybackScreenState
               },
             ),
             CustomIconButton(
-              icon: Icons.forward_10,
+              icon: Icons.chevron_right,
               backgroundColor: Colors.black54,
               iconColor: Colors.white,
               height: 56.h,
