@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/app_scaffold_messenger.dart';
 
 import './core/services/deep_link_service.dart';
 import './core/utils/theme_provider.dart';
@@ -55,12 +56,14 @@ Future<void> main() async {
   await DeepLinkService().initialize();
 
   runApp(
-    ProviderScope(
-      parent: _globalContainer,
-      child: Sizer(
-        builder: (context, orientation, deviceType) {
-          return MyApp();
-        },
+    AppScaffoldMessenger(
+      child: ProviderScope(
+        parent: _globalContainer,
+        child: Sizer(
+          builder: (context, orientation, deviceType) {
+            return MyApp();
+          },
+        ),
       ),
     ),
   );

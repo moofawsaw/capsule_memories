@@ -1,5 +1,4 @@
 import '../core/app_export.dart';
-import './custom_image_view.dart';
 
 /** CustomGroupCard - A reusable group card component that displays group information with member avatars and action buttons. Supports flexible member avatar stacking and customizable styling for group management interfaces. */
 class CustomGroupCard extends StatelessWidget {

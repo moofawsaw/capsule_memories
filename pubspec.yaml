@@ -1,6 +1,6 @@
 name: Capsule
 description: One memory, every angle.
-version: 1.0.0+3
+version: 1.0.0+51
 environment: 
   sdk: ^3.6.0
 dependencies: 

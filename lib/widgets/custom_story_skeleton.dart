@@ -61,7 +61,6 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
           height: containerHeight,
           width: containerWidth,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
             gradient: LinearGradient(
               begin: Alignment(-1.0 - _shimmerController.value * 2, 0.0),
               end: Alignment(1.0 - _shimmerController.value * 2, 0.0),

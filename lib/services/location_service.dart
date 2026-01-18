@@ -38,6 +38,47 @@ class LocationService {
       return false;
     }
   }
+  /// Fast coords-only fetch (no reverse geocode).
+  /// Safe for "post now" flows.
+  static Future<Map<String, dynamic>?> getCoordsOnly({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    try {
+      final position = await getCurrentLocation().timeout(timeout, onTimeout: () {
+        print('⏱️ Coords-only timeout after ${timeout.inSeconds}s');
+        return null;
+      });
+
+      if (position == null) return null;
+
+      return {
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+      };
+    } catch (e) {
+      print('⚠️ getCoordsOnly failed: $e');
+      return null;
+    }
+  }
+
+  /// Best-effort reverse geocode with a shorter cap than your current 60s.
+  /// Use this in background backfill only.
+  static Future<String?> getLocationNameBestEffort(
+      double latitude,
+      double longitude, {
+        Duration timeout = const Duration(seconds: 6),
+      }) async {
+    try {
+      return await getLocationName(latitude, longitude)
+          .timeout(timeout, onTimeout: () {
+        print('⏱️ Best-effort geocode timeout after ${timeout.inSeconds}s');
+        return null;
+      });
+    } catch (e) {
+      print('⚠️ getLocationNameBestEffort failed: $e');
+      return null;
+    }
+  }
 
   /// Get current location with reliable fallbacks
   ///

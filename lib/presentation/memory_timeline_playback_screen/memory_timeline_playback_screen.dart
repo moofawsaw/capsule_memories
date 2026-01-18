@@ -1,4 +1,6 @@
 // lib/presentation/memory_timeline_playback_screen/memory_timeline_playback_screen.dart
+import 'dart:async';
+
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_export.dart';
@@ -25,8 +27,12 @@ class MemoryTimelinePlaybackScreenState
     with SingleTickerProviderStateMixin {
   bool _showControls = true;
   bool _showFilters = false;
+  ProviderSubscription<MemoryTimelinePlaybackState>? _playbackSub;
+
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+
+  Timer? _controlsTimer;
 
   @override
   void initState() {
@@ -44,103 +50,87 @@ class MemoryTimelinePlaybackScreenState
       ref
           .read(memoryTimelinePlaybackNotifier.notifier)
           .loadMemoryPlayback(widget.memoryId);
+
+      _showControls = true;
       _fadeController.forward();
+
+      final isPlaying =
+          ref.read(memoryTimelinePlaybackNotifier).isPlaying ?? false;
+      if (isPlaying) _startControlsTimer();
     });
 
-    _startControlsTimer();
+    // ✅ MUST use listenManual outside build()
+    _playbackSub = ref.listenManual<MemoryTimelinePlaybackState>(
+      memoryTimelinePlaybackNotifier,
+          (prev, next) {
+        final wasPlaying = prev?.isPlaying ?? false;
+        final isPlaying = next.isPlaying ?? false;
+
+        if (wasPlaying == isPlaying) return;
+
+        if (!isPlaying) {
+          // Paused: always show overlay + cancel auto-hide
+          _controlsTimer?.cancel();
+          _controlsTimer = null;
+
+          if (mounted) {
+            setState(() => _showControls = true);
+            _fadeController.forward();
+          }
+        } else {
+          // Playing: show overlay briefly then auto-hide
+          if (mounted) {
+            setState(() => _showControls = true);
+            _fadeController.forward();
+          }
+          _startControlsTimer();
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
+    _playbackSub?.close();
+    _controlsTimer?.cancel();
     _fadeController.dispose();
     super.dispose();
   }
 
+
   void _startControlsTimer() {
-    Future.delayed(const Duration(seconds: 3), () {
+    _controlsTimer?.cancel();
+    _controlsTimer = Timer(const Duration(seconds: 3), () {
       if (!mounted) return;
 
-      final isPlaying = ref.read(memoryTimelinePlaybackNotifier).isPlaying ?? false;
+      final isPlaying =
+          ref.read(memoryTimelinePlaybackNotifier).isPlaying ?? false;
 
       // ✅ Only auto-hide overlay while playing
-      if (_showControls && isPlaying) {
-        setState(() {
-          _showControls = false;
-        });
+      if (isPlaying && _showControls) {
+        setState(() => _showControls = false);
         _fadeController.reverse();
       }
     });
-
-    @override
-    void initState() {
-      super.initState();
-
-      _fadeController = AnimationController(
-        duration: const Duration(milliseconds: 300),
-        vsync: this,
-      );
-      _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
-      );
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref
-            .read(memoryTimelinePlaybackNotifier.notifier)
-            .loadMemoryPlayback(widget.memoryId);
-        _fadeController.forward();
-      });
-
-      // ✅ Listen to play/pause changes and enforce overlay rules
-      ref.listen<MemoryTimelinePlaybackState>(memoryTimelinePlaybackNotifier,
-              (prev, next) {
-            final wasPlaying = prev?.isPlaying ?? false;
-            final isPlaying = next.isPlaying ?? false;
-
-            if (wasPlaying == isPlaying) return;
-
-            if (!isPlaying) {
-              // Paused: always show overlay, never auto-hide
-              if (mounted) {
-                setState(() => _showControls = true);
-                _fadeController.forward();
-              }
-            } else {
-              // Playing: allow auto-hide
-              if (mounted) {
-                setState(() => _showControls = true);
-                _fadeController.forward();
-                _startControlsTimer();
-              }
-            }
-          });
-    }
-
   }
 
   Future<void> _toggleControls() async {
     final state = ref.read(memoryTimelinePlaybackNotifier);
     final isPlaying = state.isPlaying ?? false;
 
-    if (isPlaying) {
-      // ✅ One tap while playing = pause + show overlay
-      ref.read(memoryTimelinePlaybackNotifier.notifier).togglePlayPause();
-
-      setState(() => _showControls = true);
-      _fadeController.forward();
-
-      // No timer here (paused state will keep overlay visible)
-      return;
-    }
-
-    // Paused: overlay stays visible; tap can still toggle timeline scrubber etc,
-    // but overlay should NOT hide. So do nothing (or keep it visible).
+    // Always show controls on tap
     if (!_showControls) {
       setState(() => _showControls = true);
       _fadeController.forward();
     }
+
+    // If playing, restart auto-hide countdown
+    if (isPlaying) {
+      _startControlsTimer();
+    }
+
+    // If paused, keep overlay visible (no timer)
   }
-
-
 
   String _formatCountdown(Duration d) {
     final totalSeconds = d.inSeconds.clamp(0, 24 * 60 * 60);
@@ -184,7 +174,7 @@ class MemoryTimelinePlaybackScreenState
 
             if (_showFilters) _buildFilterPanel(context, state),
 
-// Author badge – ONLY in full screen (controls hidden)
+            // Author badge – ONLY in full screen (controls hidden)
             if (!_showControls)
               Positioned(
                 left: 16.h,
@@ -224,7 +214,9 @@ class MemoryTimelinePlaybackScreenState
 
           return InkWell(
             onTap: () {
-              ref.read(memoryTimelinePlaybackNotifier.notifier).jumpToStory(index);
+              ref
+                  .read(memoryTimelinePlaybackNotifier.notifier)
+                  .jumpToStory(index);
             },
             borderRadius: BorderRadius.circular(10.h),
             child: Container(
@@ -447,7 +439,6 @@ class MemoryTimelinePlaybackScreenState
             ),
           ),
 
-          // Spacer pushes date to far right within badge
           SizedBox(width: 12.h),
           if (timestamp.isNotEmpty) ...[
             Text(
@@ -477,7 +468,6 @@ class MemoryTimelinePlaybackScreenState
       ),
     );
   }
-
 
   Widget _buildImageDisplay(String imageUrl) {
     return SizedBox(
@@ -603,8 +593,6 @@ class MemoryTimelinePlaybackScreenState
     );
   }
 
-  // Keep your existing bottom overlay if you still want it.
-  // If you DON'T want duplicate progress UI, you can delete it.
   Widget _buildBottomOverlay(
       BuildContext context, MemoryTimelinePlaybackState state) {
     final progress = (state.currentStoryIndex ?? 0) / (state.totalStories ?? 1);
@@ -628,12 +616,10 @@ class MemoryTimelinePlaybackScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ✅ Thumbnails strip (above timestamp/date)
               _buildStoryThumbnailsRow(state),
 
               SizedBox(height: 12.h),
 
-              // Story timestamp/date
               if (state.currentStory?.timestamp != null)
                 Padding(
                   padding: EdgeInsets.only(bottom: 12.h),
@@ -646,7 +632,6 @@ class MemoryTimelinePlaybackScreenState
                   ),
                 ),
 
-              // Progress bar
               Row(
                 children: [
                   Text(
@@ -675,7 +660,6 @@ class MemoryTimelinePlaybackScreenState
       ),
     );
   }
-
 
   Widget _buildPlaybackControls(
       BuildContext context, MemoryTimelinePlaybackState state) {

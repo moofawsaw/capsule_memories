@@ -107,6 +107,179 @@ class FeedService {
   }
 
   // -----------------------------
+  // RELATIONSHIP HELPERS (FRIENDS + FOLLOWING)
+  // -----------------------------
+
+  /// Returns friend user IDs for the current user.
+  /// Requires: friendships(user_id, friend_id, status='accepted')
+  Future<Set<String>> _fetchFriendUserIds(String currentUserId) async {
+    if (_client == null) return {};
+
+    try {
+      final response = await _client!
+          .from('friends')
+          .select('user_id, friend_id')
+          .or('user_id.eq.$currentUserId,friend_id.eq.$currentUserId');
+
+      final Set<String> ids = {};
+
+      for (final row in (response as List)) {
+        final userId = row['user_id'] as String?;
+        final friendId = row['friend_id'] as String?;
+
+        if (userId == currentUserId && friendId != null) {
+          ids.add(friendId);
+        } else if (friendId == currentUserId && userId != null) {
+          ids.add(userId);
+        }
+      }
+
+      ids.remove(currentUserId);
+      return ids;
+    } catch (e) {
+      print('❌ ERROR fetching friend IDs: $e');
+      return {};
+    }
+  }
+
+  /// Returns user IDs that the current user is following.
+  /// Requires: follows(follower_id, following_id)
+  Future<Set<String>> _fetchFollowingUserIds(String currentUserId) async {
+    if (_client == null) return {};
+
+    try {
+      final response = await _client!
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', currentUserId);
+
+      final Set<String> ids = {};
+      for (final row in (response as List)) {
+        final id = row['following_id'] as String?;
+        if (id != null) ids.add(id);
+      }
+
+      ids.remove(currentUserId);
+      return ids;
+    } catch (e) {
+      print('❌ ERROR fetching following IDs: $e');
+      return {};
+    }
+  }
+
+  /// For You author set = friends ∪ following
+  Future<Set<String>> _fetchForYouAuthorIds(String currentUserId) async {
+    final friends = await _fetchFriendUserIds(currentUserId);
+    final following = await _fetchFollowingUserIds(currentUserId);
+    return {...friends, ...following};
+  }
+
+  // -----------------------------
+  // FOR YOU: GATING HELPERS
+  // -----------------------------
+
+  /// Optional: define what "active" means for For You.
+  /// If you want ALL-time, remove the created_at filter below.
+  static const Duration _forYouActiveWindow = Duration(hours: 24);
+
+  /// Returns true if user has 1+ (friends OR following)
+  /// AND there is at least one matching story from those authors.
+  Future<bool> shouldServeForYouStoriesFeed() async {
+    if (_client == null) return false;
+
+    final currentUserId = _client!.auth.currentUser?.id;
+    if (currentUserId == null) return false;
+
+    final authorIds = await _fetchForYouAuthorIds(currentUserId);
+    if (authorIds.isEmpty) return false;
+
+    return _hasForYouAuthorStories(authorIds: authorIds);
+  }
+
+  /// Cheap exists-check (limit 1) for whether any For You story exists.
+  Future<bool> _hasForYouAuthorStories({required Set<String> authorIds}) async {
+    if (_client == null) return false;
+    if (authorIds.isEmpty) return false;
+
+    try {
+      final since = DateTime.now()
+          .subtract(_forYouActiveWindow)
+          .toIso8601String();
+
+      final response = await _client!
+          .from('stories')
+          .select('id, created_at, contributor_id, memory_id, memories!inner(visibility, state)')
+          .eq('memories.visibility', 'public')
+          .eq('memories.state', 'open')
+          .gte('created_at', since) // remove if you want all-time
+          .inFilter('contributor_id', authorIds.toList())
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      final rows = (response as List);
+      return rows.isNotEmpty;
+    } catch (e) {
+      print('❌ ERROR checking For You author stories: $e');
+      return false;
+    }
+  }
+
+
+
+  // -----------------------------
+  // FROM FRIENDS: GATING HELPERS
+  // -----------------------------
+
+  /// Define what "active stories" means for From Friends.
+  /// Adjust this window if you want (ex: 12h, 48h, etc.)
+  static const Duration _fromFriendsActiveWindow = Duration(hours: 24);
+
+  /// Returns true if user has 1+ friends AND there is at least one active story
+  /// from any friend that matches From Friends criteria.
+  Future<bool> shouldServeFromFriendsFeed() async {
+    if (_client == null) return false;
+
+    final currentUserId = _client!.auth.currentUser?.id;
+    if (currentUserId == null) return false;
+
+    final friendIds = await _fetchFriendUserIds(currentUserId);
+    if (friendIds.isEmpty) return false;
+
+    return _hasActiveFriendStories(friendIds: friendIds);
+  }
+
+  /// Cheap existence check (no heavy payload): does at least 1 matching story exist?
+  Future<bool> _hasActiveFriendStories({required Set<String> friendIds}) async {
+    if (_client == null) return false;
+    if (friendIds.isEmpty) return false;
+
+    try {
+      final since = DateTime.now()
+          .subtract(_fromFriendsActiveWindow)
+          .toIso8601String();
+
+      final response = await _client!
+          .from('stories')
+          .select('id, created_at, contributor_id, memory_id, memories!inner(visibility, state)')
+          .eq('memories.visibility', 'public')
+          .eq('memories.state', 'open')
+          .gte('created_at', since)
+          .inFilter('contributor_id', friendIds.toList())
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      final rows = (response as List);
+      return rows.isNotEmpty;
+    } catch (e) {
+      print('❌ ERROR checking active friend stories: $e');
+      return false;
+    }
+  }
+
+
+
+
+  // -----------------------------
   // VALIDATION (MEMORIES)
   // -----------------------------
 
@@ -199,6 +372,351 @@ class FeedService {
       _storyViewsChannel!.unsubscribe();
       _storyViewsChannel = null;
       print('✅ SUCCESS: Unsubscribed from real-time story views');
+    }
+  }
+
+  // -----------------------------
+  // STORIES: From Friends (NEW)
+  // -----------------------------
+
+  /// Fetch public stories where the contributor is a friend of current user.
+  /// Only returns stories that match the "active" window + open/public memories.
+  Future<List<Map<String, dynamic>>> fetchFromFriendsStories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
+    if (_client == null) return [];
+
+    try {
+      final currentUserId = _client!.auth.currentUser?.id;
+      if (currentUserId == null) {
+        print('❌ ERROR: No authenticated user');
+        return [];
+      }
+
+      final friendIds = await _fetchFriendUserIds(currentUserId);
+      if (friendIds.isEmpty) return [];
+
+      // Enforce "active stories" constraint here too.
+      final since = DateTime.now()
+          .subtract(_fromFriendsActiveWindow)
+          .toIso8601String();
+
+      final response = await _client!
+          .from('stories')
+          .select('''
+            id,
+            video_url,
+            thumbnail_url,
+            created_at,
+            contributor_id,
+            memory_id,
+            view_count,
+            memories!inner(
+              title,
+              state,
+              visibility,
+              category_id,
+              memory_categories:category_id(
+                id,
+                name,
+                icon_url
+              )
+            ),
+            user_profiles_public!stories_contributor_id_fkey(
+              id,
+              display_name,
+              avatar_url
+            )
+          ''')
+          .eq('memories.visibility', 'public')
+          .eq('memories.state', 'open')
+          .gte('created_at', since)
+          .inFilter('contributor_id', friendIds.toList())
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      final rows = (response as List);
+
+      final storyIds =
+      rows.map((r) => r['id'] as String?).whereType<String>().toList();
+
+      final viewedIds = await _fetchViewedStoryIdsForUser(
+        userId: currentUserId,
+        storyIds: storyIds,
+      );
+
+      final validatedStories = <Map<String, dynamic>>[];
+
+      for (final item in rows) {
+        final memory = item['memories'] as Map<String, dynamic>?;
+        final contributor =
+            item['user_profiles_public'] as Map<String, dynamic>? ?? {};
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
+
+        final memoryTitle = (memory?['title'] as String?)?.trim();
+        final contributorName = (contributor['display_name'] as String?)?.trim();
+        final rawThumb = item['thumbnail_url'];
+
+        if (memoryTitle == null ||
+            memoryTitle.isEmpty ||
+            contributorName == null ||
+            contributorName.isEmpty ||
+            rawThumb == null ||
+            rawThumb.toString().trim().isEmpty) {
+          continue;
+        }
+
+        final isRead = viewedIds.contains(item['id']);
+
+        validatedStories.add({
+          'id': item['id'] ?? '',
+          'thumbnail_url': _resolveThumbnailUrl(rawThumb),
+          'created_at': item['created_at'] ?? '',
+          'view_count': item['view_count'] ?? 0,
+          'memory_id': item['memory_id'] ?? '',
+          'contributor_name': contributorName,
+          'contributor_avatar': AvatarHelperService.getAvatarUrl(
+            contributor['avatar_url'],
+          ),
+          'memory_title': memoryTitle,
+          'category_name': (category?['name'] as String?)?.trim() ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+          'is_read': isRead,
+        });
+      }
+
+      return validatedStories;
+    } catch (e) {
+      print('❌ ERROR fetching From Friends stories: $e');
+      return [];
+    }
+  }
+
+
+  // -----------------------------
+  // STORIES: For You (NEW)
+  // -----------------------------
+
+  /// Fetch public stories where contributor is a friend OR followed by current user.
+  Future<List<Map<String, dynamic>>> fetchForYouStories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
+    if (_client == null) return [];
+
+    try {
+      final currentUserId = _client!.auth.currentUser?.id;
+      if (currentUserId == null) {
+        print('❌ ERROR: No authenticated user');
+        return [];
+      }
+
+      final authorIds = await _fetchForYouAuthorIds(currentUserId);
+      if (authorIds.isEmpty) return [];
+
+      final response = await _client!
+          .from('stories')
+          .select('''
+            id,
+            video_url,
+            thumbnail_url,
+            created_at,
+            contributor_id,
+            memory_id,
+            view_count,
+            memories!inner(
+              title,
+              state,
+              visibility,
+              category_id,
+              memory_categories:category_id(
+                id,
+                name,
+                icon_url
+              )
+            ),
+            user_profiles_public!stories_contributor_id_fkey(
+              id,
+              display_name,
+              avatar_url
+            )
+          ''')
+          .eq('memories.visibility', 'public')
+          .inFilter('contributor_id', authorIds.toList())
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      final rows = (response as List);
+
+      final storyIds =
+      rows.map((r) => r['id'] as String?).whereType<String>().toList();
+
+      final viewedIds = await _fetchViewedStoryIdsForUser(
+        userId: currentUserId,
+        storyIds: storyIds,
+      );
+
+      final validatedStories = <Map<String, dynamic>>[];
+
+      for (final item in rows) {
+        final memory = item['memories'] as Map<String, dynamic>?;
+        final contributor =
+            item['user_profiles_public'] as Map<String, dynamic>? ?? {};
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
+
+        final memoryTitle = (memory?['title'] as String?)?.trim();
+        final contributorName =
+        (contributor['display_name'] as String?)?.trim();
+        final rawThumb = item['thumbnail_url'];
+
+        if (memoryTitle == null ||
+            memoryTitle.isEmpty ||
+            contributorName == null ||
+            contributorName.isEmpty ||
+            rawThumb == null ||
+            rawThumb.toString().trim().isEmpty) {
+          continue;
+        }
+
+        final isRead = viewedIds.contains(item['id']);
+
+        validatedStories.add({
+          'id': item['id'] ?? '',
+          'thumbnail_url': _resolveThumbnailUrl(rawThumb),
+          'created_at': item['created_at'] ?? '',
+          'view_count': item['view_count'] ?? 0,
+          'memory_id': item['memory_id'] ?? '',
+          'contributor_name': contributorName,
+          'contributor_avatar': AvatarHelperService.getAvatarUrl(
+            contributor['avatar_url'],
+          ),
+          'memory_title': memoryTitle,
+          'category_name': (category?['name'] as String?)?.trim() ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+          'is_read': isRead,
+        });
+      }
+
+      return validatedStories;
+    } catch (e) {
+      print('❌ ERROR fetching For You stories: $e');
+      return [];
+    }
+  }
+
+  // -----------------------------
+  // MEMORIES: For You (NEW)
+  // -----------------------------
+
+  /// Fetch public memories where creator is a friend OR followed by current user.
+  Future<List<Map<String, dynamic>>> fetchForYouMemories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
+    if (_client == null) return [];
+
+    try {
+      final currentUserId = _client!.auth.currentUser?.id;
+      if (currentUserId == null) {
+        print('❌ ERROR: No authenticated user');
+        return [];
+      }
+
+      final authorIds = await _fetchForYouAuthorIds(currentUserId);
+      if (authorIds.isEmpty) return [];
+
+      final response = await _client!
+          .from('memories')
+          .select('''
+            id,
+            title,
+            created_at,
+            expires_at,
+            location_name,
+            contributor_count,
+            state,
+            visibility,
+            creator_id,
+            category_id,
+            stories_count,
+            memory_categories:category_id(
+              name,
+              icon_url
+            ),
+            stories(
+              thumbnail_url,
+              video_url
+            )
+          ''')
+          .eq('visibility', 'public')
+          .gt('stories_count', 0)
+          .eq('state', 'open')
+          .inFilter('creator_id', authorIds.toList())
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      final rows = (response as List);
+
+      final memoryIds =
+      rows.map((m) => m['id'] as String?).whereType<String>().toList();
+
+      final avatarsByMemory = await _fetchContributorAvatarsForMemories(
+        memoryIds: memoryIds,
+        perMemoryLimit: 3,
+      );
+
+      final List<Map<String, dynamic>> transformedMemories = [];
+
+      for (final memory in rows) {
+        if (!_validateMemoryData(memory, 'ForYouMemories')) continue;
+
+        final category = memory['memory_categories'] as Map<String, dynamic>?;
+        final categoryIconUrl = category?['icon_url'] ?? '';
+
+        final stories = memory['stories'] as List? ?? [];
+        final mediaItems = stories
+            .where((s) =>
+        s['thumbnail_url'] != null &&
+            s['thumbnail_url'].toString().trim().isNotEmpty)
+            .take(2)
+            .map((s) => {
+          'thumbnail_url': _resolveThumbnailUrl(s['thumbnail_url']),
+          'video_url': s['video_url'],
+        })
+            .toList();
+
+        if (mediaItems.isEmpty) {
+          continue;
+        }
+
+        final createdAt = DateTime.parse(memory['created_at']);
+        final expiresAt = DateTime.parse(memory['expires_at']);
+
+        final memoryId = memory['id'] as String? ?? '';
+
+        transformedMemories.add({
+          'id': memoryId,
+          'title': memory['title'] ?? 'Untitled Memory',
+          'date': _formatDate(createdAt),
+          'category_icon': categoryIconUrl,
+          'contributor_avatars': avatarsByMemory[memoryId] ?? <String>[],
+          'media_items': mediaItems,
+          'start_date': _formatDate(createdAt),
+          'start_time': _formatTime(createdAt),
+          'end_date': _formatDate(expiresAt),
+          'end_time': _formatTime(expiresAt),
+          'location': memory['location_name'] ?? '',
+          'state': memory['state'] ?? 'open',
+          'visibility': memory['visibility'] ?? 'public',
+          'stories_count': memory['stories_count'] ?? 0,
+        });
+      }
+
+      return transformedMemories;
+    } catch (e) {
+      print('❌ ERROR fetching For You memories: $e');
+      return [];
     }
   }
 
@@ -980,16 +1498,13 @@ class FeedService {
         return [];
       }
 
-      final response = await client
-          .from('stories')
-          .select('''
+      final response = await client.from('stories').select('''
             id,
             created_at,
             memory_id,
             memories!inner(visibility)
-          ''')
-          .eq('memories.visibility', 'public')
-          .order('created_at', ascending: false);
+          ''').eq('memories.visibility', 'public').order('created_at',
+          ascending: false);
 
       if (response.isEmpty) {
         return [];
@@ -1112,9 +1627,8 @@ class FeedService {
         final expiresAt = DateTime.parse(memory['expires_at']);
 
         final creatorName = (creator?['display_name'] as String?)?.trim();
-        final safeCreatorName = (creatorName != null && creatorName.isNotEmpty)
-            ? creatorName
-            : null;
+        final safeCreatorName =
+        (creatorName != null && creatorName.isNotEmpty) ? creatorName : null;
 
         return {
           'id': memory['id'] ?? '',
@@ -1331,8 +1845,8 @@ class FeedService {
       }
 
       return {
-        'id': storyId, // ADD THIS LINE
-        'share_code': response['share_code'], // ADD THIS LINE
+        'id': storyId,
+        'share_code': response['share_code'],
         'media_url': mediaUrl,
         'media_type': mediaType,
         'user_name': contributor?['display_name'] ?? 'Unknown User',

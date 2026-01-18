@@ -443,7 +443,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         duration: const Duration(seconds: 5),
                         behavior: SnackBarBehavior.floating,
                         margin: EdgeInsets.only(
-                            bottom: 80.h, left: 16.w, right: 16.w),
+                            bottom: 16.h, left: 16.w, right: 16.w),
                         action: SnackBarAction(
                           label: 'UNDO',
                           textColor: appTheme.deep_purple_A100,

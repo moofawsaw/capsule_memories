@@ -298,27 +298,19 @@ class StoryService {
     required int durationSeconds,
     DateTime? captureTimestamp,
     bool isFromCameraRoll = false,
+
+    // ✅ NEW: control async location behavior
+    bool backfillLocationAsync = true,
   }) async {
     if (_supabase == null) {
       throw Exception('Supabase client is null (not initialized)');
     }
 
     try {
-      final locationData = await LocationService.getLocationData();
-
-      double? latitude;
-      double? longitude;
-      String? locationName;
-
-      if (locationData != null) {
-        latitude = locationData['latitude'];
-        longitude = locationData['longitude'];
-        locationName = locationData['location_name'];
-      }
-
       final nowUtc = DateTime.now().toUtc();
       final captureUtc = (captureTimestamp ?? nowUtc).toUtc();
 
+      // ✅ FAST INSERT: no getLocationData() here
       final storyData = <String, dynamic>{
         'memory_id': memoryId,
         'contributor_id': contributorId,
@@ -326,57 +318,90 @@ class StoryService {
         'video_url': mediaType == 'video' ? mediaUrl : null,
         'thumbnail_url': thumbnailUrl,
         'media_type': mediaType,
-        'location_lat': latitude,
-        'location_lng': longitude,
-        'location_name': locationName,
+
+        // insert null for now; fill after
+        'location_lat': null,
+        'location_lng': null,
+        'location_name': null,
+
         'created_at': nowUtc.toIso8601String(),
         'capture_timestamp': captureUtc.toIso8601String(),
         'is_from_camera_roll': isFromCameraRoll,
         'duration_seconds': durationSeconds,
-        'text_overlays': caption != null
-            ? [
-          {'text': caption}
-        ]
-            : [],
+        'text_overlays': caption != null ? [{'text': caption}] : [],
       };
 
-      final response =
-      await _supabase.from('stories').insert(storyData).select('''
-            id,
-            location_name,
-            location_lat,
-            location_lng,
-            contributor_id,
-            memory_id
-          ''').single();
+      final inserted = await _supabase.from('stories').insert(storyData).select('''
+      id,
+      contributor_id,
+      memory_id,
+      location_name,
+      location_lat,
+      location_lng
+    ''').single();
 
-      return Map<String, dynamic>.from(response);
+      final insertedMap = Map<String, dynamic>.from(inserted);
+      final storyId = insertedMap['id']?.toString();
+
+      // ✅ Async backfill in background
+      if (backfillLocationAsync && storyId != null && storyId.isNotEmpty) {
+        unawaited(_backfillStoryLocation(storyId));
+      }
+
+      return insertedMap;
     } on PostgrestException catch (e) {
       final parts = <String>[];
 
-      final message = e.message;
-      if (message.isNotEmpty) {
-        parts.add('message=$message');
-      }
-
+      if (e.message.isNotEmpty) parts.add('message=${e.message}');
       final details = e.details;
-      if (details is String && details.isNotEmpty) {
-        parts.add('details=$details');
-      }
-
+      if (details is String && details.isNotEmpty) parts.add('details=$details');
       final hint = e.hint;
-      if (hint is String && hint.isNotEmpty) {
-        parts.add('hint=$hint');
-      }
-
+      if (hint is String && hint.isNotEmpty) parts.add('hint=$hint');
       final code = e.code;
-      if (code is String && code.isNotEmpty) {
-        parts.add('code=$code');
-      }
+      if (code is String && code.isNotEmpty) parts.add('code=$code');
 
       final errorText = parts.isNotEmpty ? parts.join(' | ') : 'unknown error';
-
       throw Exception('Create story failed ($errorText)');
+    }
+  }
+
+  /// ✅ Background backfill: coords quickly, geocode best-effort, then update story row.
+  Future<void> _backfillStoryLocation(String storyId) async {
+    try {
+      // 1) Get coords fast (don’t hang)
+      final coords = await LocationService.getCoordsOnly(
+        timeout: const Duration(seconds: 3),
+      );
+
+      if (coords == null) {
+        print('⚠️ Backfill: no coords available');
+        return;
+      }
+
+      final lat = coords['latitude'] as double?;
+      final lng = coords['longitude'] as double?;
+      if (lat == null || lng == null) return;
+
+      // 2) Get name best-effort (short cap)
+      final name = await LocationService.getLocationNameBestEffort(
+        lat,
+        lng,
+        timeout: const Duration(seconds: 6),
+      );
+
+      // 3) Update story (coords always, name if available)
+      final updateData = <String, dynamic>{
+        'location_lat': lat,
+        'location_lng': lng,
+        'location_name': name,
+      };
+
+      await _supabase!.from('stories').update(updateData).eq('id', storyId);
+
+      print('✅ Backfilled story location for $storyId: ${name ?? "coords-only"}');
+    } catch (e) {
+      // swallow: posting already succeeded
+      print('⚠️ Backfill location failed for $storyId: $e');
     }
   }
 

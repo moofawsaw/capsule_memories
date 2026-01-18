@@ -92,22 +92,27 @@ class _OpenTimelineSkeletonSection extends StatelessWidget {
 class _StoriesSkeletonRow extends StatelessWidget {
   const _StoriesSkeletonRow();
 
+  static const double _cardW = 90;   // matches CustomStoryList width: 90.h
+  static const double _cardH = 120;  // matches CustomStoryList height: 120.h
+  static const double _radius = 12;  // matches CustomStoryList radius: 12.h
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 140.h,
+      height: _cardH.h,
       child: ListView.separated(
         padding: EdgeInsets.symmetric(horizontal: 20.h),
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: 4,
-        separatorBuilder: (_, __) => SizedBox(width: 12.h),
+        separatorBuilder: (_, __) => SizedBox(width: 8.h), // match your itemGap default
         itemBuilder: (_, __) {
           return Container(
-            width: 120.h,
+            width: _cardW.h,
+            height: _cardH.h,
             decoration: BoxDecoration(
               color: appTheme.gray_900_01,
-              borderRadius: BorderRadius.circular(16.h),
+              borderRadius: BorderRadius.circular(_radius.h),
             ),
           );
         },
@@ -531,7 +536,7 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
             width: double.infinity,
             buttonStyle: CustomButtonStyle.outlineDark,
             buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-            leftIcon: Icons.theaters, // ✅ Material icon
+            leftIcon: Icons.theaters_outlined, // ✅ Material icon
             onPressed: () => onTapReplayAll(context),
           ),
           SizedBox(height: 12.h),

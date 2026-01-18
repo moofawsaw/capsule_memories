@@ -2,42 +2,33 @@ import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../model/memory_feed_dashboard_model.dart';
 
-// IMPORTANT: This widget CANNOT be const because it uses runtime values:
-// - .h/.w extensions from Sizer package (runtime calculations)
-// - appTheme theme values (runtime theme access)
-// - TextStyleHelper.instance (runtime singleton access)
-// Flutter hot reload may fail when switching between const/non-const.
-// Solution: Perform Hot Restart (not Hot Reload) when you see const-related errors.
-
 class HappeningNowStoryCard extends StatelessWidget {
   final HappeningNowStoryData story;
   final VoidCallback? onTap;
 
-  // Explicitly non-const constructor (required due to runtime values in build method)
   HappeningNowStoryCard({
     Key? key,
     required this.story,
     this.onTap,
   }) : super(key: key);
 
+  bool _isNetwork(String? s) {
+    if (s == null) return false;
+    final v = s.trim();
+    if (v.isEmpty) return false;
+    if (v == 'null' || v == 'undefined') return false;
+    return v.startsWith('http://') || v.startsWith('https://');
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 🎨 DEBUG: Log widget build with isRead status
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    print('🎨 WIDGET BUILD: HappeningNowStoryCard');
-    print('   Story ID: "${story.storyId}"');
-    print('   User Name: "${story.userName}"');
-    print('   isRead Status: ${story.isRead}');
-    print(
-        '   Ring Display: ${story.isRead ? 'GRAY (read)' : 'GRADIENT (unread)'}');
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 160.h,
+        // ✅ FIX: width should be .w, not .h
+        width: 160.w,
         height: 240.h,
-        margin: EdgeInsets.only(right: 12.h),
+        margin: EdgeInsets.only(right: 12.w),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16.0),
         ),
@@ -45,17 +36,33 @@ class HappeningNowStoryCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14.0),
           child: Stack(
             children: [
-              // Background image filling the entire card
-              // CRITICAL FIX: Use ValueKey to preserve CustomImageView animation state across rebuilds
-              // This prevents thumbnail animation from retriggering when story viewer closes
+              // ✅ Background image (use Image.network directly - no CustomImageView)
               Positioned.fill(
-                child: CustomImageView(
-                  key: ValueKey(story
-                      .backgroundImage), // Preserve state for this specific URL
-                  imagePath: story.backgroundImage ?? '',
+                child: _isNetwork(story.backgroundImage)
+                    ? Image.network(
+                  story.backgroundImage ?? '',
                   fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: appTheme.gray_900_02,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      color: appTheme.blue_gray_300,
+                    ),
+                  ),
+                )
+                    : Container(
+                  color: appTheme.gray_900_02,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    color: appTheme.blue_gray_300,
+                  ),
                 ),
               ),
+
               // Gradient overlay for better text visibility
               Positioned.fill(
                 child: Container(
@@ -73,6 +80,7 @@ class HappeningNowStoryCard extends StatelessWidget {
                   ),
                 ),
               ),
+
               // Content overlay
               Positioned(
                 top: 12.h,
@@ -85,16 +93,17 @@ class HappeningNowStoryCard extends StatelessWidget {
                     Container(
                       width: 46.h,
                       height: 46.h,
-                      padding:
-                          EdgeInsets.all(2.h), // Gap between ring and avatar
+                      padding: EdgeInsets.all(2.h),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        // Solid primary color for unread, gray for read
                         color: story.isRead
-                            ? Color(0xFF9CA3AF) // Gray for read
-                            : Color(0xFF8B5CF6), // Primary purple for unread
+                            ? const Color(0xFF9CA3AF)
+                            : const Color(0xFF8B5CF6),
                         border: story.isRead
-                            ? Border.all(color: Color(0xFF9CA3AF), width: 2.h)
+                            ? Border.all(
+                          color: const Color(0xFF9CA3AF),
+                          width: 2.h,
+                        )
                             : null,
                       ),
                       child: Container(
@@ -102,8 +111,7 @@ class HappeningNowStoryCard extends StatelessWidget {
                         height: 38.h,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color:
-                              appTheme.gray_900, // Background color for padding
+                          color: appTheme.gray_900,
                         ),
                         padding: EdgeInsets.all(2.h),
                         child: ClipOval(
@@ -114,7 +122,6 @@ class HappeningNowStoryCard extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 8.h),
-                    // User name
                     Text(
                       story.userName ?? '',
                       style: TextStyleHelper.instance.body14BoldPlusJakartaSans
@@ -128,6 +135,7 @@ class HappeningNowStoryCard extends StatelessWidget {
                   ],
                 ),
               ),
+
               // Category badge and timestamp at bottom
               Positioned(
                 bottom: 12.h,
@@ -136,7 +144,6 @@ class HappeningNowStoryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Category badge with icon and name from database
                     Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 10.h,
@@ -154,8 +161,9 @@ class HappeningNowStoryCard extends StatelessWidget {
                               imagePath: story.categoryIcon,
                               height: 14.h,
                               width: 14.h,
-                            ),
-                          if (story.categoryIcon.isEmpty)
+                              fit: BoxFit.contain,
+                            )
+                          else
                             Text(
                               '📸',
                               style: TextStyle(fontSize: 14.h),
@@ -174,7 +182,6 @@ class HappeningNowStoryCard extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 6.h),
-                    // Timestamp
                     Text(
                       story.timestamp ?? '',
                       style: TextStyleHelper
@@ -194,6 +201,7 @@ class HappeningNowStoryCard extends StatelessWidget {
     );
   }
 }
+
 /// Forces true cover behavior for avatars (prevents stretching).
 class _CoverAvatar extends StatelessWidget {
   final String imagePath;

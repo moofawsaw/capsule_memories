@@ -11,7 +11,7 @@ part 'memory_feed_dashboard_state.dart';
 
 final memoryFeedDashboardProvider = StateNotifierProvider.autoDispose<
     MemoryFeedDashboardNotifier, MemoryFeedDashboardState>(
-  (ref) => MemoryFeedDashboardNotifier(),
+      (ref) => MemoryFeedDashboardNotifier(),
 );
 
 /// A notifier that manages the state of the MemoryFeedDashboard screen.
@@ -32,10 +32,10 @@ class MemoryFeedDashboardNotifier
 
   MemoryFeedDashboardNotifier()
       : super(
-          MemoryFeedDashboardState(
-            memoryFeedDashboardModel: MemoryFeedDashboardModel(),
-          ),
-        ) {
+    MemoryFeedDashboardState(
+      memoryFeedDashboardModel: MemoryFeedDashboardModel(),
+    ),
+  ) {
     loadInitialData();
     _subscribeToStoryViews();
     _setupRealtimeSubscriptions();
@@ -124,20 +124,23 @@ class MemoryFeedDashboardNotifier
             : _normVisibility(server?['visibility']);
 
         final existingEndTime = m['end_time'];
-        final hydratedEndTime = (existingEndTime != null &&
-            existingEndTime.toString().trim().isNotEmpty)
+        final hydratedEndTime =
+        (existingEndTime != null && existingEndTime.toString().trim().isNotEmpty)
             ? existingEndTime
             : server?['end_time'];
 
         final endTimeDt = parseEndTime(hydratedEndTime);
-        final expirationText = endTimeDt == null ? '' : _formatExpirationTime(endTimeDt);
+        final expirationText =
+        endTimeDt == null ? '' : _formatExpirationTime(endTimeDt);
 
         return <String, dynamic>{
           ...m,
           'visibility': hydratedVis,
           'end_time': hydratedEndTime,
           // keep a stable UI string available too
-          'expiration_text': expirationText.isNotEmpty ? expirationText : (m['expiration_text'] ?? ''),
+          'expiration_text': expirationText.isNotEmpty
+              ? expirationText
+              : (m['expiration_text'] ?? ''),
         };
       }).toList();
 
@@ -159,7 +162,6 @@ class MemoryFeedDashboardNotifier
     }
   }
 
-
   /// Load initial data from the database
   Future<void> loadInitialData() async {
     if (_isDisposed) return;
@@ -170,24 +172,35 @@ class MemoryFeedDashboardNotifier
 
     try {
       // Active memories for current user
-      final rawActiveMemoriesData =
-          await _feedService.fetchUserActiveMemories();
+      final rawActiveMemoriesData = await _feedService.fetchUserActiveMemories();
       final activeMemoriesData =
-          await _hydrateActiveMemoriesWithVisibility(rawActiveMemoriesData);
+      await _hydrateActiveMemoriesWithVisibility(rawActiveMemoriesData);
 
       // Fetch initial page (offset 0) for all feeds
-      final happeningNowData = await _feedService.fetchHappeningNowStories(
-          offset: 0, limit: _pageSize);
+      final happeningNowData =
+      await _feedService.fetchHappeningNowStories(offset: 0, limit: _pageSize);
       final latestStoriesData =
-          await _feedService.fetchLatestStories(offset: 0, limit: _pageSize);
+      await _feedService.fetchLatestStories(offset: 0, limit: _pageSize);
       final publicMemoriesData =
-          await _feedService.fetchPublicMemories(offset: 0, limit: _pageSize);
+      await _feedService.fetchPublicMemories(offset: 0, limit: _pageSize);
       final trendingData =
-          await _feedService.fetchTrendingStories(offset: 0, limit: _pageSize);
-      final longestStreakData = await _feedService.fetchLongestStreakStories(
-          offset: 0, limit: _pageSize);
-      final popularUserData = await _feedService.fetchPopularUserStories(
-          offset: 0, limit: _pageSize);
+      await _feedService.fetchTrendingStories(offset: 0, limit: _pageSize);
+      final longestStreakData =
+      await _feedService.fetchLongestStreakStories(offset: 0, limit: _pageSize);
+      final popularUserData =
+      await _feedService.fetchPopularUserStories(offset: 0, limit: _pageSize);
+
+      // ✅ NEW (required by MemoryFeedDashboardModel fields used in UI)
+      // NOTE: These FeedService methods must exist. If you haven't built them yet,
+      // return [] from the service so the UI compiles and stays deterministic.
+      final fromFriendsData =
+      await _feedService.fetchFromFriendsStories(offset: 0, limit: _pageSize);
+      final forYouStoriesData =
+      await _feedService.fetchForYouStories(offset: 0, limit: _pageSize);
+      final popularMemoriesData =
+      await _feedService.fetchPopularMemories(offset: 0, limit: _pageSize);
+      final forYouMemoriesData =
+      await _feedService.fetchForYouMemories(offset: 0, limit: _pageSize);
 
       // Transform happening now
       final happeningNowStories = happeningNowData.map((item) {
@@ -201,8 +214,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: categoryIcon,
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -218,8 +230,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -227,28 +238,28 @@ class MemoryFeedDashboardNotifier
       // Transform public memories
       final publicMemories = publicMemoriesData
           .map((item) => CustomMemoryItem(
-                id: item['id'],
-                title: item['title'],
-                date: item['date'],
-                iconPath: item['category_icon'] ?? '',
-                profileImages:
-                    (item['contributor_avatars'] as List?)?.cast<String>() ??
-                        <String>[],
-                mediaItems: (item['media_items'] as List?)
-                        ?.map((media) => CustomMediaItem(
-                              imagePath: media['thumbnail_url'] ?? '',
-                              hasPlayButton: media['video_url'] != null,
-                            ))
-                        .toList() ??
-                    <CustomMediaItem>[],
-                startDate: item['start_date'],
-                startTime: item['start_time'],
-                endDate: item['end_date'],
-                endTime: item['end_time'],
-                location: item['location'],
-                distance: '',
-                isLiked: false,
-              ))
+        id: item['id'],
+        title: item['title'],
+        date: item['date'],
+        iconPath: item['category_icon'] ?? '',
+        profileImages:
+        (item['contributor_avatars'] as List?)?.cast<String>() ??
+            <String>[],
+        mediaItems: (item['media_items'] as List?)
+            ?.map((media) => CustomMediaItem(
+          imagePath: media['thumbnail_url'] ?? '',
+          hasPlayButton: media['video_url'] != null,
+        ))
+            .toList() ??
+            <CustomMediaItem>[],
+        startDate: item['start_date'],
+        startTime: item['start_time'],
+        endDate: item['end_date'],
+        endTime: item['end_time'],
+        location: item['location'],
+        distance: '',
+        isLiked: false,
+      ))
           .toList();
 
       // Transform trending
@@ -262,8 +273,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -279,8 +289,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -296,11 +305,96 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
+
+      // ✅ Transform from friends
+      final fromFriendsStories = fromFriendsData.map((item) {
+        final isRead = item['is_read'] as bool? ?? false;
+
+        return HappeningNowStoryData(
+          storyId: item['id'] as String,
+          backgroundImage: item['thumbnail_url'] as String,
+          profileImage: item['contributor_avatar'] as String,
+          userName: item['contributor_name'] as String,
+          categoryName: item['category_name'] as String,
+          categoryIcon: item['category_icon'] as String? ?? '',
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          isRead: isRead,
+        );
+      }).toList();
+
+      // ✅ Transform for you stories
+      final forYouStories = forYouStoriesData.map((item) {
+        final isRead = item['is_read'] as bool? ?? false;
+
+        return HappeningNowStoryData(
+          storyId: item['id'] as String,
+          backgroundImage: item['thumbnail_url'] as String,
+          profileImage: item['contributor_avatar'] as String,
+          userName: item['contributor_name'] as String,
+          categoryName: item['category_name'] as String,
+          categoryIcon: item['category_icon'] as String? ?? '',
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          isRead: isRead,
+        );
+      }).toList();
+
+      // ✅ Transform popular memories
+      final popularMemories = popularMemoriesData
+          .map((item) => CustomMemoryItem(
+        id: item['id'],
+        title: item['title'],
+        date: item['date'],
+        iconPath: item['category_icon'] ?? '',
+        profileImages:
+        (item['contributor_avatars'] as List?)?.cast<String>() ??
+            <String>[],
+        mediaItems: (item['media_items'] as List?)
+            ?.map((media) => CustomMediaItem(
+          imagePath: media['thumbnail_url'] ?? '',
+          hasPlayButton: media['video_url'] != null,
+        ))
+            .toList() ??
+            <CustomMediaItem>[],
+        startDate: item['start_date'],
+        startTime: item['start_time'],
+        endDate: item['end_date'],
+        endTime: item['end_time'],
+        location: item['location'],
+        distance: '',
+        isLiked: false,
+      ))
+          .toList();
+
+      // ✅ Transform for you memories
+      final forYouMemories = forYouMemoriesData
+          .map((item) => CustomMemoryItem(
+        id: item['id'],
+        title: item['title'],
+        date: item['date'],
+        iconPath: item['category_icon'] ?? '',
+        profileImages:
+        (item['contributor_avatars'] as List?)?.cast<String>() ??
+            <String>[],
+        mediaItems: (item['media_items'] as List?)
+            ?.map((media) => CustomMediaItem(
+          imagePath: media['thumbnail_url'] ?? '',
+          hasPlayButton: media['video_url'] != null,
+        ))
+            .toList() ??
+            <CustomMediaItem>[],
+        startDate: item['start_date'],
+        startTime: item['start_time'],
+        endDate: item['end_date'],
+        endTime: item['end_time'],
+        location: item['location'],
+        distance: '',
+        isLiked: false,
+      ))
+          .toList();
 
       if (_isDisposed) return;
 
@@ -309,10 +403,15 @@ class MemoryFeedDashboardNotifier
         happeningNowStories: happeningNowStories.cast<HappeningNowStoryData>(),
         latestStories: latestStories.cast<HappeningNowStoryData>(),
         publicMemories: publicMemories,
+        popularMemories: popularMemories,
         trendingStories: trendingStories.cast<HappeningNowStoryData>(),
-        longestStreakStories:
-            longestStreakStories.cast<HappeningNowStoryData>(),
+        longestStreakStories: longestStreakStories.cast<HappeningNowStoryData>(),
         popularUserStories: popularUserStories.cast<HappeningNowStoryData>(),
+
+        // ✅ NEW
+        fromFriendsStories: fromFriendsStories.cast<HappeningNowStoryData>(),
+        forYouStories: forYouStories.cast<HappeningNowStoryData>(),
+        forYouMemories: forYouMemories,
       );
 
       _safeSetState(
@@ -327,7 +426,9 @@ class MemoryFeedDashboardNotifier
           hasMoreTrending: trendingData.length == _pageSize,
           hasMoreLongestStreak: longestStreakData.length == _pageSize,
           hasMorePopularUsers: popularUserData.length == _pageSize,
-          hasMorePopularMemories: false,
+
+          // ✅ now actually driven by initial fetchPopularMemories
+          hasMorePopularMemories: popularMemoriesData.length == _pageSize,
         ),
       );
     } catch (e) {
@@ -335,7 +436,8 @@ class MemoryFeedDashboardNotifier
       print('Error loading feed data: $e');
       if (!_isDisposed) {
         _safeSetState(
-            state.copyWith(isLoading: false, isLoadingActiveMemories: false));
+          state.copyWith(isLoading: false, isLoadingActiveMemories: false),
+        );
       }
     }
   }
@@ -347,7 +449,8 @@ class MemoryFeedDashboardNotifier
       if (currentUserId == null) {
         // ignore: avoid_print
         print(
-            'ℹ️ INFO: Real-time subscription skipped (optional - requires authentication)');
+          'ℹ️ INFO: Real-time subscription skipped (optional - requires authentication)',
+        );
         return;
       }
 
@@ -374,9 +477,9 @@ class MemoryFeedDashboardNotifier
     bool anyUpdated = false;
 
     List<HappeningNowStoryData>? updateListIfPresent(
-      List<HappeningNowStoryData>? stories,
-      String listName,
-    ) {
+        List<HappeningNowStoryData>? stories,
+        String listName,
+        ) {
       if (stories == null || stories.isEmpty) return null;
 
       bool foundInList = false;
@@ -396,27 +499,35 @@ class MemoryFeedDashboardNotifier
     }
 
     final updatedHappeningNow =
-        updateListIfPresent(currentModel.happeningNowStories, 'Happening Now');
+    updateListIfPresent(currentModel.happeningNowStories, 'Happening Now');
     final updatedLatest =
-        updateListIfPresent(currentModel.latestStories, 'Latest Stories');
+    updateListIfPresent(currentModel.latestStories, 'Latest Stories');
     final updatedTrending =
-        updateListIfPresent(currentModel.trendingStories, 'Trending');
-    final updatedLongestStreak = updateListIfPresent(
-        currentModel.longestStreakStories, 'Longest Streak');
+    updateListIfPresent(currentModel.trendingStories, 'Trending');
+    final updatedLongestStreak =
+    updateListIfPresent(currentModel.longestStreakStories, 'Longest Streak');
     final updatedPopularUsers =
-        updateListIfPresent(currentModel.popularUserStories, 'Popular Users');
+    updateListIfPresent(currentModel.popularUserStories, 'Popular Users');
+
+    // ✅ NEW story lists
+    final updatedFromFriends =
+    updateListIfPresent(currentModel.fromFriendsStories, 'From Friends');
+    final updatedForYouStories =
+    updateListIfPresent(currentModel.forYouStories, 'For You Stories');
 
     if (!anyUpdated) return;
 
     final updatedModel = currentModel.copyWith(
-      happeningNowStories:
-          updatedHappeningNow ?? currentModel.happeningNowStories,
+      happeningNowStories: updatedHappeningNow ?? currentModel.happeningNowStories,
       latestStories: updatedLatest ?? currentModel.latestStories,
       trendingStories: updatedTrending ?? currentModel.trendingStories,
       longestStreakStories:
-          updatedLongestStreak ?? currentModel.longestStreakStories,
-      popularUserStories:
-          updatedPopularUsers ?? currentModel.popularUserStories,
+      updatedLongestStreak ?? currentModel.longestStreakStories,
+      popularUserStories: updatedPopularUsers ?? currentModel.popularUserStories,
+
+      // ✅ NEW
+      fromFriendsStories: updatedFromFriends ?? currentModel.fromFriendsStories,
+      forYouStories: updatedForYouStories ?? currentModel.forYouStories,
     );
 
     _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
@@ -448,33 +559,33 @@ class MemoryFeedDashboardNotifier
       _storiesChannel = client
           .channel('public:stories')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'stories',
-            callback: _handleNewStory,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'stories',
+        callback: _handleNewStory,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'stories',
-            callback: _handleStoryUpdate,
-          )
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'stories',
+        callback: _handleStoryUpdate,
+      )
           .subscribe();
 
       _memoriesChannel = client
           .channel('public:memories')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleNewMemory,
-          )
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleNewMemory,
+      )
           .onPostgresChanges(
-            event: PostgresChangeEvent.update,
-            schema: 'public',
-            table: 'memories',
-            callback: _handleMemoryUpdate,
-          )
+        event: PostgresChangeEvent.update,
+        schema: 'public',
+        table: 'memories',
+        callback: _handleMemoryUpdate,
+      )
           .subscribe();
     } catch (e) {
       // ignore: avoid_print
@@ -515,18 +626,19 @@ class MemoryFeedDashboardNotifier
 
       if (_isDisposed) return;
 
-      final memoryVisibility =
-          _normVisibility(memoryVisibilityCheck['visibility']);
+      final memoryVisibility = _normVisibility(memoryVisibilityCheck['visibility']);
 
       // ⛔ STOP: If memory is private, do NOT add story to "Happening Now" feed
       if (memoryVisibility != 'public') {
+        // ignore: avoid_print
         print(
-            '🔒 REALTIME: Skipped private memory story from appearing in real-time feed (memory_id: $memoryId, visibility: $memoryVisibility)');
+          '🔒 REALTIME: Skipped private memory story from appearing in real-time feed (memory_id: $memoryId, visibility: $memoryVisibility)',
+        );
         return;
       }
 
       final resolvedThumbnailUrl =
-          StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
+      StorageUtils.resolveStoryMediaUrl(rawThumbnailUrl);
 
       final profileResponse = await client
           .from('user_profiles')
@@ -556,11 +668,11 @@ class MemoryFeedDashboardNotifier
         backgroundImage: resolvedThumbnailUrl ?? '',
         profileImage: resolvedAvatarUrl ?? '',
         userName: profileResponse['display_name'] as String? ?? 'Unknown User',
-        categoryName: memoryResponse['memories']['memory_categories']['name']
-                as String? ??
+        categoryName:
+        memoryResponse['memories']['memory_categories']['name'] as String? ??
             '',
-        categoryIcon: memoryResponse['memories']['memory_categories']
-                ['icon_url'] as String? ??
+        categoryIcon:
+        memoryResponse['memories']['memory_categories']['icon_url'] as String? ??
             '',
         timestamp: 'Just now',
         isRead: false,
@@ -573,15 +685,13 @@ class MemoryFeedDashboardNotifier
       final updatedStories = [newStoryData, ...currentStories];
 
       // Update memory card media (only if memory is currently in public feed)
-      final currentMemories =
-          currentModel.publicMemories ?? <CustomMemoryItem>[];
+      final currentMemories = currentModel.publicMemories ?? <CustomMemoryItem>[];
       final memoryIndex = currentMemories.indexWhere((m) => m.id == memoryId);
 
       List<CustomMemoryItem> updatedMemories = currentMemories;
       if (memoryIndex != -1) {
         final targetMemory = currentMemories[memoryIndex];
-        final currentMediaItems =
-            targetMemory.mediaItems ?? <CustomMediaItem>[];
+        final currentMediaItems = targetMemory.mediaItems ?? <CustomMediaItem>[];
 
         final newMediaItem = CustomMediaItem(
           imagePath: resolvedThumbnailUrl ?? '',
@@ -589,10 +699,9 @@ class MemoryFeedDashboardNotifier
         );
 
         final updatedMediaItems =
-            [newMediaItem, ...currentMediaItems].take(2).toList();
+        [newMediaItem, ...currentMediaItems].take(2).toList();
 
-        final updatedMemory =
-            targetMemory.copyWith(mediaItems: updatedMediaItems);
+        final updatedMemory = targetMemory.copyWith(mediaItems: updatedMediaItems);
 
         updatedMemories = [...currentMemories];
         updatedMemories[memoryIndex] = updatedMemory;
@@ -637,11 +746,27 @@ class MemoryFeedDashboardNotifier
         payload.newRecord,
       );
 
+      // ✅ NEW story lists
+      final updatedFromFriends = _updateStoryInList(
+        currentModel.fromFriendsStories,
+        storyId,
+        payload.newRecord,
+      );
+
+      final updatedForYou = _updateStoryInList(
+        currentModel.forYouStories,
+        storyId,
+        payload.newRecord,
+      );
+
       final updatedModel = currentModel.copyWith(
-        happeningNowStories:
-            updatedHappeningNow ?? currentModel.happeningNowStories,
+        happeningNowStories: updatedHappeningNow ?? currentModel.happeningNowStories,
         latestStories: updatedLatest ?? currentModel.latestStories,
         trendingStories: updatedTrending ?? currentModel.trendingStories,
+
+        // ✅ NEW
+        fromFriendsStories: updatedFromFriends ?? currentModel.fromFriendsStories,
+        forYouStories: updatedForYou ?? currentModel.forYouStories,
       );
 
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
@@ -657,7 +782,6 @@ class MemoryFeedDashboardNotifier
 
     try {
       final memoryId = payload.newRecord['id'] as String;
-      final creatorId = payload.newRecord['creator_id'] as String;
       final visibility = _normVisibility(payload.newRecord['visibility']);
 
       final client = SupabaseService.instance.client;
@@ -678,6 +802,7 @@ class MemoryFeedDashboardNotifier
 
           isCurrentUserContributor = contributorCheck != null;
         } catch (e) {
+          // ignore: avoid_print
           print('⚠️ REALTIME: Failed to check contributor status: $e');
         }
       }
@@ -706,19 +831,16 @@ class MemoryFeedDashboardNotifier
 
         if (_isDisposed) return;
 
-        final category =
-            memoryDetails['memory_categories'] as Map<String, dynamic>?;
-        final creator =
-            memoryDetails['user_profiles_public'] as Map<String, dynamic>?;
+        final category = memoryDetails['memory_categories'] as Map<String, dynamic>?;
+        final creator = memoryDetails['user_profiles_public'] as Map<String, dynamic>?;
         final createdAt = DateTime.parse(memoryDetails['created_at']);
         final endTime = memoryDetails['end_time'] != null
             ? DateTime.parse(memoryDetails['end_time'])
             : null;
 
         final creatorName = (creator?['display_name'] as String?)?.trim();
-        final safeCreatorName = (creatorName != null && creatorName.isNotEmpty)
-            ? creatorName
-            : null;
+        final safeCreatorName =
+        (creatorName != null && creatorName.isNotEmpty) ? creatorName : null;
 
         final newActiveMemory = {
           'id': memoryDetails['id'] ?? '',
@@ -736,15 +858,12 @@ class MemoryFeedDashboardNotifier
 
         // Add to the beginning of active memories list
         final currentActiveMemories = state.activeMemories;
-        final updatedActiveMemories = [
-          newActiveMemory,
-          ...currentActiveMemories
-        ];
+        final updatedActiveMemories = [newActiveMemory, ...currentActiveMemories];
 
         _safeSetState(state.copyWith(activeMemories: updatedActiveMemories));
 
-        print(
-            '✅ REALTIME: Added new memory "${newActiveMemory['title']}" to active memories');
+        // ignore: avoid_print
+        print('✅ REALTIME: Added new memory "${newActiveMemory['title']}" to active memories');
       }
 
       // Continue with existing logic for public feed update
@@ -786,10 +905,10 @@ class MemoryFeedDashboardNotifier
         mediaItems: stories
             .map(
               (s) => CustomMediaItem(
-                imagePath: s['thumbnail_url'] ?? '',
-                hasPlayButton: s['video_url'] != null,
-              ),
-            )
+            imagePath: s['thumbnail_url'] ?? '',
+            hasPlayButton: s['video_url'] != null,
+          ),
+        )
             .toList(),
         startDate: response['start_time'],
         startTime: response['start_time'],
@@ -800,14 +919,11 @@ class MemoryFeedDashboardNotifier
         isLiked: false,
       );
 
-      final currentModel =
-          state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel();
-      final currentMemories =
-          currentModel.publicMemories ?? <CustomMemoryItem>[];
+      final currentModel = state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel();
+      final currentMemories = currentModel.publicMemories ?? <CustomMemoryItem>[];
       final updatedMemories = [newMemoryData, ...currentMemories];
 
-      final updatedModel =
-          currentModel.copyWith(publicMemories: updatedMemories);
+      final updatedModel = currentModel.copyWith(publicMemories: updatedMemories);
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
     } catch (e) {
       // ignore: avoid_print
@@ -824,8 +940,7 @@ class MemoryFeedDashboardNotifier
       final currentModel = state.memoryFeedDashboardModel;
       if (currentModel == null) return;
 
-      final currentMemories =
-          currentModel.publicMemories ?? <CustomMemoryItem>[];
+      final currentMemories = currentModel.publicMemories ?? <CustomMemoryItem>[];
       if (currentMemories.isEmpty) return;
 
       final updatedMemories = currentMemories.map((memory) {
@@ -837,8 +952,7 @@ class MemoryFeedDashboardNotifier
         return memory;
       }).toList();
 
-      final updatedModel =
-          currentModel.copyWith(publicMemories: updatedMemories);
+      final updatedModel = currentModel.copyWith(publicMemories: updatedMemories);
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
     } catch (e) {
       // ignore: avoid_print
@@ -848,10 +962,10 @@ class MemoryFeedDashboardNotifier
 
   /// Helper to update story in a list
   List<HappeningNowStoryData>? _updateStoryInList(
-    List<HappeningNowStoryData>? stories,
-    String storyId,
-    Map<String, dynamic> newRecord,
-  ) {
+      List<HappeningNowStoryData>? stories,
+      String storyId,
+      Map<String, dynamic> newRecord,
+      ) {
     if (stories == null || stories.isEmpty) return null;
 
     bool found = false;
@@ -875,8 +989,7 @@ class MemoryFeedDashboardNotifier
     try {
       state = newState;
     } catch (e) {
-      if (e.toString().contains('dispose') ||
-          e.toString().contains('Bad state')) {
+      if (e.toString().contains('dispose') || e.toString().contains('Bad state')) {
         _isDisposed = true;
         // ignore: avoid_print
         print('⚠️ FEED NOTIFIER: Attempted to set state after dispose');
@@ -890,27 +1003,23 @@ class MemoryFeedDashboardNotifier
   // PAGINATION (FIXED OFFSETS)
   // ----------------------------
 
-  /// Load more happening now stories
   Future<void> loadMoreHappeningNow() async {
-    if (_isDisposed || state.isLoadingMore || !state.hasMoreHappeningNow)
-      return;
+    if (_isDisposed || state.isLoadingMore || !state.hasMoreHappeningNow) return;
 
     _safeSetState(state.copyWith(isLoadingMore: true));
 
     try {
       final currentStories =
-          state.memoryFeedDashboardModel?.happeningNowStories ??
-              <HappeningNowStoryData>[];
+          state.memoryFeedDashboardModel?.happeningNowStories ?? <HappeningNowStoryData>[];
       final offset = currentStories.length;
 
-      final newData = await _feedService.fetchHappeningNowStories(
-          offset: offset, limit: _pageSize);
+      final newData =
+      await _feedService.fetchHappeningNowStories(offset: offset, limit: _pageSize);
 
       if (_isDisposed) return;
 
       if (newData.isEmpty) {
-        _safeSetState(
-            state.copyWith(isLoadingMore: false, hasMoreHappeningNow: false));
+        _safeSetState(state.copyWith(isLoadingMore: false, hasMoreHappeningNow: false));
         return;
       }
 
@@ -924,8 +1033,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -933,8 +1041,7 @@ class MemoryFeedDashboardNotifier
       final updatedStories = [...currentStories, ...newStories];
 
       final updatedModel =
-          (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel())
-              .copyWith(
+      (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel()).copyWith(
         happeningNowStories: updatedStories.cast<HappeningNowStoryData>(),
       );
 
@@ -950,26 +1057,23 @@ class MemoryFeedDashboardNotifier
     }
   }
 
-  /// Load more latest stories
   Future<void> loadMoreLatestStories() async {
-    if (_isDisposed || state.isLoadingMore || !state.hasMoreLatestStories)
-      return;
+    if (_isDisposed || state.isLoadingMore || !state.hasMoreLatestStories) return;
 
     _safeSetState(state.copyWith(isLoadingMore: true));
 
     try {
-      final currentStories = state.memoryFeedDashboardModel?.latestStories ??
-          <HappeningNowStoryData>[];
+      final currentStories =
+          state.memoryFeedDashboardModel?.latestStories ?? <HappeningNowStoryData>[];
       final offset = currentStories.length;
 
-      final newData = await _feedService.fetchLatestStories(
-          offset: offset, limit: _pageSize);
+      final newData =
+      await _feedService.fetchLatestStories(offset: offset, limit: _pageSize);
 
       if (_isDisposed) return;
 
       if (newData.isEmpty) {
-        _safeSetState(
-            state.copyWith(isLoadingMore: false, hasMoreLatestStories: false));
+        _safeSetState(state.copyWith(isLoadingMore: false, hasMoreLatestStories: false));
         return;
       }
 
@@ -983,8 +1087,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -992,8 +1095,7 @@ class MemoryFeedDashboardNotifier
       final updatedStories = [...currentStories, ...newStories];
 
       final updatedModel =
-          (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel())
-              .copyWith(
+      (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel()).copyWith(
         latestStories: updatedStories.cast<HappeningNowStoryData>(),
       );
 
@@ -1009,7 +1111,6 @@ class MemoryFeedDashboardNotifier
     }
   }
 
-  /// Load more public memories
   Future<void> loadMorePublicMemories() async {
     if (_isDisposed || state.isLoadingMore || !state.hasMorePublicMemories) {
       // ignore: avoid_print
@@ -1022,17 +1123,15 @@ class MemoryFeedDashboardNotifier
     _safeSetState(state.copyWith(isLoadingMore: true));
 
     try {
-      final currentModel =
-          state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel();
-      final currentMemories =
-          currentModel.publicMemories ?? <CustomMemoryItem>[];
+      final currentModel = state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel();
+      final currentMemories = currentModel.publicMemories ?? <CustomMemoryItem>[];
       final offset = currentMemories.length;
 
       // ignore: avoid_print
       print('🌍 loadMorePublicMemories START offset=$offset limit=$_pageSize');
 
-      final newData = await _feedService.fetchPublicMemories(
-          offset: offset, limit: _pageSize);
+      final newData =
+      await _feedService.fetchPublicMemories(offset: offset, limit: _pageSize);
 
       // ignore: avoid_print
       print('✅ fetchPublicMemories returned rows=${newData.length}');
@@ -1040,27 +1139,23 @@ class MemoryFeedDashboardNotifier
       if (_isDisposed) return;
 
       if (newData.isEmpty) {
-        _safeSetState(
-            state.copyWith(isLoadingMore: false, hasMorePublicMemories: false));
+        _safeSetState(state.copyWith(isLoadingMore: false, hasMorePublicMemories: false));
         return;
       }
 
-      final List<CustomMemoryItem> newMemories =
-          newData.map<CustomMemoryItem>((item) {
+      final List<CustomMemoryItem> newMemories = newData.map<CustomMemoryItem>((item) {
         return CustomMemoryItem(
           id: item['id'] as String?,
           title: item['title'] as String?,
           date: item['date'] as String?,
           iconPath: (item['category_icon'] as String?) ?? '',
-          profileImages:
-              (item['contributor_avatars'] as List?)?.cast<String>() ??
-                  <String>[],
+          profileImages: (item['contributor_avatars'] as List?)?.cast<String>() ?? <String>[],
           mediaItems: (item['media_items'] as List?)
-                  ?.map((media) => CustomMediaItem(
-                        imagePath: (media['thumbnail_url'] as String?) ?? '',
-                        hasPlayButton: media['video_url'] != null,
-                      ))
-                  .toList() ??
+              ?.map((media) => CustomMediaItem(
+            imagePath: (media['thumbnail_url'] as String?) ?? '',
+            hasPlayButton: media['video_url'] != null,
+          ))
+              .toList() ??
               <CustomMediaItem>[],
           startDate: item['start_date'] as String?,
           startTime: item['start_time'] as String?,
@@ -1072,13 +1167,8 @@ class MemoryFeedDashboardNotifier
         );
       }).toList();
 
-      final updatedMemories = <CustomMemoryItem>[
-        ...currentMemories,
-        ...newMemories
-      ];
-
-      final updatedModel =
-          currentModel.copyWith(publicMemories: updatedMemories);
+      final updatedMemories = <CustomMemoryItem>[...currentMemories, ...newMemories];
+      final updatedModel = currentModel.copyWith(publicMemories: updatedMemories);
 
       _safeSetState(state.copyWith(
         memoryFeedDashboardModel: updatedModel,
@@ -1095,30 +1185,27 @@ class MemoryFeedDashboardNotifier
       print('❌ Error loading more public memories: $e');
       // ignore: avoid_print
       print(st);
-
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
 
-  /// Load more trending stories
   Future<void> loadMoreTrending() async {
     if (_isDisposed || state.isLoadingMore || !state.hasMoreTrending) return;
 
     _safeSetState(state.copyWith(isLoadingMore: true));
 
     try {
-      final currentStories = state.memoryFeedDashboardModel?.trendingStories ??
-          <HappeningNowStoryData>[];
+      final currentStories =
+          state.memoryFeedDashboardModel?.trendingStories ?? <HappeningNowStoryData>[];
       final offset = currentStories.length;
 
-      final newData = await _feedService.fetchTrendingStories(
-          offset: offset, limit: _pageSize);
+      final newData =
+      await _feedService.fetchTrendingStories(offset: offset, limit: _pageSize);
 
       if (_isDisposed) return;
 
       if (newData.isEmpty) {
-        _safeSetState(
-            state.copyWith(isLoadingMore: false, hasMoreTrending: false));
+        _safeSetState(state.copyWith(isLoadingMore: false, hasMoreTrending: false));
         return;
       }
 
@@ -1132,8 +1219,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -1141,8 +1227,7 @@ class MemoryFeedDashboardNotifier
       final updatedStories = [...currentStories, ...newStories];
 
       final updatedModel =
-          (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel())
-              .copyWith(
+      (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel()).copyWith(
         trendingStories: updatedStories.cast<HappeningNowStoryData>(),
       );
 
@@ -1158,27 +1243,27 @@ class MemoryFeedDashboardNotifier
     }
   }
 
-  /// Load more longest streak stories
   Future<void> loadMoreLongestStreak() async {
-    if (_isDisposed || state.isLoadingMore || !state.hasMoreLongestStreak)
-      return;
+    if (_isDisposed || state.isLoadingMore || !state.hasMoreLongestStreak) return;
 
     _safeSetState(state.copyWith(isLoadingMore: true));
 
     try {
       final currentStories =
-          state.memoryFeedDashboardModel?.longestStreakStories ??
-              <HappeningNowStoryData>[];
+          state.memoryFeedDashboardModel?.longestStreakStories ?? <HappeningNowStoryData>[];
       final offset = currentStories.length;
 
       final newData = await _feedService.fetchLongestStreakStories(
-          offset: offset, limit: _pageSize);
+        offset: offset,
+        limit: _pageSize,
+      );
 
       if (_isDisposed) return;
 
       if (newData.isEmpty) {
         _safeSetState(
-            state.copyWith(isLoadingMore: false, hasMoreLongestStreak: false));
+          state.copyWith(isLoadingMore: false, hasMoreLongestStreak: false),
+        );
         return;
       }
 
@@ -1192,8 +1277,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -1201,8 +1285,7 @@ class MemoryFeedDashboardNotifier
       final updatedStories = [...currentStories, ...newStories];
 
       final updatedModel =
-          (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel())
-              .copyWith(
+      (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel()).copyWith(
         longestStreakStories: updatedStories.cast<HappeningNowStoryData>(),
       );
 
@@ -1218,27 +1301,23 @@ class MemoryFeedDashboardNotifier
     }
   }
 
-  /// Load more popular user stories
   Future<void> loadMorePopularUsers() async {
-    if (_isDisposed || state.isLoadingMore || !state.hasMorePopularUsers)
-      return;
+    if (_isDisposed || state.isLoadingMore || !state.hasMorePopularUsers) return;
 
     _safeSetState(state.copyWith(isLoadingMore: true));
 
     try {
       final currentStories =
-          state.memoryFeedDashboardModel?.popularUserStories ??
-              <HappeningNowStoryData>[];
+          state.memoryFeedDashboardModel?.popularUserStories ?? <HappeningNowStoryData>[];
       final offset = currentStories.length;
 
-      final newData = await _feedService.fetchPopularUserStories(
-          offset: offset, limit: _pageSize);
+      final newData =
+      await _feedService.fetchPopularUserStories(offset: offset, limit: _pageSize);
 
       if (_isDisposed) return;
 
       if (newData.isEmpty) {
-        _safeSetState(
-            state.copyWith(isLoadingMore: false, hasMorePopularUsers: false));
+        _safeSetState(state.copyWith(isLoadingMore: false, hasMorePopularUsers: false));
         return;
       }
 
@@ -1252,8 +1331,7 @@ class MemoryFeedDashboardNotifier
           userName: item['contributor_name'] as String,
           categoryName: item['category_name'] as String,
           categoryIcon: item['category_icon'] as String? ?? '',
-          timestamp:
-              _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
           isRead: isRead,
         );
       }).toList();
@@ -1261,8 +1339,7 @@ class MemoryFeedDashboardNotifier
       final updatedStories = [...currentStories, ...newStories];
 
       final updatedModel =
-          (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel())
-              .copyWith(
+      (state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel()).copyWith(
         popularUserStories: updatedStories.cast<HappeningNowStoryData>(),
       );
 
@@ -1278,30 +1355,26 @@ class MemoryFeedDashboardNotifier
     }
   }
 
-  /// Load more popular memories (if you actually show a separate "popular memories" list)
-  /// NOTE: This method assumes you want to append to the same publicMemories list.
-  /// If you have a separate list in the model for popular memories, wire it there instead.
+  /// ✅ FIXED: popular memories must append to `popularMemories`, NOT `publicMemories`
   Future<void> loadMorePopularMemories() async {
-    if (_isDisposed || state.isLoadingMore || !state.hasMorePopularMemories)
-      return;
+    if (_isDisposed || state.isLoadingMore || !state.hasMorePopularMemories) return;
 
     _safeSetState(state.copyWith(isLoadingMore: true));
 
     try {
-      final currentModel =
-          state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel();
-      final currentMemories =
-          currentModel.publicMemories ?? <CustomMemoryItem>[];
-      final offset = currentMemories.length;
+      final currentModel = state.memoryFeedDashboardModel ?? MemoryFeedDashboardModel();
+      final currentPopular = currentModel.popularMemories ?? <CustomMemoryItem>[];
+      final offset = currentPopular.length;
 
-      final newData = await _feedService.fetchPopularMemories(
-          offset: offset, limit: _pageSize);
+      final newData =
+      await _feedService.fetchPopularMemories(offset: offset, limit: _pageSize);
 
       if (_isDisposed) return;
 
       if (newData.isEmpty) {
-        _safeSetState(state.copyWith(
-            isLoadingMore: false, hasMorePopularMemories: false));
+        _safeSetState(
+          state.copyWith(isLoadingMore: false, hasMorePopularMemories: false),
+        );
         return;
       }
 
@@ -1311,15 +1384,13 @@ class MemoryFeedDashboardNotifier
           title: item['title'],
           date: item['date'],
           iconPath: item['category_icon'] ?? '',
-          profileImages:
-              (item['contributor_avatars'] as List?)?.cast<String>() ??
-                  <String>[],
+          profileImages: (item['contributor_avatars'] as List?)?.cast<String>() ?? <String>[],
           mediaItems: (item['media_items'] as List?)
-                  ?.map((media) => CustomMediaItem(
-                        imagePath: media['thumbnail_url'] ?? '',
-                        hasPlayButton: media['video_url'] != null,
-                      ))
-                  .toList() ??
+              ?.map((media) => CustomMediaItem(
+            imagePath: media['thumbnail_url'] ?? '',
+            hasPlayButton: media['video_url'] != null,
+          ))
+              .toList() ??
               <CustomMediaItem>[],
           startDate: item['start_date'],
           startTime: item['start_time'],
@@ -1331,10 +1402,11 @@ class MemoryFeedDashboardNotifier
         );
       }).toList();
 
-      final updatedMemories = [...currentMemories, ...newMemories];
+      final updatedPopular = [...currentPopular, ...newMemories];
 
-      final updatedModel =
-          currentModel.copyWith(publicMemories: updatedMemories);
+      final updatedModel = currentModel.copyWith(
+        popularMemories: updatedPopular,
+      );
 
       _safeSetState(state.copyWith(
         memoryFeedDashboardModel: updatedModel,
@@ -1385,7 +1457,7 @@ class MemoryFeedDashboardNotifier
       }).toList();
 
       final updatedModel =
-          (currentModel ?? MemoryFeedDashboardModel()).copyWith(
+      (currentModel ?? MemoryFeedDashboardModel()).copyWith(
         happeningNowStories: updatedStories.cast<HappeningNowStoryData>(),
       );
 
@@ -1400,8 +1472,7 @@ class MemoryFeedDashboardNotifier
 
     try {
       final currentModel = state.memoryFeedDashboardModel;
-      final currentMemories =
-          currentModel?.publicMemories ?? <CustomMemoryItem>[];
+      final currentMemories = currentModel?.publicMemories ?? <CustomMemoryItem>[];
       if (currentMemories.isEmpty) return;
 
       final updatedMemories = currentMemories.map((memory) {
@@ -1412,7 +1483,7 @@ class MemoryFeedDashboardNotifier
       }).toList();
 
       final updatedModel =
-          (currentModel ?? MemoryFeedDashboardModel()).copyWith(
+      (currentModel ?? MemoryFeedDashboardModel()).copyWith(
         publicMemories: updatedMemories,
       );
 
@@ -1474,16 +1545,13 @@ class MemoryFeedDashboardNotifier
     return 'Expires in ${diff.inMinutes}m';
   }
 
-
-
   Future<void> loadCategories() async {
     try {
       _safeSetState(state.copyWith(isLoadingCategories: true));
 
       final client = SupabaseService.instance.client;
       if (client == null) {
-        _safeSetState(
-            state.copyWith(isLoadingCategories: false, categories: []));
+        _safeSetState(state.copyWith(isLoadingCategories: false, categories: []));
         return;
       }
 

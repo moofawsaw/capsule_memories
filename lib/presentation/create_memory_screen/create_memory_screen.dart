@@ -83,7 +83,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                           CustomHeaderSection(
                             title: 'Create Memory',
                             description:
-                                'Invite-only. Every perspective. One timeline. Replay forever',
+                            'Invite-only. Every perspective. One timeline. Replay forever',
                             margin: EdgeInsets.only(left: 10.h, right: 10.h),
                           ),
                           _buildNameSection(context),
@@ -114,7 +114,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         CustomHeaderSection(
           title: 'Create Memory',
           description:
-              'Invite-only. Every perspective. One timeline. Replay forever',
+          'Invite-only. Every perspective. One timeline. Replay forever',
           margin: EdgeInsets.only(left: 10.h, right: 10.h),
         ),
         _buildNameSection(context),
@@ -224,12 +224,12 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
 
   /// Helper: Build individual duration tab
   Widget _buildDurationTab(
-    BuildContext context,
-    WidgetRef ref,
-    String label,
-    String value,
-    bool isSelected,
-  ) {
+      BuildContext context,
+      WidgetRef ref,
+      String label,
+      String value,
+      bool isSelected,
+      ) {
     return GestureDetector(
       onTap: () {
         ref.read(createMemoryNotifier.notifier).updateSelectedDuration(value);
@@ -239,18 +239,11 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         decoration: BoxDecoration(
           color: isSelected ? appTheme.deep_purple_A100 : appTheme.gray_900,
           borderRadius: BorderRadius.circular(8.h),
-          border: Border.all(
-            color: isSelected
-                ? appTheme.deep_purple_A100
-                : appTheme.blue_gray_300.withAlpha(77),
-            width: 1.5,
-          ),
         ),
         child: Center(
           child: Text(
             label,
-            style:
-                TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
+            style: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
               color: isSelected ? appTheme.gray_50 : appTheme.blue_gray_300,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             ),
@@ -260,14 +253,33 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  /// FIXED: Category Selection Section - removed preview badge, dropdown shows selection
+  /// Category Selection Section - SAME UX/UI AS MemoryDetails (closed field + bottom sheet)
   Widget _buildCategorySection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(createMemoryNotifier);
+        final notifier = ref.read(createMemoryNotifier.notifier);
+
         final availableCategories =
             state.createMemoryModel?.availableCategories ?? [];
-        final selectedCategory = state.createMemoryModel?.selectedCategory;
+        final selectedCategoryId = state.createMemoryModel?.selectedCategory;
+
+        final selectedCategoryName = _getCategoryNameById(
+          availableCategories,
+          selectedCategoryId,
+        );
+
+        final selectedCategory = _getCategoryById(
+          availableCategories,
+          selectedCategoryId,
+        );
+
+        final selectedIconUrl =
+        (selectedCategory?['icon_url'] as String?)?.trim();
+        final hasSelectedIconUrl =
+            selectedIconUrl != null && selectedIconUrl.isNotEmpty;
+
+        final bool hasSelection = selectedCategoryName != null;
 
         return Container(
           width: double.infinity,
@@ -279,46 +291,98 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 children: [
                   Text(
                     'Category',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
+                    style: TextStyleHelper.instance.title16RegularPlusJakartaSans
                         .copyWith(color: appTheme.blue_gray_300),
                   ),
                   SizedBox(width: 4.h),
                   Text(
                     '*',
-                    style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
+                    style: TextStyleHelper.instance.title16RegularPlusJakartaSans
                         .copyWith(color: appTheme.colorFFD81E),
                   ),
                 ],
               ),
               SizedBox(height: 10.h),
-              availableCategories.isEmpty
-                  ? Container(
-                      padding: EdgeInsets.all(16.h),
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_900,
-                        borderRadius: BorderRadius.circular(8.h),
+
+              // Closed field (tap to open sheet) - matches MemoryDetails style
+              GestureDetector(
+                onTap: () {
+                  if (availableCategories.isEmpty) return;
+                  _showCategorySelectionBottomSheetCreateMemory(
+                    context,
+                    notifier,
+                    availableCategories,
+                    selectedCategoryId,
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.h,
+                    vertical: 16.h, // slightly taller
+                  ),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900,
+                    borderRadius: BorderRadius.circular(8.h),
+                  ),
+                  child: Row(
+                    children: [
+                      // ✅ LEFT ICON (only when a category is selected)
+                      if (hasSelection) ...[
+                        if (hasSelectedIconUrl)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8.h),
+                            child: CustomImageView(
+                              imagePath: selectedIconUrl,
+                              height: 26.h,
+                              width: 26.h,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        else
+                          Container(
+                            height: 26.h,
+                            width: 26.h,
+                            decoration: BoxDecoration(
+                              color: appTheme.deep_purple_A100.withAlpha(51),
+                              borderRadius: BorderRadius.circular(8.h),
+                            ),
+                            child: Icon(
+                              Icons.category,
+                              color: appTheme.deep_purple_A100,
+                              size: 16.h,
+                            ),
+                          ),
+                        SizedBox(width: 10.h),
+                      ],
+
+                      // TEXT
+                      Expanded(
+                        child: Text(
+                          availableCategories.isEmpty
+                              ? 'Loading categories...'
+                              : (selectedCategoryName ?? 'Select Category'),
+                          style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                              .copyWith(
+                            fontSize: 16.fSize,
+                            fontWeight: FontWeight.w700,
+                            color: selectedCategoryName != null
+                                ? appTheme.gray_50
+                                : appTheme.blue_gray_300,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      child: Text(
-                        'Loading categories...',
-                        style: TextStyleHelper
-                            .instance.body14RegularPlusJakartaSans
-                            .copyWith(color: appTheme.blue_gray_300),
+
+                      // RIGHT ARROW
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: appTheme.gray_50,
+                        size: 26.h,
                       ),
-                    )
-                  : CustomDropdown<String>(
-                      items: _buildCategoryDropdownItems(availableCategories),
-                      onChanged: (value) {
-                        ref
-                            .read(createMemoryNotifier.notifier)
-                            .updateSelectedCategory(value);
-                      },
-                      value: selectedCategory,
-                      placeholder: 'Select a category...',
-                      rightIcon: ImageConstant.imgIconBlueGray30022x18,
-                      margin: EdgeInsets.zero,
-                    ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -326,57 +390,192 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  /// NEW: Build category dropdown items
-  List<DropdownMenuItem<String>> _buildCategoryDropdownItems(
-      List<Map<String, dynamic>> categories) {
-    return categories.map((category) {
-      return DropdownMenuItem<String>(
-        value: category['id'] as String,
-        child: Row(
-          children: [
-            if (category['icon_url'] != null)
-              Padding(
-                padding: EdgeInsets.only(right: 8.h),
-                child: CustomImageView(
-                  imagePath: category['icon_url'] as String,
-                  height: 20.h,
-                  width: 20.h,
-                ),
+  String? _getCategoryNameById(
+      List<Map<String, dynamic>> categories,
+      String? categoryId,
+      ) {
+    if (categoryId == null) return null;
+    for (final c in categories) {
+      final id = c['id'] as String?;
+      if (id == categoryId) return c['name'] as String?;
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _getCategoryById(
+      List<Map<String, dynamic>> categories,
+      String? categoryId,
+      ) {
+    if (categoryId == null) return null;
+    for (final c in categories) {
+      final id = c['id'] as String?;
+      if (id == categoryId) return c;
+    }
+    return null;
+  }
+
+  void _showCategorySelectionBottomSheetCreateMemory(
+      BuildContext context,
+      CreateMemoryNotifier notifier,
+      List<Map<String, dynamic>> categories,
+      String? selectedCategoryId,
+      ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: appTheme.gray_900_02,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
+        ),
+      ),
+      builder: (modalContext) {
+        final maxH = MediaQuery.of(modalContext).size.height * 0.8;
+
+        return SafeArea(
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxH),
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 20.h,
+                right: 20.h,
+                top: 20.h,
+                // bottom: 20.h + MediaQuery.of(modalContext).viewInsets.bottom,
               ),
-            Expanded(
               child: Column(
+                mainAxisSize: MainAxisSize.max,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    category['name'] as String,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
-                      color: appTheme.gray_50,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if ((category['tagline'] as String?)?.trim().isNotEmpty == true)
-                    Padding(
-                      padding: EdgeInsets.only(top: 2.h),
-                      child: Text(
-                        category['tagline'] as String,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
-                          color: appTheme.blue_gray_300,
-                          fontSize: 10.fSize,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Select Category',
+                        style: TextStyleHelper.instance.title20BoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(modalContext),
+                        child: Icon(
+                          Icons.close,
+                          color: appTheme.gray_50,
+                          size: 24.h,
                         ),
                       ),
+                    ],
+                  ),
+                  SizedBox(height: 16.h),
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: categories.length,
+                      separatorBuilder: (_, __) => SizedBox(height: 16.h),
+                      itemBuilder: (context, index) {
+                        final category = categories[index];
+                        final categoryId = category['id'] as String;
+                        final categoryName = category['name'] as String;
+                        final isSelected = categoryId == selectedCategoryId;
+
+                        final iconUrl = (category['icon_url'] as String?)?.trim();
+                        final tagline = (category['tagline'] as String?)?.trim();
+
+                        final hasIconUrl = iconUrl != null && iconUrl.isNotEmpty;
+                        final hasTagline = tagline != null && tagline.isNotEmpty;
+
+                        return GestureDetector(
+                          onTap: () {
+                            notifier.updateSelectedCategory(categoryId);
+                            Navigator.pop(modalContext);
+                          },
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 18.h,
+                              vertical: 18.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? appTheme.deep_purple_A100.withAlpha(26)
+                                  : appTheme.gray_900,
+                              borderRadius: BorderRadius.circular(14.h),
+                            ),
+                            child: Row(
+                              children: [
+                                if (hasIconUrl)
+                                  ClipRRect(
+                                    child: CustomImageView(
+                                      imagePath: iconUrl,
+                                      height: 32.h,
+                                      width: 32.h,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    height: 32.h,
+                                    width: 32.h,
+                                    decoration: BoxDecoration(
+                                      color: appTheme.deep_purple_A100.withAlpha(51),
+                                    ),
+                                    child: Icon(
+                                      Icons.category,
+                                      color: appTheme.deep_purple_A100,
+                                      size: 21.h,
+                                    ),
+                                  ),
+                                SizedBox(width: 14.h),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        categoryName,
+                                        style: TextStyleHelper.instance
+                                            .body16BoldPlusJakartaSans
+                                            .copyWith(
+                                          fontSize: 18.fSize,
+                                          fontWeight: FontWeight.w700,
+                                          color: appTheme.gray_50,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (hasTagline) ...[
+                                        SizedBox(height: 3.h),
+                                        Text(
+                                          tagline,
+                                          style: TextStyleHelper.instance
+                                              .body14RegularPlusJakartaSans
+                                              .copyWith(
+                                            color: appTheme.blue_gray_300,
+                                            height: 1.35,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(
+                                    Icons.check_circle,
+                                    color: appTheme.deep_purple_A100,
+                                    size: 26.h,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
-      );
-    }).toList();
+          ),
+        );
+      },
+    );
   }
 
   /// Step 2: Invite People
@@ -399,7 +598,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         CustomHeaderSection(
           title: 'Invite people (optional)',
           description:
-              'Invite-only. Every perspective. One timeline. Replay forever',
+          'Invite-only. Every perspective. One timeline. Replay forever',
           margin: EdgeInsets.only(left: 10.h, right: 10.h),
         ),
         _buildInviteIconButtons(context),
@@ -438,9 +637,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 : 'Only members can view',
             switchValue: isPublic,
             onSwitchChanged: (value) {
-              ref
-                  .read(createMemoryNotifier.notifier)
-                  .togglePrivacySetting(value);
+              ref.read(createMemoryNotifier.notifier).togglePrivacySetting(value);
             },
             margin: EdgeInsets.zero,
           ),
@@ -467,8 +664,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   },
                   buttonStyle: CustomButtonStyle.fillDark,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 ),
               ),
               Expanded(
@@ -481,8 +677,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   },
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 ),
               ),
             ],
@@ -556,9 +751,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             CustomDropdown<String>(
               items: _buildDropdownItemsFromGroups(availableGroups),
               onChanged: (value) {
-                ref
-                    .read(createMemoryNotifier.notifier)
-                    .updateSelectedGroup(value);
+                ref.read(createMemoryNotifier.notifier).updateSelectedGroup(value);
               },
               value: state.createMemoryModel?.selectedGroup,
               placeholder: availableGroups.isEmpty
@@ -597,8 +790,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             children: [
               Text(
                 'Group Members (${groupMembers.length})',
-                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                    .copyWith(
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
                   color: appTheme.blue_gray_300,
                   fontWeight: FontWeight.w600,
                 ),
@@ -626,7 +818,9 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
 
   /// Individual group member item
   Widget _buildGroupMemberItem(
-      BuildContext context, Map<String, dynamic> member) {
+      BuildContext context,
+      Map<String, dynamic> member,
+      ) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 6.h),
       child: Row(
@@ -646,8 +840,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
               children: [
                 Text(
                   member['name'] ?? 'Unknown User',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                      .copyWith(
+                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
                     color: appTheme.gray_50,
                     fontWeight: FontWeight.w600,
                   ),
@@ -656,8 +849,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 ),
                 Text(
                   '@${member['username'] ?? 'username'}',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                      .copyWith(
+                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
                     color: appTheme.blue_gray_300,
                     fontSize: 10.fSize,
                   ),
@@ -701,14 +893,12 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 }
               });
             },
-            style:
-                TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
+            style: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
               color: appTheme.gray_50,
             ),
             decoration: InputDecoration(
               hintText: 'Search by name...',
-              hintStyle:
-                  TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
+              hintStyle: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
                 color: appTheme.blue_gray_300,
               ),
               prefixIcon: Padding(
@@ -750,8 +940,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             padding: EdgeInsets.symmetric(vertical: 16.h),
             child: Text(
               'No users found',
-              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                  .copyWith(
+              style: TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
                 color: appTheme.blue_gray_300,
               ),
               textAlign: TextAlign.center,
@@ -805,8 +994,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
               children: [
                 Text(
                   user['name'] ?? 'Unknown User',
-                  style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                      .copyWith(
+                  style: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
                     color: appTheme.gray_50,
                     fontWeight: FontWeight.w600,
                   ),
@@ -816,8 +1004,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 SizedBox(height: 2.h),
                 Text(
                   '@${user['username'] ?? 'username'}',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                      .copyWith(
+                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
                     color: appTheme.blue_gray_300,
                   ),
                   maxLines: 1,
@@ -829,37 +1016,28 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
           // Invite button
           GestureDetector(
             onTap: () {
-              ref
-                  .read(createMemoryNotifier.notifier)
-                  .toggleUserInvite(user['id']);
+              ref.read(createMemoryNotifier.notifier).toggleUserInvite(user['id']);
             },
             child: Consumer(
               builder: (context, ref, _) {
                 final state = ref.watch(createMemoryNotifier);
-                final isInvited = state.createMemoryModel?.invitedUserIds
-                        .contains(user['id']) ??
-                    false;
+                final isInvited =
+                    state.createMemoryModel?.invitedUserIds.contains(user['id']) ??
+                        false;
 
                 return Container(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
+                  padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
                   decoration: BoxDecoration(
-                    color: isInvited
-                        ? appTheme.deep_purple_A100
-                        : Colors.transparent,
+                    color: isInvited ? appTheme.deep_purple_A100 : Colors.transparent,
                     borderRadius: BorderRadius.circular(8.h),
                     border: Border.all(
-                      color: isInvited
-                          ? appTheme.deep_purple_A100
-                          : appTheme.blue_gray_300,
+                      color: isInvited ? appTheme.deep_purple_A100 : appTheme.blue_gray_300,
                     ),
                   ),
                   child: Text(
                     isInvited ? 'Invited' : 'Invite',
-                    style: TextStyleHelper.instance.body12BoldPlusJakartaSans
-                        .copyWith(
-                      color:
-                          isInvited ? appTheme.gray_50 : appTheme.blue_gray_300,
+                    style: TextStyleHelper.instance.body12BoldPlusJakartaSans.copyWith(
+                      color: isInvited ? appTheme.gray_50 : appTheme.blue_gray_300,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -891,7 +1069,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         // Listen for navigation and errors
         ref.listen(
           createMemoryNotifier,
-          (previous, current) {
+              (previous, current) {
             if (current.shouldNavigateBack ?? false) {
               NavigatorService.goBack();
             }
@@ -920,8 +1098,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   onPressed: () {
                     ref.read(createMemoryNotifier.notifier).backToStep1();
                   },
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 ),
               ),
               Expanded(
@@ -933,8 +1110,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   onPressed: () {
                     ref.read(createMemoryNotifier.notifier).createMemory();
                   },
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 ),
               ),
             ],
@@ -946,7 +1122,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
 
   /// Dropdown items builder from real groups
   List<DropdownMenuItem<String>> _buildDropdownItemsFromGroups(
-      List<Map<String, dynamic>> groups) {
+      List<Map<String, dynamic>> groups,
+      ) {
     if (groups.isEmpty) {
       return [];
     }
@@ -968,15 +1145,13 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         // Listen for navigation to confirmation screen
         ref.listen(
           createMemoryNotifier,
-          (previous, current) {
+              (previous, current) {
             // CRITICAL FIX: Close bottom sheet FIRST, then navigate
             if (current.shouldNavigateToConfirmation == true &&
                 (previous?.shouldNavigateToConfirmation != true)) {
-              print(
-                  '🔔 LISTENER TRIGGERED: shouldNavigateToConfirmation = true');
+              print('🔔 LISTENER TRIGGERED: shouldNavigateToConfirmation = true');
               print('📍 Memory ID: ${current.createdMemoryId}');
-              print(
-                  '📝 Memory Name: ${current.memoryNameController?.text.trim()}');
+              print('📝 Memory Name: ${current.memoryNameController?.text.trim()}');
 
               // Close bottom sheet FIRST
               print('🚀 Closing bottom sheet first...');
@@ -1029,8 +1204,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   },
                   buttonStyle: CustomButtonStyle.fillDark,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 ),
               ),
               Expanded(
@@ -1039,22 +1213,19 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   onPressed: state.isLoading
                       ? null
                       : () {
-                          print('🎯 Create Memory button pressed');
+                    print('🎯 Create Memory button pressed');
 
-                          if (_formKey.currentState?.validate() ?? false) {
-                            print('✅ Form validation passed');
-                            ref
-                                .read(createMemoryNotifier.notifier)
-                                .createMemory();
-                          } else {
-                            print('❌ Form validation failed');
-                          }
-                        },
+                    if (_formKey.currentState?.validate() ?? false) {
+                      print('✅ Form validation passed');
+                      ref.read(createMemoryNotifier.notifier).createMemory();
+                    } else {
+                      print('❌ Form validation failed');
+                    }
+                  },
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   isDisabled: state.isLoading,
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 ),
               ),
             ],

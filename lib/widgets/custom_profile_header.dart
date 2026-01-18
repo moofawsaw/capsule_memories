@@ -1,3 +1,5 @@
+// lib/widgets/custom_profile_header.dart
+
 import '../core/app_export.dart';
 import './custom_image_view.dart';
 
@@ -5,7 +7,8 @@ class CustomProfileHeader extends StatefulWidget {
   const CustomProfileHeader({
     Key? key,
     required this.avatarImagePath,
-
+    this.displayNameError,
+    this.usernameError,
     // ✅ DB-backed fields
     required this.displayName, // display_name
     required this.username, // username (raw, no @ preferred)
@@ -22,6 +25,12 @@ class CustomProfileHeader extends StatefulWidget {
     this.onUsernameChanged,
 
     this.margin,
+
+    // ✅ NEW: save UX flags (optional)
+    this.isSavingDisplayName = false,
+    this.isSavingUsername = false,
+    this.displayNameSavedPulse = false,
+    this.usernameSavedPulse = false,
   }) : super(key: key);
 
   final String avatarImagePath;
@@ -43,6 +52,14 @@ class CustomProfileHeader extends StatefulWidget {
   final Function(String)? onUsernameChanged;
 
   final EdgeInsetsGeometry? margin;
+
+  // ✅ NEW: name/username save indicators
+  final bool isSavingDisplayName;
+  final bool isSavingUsername;
+  final bool displayNameSavedPulse;
+  final bool usernameSavedPulse;
+  final String? displayNameError;
+  final String? usernameError;
 
   @override
   State<CustomProfileHeader> createState() => _CustomProfileHeaderState();
@@ -110,6 +127,56 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
     if (t.isEmpty) return '';
     return t.startsWith('@') ? t : '@$t';
   }
+  Widget _editPencil({
+    required bool show,
+    double size = 14,
+  }) {
+    if (!show) {
+      return SizedBox(width: size, height: size);
+    }
+
+    return Icon(
+      Icons.edit,
+      size: size,
+      color: appTheme.blue_gray_300,
+    );
+  }
+
+  Widget _saveIndicator({
+    required bool saving,
+    required bool savedPulse,
+    String? errorText,
+    double size = 16,
+  }) {
+    if (saving) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: appTheme.deep_purple_A100,
+        ),
+      );
+    }
+
+    if (errorText != null && errorText.trim().isNotEmpty) {
+      return Icon(
+        Icons.cancel,
+        size: size,
+        color: appTheme.red_500,
+      );
+    }
+
+    if (savedPulse) {
+      return Icon(
+        Icons.check_circle,
+        size: size,
+        color: appTheme.deep_purple_A100,
+      );
+    }
+
+    return SizedBox(width: size, height: size);
+  }
 
   void _saveDisplayName() {
     final next = _displayNameController.text.trim();
@@ -174,7 +241,6 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // ✅ Always center the avatar in the available box
           Positioned(
             left: 0,
             right: 0,
@@ -211,15 +277,12 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
                     width: size,
                     height: size,
                     fit: BoxFit.cover,
-
-                    // ✅ Use true circular crop, not radius math
                     isCircular: true,
                   ),
                 ),
               ),
             ),
           ),
-
           if (_showAvatarEdit)
             Positioned(
               bottom: 0,
@@ -242,32 +305,57 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
   Widget _buildDisplayName() {
     final current = widget.displayName.trim();
 
+    const double fieldWidth = 260; // fixed width = stable centering
+
     if (widget.allowEdit && _editingDisplayName) {
       return SizedBox(
-        width: 260.h,
-        child: TextField(
-          controller: _displayNameController,
-          focusNode: _displayNameFocus,
-          autofocus: true,
-          textAlign: TextAlign.center,
-          style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-              .copyWith(color: appTheme.white_A700, height: 1.29),
-          decoration: const InputDecoration(
-            border: UnderlineInputBorder(),
-          ),
-          onSubmitted: (_) => _saveDisplayName(),
+        width: fieldWidth.h,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GestureDetector(
+              onTap: widget.allowEdit
+                  ? () => setState(() => _editingDisplayName = true)
+                  : null,
+              child: Text(
+                current.isNotEmpty ? current : 'User',
+                style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
+                    .copyWith(color: appTheme.white_A700, height: 1.29),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+
+            // ✅ RIGHT-SIDE ABSOLUTE ICON SLOT
+            if (widget.allowEdit)
+              Positioned(
+                right: 0,
+                child: widget.isSavingDisplayName ||
+                    widget.displayNameSavedPulse ||
+                    widget.displayNameError != null
+                    ? _saveIndicator(
+                  saving: widget.isSavingDisplayName,
+                  savedPulse: widget.displayNameSavedPulse,
+                  errorText: widget.displayNameError,
+                  size: 16.h,
+                )
+                    : _editPencil(show: true, size: 16.h),
+              ),
+          ],
         ),
       );
     }
 
-    return GestureDetector(
-      onTap: widget.allowEdit
-          ? () => setState(() => _editingDisplayName = true)
-          : null,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return SizedBox(
+      width: fieldWidth.h,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Flexible(
+          GestureDetector(
+            onTap: widget.allowEdit
+                ? () => setState(() => _editingDisplayName = true)
+                : null,
             child: Text(
               current.isNotEmpty ? current : 'User',
               style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
@@ -277,10 +365,17 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (widget.allowEdit) ...[
-            SizedBox(width: 6.h),
-            Icon(Icons.edit, size: 16.h, color: appTheme.blue_gray_300),
-          ],
+
+          // ✅ ABSOLUTE indicator
+          if (widget.allowEdit)
+            Positioned(
+              right: 0,
+              child: _saveIndicator(
+                saving: widget.isSavingDisplayName,
+                savedPulse: widget.displayNameSavedPulse,
+                size: 16.h,
+              ),
+            ),
         ],
       ),
     );
@@ -289,50 +384,103 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
   Widget _buildUsername() {
     final handle = _formatHandle(widget.username);
 
+    const double fieldWidth = 260;
+
     if (widget.allowEdit && _editingUsername) {
-      return SizedBox(
-        width: 260.h,
-        child: TextField(
-          controller: _usernameController,
-          focusNode: _usernameFocus,
-          autofocus: true,
-          textAlign: TextAlign.center,
-          style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-              .copyWith(color: appTheme.blue_gray_300, height: 1.31),
-          decoration: const InputDecoration(
-            border: UnderlineInputBorder(),
-          ),
-          onSubmitted: (_) => _saveUsername(),
+      SizedBox(
+        width: fieldWidth.h,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GestureDetector(
+              onTap: widget.allowEdit
+                  ? () => setState(() {
+                _editingUsername = true;
+                _usernameController.text = _stripAt(handle);
+              })
+                  : null,
+              child: Text(
+                handle.isNotEmpty ? handle : '@',
+                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+
+            if (widget.allowEdit)
+              Positioned(
+                right: 0,
+                child: widget.isSavingUsername ||
+                    widget.usernameSavedPulse ||
+                    widget.usernameError != null
+                    ? _saveIndicator(
+                  saving: widget.isSavingUsername,
+                  savedPulse: widget.usernameSavedPulse,
+                  errorText: widget.usernameError,
+                  size: 14.h,
+                )
+                    : _editPencil(show: true, size: 14.h),
+              ),
+          ],
         ),
       );
     }
 
-    return GestureDetector(
-      onTap: widget.allowEdit
-          ? () => setState(() {
-        _editingUsername = true;
-        _usernameController.text = _stripAt(handle);
-      })
-          : null,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: fieldWidth.h,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              GestureDetector(
+                onTap: widget.allowEdit
+                    ? () => setState(() {
+                  _editingUsername = true;
+                  _usernameController.text = _stripAt(handle);
+                })
+                    : null,
+                child: Text(
+                  handle.isNotEmpty ? handle : '@',
+                  style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                      .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (widget.allowEdit)
+                Positioned(
+                  right: 0,
+                  child: _saveIndicator(
+                    saving: widget.isSavingUsername,
+                    savedPulse: widget.usernameSavedPulse,
+                    errorText: widget.usernameError,
+                    size: 14.h,
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        if (widget.usernameError != null && widget.usernameError!.trim().isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(top: 6.h),
             child: Text(
-              handle.isNotEmpty ? handle : '@',
-              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+              widget.usernameError!,
+              style: TextStyle(
+                color: appTheme.red_500,
+                fontSize: 12.h,
+                height: 1.2,
+              ),
               textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (widget.allowEdit) ...[
-            SizedBox(width: 6.h),
-            Icon(Icons.edit, size: 14.h, color: appTheme.blue_gray_300),
-          ],
-        ],
-      ),
+      ],
     );
+
   }
 }

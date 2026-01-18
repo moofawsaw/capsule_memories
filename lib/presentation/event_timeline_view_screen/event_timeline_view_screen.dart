@@ -29,7 +29,6 @@ class EventTimelineViewScreen extends ConsumerStatefulWidget {
   EventTimelineViewScreenState createState() => EventTimelineViewScreenState();
 }
 
-
 // ============================
 // SKELETONS (MATCH SEALED VIEW)
 // ============================
@@ -240,15 +239,16 @@ class _StoriesSkeletonRow extends StatelessWidget {
 
 class EventTimelineViewScreenState
     extends ConsumerState<EventTimelineViewScreen> with WidgetsBindingObserver {
-
   String? _pendingInitialStoryId;
 
   late final ProviderSubscription<EventTimelineViewState> _firstLoadSub;
 
   bool _hasCompletedFirstLoad = false;
   bool _booting = true;
+  int _storyOpenRetryCount = 0; // NEW: Track retry attempts
+  static const int _maxRetryAttempts =
+  10; // NEW: Max retries (2 seconds total with 200ms delays)
 
-  @override
   @override
   void initState() {
     super.initState();
@@ -298,7 +298,8 @@ class EventTimelineViewScreenState
             NavigatorService.popAndPushNamed(AppRoutes.appMemories);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Please select a memory to view its timeline'),
+                content:
+                const Text('Please select a memory to view its timeline'),
                 backgroundColor: appTheme.deep_purple_A100,
                 duration: const Duration(seconds: 3),
               ),
@@ -308,7 +309,9 @@ class EventTimelineViewScreenState
         return;
       }
 
-      ref.read(eventTimelineViewNotifier.notifier).initializeFromMemory(navArgs);
+      ref
+          .read(eventTimelineViewNotifier.notifier)
+          .initializeFromMemory(navArgs);
     });
 
     _firstLoadSub = ref.listenManual<EventTimelineViewState>(
@@ -317,16 +320,16 @@ class EventTimelineViewScreenState
         final prevLoading = prev?.isLoading ?? false;
         final nextLoading = next.isLoading ?? false;
 
-        if (!_hasCompletedFirstLoad && prevLoading == true && nextLoading == false) {
+        if (!_hasCompletedFirstLoad &&
+            prevLoading == true &&
+            nextLoading == false) {
           if (mounted) {
             setState(() => _hasCompletedFirstLoad = true);
 
-            // ✅ Auto-open story viewer if we have a pending story ID
-            if (_pendingInitialStoryId != null && _pendingInitialStoryId!.isNotEmpty) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _openStoryFromDeepLink(_pendingInitialStoryId!);
-                _pendingInitialStoryId = null;
-              });
+            // ✅ Auto-open story viewer with retry mechanism
+            if (_pendingInitialStoryId != null &&
+                _pendingInitialStoryId!.isNotEmpty) {
+              _attemptStoryOpen();
             }
           } else {
             _hasCompletedFirstLoad = true;
@@ -342,6 +345,7 @@ class EventTimelineViewScreenState
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
   void _openStoryFromDeepLink(String storyId) {
     final notifier = ref.read(eventTimelineViewNotifier.notifier);
     final storyIds = notifier.currentMemoryStoryIds;
@@ -362,6 +366,47 @@ class EventTimelineViewScreenState
       AppRoutes.appStoryView,
       arguments: feedContext,
     );
+  }
+
+  // NEW: Retry mechanism for opening story viewer
+  void _attemptStoryOpen() {
+    if (_pendingInitialStoryId == null || _pendingInitialStoryId!.isEmpty) {
+      return;
+    }
+
+    final notifier = ref.read(eventTimelineViewNotifier.notifier);
+    final storyIds = notifier.currentMemoryStoryIds;
+
+    if (storyIds.isEmpty) {
+      // Stories not loaded yet - retry with exponential backoff
+      if (_storyOpenRetryCount < _maxRetryAttempts) {
+        _storyOpenRetryCount++;
+        debugPrint(
+            '⏳ Stories not loaded yet, retry attempt $_storyOpenRetryCount/$_maxRetryAttempts');
+
+        Future.delayed(Duration(milliseconds: 200 * _storyOpenRetryCount), () {
+          if (mounted && _pendingInitialStoryId != null) {
+            _attemptStoryOpen();
+          }
+        });
+      } else {
+        debugPrint(
+            '❌ Max retry attempts reached, stories failed to load for deep link');
+        _pendingInitialStoryId = null;
+        _storyOpenRetryCount = 0;
+      }
+      return;
+    }
+
+    // Stories loaded successfully - open viewer
+    debugPrint('✅ Stories loaded, opening story viewer for deep link');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _pendingInitialStoryId != null) {
+        _openStoryFromDeepLink(_pendingInitialStoryId!);
+        _pendingInitialStoryId = null;
+        _storyOpenRetryCount = 0;
+      }
+    });
   }
 
   @override
@@ -421,15 +466,15 @@ class EventTimelineViewScreenState
                 SizedBox(height: 18.h),
                 effectiveLoading
                     ? Container(
-                        margin: EdgeInsets.symmetric(horizontal: 24.h),
-                        child: Column(
-                          children: [
-                            CustomButtonSkeleton(),
-                            SizedBox(height: 12.h),
-                            CustomButtonSkeleton(),
-                          ],
-                        ),
-                      )
+                  margin: EdgeInsets.symmetric(horizontal: 24.h),
+                  child: Column(
+                    children: [
+                      CustomButtonSkeleton(),
+                      SizedBox(height: 12.h),
+                      CustomButtonSkeleton(),
+                    ],
+                  ),
+                )
                     : _buildActionButtons(context),
                 SizedBox(height: 20.h),
               ],
@@ -455,16 +500,16 @@ class EventTimelineViewScreenState
     return CustomEventCard(
       isLoading: effectiveLoading,
       eventTitle:
-          effectiveLoading ? null : state.eventTimelineViewModel?.eventTitle,
+      effectiveLoading ? null : state.eventTimelineViewModel?.eventTitle,
       eventDate:
-          effectiveLoading ? null : state.eventTimelineViewModel?.eventDate,
+      effectiveLoading ? null : state.eventTimelineViewModel?.eventDate,
       eventLocation: effectiveLoading
           ? null
           : state.eventTimelineViewModel?.timelineDetail?.centerLocation,
       isPrivate:
-          effectiveLoading ? null : state.eventTimelineViewModel?.isPrivate,
+      effectiveLoading ? null : state.eventTimelineViewModel?.isPrivate,
       iconButtonImagePath:
-          effectiveLoading ? null : state.eventTimelineViewModel?.categoryIcon,
+      effectiveLoading ? null : state.eventTimelineViewModel?.categoryIcon,
       participantImages: effectiveLoading
           ? null
           : state.eventTimelineViewModel?.participantImages,
@@ -782,10 +827,10 @@ class EventTimelineViewScreenState
         if (!_hasCompletedFirstLoad) return const SizedBox.shrink();
 
         final List<CustomStoryItem> storyItems =
-            (state.eventTimelineViewModel?.customStoryItems ??
-                    const <dynamic>[])
-                .whereType<CustomStoryItem>()
-                .toList();
+        (state.eventTimelineViewModel?.customStoryItems ??
+            const <dynamic>[])
+            .whereType<CustomStoryItem>()
+            .toList();
 
         if (storyItems.isEmpty) {
           return Container(
@@ -820,12 +865,14 @@ class EventTimelineViewScreenState
         final state = ref.watch(eventTimelineViewNotifier);
         final isCurrentUserMember = state.isCurrentUserMember ?? false;
 
-        final storyCount = state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
+        final storyCount =
+            state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
         final hasStories = storyCount > 0;
 
         return Container(
           margin: EdgeInsets.symmetric(horizontal: 24.h),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (hasStories) ...[
                 CustomButton(
@@ -833,11 +880,30 @@ class EventTimelineViewScreenState
                   width: double.infinity,
                   buttonStyle: CustomButtonStyle.outlineDark,
                   buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-                  leftIcon: Icons.theaters, // ✅ Material icon
+                  leftIcon: Icons.theaters_outlined, // ✅ Material icon
                   onPressed: () => onTapViewAll(context),
                 ),
+
+                // ✅ EXPLANATION ONLY FOR NON-MEMBERS
+                if (!isCurrentUserMember) ...[
+                  SizedBox(height: 10.h),
+                  Padding(
+                    padding: EdgeInsets.only(left: 4.h, right: 4.h),
+                    child: Center(
+                      child: Text(
+                        'Watch every story in the full screen media player',
+                        textAlign: TextAlign.center,
+                        style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                ],
+
                 if (isCurrentUserMember) SizedBox(height: 12.h),
               ],
+
               if (isCurrentUserMember)
                 CustomButton(
                   text: 'Create Story',
@@ -982,7 +1048,7 @@ class EventTimelineViewScreenState
     if (ids.isEmpty) return;
 
     final initialId =
-        (index >= 0 && index < ids.length) ? ids[index] : ids.first;
+    (index >= 0 && index < ids.length) ? ids[index] : ids.first;
 
     final feedContext = FeedStoryContext(
       feedType: 'memory_timeline',
@@ -1079,7 +1145,7 @@ class EventTimelineViewScreenState
       builder: (dialogContext) => AlertDialog(
         backgroundColor: appTheme.gray_900_01,
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
         title: Text(
           'Leave Memory?',
           style: TextStyleHelper.instance.title18BoldPlusJakartaSans
@@ -1127,7 +1193,7 @@ class EventTimelineViewScreenState
       builder: (dialogContext) => AlertDialog(
         backgroundColor: appTheme.gray_900_01,
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.h)),
         title: Text(
           'Delete Memory?',
           style: TextStyleHelper.instance.title18BoldPlusJakartaSans

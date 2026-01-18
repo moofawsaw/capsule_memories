@@ -107,33 +107,37 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     return SafeArea(
       child: Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        body: showSkeleton
-            ? UserProfileSkeleton(showActions: isViewingOtherUser)
-            : RefreshIndicator(
-          color: appTheme.deep_purple_A100,
-          backgroundColor: appTheme.gray_900_02,
-          onRefresh: _onRefresh,
-          child: SingleChildScrollView(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.only(
-              top: 24.h,
-              left: 18.h,
-              right: 18.h,
-            ),
-            child: Column(
-              children: [
-                _buildProfileHeader(context),
-                SizedBox(height: 12.h),
-                _buildStats(context),
-                if (_userId != null) ...[
-                  SizedBox(height: 16.h),
-                  _buildActions(context),
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: showSkeleton
+              ? UserProfileSkeleton(showActions: isViewingOtherUser)
+              : RefreshIndicator(
+            color: appTheme.deep_purple_A100,
+            backgroundColor: appTheme.gray_900_02,
+            onRefresh: _onRefresh,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(
+                top: 24.h,
+                left: 18.h,
+                right: 18.h,
+              ),
+              child: Column(
+                children: [
+                  _buildProfileHeader(context),
+                  SizedBox(height: 12.h),
+                  _buildStats(context),
+                  if (_userId != null) ...[
+                    SizedBox(height: 16.h),
+                    _buildActions(context),
+                  ],
+                  SizedBox(height: 28.h),
+                  _buildStories(context),
+                  SizedBox(height: 12.h),
                 ],
-                SizedBox(height: 28.h),
-                _buildStories(context),
-                SizedBox(height: 12.h),
-              ],
+              ),
             ),
           ),
         ),
@@ -162,20 +166,32 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
                 ImageConstant.imgEllipse896x96,
             displayName: displayName.isNotEmpty ? displayName : 'User',
             username: usernameRaw,
-            email: '',
+            email: isCurrentUser ? (model?.email ?? '') : '',
+
+            allowEdit: isCurrentUser,
             onEditTap: isCurrentUser
                 ? () => ref.read(userProfileScreenTwoNotifier.notifier).uploadAvatar()
                 : null,
-            allowEdit: isCurrentUser,
+
             onDisplayNameChanged: isCurrentUser
                 ? (newDisplayName) => ref
                 .read(userProfileScreenTwoNotifier.notifier)
                 .updateDisplayName(newDisplayName)
                 : null,
             onUsernameChanged: isCurrentUser
-                ? (newUsername) =>
-                ref.read(userProfileScreenTwoNotifier.notifier).updateUsername(newUsername)
+                ? (newUsername) => ref
+                .read(userProfileScreenTwoNotifier.notifier)
+                .updateUsername(newUsername)
                 : null,
+
+            // 🔴 🔴 🔴 THIS IS #3 🔴 🔴 🔴
+            isSavingDisplayName: state.isSavingDisplayName,
+            isSavingUsername: state.isSavingUsername,
+            displayNameSavedPulse: state.displayNameSavedPulse,
+            usernameSavedPulse: state.usernameSavedPulse,
+            displayNameError: state.displayNameError,
+            usernameError: state.usernameError,
+
             margin: EdgeInsets.symmetric(horizontal: 68.h),
           ),
         ),

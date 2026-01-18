@@ -49,8 +49,10 @@ class StorageUtils {
   /// - Bucket path: "category-icons/graduation.svg" or "/category-icons/graduation.svg"
   /// - File name: "graduation.svg" / "graduation.png"
   /// - Raw name: "graduation"  -> tries .svg then .png fallback (optional)
-  static String? resolveMemoryCategoryIconUrl(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
+  /// Always returns a non-null String.
+  /// If input is null/empty or resolution fails, returns '' (empty string).
+  static String resolveMemoryCategoryIconUrl(String? value) {
+    if (value == null || value.trim().isEmpty) return '';
     final raw = value.trim();
 
     if (_isFullUrl(raw)) return raw;
@@ -62,7 +64,6 @@ class StorageUtils {
       normalized = normalized.substring('category-icons/'.length);
     }
 
-    // If it already has an extension, use it as-is
     final lower = normalized.toLowerCase();
     final hasExt = lower.endsWith('.svg') ||
         lower.endsWith('.png') ||
@@ -70,17 +71,19 @@ class StorageUtils {
         lower.endsWith('.jpeg') ||
         lower.endsWith('.webp');
 
+    // If it already has an extension, use it as-is
     if (hasExt) {
       return Supabase.instance.client.storage
           .from('category-icons')
           .getPublicUrl(normalized);
     }
 
-    // Default strategy: SVG-first (swap if your bucket is mostly PNG)
+    // Default strategy: SVG-first
     return Supabase.instance.client.storage
         .from('category-icons')
         .getPublicUrl('$normalized.svg');
   }
+
 
   /// Upload media file to Supabase storage
   /// Returns the path of the uploaded file or null if upload fails

@@ -7,15 +7,27 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/app_export.dart';
+import '../utils/storage_utils.dart';
 
 extension ImageTypeExtension on String {
   ImageType get imageType {
-    if (startsWith('http') || startsWith('https')) {
-      if (endsWith('.svg')) return ImageType.networkSvg;
+    final raw = trim();
+    if (raw.isEmpty) return ImageType.unknown;
+
+    // ✅ IMPORTANT: ignore query params / fragments when checking extensions
+    // ex: road-trip.svg?token=... should still be treated as svg
+    String normalized = raw;
+    final q = normalized.indexOf('?');
+    if (q != -1) normalized = normalized.substring(0, q);
+    final h = normalized.indexOf('#');
+    if (h != -1) normalized = normalized.substring(0, h);
+
+    if (raw.startsWith('http') || raw.startsWith('https')) {
+      if (normalized.toLowerCase().endsWith('.svg')) return ImageType.networkSvg;
       return ImageType.network;
-    } else if (endsWith('.svg')) {
+    } else if (normalized.toLowerCase().endsWith('.svg')) {
       return ImageType.svg;
-    } else if (startsWith('file://')) {
+    } else if (raw.startsWith('file://')) {
       return ImageType.file;
     } else {
       return ImageType.png;
@@ -24,6 +36,53 @@ extension ImageTypeExtension on String {
 }
 
 enum ImageType { svg, png, network, networkSvg, file, unknown }
+
+/// ✅ Centralized resolver:
+/// - If a string is a raw category `icon_name` (ex: "road-trip") resolve via StorageUtils.
+/// - If already a URL / asset path, leave as-is.
+String _resolveMaybeCategoryIcon(String? input) {
+  if (input == null) return '';
+  final s = input.trim();
+  if (s.isEmpty) return s;
+
+  // Already a URL
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+
+  // Asset-ish
+  if (s.startsWith('assets/') || s.startsWith('packages/')) return s;
+
+  // File paths
+  if (s.startsWith('file://') || s.startsWith('/')) return s;
+
+  // If it has an extension already, assume it is a filename/path-like string.
+  final hasExt =
+  RegExp(r'\.(png|jpg|jpeg|webp|svg)$', caseSensitive: false).hasMatch(s);
+  if (hasExt) {
+    // Could still be a bare filename (road-trip.svg) intended for storage resolution.
+    // If it's not an asset path, try resolving it anyway.
+    final maybe = StorageUtils.resolveMemoryCategoryIconUrl(s);
+    if (maybe.trim().isNotEmpty) return maybe.trim();
+    return s;
+  }
+
+  // Looks like icon_name
+  final looksLikeIconName = !s.contains('/') && !s.contains('.');
+  if (looksLikeIconName) {
+    // Your bucket uses .svg files, but icon_name in DB is without extension.
+    // Try plain name first, then common extensions.
+    final direct = StorageUtils.resolveMemoryCategoryIconUrl(s);
+    if (direct.trim().isNotEmpty) return direct.trim();
+
+    const exts = <String>['svg', 'png', 'webp', 'jpg', 'jpeg'];
+    for (final ext in exts) {
+      final candidate = '$s.$ext';
+      final resolved = StorageUtils.resolveMemoryCategoryIconUrl(candidate);
+      if (resolved.trim().isNotEmpty) return resolved.trim();
+    }
+  }
+
+  return s;
+}
 
 class CustomImageView extends StatefulWidget {
   CustomImageView({
@@ -39,14 +98,13 @@ class CustomImageView extends StatefulWidget {
     this.margin,
     this.border,
     this.placeHolder,
-    this.isCircular = false, // ✅ NEW
+    this.isCircular = false,
   }) : super(key: key) {
-    if (imagePath == null || imagePath!.isEmpty) {
+    if (imagePath == null || imagePath!.trim().isEmpty) {
       imagePath = ImageConstant.imgImageNotFound;
     }
   }
 
-  /// [imagePath] is required parameter for showing image
   late String? imagePath;
 
   final double? height;
@@ -64,7 +122,6 @@ class CustomImageView extends StatefulWidget {
   final BorderRadius? radius;
   final BoxBorder? border;
 
-  /// ✅ When true, forces ClipOval around the image (perfect avatars)
   final bool isCircular;
 
   @override
@@ -76,13 +133,45 @@ class _CustomImageViewState extends State<CustomImageView>
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
-  String? _previousImagePath;
   bool _hasAnimationCompleted = false;
+
+  String _resolvedPathOrFallback(String? raw) {
+    final resolved = _resolveMaybeCategoryIcon(raw);
+    if (resolved.trim().isEmpty) return ImageConstant.imgImageNotFound;
+    return resolved;
+  }
+
+  bool _isNetworkImage(String? path) {
+    if (path == null) return false;
+    final p = path.trim();
+    if (p.isEmpty) return false;
+    return p.startsWith('http://') || p.startsWith('https://');
+  }
+
+  bool _hasImagePathChanged(String? oldPath, String? newPath) {
+    final oldResolved = _resolvedPathOrFallback(oldPath);
+    final newResolved = _resolvedPathOrFallback(newPath);
+    return oldResolved != newResolved;
+  }
+
+  int _safeCacheDim(double? v, {int fallback = 200}) {
+    if (v == null) return fallback;
+    if (!v.isFinite) return fallback;
+    if (v <= 0) return fallback;
+    final rounded = v.round();
+    return rounded <= 0 ? fallback : rounded;
+  }
+
+  double? _safeFiniteDouble(double? v) {
+    if (v == null) return null;
+    if (!v.isFinite) return null;
+    if (v <= 0) return null;
+    return v;
+  }
 
   @override
   void initState() {
     super.initState();
-    _previousImagePath = widget.imagePath;
 
     _animationController = AnimationController(
       vsync: this,
@@ -102,7 +191,9 @@ class _CustomImageViewState extends State<CustomImageView>
       }
     });
 
-    if (_isNetworkImage(widget.imagePath)) {
+    final currentResolved = _resolvedPathOrFallback(widget.imagePath);
+
+    if (_isNetworkImage(currentResolved)) {
       _animationController.forward();
     } else {
       _animationController.value = 1.0;
@@ -118,18 +209,21 @@ class _CustomImageViewState extends State<CustomImageView>
     _hasImagePathChanged(oldWidget.imagePath, widget.imagePath);
 
     if (urlChanged) {
-      _previousImagePath = widget.imagePath;
       _hasAnimationCompleted = false;
 
-      if (_isNetworkImage(widget.imagePath)) {
+      final resolved = _resolvedPathOrFallback(widget.imagePath);
+
+      if (_isNetworkImage(resolved)) {
         _animationController.reset();
         _animationController.forward();
       } else {
         _animationController.value = 1.0;
         _hasAnimationCompleted = true;
       }
-    } else if (!_hasAnimationCompleted && _isNetworkImage(widget.imagePath)) {
-      if (_animationController.status == AnimationStatus.dismissed) {
+    } else if (!_hasAnimationCompleted) {
+      final resolved = _resolvedPathOrFallback(widget.imagePath);
+      if (_isNetworkImage(resolved) &&
+          _animationController.status == AnimationStatus.dismissed) {
         _animationController.forward();
       }
     }
@@ -139,33 +233,6 @@ class _CustomImageViewState extends State<CustomImageView>
   void dispose() {
     _animationController.dispose();
     super.dispose();
-  }
-
-  bool _hasImagePathChanged(String? oldPath, String? newPath) {
-    if (oldPath == null && newPath == null) return false;
-    if (oldPath == null || newPath == null) return true;
-    return oldPath != newPath;
-  }
-
-  bool _isNetworkImage(String? path) {
-    if (path == null || path.isEmpty) return false;
-    return path.startsWith('http://') || path.startsWith('https://');
-  }
-
-  // ✅ Prevent Infinity/NaN toInt crashes
-  int _safeCacheDim(double? v, {int fallback = 200}) {
-    if (v == null) return fallback;
-    if (!v.isFinite) return fallback;
-    if (v <= 0) return fallback;
-    final rounded = v.round();
-    return rounded <= 0 ? fallback : rounded;
-  }
-
-  double? _safeFiniteDouble(double? v) {
-    if (v == null) return null;
-    if (!v.isFinite) return null;
-    if (v <= 0) return null;
-    return v;
   }
 
   @override
@@ -184,7 +251,9 @@ class _CustomImageViewState extends State<CustomImageView>
       ),
     );
 
-    if (_isNetworkImage(widget.imagePath)) {
+    final resolved = _resolvedPathOrFallback(widget.imagePath);
+
+    if (_isNetworkImage(resolved)) {
       return ScaleTransition(
         scale: _scaleAnimation,
         child: imageContent,
@@ -194,7 +263,6 @@ class _CustomImageViewState extends State<CustomImageView>
     return imageContent;
   }
 
-  // ✅ NEW: proper circular mode for avatars
   Widget _buildCircleImage() {
     if (widget.isCircular) {
       return ClipOval(
@@ -221,22 +289,23 @@ class _CustomImageViewState extends State<CustomImageView>
         ),
         child: _buildImageView(),
       );
-    } else {
-      return _buildImageView();
     }
+    return _buildImageView();
   }
 
   Widget _buildImageView() {
     final safeH = _safeFiniteDouble(widget.height);
     final safeW = _safeFiniteDouble(widget.width);
 
-    switch (widget.imagePath!.imageType) {
+    final resolvedPath = _resolvedPathOrFallback(widget.imagePath);
+
+    switch (resolvedPath.imageType) {
       case ImageType.svg:
         return SizedBox(
           height: safeH,
           width: safeW,
           child: SvgPicture.asset(
-            widget.imagePath!,
+            resolvedPath,
             height: safeH,
             width: safeW,
             fit: widget.fit ?? BoxFit.contain,
@@ -251,7 +320,7 @@ class _CustomImageViewState extends State<CustomImageView>
 
       case ImageType.file:
         return Image.file(
-          File(widget.imagePath!),
+          File(resolvedPath),
           height: safeH,
           width: safeW,
           fit: widget.fit ?? BoxFit.cover,
@@ -260,7 +329,7 @@ class _CustomImageViewState extends State<CustomImageView>
 
       case ImageType.networkSvg:
         return SvgPicture.network(
-          widget.imagePath!,
+          resolvedPath,
           height: safeH,
           width: safeW,
           fit: widget.fit ?? BoxFit.contain,
@@ -279,11 +348,8 @@ class _CustomImageViewState extends State<CustomImageView>
         return CachedNetworkImage(
           height: safeH,
           width: safeW,
-
-          // ✅ CRITICAL: default to cover if caller didn’t specify fit
           fit: widget.fit ?? BoxFit.cover,
-
-          imageUrl: widget.imagePath!,
+          imageUrl: resolvedPath,
           color: widget.color,
           cacheManager: CacheManager(
             Config(
@@ -312,6 +378,8 @@ class _CustomImageViewState extends State<CustomImageView>
             ),
           ),
           errorWidget: (context, url, error) {
+            // If the URL is an svg with query params but got misrouted here,
+            // the ImageTypeExtension fix above prevents that now.
             final isInvalidUrl = url.isEmpty ||
                 url == 'null' ||
                 url == 'undefined' ||
@@ -326,44 +394,11 @@ class _CustomImageViewState extends State<CustomImageView>
               );
             }
 
-            return Container(
+            return Image.asset(
+              widget.placeHolder ?? ImageConstant.imgImageNotFound,
               height: safeH,
               width: safeW,
-              decoration: BoxDecoration(
-                color: appTheme.grey100,
-                borderRadius: widget.radius,
-              ),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            appTheme.gray_300.withAlpha(51),
-                            appTheme.gray_300.withAlpha(128),
-                            appTheme.gray_300.withAlpha(51),
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
-                        borderRadius: widget.radius,
-                      ),
-                    ),
-                  ),
-                  Center(
-                    child: SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: appTheme.gray_300,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              fit: widget.fit ?? BoxFit.cover,
             );
           },
           fadeInDuration: const Duration(milliseconds: 200),
@@ -371,25 +406,15 @@ class _CustomImageViewState extends State<CustomImageView>
           memCacheWidth: cacheW,
         );
 
-
       case ImageType.png:
       default:
         return Image.asset(
-          widget.imagePath!,
+          resolvedPath,
           height: safeH,
           width: safeW,
           fit: widget.fit ?? BoxFit.cover,
           color: widget.color,
           errorBuilder: (context, error, stackTrace) {
-            // ignore: avoid_print
-            print('❌ ASSET LOAD FAILED:');
-            // ignore: avoid_print
-            print('   Asset Path: ${widget.imagePath}');
-            // ignore: avoid_print
-            print('   Error: $error');
-            // ignore: avoid_print
-            print('   Stack Trace: $stackTrace');
-
             return Image.asset(
               widget.placeHolder ?? ImageConstant.imgImageNotFound,
               height: safeH,

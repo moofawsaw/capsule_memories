@@ -39,7 +39,7 @@ class UserProfileSkeleton extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 14.h),
       decoration: BoxDecoration(
-        color: appTheme.gray_900_01,
+        // color: appTheme.gray_900_01,
         borderRadius: BorderRadius.circular(22.h),
         border: Border.all(
           color: appTheme.gray_900_01.withAlpha(120),

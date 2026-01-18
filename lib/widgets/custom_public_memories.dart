@@ -3,6 +3,7 @@ import '../core/app_export.dart';
 import '../services/avatar_helper_service.dart';
 import '../services/memory_members_service.dart';
 import '../services/story_service.dart';
+import '../utils/storage_utils.dart';
 import '../services/supabase_service.dart';
 import './custom_button.dart';
 import './custom_image_view.dart';
@@ -216,7 +217,7 @@ class CustomPublicMemories extends StatelessWidget {
               ),
               SizedBox(height: 4.h),
               Text(
-                'Check back soon to view public memories',
+                'Check back soon to view open memories',
                 style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(color: appTheme.blue_gray_300),
               ),
             ],
@@ -228,13 +229,21 @@ class CustomPublicMemories extends StatelessWidget {
 }
 
 /// Data model for memory items
+/// Data model for memory items
 class CustomMemoryItem {
   CustomMemoryItem({
     this.id,
     this.userId, // owner id
     this.title,
     this.date,
-    this.iconPath,
+
+    // OLD: some call sites pass a full URL (icon_url), some pass just "life.svg"
+    // We'll normalize it.
+    String? iconPath,
+
+    // NEW: store the category icon_name (ex: "life", "road-trip")
+    this.iconName,
+
     this.profileImages,
     this.mediaItems,
     this.startDate,
@@ -246,13 +255,19 @@ class CustomMemoryItem {
     this.isLiked,
     this.state, // open / sealed
     this.visibility, // public / private
-  });
+  }) : _iconPath = iconPath;
 
   final String? id;
   final String? userId;
   final String? title;
   final String? date;
-  final String? iconPath;
+
+  // ✅ NEW: stable identifier from DB (memory_categories.icon_name)
+  final String? iconName;
+
+  // Backing field for whatever the caller passed.
+  final String? _iconPath;
+
   final List<String>? profileImages;
   final List<CustomMediaItem>? mediaItems;
   final String? startDate;
@@ -265,7 +280,63 @@ class CustomMemoryItem {
 
   final String? state;
   final String? visibility;
+
+  /// ✅ The only thing the UI should use.
+  /// Rules:
+  /// 1) If we have iconName -> always build stable bucket URL: category-icons/<iconName>.svg
+  /// 2) Else, if caller already passed a stable bucket url (endsWith .svg and NOT a timestamp-random upload) -> keep it
+  /// 3) Else, if caller passed just "life" or "life.svg" -> build stable URL
+  /// 4) Else, fallback to whatever was passed
+  String? get iconPath {
+    final String raw = (_iconPath ?? '').trim();
+    final String name = (iconName ?? '').trim();
+
+    // 1) iconName wins every time (stable path)
+    if (name.isNotEmpty) {
+      return StorageUtils.resolveMemoryCategoryIconUrl(
+        name.endsWith('.svg') ? name : '$name.svg',
+      );
+    }
+
+    if (raw.isEmpty) return null;
+
+    // 2) If it's already a stable bucket icon url, keep it:
+    //    ".../category-icons/life.svg"
+    final bool isCategoryIconsUrl =
+        raw.contains('/storage/v1/object/public/category-icons/') &&
+            raw.toLowerCase().endsWith('.svg');
+
+    // A dead "uploaded" icon_url pattern: ".../category-icons/<timestamp>-<rand>.svg"
+    final bool looksLikeUploadedTemp =
+    RegExp(r'/category-icons/\d{10,}-[a-z0-9]+\.svg$', caseSensitive: false)
+        .hasMatch(raw);
+
+    if (isCategoryIconsUrl && !looksLikeUploadedTemp) {
+      return raw;
+    }
+
+    // 3) If raw is just an icon file/name, build stable URL
+    //    "life" or "life.svg"
+    final bool rawLooksLikeNameOnly =
+        !raw.startsWith('http://') && !raw.startsWith('https://');
+
+    if (rawLooksLikeNameOnly) {
+      final String file = raw.toLowerCase().endsWith('.svg') ? raw : '$raw.svg';
+      return StorageUtils.resolveMemoryCategoryIconUrl(file);
+    }
+
+    // 4) If it was a temp uploaded url, try to recover icon_name from the filename
+    //    (this saves you even if callers only pass icon_url)
+    if (looksLikeUploadedTemp) {
+      // If your temp upload filenames ever include the icon name, you can parse it here.
+      // Otherwise, we just return raw.
+      return raw;
+    }
+
+    return raw;
+  }
 }
+
 
 /// Data model for media items in the timeline (kept for compatibility)
 class CustomMediaItem {
@@ -952,6 +1023,9 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   Widget _buildMemoryHeader(BuildContext context) {
     final CustomMemoryItem memory = widget.memory;
+    // ✅ DEBUG: see what the card is trying to render
+    // ignore: avoid_print
+    print('🧩 CARD ICON RAW: ${memory.iconPath}');
     final bool showBadges = _shouldShowBadges(memory);
     final double headerHeight = showBadges ? 110.h : 74.h;
 
@@ -989,6 +1063,10 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
                     imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
                     height: 29.h,
                     width: 29.h,
+
+                    // ✅ REQUIRED for SVG icons (otherwise they render black on dark)
+                    color: appTheme.gray_50, // or appTheme.deep_purple_A100
+                    fit: BoxFit.contain,
                   ),
                 ),
                 SizedBox(width: 12.h),

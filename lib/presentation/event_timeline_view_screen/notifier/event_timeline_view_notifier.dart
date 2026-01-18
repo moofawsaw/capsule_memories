@@ -305,10 +305,26 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       final location = memoryData['location_name'] as String?;
 
       final category = memoryData['memory_categories'] as Map<String, dynamic>?;
-      final iconName = category?['icon_name'] as String?;
-      final categoryIconUrl = iconName != null
-          ? StorageUtils.resolveMemoryCategoryIconUrl(iconName)
-          : (category?['icon_url'] as String? ?? ImageConstant.imgFrame13);
+      final iconNameRaw = category?['icon_name'] as String?;
+      final iconName = (iconNameRaw ?? '').trim();
+      final iconUrl = (category?['icon_url'] as String?)?.trim();
+
+      String categoryIconUrl = ImageConstant.imgFrame13;
+
+      if (iconName.isNotEmpty) {
+        final resolved = StorageUtils.resolveMemoryCategoryIconUrl(iconName);
+        if (resolved.trim().isNotEmpty) {
+          categoryIconUrl = resolved.trim();
+        } else if (iconUrl != null && iconUrl.isNotEmpty) {
+          categoryIconUrl = iconUrl;
+        }
+      } else if (iconUrl != null && iconUrl.isNotEmpty) {
+        categoryIconUrl = iconUrl;
+      }
+
+      print('🧩 CATEGORY ICON DEBUG (reload): '
+          'icon_name="$iconNameRaw" icon_url="$iconUrl" final="$categoryIconUrl"');
+
 
       // Date display
       String dateDisplay = 'Unknown Date';
@@ -392,25 +408,47 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('   - Is Member: $isMember');
 
       final memoryResponse = await client.from('memories').select('''
-            id,
-            title,
-            visibility,
-            created_at,
-            start_time,
-            end_time,
-            state,
-            location_name,
-            memory_categories(name, icon_name)
-          ''').eq('id', navArgs.memoryId).single();
+  id,
+  title,
+  visibility,
+  created_at,
+  start_time,
+  end_time,
+  state,
+  location_name,
+  memory_categories(name, icon_name, icon_url)
+''').eq('id', navArgs.memoryId).single();
 
       print('✅ TIMELINE NOTIFIER: Memory data fetched');
       print('   - Memory title: ${memoryResponse['title']}');
       print('   - Memory state: ${memoryResponse['state']}');
       print('   - Visibility: ${memoryResponse['visibility']}');
 
-      final categoryData = memoryResponse['memory_categories'];
-      final iconName = categoryData?['icon_name'] as String?;
-      final categoryIconUrl = iconName != null ? StorageUtils.resolveMemoryCategoryIconUrl(iconName) : null;
+      final categoryData = memoryResponse['memory_categories'] as Map<String, dynamic>?;
+
+      final iconNameRaw = categoryData?['icon_name'] as String?;
+      final iconName = (iconNameRaw ?? '').trim();
+      final iconUrl = (categoryData?['icon_url'] as String?)?.trim();
+
+      String categoryIconFinal = ImageConstant.imgFrame13;
+
+// Prefer icon_name -> resolved storage url (if non-empty)
+      if (iconName.isNotEmpty) {
+        final resolved = StorageUtils.resolveMemoryCategoryIconUrl(iconName);
+        if (resolved.trim().isNotEmpty) {
+          categoryIconFinal = resolved.trim();
+        } else if (iconUrl != null && iconUrl.isNotEmpty) {
+          categoryIconFinal = iconUrl;
+        }
+      } else if (iconUrl != null && iconUrl.isNotEmpty) {
+        categoryIconFinal = iconUrl;
+      }
+
+// Debug so you can see exactly what's happening
+      print('🧩 CATEGORY ICON DEBUG: '
+          'icon_name="$iconNameRaw" '
+          'icon_url="$iconUrl" '
+          'final="$categoryIconFinal"');
 
       // Contributors
       final contributorsResponse = await client
@@ -445,7 +483,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           eventTitle: memoryResponse['title'] ?? 'Memory',
           eventDate: _formatTimestamp(memoryResponse['created_at'] ?? ''),
           isPrivate: memoryResponse['visibility'] == 'private',
-          categoryIcon: categoryIconUrl,
+          categoryIcon: categoryIconFinal,
           participantImages: contributorAvatars,
           timelineDetail: TimelineDetailModel(
             centerLocation: (memoryResponse['location_name'] as String?) ??

@@ -1,69 +1,107 @@
+// lib/presentation/memory_feed_dashboard_screen/model/memory_feed_dashboard_model.dart
+
 import '../../../core/app_export.dart';
+import '../../../utils/storage_utils.dart';
 
 /// This class defines the model for the MemoryFeedDashboard screen.
 class MemoryFeedDashboardModel extends Equatable {
   final List<HappeningNowStoryData>? happeningNowStories;
-  final List<CustomMemoryItem>? publicMemories;
-
-  // ✅ ADD THIS
-  final List<CustomMemoryItem>? popularMemories;
-
+  final List<HappeningNowStoryData>? latestStories;
   final List<HappeningNowStoryData>? trendingStories;
   final List<HappeningNowStoryData>? longestStreakStories;
   final List<HappeningNowStoryData>? popularUserStories;
-  final List<HappeningNowStoryData>? latestStories;
+
+  // ✅ NEW STORY FEEDS
+  final List<HappeningNowStoryData>? fromFriendsStories;
+  final List<HappeningNowStoryData>? forYouStories;
+
+  final List<CustomMemoryItem>? publicMemories;
+
+  // ✅ Existing
+  final List<CustomMemoryItem>? popularMemories;
+
+  // ✅ NEW MEMORY FEED
+  final List<CustomMemoryItem>? forYouMemories;
 
   MemoryFeedDashboardModel({
     this.happeningNowStories = const [],
-    this.publicMemories = const [],
-
-    // ✅ ADD THIS
-    this.popularMemories = const [],
-
+    this.latestStories = const [],
     this.trendingStories = const [],
     this.longestStreakStories = const [],
     this.popularUserStories = const [],
-    this.latestStories = const [],
+
+    // ✅ NEW STORY FEEDS
+    this.fromFriendsStories = const [],
+    this.forYouStories = const [],
+
+    this.publicMemories = const [],
+
+    // ✅ Existing
+    this.popularMemories = const [],
+
+    // ✅ NEW MEMORY FEED
+    this.forYouMemories = const [],
   });
 
   MemoryFeedDashboardModel copyWith({
     List<HappeningNowStoryData>? happeningNowStories,
-    List<CustomMemoryItem>? publicMemories,
-
-    // ✅ ADD THIS
-    List<CustomMemoryItem>? popularMemories,
-
+    List<HappeningNowStoryData>? latestStories,
     List<HappeningNowStoryData>? trendingStories,
     List<HappeningNowStoryData>? longestStreakStories,
     List<HappeningNowStoryData>? popularUserStories,
-    List<HappeningNowStoryData>? latestStories,
+
+    // ✅ NEW STORY FEEDS
+    List<HappeningNowStoryData>? fromFriendsStories,
+    List<HappeningNowStoryData>? forYouStories,
+
+    List<CustomMemoryItem>? publicMemories,
+
+    // ✅ Existing
+    List<CustomMemoryItem>? popularMemories,
+
+    // ✅ NEW MEMORY FEED
+    List<CustomMemoryItem>? forYouMemories,
   }) {
     return MemoryFeedDashboardModel(
       happeningNowStories: happeningNowStories ?? this.happeningNowStories,
-      publicMemories: publicMemories ?? this.publicMemories,
-
-      // ✅ ADD THIS
-      popularMemories: popularMemories ?? this.popularMemories,
-
+      latestStories: latestStories ?? this.latestStories,
       trendingStories: trendingStories ?? this.trendingStories,
       longestStreakStories: longestStreakStories ?? this.longestStreakStories,
       popularUserStories: popularUserStories ?? this.popularUserStories,
-      latestStories: latestStories ?? this.latestStories,
+
+      // ✅ NEW STORY FEEDS
+      fromFriendsStories: fromFriendsStories ?? this.fromFriendsStories,
+      forYouStories: forYouStories ?? this.forYouStories,
+
+      publicMemories: publicMemories ?? this.publicMemories,
+
+      // ✅ Existing
+      popularMemories: popularMemories ?? this.popularMemories,
+
+      // ✅ NEW MEMORY FEED
+      forYouMemories: forYouMemories ?? this.forYouMemories,
     );
   }
 
   @override
   List<Object?> get props => [
     happeningNowStories,
-    publicMemories,
-
-    // ✅ ADD THIS
-    popularMemories,
-
+    latestStories,
     trendingStories,
     longestStreakStories,
     popularUserStories,
-    latestStories,
+
+    // ✅ NEW STORY FEEDS
+    fromFriendsStories,
+    forYouStories,
+
+    publicMemories,
+
+    // ✅ Existing
+    popularMemories,
+
+    // ✅ NEW MEMORY FEED
+    forYouMemories,
   ];
 }
 
@@ -76,7 +114,7 @@ class HappeningNowStoryData extends Equatable {
   final String categoryIcon;
   final String categoryName;
   final String timestamp;
-  final bool isRead; // Existing field for read/unread status
+  final bool isRead;
 
   const HappeningNowStoryData({
     required this.storyId,
@@ -89,7 +127,6 @@ class HappeningNowStoryData extends Equatable {
     required this.isRead,
   });
 
-  // NEW: Add copyWith method for updating individual fields
   HappeningNowStoryData copyWith({
     String? storyId,
     String? backgroundImage,
@@ -130,7 +167,16 @@ class CustomMemoryItem extends Equatable {
   final String? id;
   final String? title;
   final String? date;
-  final String? iconPath;
+
+  /// Call sites may pass:
+  /// - stable iconName ("life", "road-trip")
+  /// - stable path ("life.svg")
+  /// - full url (sometimes stale uploaded icon_url like ".../1768...-abcd.svg")
+  final String? iconName;
+
+  /// Keep the raw value passed in from existing code.
+  final String? _iconPathRaw;
+
   final List<String>? profileImages;
   final List<CustomMediaItem>? mediaItems;
   final String? startDate;
@@ -145,7 +191,8 @@ class CustomMemoryItem extends Equatable {
     this.id,
     this.title,
     this.date,
-    this.iconPath,
+    String? iconPath,
+    this.iconName,
     this.profileImages,
     this.mediaItems,
     this.startDate,
@@ -155,13 +202,42 @@ class CustomMemoryItem extends Equatable {
     this.location,
     this.distance,
     this.isLiked,
-  });
+  }) : _iconPathRaw = iconPath;
+
+  /// ✅ Normalized icon path used by UI.
+  /// Rule:
+  /// - If iconName exists, ALWAYS build bucket URL from it => category-icons/<iconName>.svg
+  /// - Else if raw looks like a plain name, build bucket URL
+  /// - Else return raw (legacy full URL)
+  String? get iconPath {
+    final String name = (iconName ?? '').trim();
+    final String raw = (_iconPathRaw ?? '').trim();
+
+    // 1) iconName wins: stable, non-stale
+    if (name.isNotEmpty) {
+      final String file = name.toLowerCase().endsWith('.svg') ? name : '$name.svg';
+      return StorageUtils.resolveMemoryCategoryIconUrl(file);
+    }
+
+    if (raw.isEmpty) return null;
+
+    // 2) If raw is NOT a URL, treat it as name/path and resolve
+    final bool isUrl = raw.startsWith('http://') || raw.startsWith('https://');
+    if (!isUrl) {
+      final String file = raw.toLowerCase().endsWith('.svg') ? raw : '$raw.svg';
+      return StorageUtils.resolveMemoryCategoryIconUrl(file);
+    }
+
+    // 3) raw is URL (could be stale icon_url). We can’t safely infer iconName here.
+    return raw;
+  }
 
   CustomMemoryItem copyWith({
     String? id,
     String? title,
     String? date,
     String? iconPath,
+    String? iconName,
     List<String>? profileImages,
     List<CustomMediaItem>? mediaItems,
     String? startDate,
@@ -176,7 +252,8 @@ class CustomMemoryItem extends Equatable {
       id: id ?? this.id,
       title: title ?? this.title,
       date: date ?? this.date,
-      iconPath: iconPath ?? this.iconPath,
+      iconPath: iconPath ?? _iconPathRaw,
+      iconName: iconName ?? this.iconName,
       profileImages: profileImages ?? this.profileImages,
       mediaItems: mediaItems ?? this.mediaItems,
       startDate: startDate ?? this.startDate,
@@ -194,7 +271,8 @@ class CustomMemoryItem extends Equatable {
     id,
     title,
     date,
-    iconPath,
+    iconName,
+    _iconPathRaw,
     profileImages,
     mediaItems,
     startDate,

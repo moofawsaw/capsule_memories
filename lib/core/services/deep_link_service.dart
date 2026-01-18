@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
 import '../models/feed_story_context.dart';
-import '../utils/memory_nav_args.dart'; // ✅ REQUIRED
+import '../utils/memory_nav_args.dart';
 import '../utils/navigator_service.dart';
 
 class DeepLinkService with WidgetsBindingObserver {
@@ -124,22 +124,11 @@ class DeepLinkService with WidgetsBindingObserver {
       return;
     }
 
-    // ---------- MEMORY ----------
-
-    // In _handleDeepLink(), add BEFORE existing memory handlers:
-// Add new helper method (near other URL helpers):
-    bool _isCapsuleMemoryStoryLink(Uri uri) =>
-        uri.scheme == 'capsule' &&
-            uri.pathSegments.length >= 4 &&
-            uri.pathSegments[0] == 'memory' &&
-            uri.pathSegments[2] == 'story';
-
-
-// ---------- MEMORY + STORY (opens story within memory context) ----------
-    if (_isCapsuleMemoryStoryLink(uri)) {
-      final memoryId = uri.pathSegments[1];  // memory/{memoryId}/story/{storyId}
+    // ---------- MEMORY + STORY (HTTPS - must be BEFORE plain memory handler) ----------
+    if (_isCapappMemoryStoryLink(uri)) {
+      final memoryId = uri.pathSegments[1];
       final storyId = uri.pathSegments[3];
-      debugPrint('📦 Memory+Story deep link: memory=$memoryId, story=$storyId');
+      debugPrint('📦 HTTPS Memory+Story deep link: memory=$memoryId, story=$storyId');
 
       _queueNavigation(
         AppRoutes.appTimeline,
@@ -148,14 +137,27 @@ class DeepLinkService with WidgetsBindingObserver {
       return;
     }
 
+    // ---------- MEMORY + STORY (capsule:// scheme) ----------
+    if (_isCapsuleMemoryStoryLink(uri)) {
+      final memoryId = uri.pathSegments[1];
+      final storyId = uri.pathSegments[3];
+      debugPrint('📦 Capsule Memory+Story deep link: memory=$memoryId, story=$storyId');
 
+      _queueNavigation(
+        AppRoutes.appTimeline,
+        MemoryNavArgs(memoryId: memoryId, initialStoryId: storyId).toMap(),
+      );
+      return;
+    }
+
+    // ---------- MEMORY (plain - must be AFTER memory+story handlers) ----------
     if (_isCapappMemoryLink(uri)) {
       final memoryId = uri.pathSegments[1];
       debugPrint('📦 Memory deep link: $memoryId');
 
       _queueNavigation(
         AppRoutes.appTimeline,
-        MemoryNavArgs(memoryId: memoryId).toMap(), // ✅ FIXED
+        MemoryNavArgs(memoryId: memoryId).toMap(),
       );
       return;
     }
@@ -282,7 +284,13 @@ class DeepLinkService with WidgetsBindingObserver {
         return;
       }
 
-      nav.pushNamed(route, arguments: args);
+      // ✅ Force widget recreation by removing existing route first
+      // This ensures initState() runs fresh with new arguments (e.g., new storyId)
+      nav.pushNamedAndRemoveUntil(
+        route,
+            (r) => r.isFirst, // Keep only the root route
+        arguments: args,
+      );
     });
   }
 
@@ -298,6 +306,21 @@ class DeepLinkService with WidgetsBindingObserver {
   bool _isCapappHost(Uri uri) =>
       uri.host == 'capapp.co' || uri.host == 'www.capapp.co';
 
+  // Memory + Story (HTTPS): capapp.co/memory/{id}/story/{id}
+  bool _isCapappMemoryStoryLink(Uri uri) =>
+      _isCapappHost(uri) &&
+          uri.pathSegments.length >= 4 &&
+          uri.pathSegments[0] == 'memory' &&
+          uri.pathSegments[2] == 'story';
+
+  // Memory + Story (capsule://): capsule://memory/{id}/story/{id}
+  bool _isCapsuleMemoryStoryLink(Uri uri) =>
+      uri.scheme == 'capsule' &&
+          uri.pathSegments.length >= 4 &&
+          uri.pathSegments[0] == 'memory' &&
+          uri.pathSegments[2] == 'story';
+
+  // Plain memory (HTTPS): capapp.co/memory/{id}
   bool _isCapappMemoryLink(Uri uri) =>
       _isCapappHost(uri) &&
           uri.pathSegments.isNotEmpty &&
@@ -409,5 +432,4 @@ class DeepLinkService with WidgetsBindingObserver {
       return null;
     }
   }
-
 }
