@@ -1,12 +1,19 @@
-// lib/presentation/feature_request_screen/feature_request_screen.dart
-
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import '../../services/supabase_service.dart';
+
 import '../../core/app_export.dart';
+import '../../core/utils/navigator_service.dart';
+import '../../services/supabase_service.dart';
+import '../../theme/text_style_helper.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
+import './notifier/feature_request_notifier.dart';
 import 'notifier/feature_request_notifier.dart';
+
+// lib/presentation/feature_request_screen/feature_request_screen.dart
 
 class FeatureRequestScreen extends ConsumerStatefulWidget {
   FeatureRequestScreen({Key? key}) : super(key: key);
@@ -34,7 +41,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listen<FeatureRequestState>(featureRequestNotifier, (previous, current) {
+      ref.listen<FeatureRequestState>(featureRequestNotifier,
+          (previous, current) {
         final prevStatus = previous?.status ?? FeatureRequestStatus.idle;
         final currStatus = current.status;
 
@@ -83,7 +91,6 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
               _buildHeaderSection(context),
               SizedBox(height: 14.h),
               _buildSubtitleSection(context),
-
               if (!showReceipt) ...[
                 SizedBox(height: 14.h),
                 _buildCategoryChipsSection(context, state),
@@ -91,9 +98,7 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
               ] else ...[
                 SizedBox(height: 16.h),
               ],
-
               Expanded(child: _buildAnimatedBodySection(context, state)),
-
               SizedBox(height: 14.h),
               _buildSubmitButton(context, state: state),
             ],
@@ -130,7 +135,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
                   SizedBox(width: 8.h),
                   Text(
                     'Submit Request',
-                    style: TextStyleHelper.instance.title18SemiBoldPlusJakartaSans
+                    style: TextStyleHelper
+                        .instance.title18SemiBoldPlusJakartaSans
                         .copyWith(color: appTheme.gray_50),
                   ),
                 ],
@@ -184,7 +190,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     );
   }
 
-  Widget _buildCategoryChipsSection(BuildContext context, FeatureRequestState state) {
+  Widget _buildCategoryChipsSection(
+      BuildContext context, FeatureRequestState state) {
     final isLocked = state.isCompleted || state.isLoading;
 
     return Column(
@@ -206,7 +213,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
                 ? appTheme.deep_purple_A100.withAlpha(26)
                 : appTheme.gray_900;
 
-            final textColor = selected ? appTheme.gray_50 : appTheme.blue_gray_300;
+            final textColor =
+                selected ? appTheme.gray_50 : appTheme.blue_gray_300;
 
             return _ChipPill(
               label: label,
@@ -227,7 +235,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     );
   }
 
-  Widget _buildAnimatedBodySection(BuildContext context, FeatureRequestState state) {
+  Widget _buildAnimatedBodySection(
+      BuildContext context, FeatureRequestState state) {
     final showReceipt = state.isCompleted;
 
     return AnimatedSwitcher(
@@ -247,10 +256,10 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
       },
       child: showReceipt
           ? Align(
-        key: const ValueKey('receipt_wrap'),
-        alignment: Alignment.topCenter,
-        child: _buildReceiptSection(context, state: state),
-      )
+              key: const ValueKey('receipt_wrap'),
+              alignment: Alignment.topCenter,
+              child: _buildReceiptSection(context, state: state),
+            )
           : _buildInputSection(context, key: const ValueKey('input')),
     );
   }
@@ -258,18 +267,110 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
   Widget _buildInputSection(BuildContext context, {Key? key}) {
     final state = ref.watch(featureRequestNotifier);
 
-    return CustomEditText(
+    return Column(
       key: key,
-      controller: state.featureDescriptionController,
-      hintText:
-      'Describe what you want changed and why. If you can, include where it happens in the app.',
-      maxLines: 12,
-      fillColor: appTheme.gray_900,
-      borderRadius: 12.h,
-      contentPadding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 14.h),
-      validator: (value) => ref
-          .read(featureRequestNotifier.notifier)
-          .validateFeatureDescription(value),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CustomEditText(
+          controller: state.featureDescriptionController,
+          hintText:
+              'Describe what you want changed and why. If you can, include where it happens in the app.',
+          maxLines: 12,
+          fillColor: appTheme.gray_900,
+          borderRadius: 12.h,
+          contentPadding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 14.h),
+          validator: (value) => ref
+              .read(featureRequestNotifier.notifier)
+              .validateFeatureDescription(value),
+        ),
+
+        // ✅ Media upload section
+        SizedBox(height: 12.h),
+        _buildMediaUploadSection(context, state),
+      ],
+    );
+  }
+
+  /// ✅ New media upload section widget
+  Widget _buildMediaUploadSection(
+      BuildContext context, FeatureRequestState state) {
+    final mediaFiles = state.selectedMediaFiles;
+    final isLocked = state.isCompleted || state.isLoading;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Upload button
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: isLocked || mediaFiles.length >= 3
+                ? null
+                : () {
+                    ref.read(featureRequestNotifier.notifier).pickMedia();
+                  },
+            borderRadius: BorderRadius.circular(12.h),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+              decoration: BoxDecoration(
+                color: appTheme.gray_900,
+                borderRadius: BorderRadius.circular(12.h),
+                border: Border.all(
+                  color: appTheme.deep_purple_A100.withAlpha(80),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.add_photo_alternate_outlined,
+                    color: mediaFiles.length >= 3
+                        ? appTheme.blue_gray_300.withAlpha(120)
+                        : appTheme.deep_purple_A100,
+                    size: 20.h,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    mediaFiles.isEmpty
+                        ? 'Upload Media (Optional)'
+                        : 'Add More (${mediaFiles.length}/3)',
+                    style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                        .copyWith(
+                      color: mediaFiles.length >= 3
+                          ? appTheme.blue_gray_300.withAlpha(120)
+                          : appTheme.gray_50,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Media preview grid
+        if (mediaFiles.isNotEmpty) ...[
+          SizedBox(height: 12.h),
+          Wrap(
+            spacing: 10.h,
+            runSpacing: 10.h,
+            children: mediaFiles.asMap().entries.map((entry) {
+              final index = entry.key;
+              final file = entry.value;
+              return _MediaPreviewItem(
+                file: file,
+                onRemove: isLocked
+                    ? null
+                    : () {
+                        ref
+                            .read(featureRequestNotifier.notifier)
+                            .removeMedia(index);
+                      },
+              );
+            }).toList(),
+          ),
+        ],
+      ],
     );
   }
 
@@ -279,9 +380,9 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
   /// - Category shown as badge
   /// - Better hierarchy using font weights
   Widget _buildReceiptSection(
-      BuildContext context, {
-        required FeatureRequestState state,
-      }) {
+    BuildContext context, {
+    required FeatureRequestState state,
+  }) {
     final isSuccess = state.status == FeatureRequestStatus.success;
 
     final accent = isSuccess ? appTheme.colorFF52D1 : appTheme.redCustom;
@@ -292,17 +393,17 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     final categoryLabel = (_selectedCategory ?? 'Other').trim();
 
     final submittedAt = _submittedAtLocal;
-    final timestampText =
-    submittedAt == null ? null : DateFormat('MMM d, yyyy • h:mm a').format(submittedAt);
+    final timestampText = submittedAt == null
+        ? null
+        : DateFormat('MMM d, yyyy • h:mm a').format(submittedAt);
 
     // ✅ Prefer the logged-in user email from Supabase session (no extra DB calls)
     final userEmail =
-        SupabaseService.instance.client?.auth.currentUser?.email ??
-            '';
+        SupabaseService.instance.client?.auth.currentUser?.email ?? '';
 
     if (!isSuccess) {
       final body = state.message ??
-          'We couldn’t submit your request right now. Please try again later.';
+          'We couldn\'t submit your request right now. Please try again later.';
 
       return Container(
         width: double.infinity,
@@ -332,7 +433,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
                 children: [
                   Text(
                     title,
-                    style: TextStyleHelper.instance.title16SemiBoldPlusJakartaSans
+                    style: TextStyleHelper
+                        .instance.title16SemiBoldPlusJakartaSans
                         .copyWith(color: appTheme.gray_50),
                   ),
                   SizedBox(height: 6.h),
@@ -388,7 +490,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
                     Expanded(
                       child: Text(
                         title,
-                        style: TextStyleHelper.instance.title16SemiBoldPlusJakartaSans
+                        style: TextStyleHelper
+                            .instance.title16SemiBoldPlusJakartaSans
                             .copyWith(color: appTheme.gray_50),
                       ),
                     ),
@@ -403,7 +506,9 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
                   Text(
                     timestampText,
                     style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300.withAlpha(180), height: 1.2),
+                        .copyWith(
+                            color: appTheme.blue_gray_300.withAlpha(180),
+                            height: 1.2),
                   ),
                 ],
 
@@ -413,7 +518,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
                 Text(
                   confirmationLine,
                   style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50.withAlpha(235), height: 1.25),
+                      .copyWith(
+                          color: appTheme.gray_50.withAlpha(235), height: 1.25),
                 ),
                 SizedBox(height: 6.h),
                 Text(
@@ -429,22 +535,25 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     );
   }
 
-  Widget _buildSubmitButton(BuildContext context, {required FeatureRequestState state}) {
+  Widget _buildSubmitButton(BuildContext context,
+      {required FeatureRequestState state}) {
     final isLoading = state.isLoading;
     final isCompleted = state.isCompleted;
 
     return CustomButton(
-      text: isCompleted ? 'Done' : (isLoading ? 'Submitting...' : 'Submit Request'),
+      text: isCompleted
+          ? 'Done'
+          : (isLoading ? 'Submitting...' : 'Submit Request'),
       width: double.infinity,
       onPressed: isLoading
           ? null
           : () {
-        if (isCompleted) {
-          onTapCloseButton(context);
-          return;
-        }
-        onTapSubmitRequest(context);
-      },
+              if (isCompleted) {
+                onTapCloseButton(context);
+                return;
+              }
+              onTapSubmitRequest(context);
+            },
       buttonStyle: CustomButtonStyle.fillPrimary,
       buttonTextStyle: CustomButtonTextStyle.bodyMedium,
       isDisabled: isLoading,
@@ -460,7 +569,99 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     _submittedAtLocal = null;
 
     ref.read(featureRequestNotifier.notifier).submitFeatureRequest(
-      category: _selectedCategory,
+          category: _selectedCategory,
+        );
+  }
+}
+
+/// ✅ Media preview item widget
+class _MediaPreviewItem extends StatelessWidget {
+  const _MediaPreviewItem({
+    Key? key,
+    required this.file,
+    required this.onRemove,
+  }) : super(key: key);
+
+  final XFile file;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 80.h,
+          height: 80.h,
+          decoration: BoxDecoration(
+            color: appTheme.gray_900,
+            borderRadius: BorderRadius.circular(10.h),
+            border: Border.all(
+              color: appTheme.deep_purple_A100.withAlpha(40),
+              width: 1,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10.h),
+            child: kIsWeb
+                ? Image.network(
+                    file.path,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: appTheme.blue_gray_300,
+                          size: 32.h,
+                        ),
+                      );
+                    },
+                  )
+                : Image.file(
+                    File(file.path),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: appTheme.blue_gray_300,
+                          size: 32.h,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ),
+        if (onRemove != null)
+          Positioned(
+            top: -6.h,
+            right: -6.h,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onRemove,
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  width: 24.h,
+                  height: 24.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.redCustom,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: appTheme.gray_900_02,
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.close_rounded,
+                    color: appTheme.gray_50,
+                    size: 14.h,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

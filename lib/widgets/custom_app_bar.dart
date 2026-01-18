@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/app_export.dart';
 import '../presentation/create_memory_screen/create_memory_screen.dart';
@@ -88,9 +90,33 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
   late final AnimationController _plusSpinController;
   late final Animation<double> _plusSpin;
 
-  // ✅ Keep a stable ImageProvider so rebuilds don’t thrash the avatar image
+  // ============================================================
+  // AVATAR: GLOBAL (STATIC) CACHE SO NAVIGATION DOESN'T THRASH
+  // ============================================================
+
+  /// Dedicated avatar cache with long stale period (prevents eviction / re-fetches).
+  static final CacheManager _avatarCacheManager = CacheManager(
+    Config(
+      'capsule_avatar_cache_v1',
+      stalePeriod: const Duration(days: 30),
+      maxNrOfCacheObjects: 500,
+    ),
+  );
+
+  /// Global avatar provider cache across ALL CustomAppBar instances/routes.
+  static String? _globalAvatarCacheKey;
+  static String? _globalAvatarUrlNoQuery;
+  static ImageProvider? _globalAvatarProvider;
+
+  /// Track which cacheKey we already precached (avoid repeat precache work).
+  static String? _globalPrecachedKey;
+
+  /// Local mirrors (still useful for debug / consistency, but global is the win).
   String? _cachedAvatarUrl;
   ImageProvider? _cachedAvatarProvider;
+
+  // ✅ Riverpod: listenManual subscription (required if listening from initState)
+  ProviderSubscription<String?>? _avatarUrlSub;
 
   @override
   void initState() {
@@ -111,10 +137,30 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     if (widget.showProfileImage) {
       Future.microtask(() => _ensureAvatarLoaded());
     }
+
+    // ✅ FIX: ref.listen(...) is NOT allowed here -> must use ref.listenManual(...)
+    _avatarUrlSub = ref.listenManual<String?>(
+      avatarStateProvider.select((s) => s.avatarUrl),
+          (prev, next) {
+        if (next == null || next.trim().isEmpty) return;
+        _primeAvatarProvider(next);
+      },
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomAppBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // If profile image gets enabled after init, ensure avatar is loaded.
+    if (widget.showProfileImage && !oldWidget.showProfileImage) {
+      Future.microtask(() => _ensureAvatarLoaded());
+    }
   }
 
   @override
   void dispose() {
+    _avatarUrlSub?.close();
     _plusSpinController.dispose();
     super.dispose();
   }
@@ -136,9 +182,17 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
           currentAvatarState.avatarUrl!.isEmpty) &&
           !currentAvatarState.isLoading) {
         await ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
+        // ignore: avoid_print
         print('✅ Avatar loaded in custom_app_bar based on empty avatarUrl');
+      } else {
+        // If we already have a URL, prime provider immediately
+        final url = currentAvatarState.avatarUrl;
+        if (url != null && url.trim().isNotEmpty) {
+          _primeAvatarProvider(url);
+        }
       }
     } catch (e) {
+      // ignore: avoid_print
       print('❌ Error ensuring avatar loaded: $e');
     }
   }
@@ -256,7 +310,6 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                   isActive = true;
                 }
 
-                // OUTLINE vs FILLED
                 IconData outlineIcon;
                 IconData filledIcon;
 
@@ -293,8 +346,6 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                             ),
                           ),
                         ),
-
-                        // 🔔 Notification badge (unchanged)
                         if (isNotificationIcon && unreadCount > 0)
                           Positioned(
                             right: -4.h,
@@ -316,9 +367,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                               child: Center(
                                 child: Text(
                                   unreadCount > 99 ? '99+' : unreadCount.toString(),
-                                  style: TextStyleHelper
-                                      .instance.body10BoldPlusJakartaSans
-                                      .copyWith(
+                                  style: TextStyleHelper.instance.body10BoldPlusJakartaSans.copyWith(
                                     color: appTheme.gray_50,
                                     height: 1.0,
                                     fontSize: unreadCount > 99 ? 8.h : 10.h,
@@ -345,8 +394,6 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     );
   }
 
-  /// Build authentication widget - shows login button or user avatar based on auth state
-  /// ✅ Optimized: only rebuilds when the small set of fields used by this widget change
   Widget _buildAuthenticationWidget(BuildContext context) {
     final userId = ref.watch(avatarStateProvider.select((s) => s.userId));
     final avatarUrl = ref.watch(avatarStateProvider.select((s) => s.avatarUrl));
@@ -355,29 +402,28 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
 
     final isAuthenticated = userId != null;
 
-    // Show loading only if we have nothing to display yet (prevents “spinner flash” while other UI updates happen)
-    if (!isAuthenticated && isLoading) {
-      return Container(
-        width: 50.h,
-        height: 50.h,
-        decoration: BoxDecoration(
-          color: appTheme.deep_purple_A100.withAlpha(77),
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: SizedBox(
-            width: 20.h,
-            height: 20.h,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.h,
-              valueColor: AlwaysStoppedAnimation<Color>(appTheme.gray_50),
+    if (!isAuthenticated) {
+      if (isLoading) {
+        return Container(
+          width: 50.h,
+          height: 50.h,
+          decoration: BoxDecoration(
+            color: appTheme.deep_purple_A100.withAlpha(77),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: SizedBox(
+              width: 20.h,
+              height: 20.h,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.h,
+                valueColor: AlwaysStoppedAnimation<Color>(appTheme.gray_50),
+              ),
             ),
           ),
-        ),
-      );
-    }
+        );
+      }
 
-    if (!isAuthenticated) {
       return GestureDetector(
         onTap: () => _handleLoginButtonTap(context),
         child: Container(
@@ -396,7 +442,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
       );
     }
 
-    // Show user avatar when authenticated
+    if (avatarUrl != null && avatarUrl.trim().isNotEmpty) {
+      _primeAvatarProvider(avatarUrl);
+    }
+
     return GestureDetector(
       onTap: () => _handleProfileTap(context),
       child: _buildUserAvatar(
@@ -407,82 +456,115 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     );
   }
 
-  /// Handle login button tap - navigate to login screen
   void _handleLoginButtonTap(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.authLogin);
   }
 
-  /// ✅ Stable avatar rendering:
-  /// - Uses CachedNetworkImageProvider
-  /// - Keeps a stable ImageProvider instance while URL is unchanged
-  /// - Does NOT replace avatar with spinner if we already have an avatar URL
+  // ============================================================
+  // AVATAR HELPERS
+  // ============================================================
+
+  String _stripQuery(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    return uri.replace(query: '').toString();
+  }
+
+  void _primeAvatarProvider(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) return;
+
+    final urlNoQuery = _stripQuery(trimmed);
+    final cacheKey = urlNoQuery;
+
+    if (_globalAvatarCacheKey == cacheKey && _globalAvatarProvider != null) {
+      _cachedAvatarUrl = urlNoQuery;
+      _cachedAvatarProvider = _globalAvatarProvider;
+      _maybePrecacheGlobal(cacheKey, _globalAvatarProvider!);
+      return;
+    }
+
+    final provider = CachedNetworkImageProvider(
+      trimmed,
+      cacheKey: cacheKey,
+      cacheManager: _avatarCacheManager,
+    );
+
+    _globalAvatarCacheKey = cacheKey;
+    _globalAvatarUrlNoQuery = urlNoQuery;
+    _globalAvatarProvider = provider;
+
+    _cachedAvatarUrl = urlNoQuery;
+    _cachedAvatarProvider = provider;
+
+    _maybePrecacheGlobal(cacheKey, provider);
+  }
+
+  void _maybePrecacheGlobal(String cacheKey, ImageProvider provider) {
+    if (_globalPrecachedKey == cacheKey) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_globalPrecachedKey == cacheKey) return;
+      _globalPrecachedKey = cacheKey;
+      precacheImage(provider, context);
+    });
+  }
+
   Widget _buildUserAvatar({
     required String? avatarUrl,
     required String? userEmail,
     required bool isLoading,
   }) {
-    final hasUrl = (avatarUrl != null && avatarUrl.isNotEmpty);
+    final hasUrl = (avatarUrl != null && avatarUrl.trim().isNotEmpty);
 
-    // Generate avatar letter from email if no avatar URL
     final email = userEmail ?? '';
     final avatarLetter = email.isNotEmpty ? email[0].toUpperCase() : 'U';
 
-    // Cache provider by URL so rebuilds don't thrash image resolution
     if (hasUrl) {
-      if (_cachedAvatarUrl != avatarUrl || _cachedAvatarProvider == null) {
-        _cachedAvatarUrl = avatarUrl;
-        _cachedAvatarProvider = CachedNetworkImageProvider(avatarUrl);
-      }
+      _primeAvatarProvider(avatarUrl!);
     } else {
       _cachedAvatarUrl = null;
       _cachedAvatarProvider = null;
     }
 
-    return Container(
+    final providerToUse = _globalAvatarProvider ?? _cachedAvatarProvider;
+
+    if (!hasUrl || providerToUse == null) {
+      return SizedBox(
+        width: 50.h,
+        height: 50.h,
+        child: ClipOval(
+          child: Container(
+            color: appTheme.deep_purple_A100,
+            child: Center(
+              child: Text(
+                avatarLetter,
+                style: TextStyleHelper.instance.title18BoldPlusJakartaSans.copyWith(
+                  color: appTheme.gray_50,
+                  fontSize: 20.h,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
       width: 50.h,
       height: 50.h,
-      decoration: BoxDecoration(
-        color: !hasUrl ? appTheme.deep_purple_A100 : null,
-        shape: BoxShape.circle,
-        image: hasUrl
-            ? DecorationImage(
-          image: _cachedAvatarProvider!,
-          fit: BoxFit.cover,
-        )
-            : null,
+      child: ClipOval(
+        child: RepaintBoundary(
+          child: Image(
+            image: providerToUse,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.low,
+          ),
+        ),
       ),
-      child: !hasUrl
-          ? Center(
-        child: Text(
-          avatarLetter,
-          style: TextStyleHelper.instance.title18BoldPlusJakartaSans.copyWith(
-            color: appTheme.gray_50,
-            fontSize: 20.h,
-          ),
-        ),
-      )
-          : (isLoading
-          ? Align(
-        alignment: Alignment.center,
-        child: SizedBox(
-          width: 20.h,
-          height: 20.h,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.h,
-            valueColor: AlwaysStoppedAnimation<Color>(appTheme.gray_50),
-          ),
-        ),
-      )
-          : null),
     );
-  }
-
-  /// Get fallback avatar text (first letter of email)
-  String _getAvatarFallbackText(String? userEmail) {
-    if (userEmail != null && userEmail.isNotEmpty) {
-      return userEmail.substring(0, 1).toUpperCase();
-    }
-    return 'U';
   }
 
   Widget _buildTitleWithLeadingLayout() {
@@ -544,12 +626,9 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     );
   }
 
-  /// Handles plus button tap - always opens memory_create bottom sheet
   void _handlePlusButtonTap(BuildContext context) {
-    // Start spin immediately
     _plusSpinController.forward(from: 0);
 
-    // Open bottom sheet on the next frame so the first rotation frame paints
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
@@ -562,33 +641,21 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     });
   }
 
-  /// Handles action icon tap - identifies and navigates accordingly
-  /// Bell/notification icons always navigate to notifications screen
-  /// Pictures/gallery icons navigate to memories screen
   void _handleActionIconTap(BuildContext context, String iconPath) {
-    // Check if this is a notification/bell icon
     if (_isNotificationIcon(iconPath)) {
       NavigatorService.pushNamed(AppRoutes.appNotifications);
-    }
-    // Check if this is a pictures/gallery icon
-    else if (_isPicturesIcon(iconPath)) {
+    } else if (_isPicturesIcon(iconPath)) {
       NavigatorService.pushNamed(AppRoutes.appMemories);
     }
   }
 
-  /// Identifies if an icon is a notification/bell icon
   bool _isNotificationIcon(String iconPath) {
-    // 🎯 EXACT match for notification bell icon - outline version used in app_shell
-    // This is the default notification icon that gets styled when active
     return iconPath.contains('icon_gray_50_32x32');
   }
 
-  /// Identifies if an icon is a pictures/gallery icon
   bool _isPicturesIcon(String iconPath) {
-    // 🎯 EXACT match for pictures/memories icon - must match the icon used in app_shell
-    // This is the ONLY pictures icon in the app
     return iconPath.contains('icon_gray_50') &&
-        !iconPath.contains('icon_gray_50_32x32') && // Exclude notification bell icon
+        !iconPath.contains('icon_gray_50_32x32') &&
         !iconPath.contains('icon_gray_50_18x') &&
         !iconPath.contains('icon_gray_50_20x') &&
         !iconPath.contains('icon_gray_50_24x') &&
@@ -596,12 +663,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
         !iconPath.contains('icon_gray_50_42x');
   }
 
-  /// Handles profile avatar tap - always opens the user menu drawer
   void _handleProfileTap(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.appMenu);
   }
 
-  /// Handles logo tap - always navigates to feed screen
   void _handleLogoTap(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.appFeed);
   }
@@ -624,14 +689,8 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
   }
 }
 
-/// Layout types for the custom app bar
 enum CustomAppBarLayoutType {
-  /// Logo with action icons and profile (default)
   logoWithActions,
-
-  /// Title with leading icon
   titleWithLeading,
-
-  /// Space between layout for leading and trailing elements
   spaceBetween,
 }

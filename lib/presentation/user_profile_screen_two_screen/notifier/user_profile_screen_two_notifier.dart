@@ -11,6 +11,7 @@ import '../../../services/friends_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/user_profile_service.dart';
+import '../../user_menu_screen/notifier/user_menu_notifier.dart'; // ✅ NEW
 import '../models/story_item_model.dart';
 import '../models/user_profile_screen_two_model.dart';
 
@@ -27,7 +28,8 @@ final userProfileScreenTwoNotifier = StateNotifierProvider.autoDispose<
 );
 
 class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoState> {
-  UserProfileScreenTwoNotifier(this.ref, UserProfileScreenTwoState state) : super(state);
+  UserProfileScreenTwoNotifier(this.ref, UserProfileScreenTwoState state)
+      : super(state);
 
   final Ref ref;
 
@@ -36,7 +38,44 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
   final BlockedUsersService _blockedUsersService = BlockedUsersService();
   final StoryService _storyService = StoryService();
 
-  String? get _currentUserId => SupabaseService.instance.client?.auth.currentUser?.id;
+  String? get _currentUserId =>
+      SupabaseService.instance.client?.auth.currentUser?.id;
+
+  bool _isNetworkUrl(String? s) {
+    if (s == null) return false;
+    final v = s.trim();
+    if (v.isEmpty) return false;
+    if (v == 'null' || v == 'undefined') return false;
+    return v.startsWith('http://') || v.startsWith('https://');
+  }
+
+  /// ✅ One resolver for *any* avatar value:
+  /// - If already http/https (Google, etc.) => return as-is
+  /// - Else treat as storage key => use existing UserProfileService.getAvatarUrl()
+  Future<String?> _resolveAnyAvatar(dynamic raw) async {
+    if (raw == null) return null;
+    final v = raw.toString().trim();
+    if (v.isEmpty || v == 'null' || v == 'undefined') return null;
+
+    if (_isNetworkUrl(v)) return v;
+
+    // storage key -> signed/public url resolver
+    try {
+      return await UserProfileService.instance.getAvatarUrl(v);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// ✅ Same idea, but non-async for places where you don't want awaits.
+  /// If AvatarHelperService already handles both, this is harmless.
+  String _resolveAnyAvatarSync(dynamic raw) {
+    if (raw == null) return '';
+    final v = raw.toString().trim();
+    if (v.isEmpty || v == 'null' || v == 'undefined') return '';
+    if (_isNetworkUrl(v)) return v;
+    return AvatarHelperService.getAvatarUrl(raw);
+  }
 
   Future<void> initialize({String? userId}) async {
     try {
@@ -54,7 +93,8 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
       if (isCurrentUserProfile) {
         profile = await UserProfileService.instance.getCurrentUserProfile();
       } else {
-        profile = await UserProfileService.instance.getPublicUserProfileById(resolvedTargetUserId);
+        profile = await UserProfileService.instance
+            .getPublicUserProfileById(resolvedTargetUserId);
       }
 
       if (profile == null) {
@@ -75,11 +115,11 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
         return;
       }
 
-      String? avatarUrl;
+      // ✅ avatar_url may be:
+      // - storage key "uuid/file.png"
+      // - full Google URL "https://lh3.googleusercontent.com/..."
       final avatarPath = profile['avatar_url'];
-      if (avatarPath != null && avatarPath.toString().isNotEmpty) {
-        avatarUrl = await UserProfileService.instance.getAvatarUrl(avatarPath.toString());
-      }
+      final avatarUrl = await _resolveAnyAvatar(avatarPath);
 
       final profileUserId = (profile['id'] as String?) ?? resolvedTargetUserId;
 
@@ -115,13 +155,22 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
         return StoryItemModel(
           storyId: story['id'] as String?,
           contributorId: story['contributor_id'] as String?,
-          userName: contributor?['display_name'] ?? contributor?['username'] ?? 'Unknown User',
-          userAvatar: AvatarHelperService.getAvatarUrl(contributor?['avatar_url']),
-          backgroundImage: StoryService.resolveStoryMediaUrl(story['thumbnail_url'] as String?),
+          userName: contributor?['display_name'] ??
+              contributor?['username'] ??
+              'Unknown User',
+
+          // ✅ contributor avatars may also be Google URLs now
+          userAvatar: _resolveAnyAvatarSync(contributor?['avatar_url']),
+
+          backgroundImage: StoryService.resolveStoryMediaUrl(
+            story['thumbnail_url'] as String?,
+          ),
           categoryText: categoryName,
           categoryIcon: categoryIconUrl ?? ImageConstant.imgVector,
           timestamp: _storyService.getTimeAgo(
-            DateTime.parse(story['created_at'] ?? DateTime.now().toIso8601String()),
+            DateTime.parse(
+              story['created_at'] ?? DateTime.now().toIso8601String(),
+            ),
           ),
         );
       }).toList();
@@ -131,12 +180,16 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
       final rawDisplayName =
       (profile['display_name'] ?? profile['displayName'])?.toString().trim();
       final rawUsername =
-      (profile['username'] ?? profile['user_name'] ?? profile['handle'])?.toString().trim();
+      (profile['username'] ?? profile['user_name'] ?? profile['handle'])
+          ?.toString()
+          .trim();
 
       state = state.copyWith(
         userProfileScreenTwoModel: UserProfileScreenTwoModel(
           avatarImagePath: avatarUrl ?? '',
-          displayName: (rawDisplayName != null && rawDisplayName.isNotEmpty) ? rawDisplayName : 'User',
+          displayName: (rawDisplayName != null && rawDisplayName.isNotEmpty)
+              ? rawDisplayName
+              : 'User',
           username: (rawUsername != null && rawUsername.isNotEmpty)
               ? rawUsername
               : (isCurrentUserProfile ? (safeEmail?.split('@').first ?? '') : ''),
@@ -154,6 +207,10 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
         isSavingUsername: false,
         displayNameSavedPulse: false,
         usernameSavedPulse: false,
+
+        // clear inline errors on fresh load
+        displayNameError: null,
+        usernameError: null,
       );
     } catch (e) {
       print('❌ ERROR initializing user profile: $e');
@@ -164,14 +221,15 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
     }
   }
 
-  // ✅ Display Name: saving spinner + pulse checkmark
+  // ✅ Display Name: saving spinner + pulse checkmark + refresh menu model
   Future<void> updateDisplayName(String newDisplayName) async {
     try {
       final trimmed = newDisplayName.trim();
       if (trimmed.isEmpty) return;
 
-      final currentUser = SupabaseService.instance.client?.auth.currentUser;
-      if (currentUser == null) return;
+      final client = SupabaseService.instance.client;
+      final currentUser = client?.auth.currentUser;
+      if (client == null || currentUser == null) return;
 
       // only allow on current-user profile
       final isCurrentUserProfile =
@@ -181,30 +239,39 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
       if (state.isSavingDisplayName) return;
 
       // avoid redundant save
-      final current =
-      (state.userProfileScreenTwoModel?.displayName ?? '').trim();
+      final current = (state.userProfileScreenTwoModel?.displayName ?? '').trim();
       if (current == trimmed) return;
 
+      // clear prior error/pulse and start saving
       state = state.copyWith(
         isSavingDisplayName: true,
         displayNameSavedPulse: false,
+        displayNameError: null,
       );
 
       final success =
       await UserProfileService.instance.updateUserProfile(displayName: trimmed);
 
       if (!success) {
-        state = state.copyWith(isSavingDisplayName: false);
+        state = state.copyWith(
+          isSavingDisplayName: false,
+          displayNameError: 'Could not update display name. Try again.',
+        );
         return;
       }
 
+      // update local model + pulse
       state = state.copyWith(
         userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
           displayName: trimmed,
         ),
         isSavingDisplayName: false,
         displayNameSavedPulse: true,
+        displayNameError: null,
       );
+
+      // ✅ refresh the drawer/menu immediately
+      await ref.read(userMenuNotifier.notifier).refreshProfile();
 
       Future.delayed(const Duration(milliseconds: 900), () {
         if (!mounted) return;
@@ -212,13 +279,16 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
       });
     } catch (e) {
       print('❌ Error updating display name: $e');
-      state = state.copyWith(isSavingDisplayName: false);
+      state = state.copyWith(
+        isSavingDisplayName: false,
+        displayNameError: 'Could not update display name. Try again.',
+      );
     }
   }
+
   String _normalizeUsername(String input) {
     final t = input.trim();
     final noAt = t.startsWith('@') ? t.substring(1) : t;
-    // simple normalization: lowercase + remove spaces
     return noAt.trim().toLowerCase();
   }
 
@@ -229,8 +299,6 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
     final currentUser = client.auth.currentUser;
     if (currentUser == null) return false;
 
-    // Look for ANY other user with same username (case-insensitive)
-    // NOTE: This assumes you store usernames lowercase OR you created a lower(username) unique index.
     final res = await client
         .from('user_profiles')
         .select('id')
@@ -242,17 +310,16 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
   }
 
   bool _isValidUsername(String u) {
-    // 3–20 chars, lowercase letters/numbers/underscore/dot
     return RegExp(r'^[a-z0-9_.]{3,20}$').hasMatch(u);
   }
 
+  // ✅ Username: validation + taken check + spinner/pulse + refresh menu model
   Future<void> updateUsername(String newUsername) async {
     try {
       final client = SupabaseService.instance.client;
       final currentUser = client?.auth.currentUser;
       if (client == null || currentUser == null) return;
 
-      // only current user can update
       final isCurrentUserProfile =
           state.targetUserId == null || state.targetUserId == currentUser.id;
       if (!isCurrentUserProfile) return;
@@ -261,7 +328,7 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
 
       final normalized = _normalizeUsername(newUsername);
 
-      // ✅ clear previous pulses + errors immediately
+      // clear previous pulse + error
       state = state.copyWith(
         usernameSavedPulse: false,
         usernameError: null,
@@ -279,12 +346,12 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
         return;
       }
 
-      final current = _normalizeUsername(state.userProfileScreenTwoModel?.username ?? '');
+      final current =
+      _normalizeUsername(state.userProfileScreenTwoModel?.username ?? '');
       if (current == normalized) return;
 
       state = state.copyWith(isSavingUsername: true);
 
-      // ✅ pre-check: taken?
       final taken = await _isUsernameTaken(normalized);
       if (taken) {
         state = state.copyWith(
@@ -294,13 +361,12 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
         return;
       }
 
-      // ✅ update DB
-      await client
-          .from('user_profiles')
-          .update({'username': normalized})
-          .eq('id', currentUser.id);
+      await client.from('user_profiles').update({'username': normalized}).eq(
+        'id',
+        currentUser.id,
+      );
 
-      // ✅ update local model + success pulse
+      // update local model + pulse
       state = state.copyWith(
         userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
           username: normalized,
@@ -309,6 +375,9 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
         usernameSavedPulse: true,
         usernameError: null,
       );
+
+      // ✅ refresh the drawer/menu immediately
+      await ref.read(userMenuNotifier.notifier).refreshProfile();
 
       Future.delayed(const Duration(milliseconds: 900), () {
         if (!mounted) return;
@@ -323,15 +392,17 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
     }
   }
 
-
   Future<void> _loadRelationshipStatus(String targetUserId) async {
     try {
       final currentUser = SupabaseService.instance.client?.auth.currentUser;
       if (currentUser == null) return;
 
-      final isFollowing = await _followsService.isFollowing(currentUser.id, targetUserId);
-      final isFriend = await _friendsService.areFriends(currentUser.id, targetUserId);
-      final hasPendingRequest = await _friendsService.hasPendingRequest(currentUser.id, targetUserId);
+      final isFollowing =
+      await _followsService.isFollowing(currentUser.id, targetUserId);
+      final isFriend =
+      await _friendsService.areFriends(currentUser.id, targetUserId);
+      final hasPendingRequest =
+      await _friendsService.hasPendingRequest(currentUser.id, targetUserId);
       final isBlocked = await _blockedUsersService.isUserBlocked(targetUserId);
 
       state = state.copyWith(

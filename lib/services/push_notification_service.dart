@@ -499,16 +499,32 @@ class PushNotificationService {
 
       switch (pathSegments[0]) {
         case 'memory':
-        // Handle: /memory/{memoryId}
           if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
             final memoryId = pathSegments[1];
-            debugPrint('📱 Navigating to memory: $memoryId');
-            navigatorKey.currentState?.pushNamed(
-              '/app/bs/details',
-              arguments: memoryId,
-            );
-          } else {
-            debugPrint('❌ Memory deep link missing ID: $deepLink');
+
+            // Check for /memory/{memoryId}/story/{storyId} pattern
+            if (pathSegments.length >= 4 &&
+                pathSegments[2] == 'story' &&
+                pathSegments[3].isNotEmpty) {
+              final storyId = pathSegments[3];
+              debugPrint('📱 Navigating to story: $storyId in memory: $memoryId');
+              navigatorKey.currentState?.pushNamed(
+                '/app/story/view',
+                arguments: FeedStoryContext(
+                  feedType: 'deep_link',
+                  initialStoryId: storyId,
+                  storyIds: [storyId],
+                  memoryId: memoryId,
+                ),
+              );
+            } else {
+              // Handle /memory/{memoryId} - navigate to memory timeline
+              debugPrint('📱 Navigating to memory timeline: $memoryId');
+              navigatorKey.currentState?.pushNamed(
+                '/app/timeline',
+                arguments: {'memoryId': memoryId},
+              );
+            }
           }
           break;
 

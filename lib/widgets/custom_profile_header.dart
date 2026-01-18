@@ -1,14 +1,18 @@
 // lib/widgets/custom_profile_header.dart
 
 import '../core/app_export.dart';
+import '../services/supabase_service.dart';
 import './custom_image_view.dart';
 
 class CustomProfileHeader extends StatefulWidget {
   const CustomProfileHeader({
     Key? key,
     required this.avatarImagePath,
+
+    // ✅ errors
     this.displayNameError,
     this.usernameError,
+
     // ✅ DB-backed fields
     required this.displayName, // display_name
     required this.username, // username (raw, no @ preferred)
@@ -26,7 +30,7 @@ class CustomProfileHeader extends StatefulWidget {
 
     this.margin,
 
-    // ✅ NEW: save UX flags (optional)
+    // ✅ inline save UX
     this.isSavingDisplayName = false,
     this.isSavingUsername = false,
     this.displayNameSavedPulse = false,
@@ -53,11 +57,13 @@ class CustomProfileHeader extends StatefulWidget {
 
   final EdgeInsetsGeometry? margin;
 
-  // ✅ NEW: name/username save indicators
+  // ✅ save indicators
   final bool isSavingDisplayName;
   final bool isSavingUsername;
   final bool displayNameSavedPulse;
   final bool usernameSavedPulse;
+
+  // ✅ errors
   final String? displayNameError;
   final String? usernameError;
 
@@ -73,6 +79,9 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
   final TextEditingController _usernameController = TextEditingController();
   final FocusNode _usernameFocus = FocusNode();
   bool _editingUsername = false;
+
+  // ✅ CHANGE THIS TO YOUR REAL AVATAR BUCKET NAME
+  static const String _avatarBucket = 'avatars';
 
   @override
   void initState() {
@@ -127,14 +136,37 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
     if (t.isEmpty) return '';
     return t.startsWith('@') ? t : '@$t';
   }
-  Widget _editPencil({
-    required bool show,
-    double size = 14,
-  }) {
-    if (!show) {
-      return SizedBox(width: size, height: size);
-    }
 
+  bool _isNetworkUrl(String? s) {
+    if (s == null) return false;
+    final v = s.trim();
+    if (v.isEmpty) return false;
+    if (v == 'null' || v == 'undefined') return false;
+    return v.startsWith('http://') || v.startsWith('https://');
+  }
+
+  /// ✅ Resolves either:
+  /// - Full network URL -> returns as-is
+  /// - Supabase storage key -> returns public URL
+  /// - invalid/empty -> returns null
+  String? _resolveAvatarPath(String? raw) {
+    if (raw == null) return null;
+    final v = raw.trim();
+    if (v.isEmpty || v == 'null' || v == 'undefined') return null;
+
+    if (_isNetworkUrl(v)) return v;
+
+    final client = SupabaseService.instance.client;
+    if (client == null) return null;
+
+    try {
+      return client.storage.from(_avatarBucket).getPublicUrl(v);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _editPencil({double size = 14}) {
     return Icon(
       Icons.edit,
       size: size,
@@ -176,6 +208,23 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
     }
 
     return SizedBox(width: size, height: size);
+  }
+
+  void _startEditDisplayName() {
+    if (!widget.allowEdit) return;
+    if (_editingDisplayName) return;
+    setState(() => _editingDisplayName = true);
+    _displayNameFocus.requestFocus();
+  }
+
+  void _startEditUsername() {
+    if (!widget.allowEdit) return;
+    if (_editingUsername) return;
+    setState(() {
+      _editingUsername = true;
+      _usernameController.text = _stripAt(_usernameController.text);
+    });
+    _usernameFocus.requestFocus();
   }
 
   void _saveDisplayName() {
@@ -232,7 +281,10 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
     final double size = 96.h;
     final displayName = widget.displayName.trim();
 
-    final shouldLetter = widget.avatarImagePath.isEmpty ||
+    final resolvedAvatarPath = _resolveAvatarPath(widget.avatarImagePath);
+
+    final shouldLetter = resolvedAvatarPath == null ||
+        resolvedAvatarPath.isEmpty ||
         widget.avatarImagePath == ImageConstant.imgDefaultAvatar;
 
     return SizedBox(
@@ -273,7 +325,7 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
                   width: size,
                   height: size,
                   child: CustomImageView(
-                    imagePath: widget.avatarImagePath,
+                    imagePath: resolvedAvatarPath!,
                     width: size,
                     height: size,
                     fit: BoxFit.cover,
@@ -304,58 +356,57 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
 
   Widget _buildDisplayName() {
     final current = widget.displayName.trim();
+    const double fieldWidth = 260;
 
-    const double fieldWidth = 260; // fixed width = stable centering
+    final bool hasStateIcon = widget.isSavingDisplayName ||
+        widget.displayNameSavedPulse ||
+        (widget.displayNameError != null && widget.displayNameError!.trim().isNotEmpty);
 
+    // ✅ EDITING: show TextField, indicator on right
     if (widget.allowEdit && _editingDisplayName) {
       return SizedBox(
         width: fieldWidth.h,
         child: Stack(
           alignment: Alignment.center,
           children: [
-            GestureDetector(
-              onTap: widget.allowEdit
-                  ? () => setState(() => _editingDisplayName = true)
-                  : null,
-              child: Text(
-                current.isNotEmpty ? current : 'User',
-                style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-                    .copyWith(color: appTheme.white_A700, height: 1.29),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            TextField(
+              controller: _displayNameController,
+              focusNode: _displayNameFocus,
+              autofocus: true,
+              textAlign: TextAlign.center,
+              style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
+                  .copyWith(color: appTheme.white_A700, height: 1.29),
+              decoration: const InputDecoration(
+                border: UnderlineInputBorder(),
               ),
+              onSubmitted: (_) => _saveDisplayName(),
             ),
-
-            // ✅ RIGHT-SIDE ABSOLUTE ICON SLOT
-            if (widget.allowEdit)
-              Positioned(
-                right: 0,
-                child: widget.isSavingDisplayName ||
-                    widget.displayNameSavedPulse ||
-                    widget.displayNameError != null
-                    ? _saveIndicator(
+            Positioned(
+              right: 0,
+              child: AbsorbPointer(
+                absorbing: true, // ✅ do not let taps bubble to parent
+                child: _saveIndicator(
                   saving: widget.isSavingDisplayName,
                   savedPulse: widget.displayNameSavedPulse,
                   errorText: widget.displayNameError,
                   size: 16.h,
-                )
-                    : _editPencil(show: true, size: 16.h),
+                ),
               ),
+            ),
           ],
         ),
       );
     }
 
+    // ✅ IDLE: tap anywhere (including pencil) enters edit; pencil is purely visual
     return SizedBox(
       width: fieldWidth.h,
       child: Stack(
         alignment: Alignment.center,
         children: [
           GestureDetector(
-            onTap: widget.allowEdit
-                ? () => setState(() => _editingDisplayName = true)
-                : null,
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.allowEdit ? _startEditDisplayName : null,
             child: Text(
               current.isNotEmpty ? current : 'User',
               style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
@@ -365,15 +416,27 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-
-          // ✅ ABSOLUTE indicator
           if (widget.allowEdit)
             Positioned(
               right: 0,
-              child: _saveIndicator(
-                saving: widget.isSavingDisplayName,
-                savedPulse: widget.displayNameSavedPulse,
-                size: 16.h,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                // ✅ consume the tap so it doesn't trigger any parent GestureDetector (avatar picker)
+                onTap: _startEditDisplayName,
+                child: hasStateIcon
+                    ? AbsorbPointer(
+                  absorbing: true,
+                  child: _saveIndicator(
+                    saving: widget.isSavingDisplayName,
+                    savedPulse: widget.displayNameSavedPulse,
+                    errorText: widget.displayNameError,
+                    size: 16.h,
+                  ),
+                )
+                    : AbsorbPointer(
+                  absorbing: true,
+                  child: _editPencil(size: 16.h),
+                ),
               ),
             ),
         ],
@@ -383,51 +446,70 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
 
   Widget _buildUsername() {
     final handle = _formatHandle(widget.username);
-
     const double fieldWidth = 260;
 
+    final bool hasStateIcon = widget.isSavingUsername ||
+        widget.usernameSavedPulse ||
+        (widget.usernameError != null && widget.usernameError!.trim().isNotEmpty);
+
+    // ✅ EDITING
     if (widget.allowEdit && _editingUsername) {
-      SizedBox(
-        width: fieldWidth.h,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            GestureDetector(
-              onTap: widget.allowEdit
-                  ? () => setState(() {
-                _editingUsername = true;
-                _usernameController.text = _stripAt(handle);
-              })
-                  : null,
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: fieldWidth.h,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                TextField(
+                  controller: _usernameController,
+                  focusNode: _usernameFocus,
+                  autofocus: true,
+                  textAlign: TextAlign.center,
+                  style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                      .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+                  decoration: InputDecoration(
+                    border: const UnderlineInputBorder(),
+                    prefixText: '@',
+                    prefixStyle: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+                  ),
+                  onSubmitted: (_) => _saveUsername(),
+                ),
+                Positioned(
+                  right: 0,
+                  child: AbsorbPointer(
+                    absorbing: true,
+                    child: _saveIndicator(
+                      saving: widget.isSavingUsername,
+                      savedPulse: widget.usernameSavedPulse,
+                      errorText: widget.usernameError,
+                      size: 14.h,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (widget.usernameError != null && widget.usernameError!.trim().isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(top: 6.h),
               child: Text(
-                handle.isNotEmpty ? handle : '@',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+                widget.usernameError!,
+                style: TextStyle(
+                  color: appTheme.red_500,
+                  fontSize: 12.h,
+                  height: 1.2,
+                ),
                 textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-
-            if (widget.allowEdit)
-              Positioned(
-                right: 0,
-                child: widget.isSavingUsername ||
-                    widget.usernameSavedPulse ||
-                    widget.usernameError != null
-                    ? _saveIndicator(
-                  saving: widget.isSavingUsername,
-                  savedPulse: widget.usernameSavedPulse,
-                  errorText: widget.usernameError,
-                  size: 14.h,
-                )
-                    : _editPencil(show: true, size: 14.h),
-              ),
-          ],
-        ),
+        ],
       );
     }
 
+    // ✅ IDLE
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -437,12 +519,8 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
             alignment: Alignment.center,
             children: [
               GestureDetector(
-                onTap: widget.allowEdit
-                    ? () => setState(() {
-                  _editingUsername = true;
-                  _usernameController.text = _stripAt(handle);
-                })
-                    : null,
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.allowEdit ? _startEditUsername : null,
                 child: Text(
                   handle.isNotEmpty ? handle : '@',
                   style: TextStyleHelper.instance.title16RegularPlusJakartaSans
@@ -455,17 +533,29 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
               if (widget.allowEdit)
                 Positioned(
                   right: 0,
-                  child: _saveIndicator(
-                    saving: widget.isSavingUsername,
-                    savedPulse: widget.usernameSavedPulse,
-                    errorText: widget.usernameError,
-                    size: 14.h,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    // ✅ consume tap so it doesn't trigger parent avatar picker
+                    onTap: _startEditUsername,
+                    child: hasStateIcon
+                        ? AbsorbPointer(
+                      absorbing: true,
+                      child: _saveIndicator(
+                        saving: widget.isSavingUsername,
+                        savedPulse: widget.usernameSavedPulse,
+                        errorText: widget.usernameError,
+                        size: 14.h,
+                      ),
+                    )
+                        : AbsorbPointer(
+                      absorbing: true,
+                      child: _editPencil(size: 14.h),
+                    ),
                   ),
                 ),
             ],
           ),
         ),
-
         if (widget.usernameError != null && widget.usernameError!.trim().isNotEmpty)
           Padding(
             padding: EdgeInsets.only(top: 6.h),
@@ -481,6 +571,5 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
           ),
       ],
     );
-
   }
 }

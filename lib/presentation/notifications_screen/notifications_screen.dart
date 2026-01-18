@@ -563,13 +563,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                             // Start countdown timer
                             Future.delayed(Duration.zero, () async {
                               for (int i = remainingSeconds; i > 0; i--) {
-                                await Future.delayed(
-                                    const Duration(seconds: 1));
-                                if (context.mounted) {
-                                  setState(() {
-                                    remainingSeconds = i - 1;
-                                  });
-                                }
+                                await Future.delayed(const Duration(seconds: 1));
+                                if (!context.mounted) return;
+
+                                setState(() {
+                                  remainingSeconds = i - 1;
+                                });
+                              }
+
+                              // ✅ When countdown finishes, explicitly dismiss the snackbar
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
                               }
                             });
 
@@ -606,7 +610,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         duration: const Duration(seconds: 5),
                         behavior: SnackBarBehavior.floating,
                         margin: EdgeInsets.only(
-                          bottom: 80.h,
+                          bottom: 16.h,
                           left: 16.w,
                           right: 16.w,
                         ),
@@ -633,7 +637,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                       duration: const Duration(seconds: 2),
                                       behavior: SnackBarBehavior.floating,
                                       margin: EdgeInsets.only(
-                                        bottom: 80.h,
+                                        bottom: 16.h,
                                         left: 16.w,
                                         right: 16.w,
                                       ),
@@ -653,7 +657,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                       duration: const Duration(seconds: 2),
                                       behavior: SnackBarBehavior.floating,
                                       margin: EdgeInsets.only(
-                                        bottom: 80.h,
+                                        bottom: 16.h,
                                         left: 16.w,
                                         right: 16.w,
                                       ),

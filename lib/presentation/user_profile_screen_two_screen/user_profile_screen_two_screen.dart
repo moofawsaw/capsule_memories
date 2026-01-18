@@ -69,7 +69,9 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       }
 
       // ✅ Kick init (notifier should set isLoading true internally)
-      ref.read(userProfileScreenTwoNotifier.notifier).initialize(userId: _userId);
+      ref
+          .read(userProfileScreenTwoNotifier.notifier)
+          .initialize(userId: _userId);
 
       // Avatar only for current user
       if (_userId == null) {
@@ -85,7 +87,9 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
   }
 
   Future<void> _onRefresh() async {
-    await ref.read(userProfileScreenTwoNotifier.notifier).initialize(userId: _userId);
+    await ref
+        .read(userProfileScreenTwoNotifier.notifier)
+        .initialize(userId: _userId);
 
     if (_userId == null) {
       await ref.read(avatarStateProvider.notifier).refreshAvatar();
@@ -100,7 +104,8 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     // - Before we even trigger init (first frame), ALWAYS show skeleton.
     // - After init is triggered, keep skeleton until we have a model and not loading.
     final bool hasModel = state.userProfileScreenTwoModel != null;
-    final bool isViewingOtherUser = _initTriggered ? (_userId != null) : _initialViewingOtherUser;
+    final bool isViewingOtherUser =
+    _initTriggered ? (_userId != null) : _initialViewingOtherUser;
 
     final bool showSkeleton = !_initTriggered || state.isLoading || !hasModel;
 
@@ -158,7 +163,9 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       children: [
         GestureDetector(
           onTap: isCurrentUser
-              ? () => ref.read(userProfileScreenTwoNotifier.notifier).uploadAvatar()
+              ? () => ref
+              .read(userProfileScreenTwoNotifier.notifier)
+              .uploadAvatar()
               : null,
           child: CustomProfileHeader(
             avatarImagePath: (isCurrentUser ? avatarState.avatarUrl : null) ??
@@ -167,12 +174,12 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             displayName: displayName.isNotEmpty ? displayName : 'User',
             username: usernameRaw,
             email: isCurrentUser ? (model?.email ?? '') : '',
-
             allowEdit: isCurrentUser,
             onEditTap: isCurrentUser
-                ? () => ref.read(userProfileScreenTwoNotifier.notifier).uploadAvatar()
+                ? () => ref
+                .read(userProfileScreenTwoNotifier.notifier)
+                .uploadAvatar()
                 : null,
-
             onDisplayNameChanged: isCurrentUser
                 ? (newDisplayName) => ref
                 .read(userProfileScreenTwoNotifier.notifier)
@@ -195,14 +202,14 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             margin: EdgeInsets.symmetric(horizontal: 68.h),
           ),
         ),
-
         if (!isCurrentUser)
           Positioned(
             top: 0,
             right: 0,
             child: GestureDetector(
               onTap: () {
-                final notifier = ref.read(userProfileScreenTwoNotifier.notifier);
+                final notifier =
+                ref.read(userProfileScreenTwoNotifier.notifier);
                 _showBlockConfirmationDialog(context, state.isBlocked, () {
                   notifier.toggleBlock();
                 });
@@ -215,13 +222,16 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
                       : appTheme.red_500.withAlpha(26),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: state.isBlocked ? appTheme.blue_gray_300 : appTheme.red_500,
+                    color: state.isBlocked
+                        ? appTheme.blue_gray_300
+                        : appTheme.red_500,
                     width: 1.5,
                   ),
                 ),
                 child: Icon(
                   state.isBlocked ? Icons.lock_open : Icons.block,
-                  color: state.isBlocked ? appTheme.blue_gray_300 : appTheme.red_500,
+                  color:
+                  state.isBlocked ? appTheme.blue_gray_300 : appTheme.red_500,
                   size: 20.0,
                 ),
               ),
@@ -240,7 +250,9 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       children: [
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: isCurrentUser ? () => NavigatorService.pushNamed(AppRoutes.appFollowers) : null,
+          onTap: isCurrentUser
+              ? () => NavigatorService.pushNamed(AppRoutes.appFollowers)
+              : null,
           child: CustomStatCard(
             count: model?.followersCount ?? '0',
             label: 'followers',
@@ -249,7 +261,9 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
         SizedBox(width: 12.h),
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: isCurrentUser ? () => NavigatorService.pushNamed(AppRoutes.appFollowing) : null,
+          onTap: isCurrentUser
+              ? () => NavigatorService.pushNamed(AppRoutes.appFollowing)
+              : null,
           child: CustomStatCard(
             count: model?.followingCount ?? '0',
             label: 'following',
@@ -263,12 +277,23 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     final state = ref.watch(userProfileScreenTwoNotifier);
     final notifier = ref.read(userProfileScreenTwoNotifier.notifier);
 
+    final unsetStyle = CustomButtonStyle(
+      backgroundColor: appTheme.deep_purple_A100, // primary / default
+      variant: CustomButtonVariant.fill,
+    );
+
+    final setStyle = CustomButtonStyle(
+      backgroundColor: appTheme.blue_gray_900, // "set" state
+      variant: CustomButtonVariant.fill,
+    );
+
     return Row(
       children: [
         Expanded(
           child: CustomButton(
             text: state.isFollowing ? 'Unfollow' : 'Follow',
             leftIcon: state.isFollowing ? Icons.person_remove : Icons.person_add,
+            buttonStyle: state.isFollowing ? setStyle : unsetStyle,
             onPressed: notifier.toggleFollow,
           ),
         ),
@@ -277,7 +302,9 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
           child: CustomButton(
             text: state.isFriend ? 'Unfriend' : 'Add Friend',
             leftIcon: state.isFriend ? Icons.person_remove : Icons.group_add,
-            onPressed: state.isFriend ? notifier.unfriendUser : notifier.sendFriendRequest,
+            buttonStyle: state.isFriend ? setStyle : unsetStyle,
+            onPressed:
+            state.isFriend ? notifier.unfriendUser : notifier.sendFriendRequest,
           ),
         ),
       ],

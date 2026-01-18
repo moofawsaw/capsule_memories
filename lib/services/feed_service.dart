@@ -174,16 +174,13 @@ class FeedService {
     return {...friends, ...following};
   }
 
-  // -----------------------------
-  // FOR YOU: GATING HELPERS
-  // -----------------------------
-
-  /// Optional: define what "active" means for For You.
-  /// If you want ALL-time, remove the created_at filter below.
-  static const Duration _forYouActiveWindow = Duration(hours: 24);
+// ----------------------------------
+// FOR YOU: GATING HELPERS (REPLACEMENT)
+// ----------------------------------
 
   /// Returns true if user has 1+ (friends OR following)
   /// AND there is at least one matching story from those authors.
+  /// REPLACEMENT: removed the past-24-hours filter (all-time).
   Future<bool> shouldServeForYouStoriesFeed() async {
     if (_client == null) return false;
 
@@ -197,21 +194,20 @@ class FeedService {
   }
 
   /// Cheap exists-check (limit 1) for whether any For You story exists.
+  /// REPLACEMENT: removed the past-24-hours filter (all-time).
   Future<bool> _hasForYouAuthorStories({required Set<String> authorIds}) async {
     if (_client == null) return false;
     if (authorIds.isEmpty) return false;
 
     try {
-      final since = DateTime.now()
-          .subtract(_forYouActiveWindow)
-          .toIso8601String();
-
       final response = await _client!
           .from('stories')
-          .select('id, created_at, contributor_id, memory_id, memories!inner(visibility, state)')
+          .select(
+        'id, created_at, contributor_id, memory_id, memories!inner(visibility, state)',
+      )
           .eq('memories.visibility', 'public')
           .eq('memories.state', 'open')
-          .gte('created_at', since) // remove if you want all-time
+      // ✅ removed: .gte('created_at', since)
           .inFilter('contributor_id', authorIds.toList())
           .order('created_at', ascending: false)
           .limit(1);
@@ -225,17 +221,13 @@ class FeedService {
   }
 
 
+// ----------------------------------
+// FROM FRIENDS: GATING HELPERS (REPLACEMENT)
+// ----------------------------------
 
-  // -----------------------------
-  // FROM FRIENDS: GATING HELPERS
-  // -----------------------------
-
-  /// Define what "active stories" means for From Friends.
-  /// Adjust this window if you want (ex: 12h, 48h, etc.)
-  static const Duration _fromFriendsActiveWindow = Duration(hours: 24);
-
-  /// Returns true if user has 1+ friends AND there is at least one active story
-  /// from any friend that matches From Friends criteria.
+  /// Returns true if user has 1+ friends AND there is at least one story
+  /// from any friend that matches criteria.
+  /// REPLACEMENT: removed the past-24-hours filter (all-time).
   Future<bool> shouldServeFromFriendsFeed() async {
     if (_client == null) return false;
 
@@ -248,22 +240,21 @@ class FeedService {
     return _hasActiveFriendStories(friendIds: friendIds);
   }
 
-  /// Cheap existence check (no heavy payload): does at least 1 matching story exist?
+  /// Cheap existence check (limit 1): does at least 1 matching friend story exist?
+  /// REPLACEMENT: removed the past-24-hours filter (all-time).
   Future<bool> _hasActiveFriendStories({required Set<String> friendIds}) async {
     if (_client == null) return false;
     if (friendIds.isEmpty) return false;
 
     try {
-      final since = DateTime.now()
-          .subtract(_fromFriendsActiveWindow)
-          .toIso8601String();
-
       final response = await _client!
           .from('stories')
-          .select('id, created_at, contributor_id, memory_id, memories!inner(visibility, state)')
+          .select(
+        'id, created_at, contributor_id, memory_id, memories!inner(visibility, state)',
+      )
           .eq('memories.visibility', 'public')
           .eq('memories.state', 'open')
-          .gte('created_at', since)
+      // ✅ removed: .gte('created_at', since)
           .inFilter('contributor_id', friendIds.toList())
           .order('created_at', ascending: false)
           .limit(1);
@@ -275,6 +266,7 @@ class FeedService {
       return false;
     }
   }
+
 
 
 
@@ -375,12 +367,12 @@ class FeedService {
     }
   }
 
-  // -----------------------------
-  // STORIES: From Friends (NEW)
-  // -----------------------------
+// ----------------------------------
+// STORIES: From Friends (FETCH) (REPLACEMENT)
+// ----------------------------------
 
   /// Fetch public stories where the contributor is a friend of current user.
-  /// Only returns stories that match the "active" window + open/public memories.
+  /// REPLACEMENT: removed the past-24-hours filter (all-time).
   Future<List<Map<String, dynamic>>> fetchFromFriendsStories({
     int offset = 0,
     int limit = _pageSize,
@@ -397,49 +389,46 @@ class FeedService {
       final friendIds = await _fetchFriendUserIds(currentUserId);
       if (friendIds.isEmpty) return [];
 
-      // Enforce "active stories" constraint here too.
-      final since = DateTime.now()
-          .subtract(_fromFriendsActiveWindow)
-          .toIso8601String();
-
       final response = await _client!
           .from('stories')
           .select('''
-            id,
-            video_url,
-            thumbnail_url,
-            created_at,
-            contributor_id,
-            memory_id,
-            view_count,
-            memories!inner(
-              title,
-              state,
-              visibility,
-              category_id,
-              memory_categories:category_id(
-                id,
-                name,
-                icon_url
-              )
-            ),
-            user_profiles_public!stories_contributor_id_fkey(
+          id,
+          video_url,
+          thumbnail_url,
+          created_at,
+          contributor_id,
+          memory_id,
+          view_count,
+          memories!inner(
+            title,
+            state,
+            visibility,
+            category_id,
+            memory_categories:category_id(
               id,
-              display_name,
-              avatar_url
+              name,
+              icon_url
             )
-          ''')
+          ),
+          user_profiles_public!stories_contributor_id_fkey(
+            id,
+            display_name,
+            avatar_url
+          )
+        ''')
           .eq('memories.visibility', 'public')
           .eq('memories.state', 'open')
-          .gte('created_at', since)
+      // ✅ removed: .gte('created_at', since)
           .inFilter('contributor_id', friendIds.toList())
           .order('created_at', ascending: false)
           .range(offset, offset + limit - 1);
 
       final rows = (response as List);
 
-      final storyIds =
-      rows.map((r) => r['id'] as String?).whereType<String>().toList();
+      final storyIds = rows
+          .map((r) => r['id'] as String?)
+          .whereType<String>()
+          .toList();
 
       final viewedIds = await _fetchViewedStoryIdsForUser(
         userId: currentUserId,
