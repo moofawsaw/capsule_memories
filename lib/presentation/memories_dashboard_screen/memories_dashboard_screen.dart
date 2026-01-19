@@ -176,15 +176,15 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
           ),
           SizedBox(height: 12.h),
           SizedBox(
-            height: 130.h,
+            height: 121.h,
             child: isLoading
                 ? ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.only(left: 20.h),
-              itemCount: 3,
+              itemCount: 5,
               itemBuilder: (_, __) => Container(
-                width: 120.h,
-                margin: EdgeInsets.only(right: 10.h),
+                width: 90.h, // ✅ match real card width
+                margin: EdgeInsets.only(right: 8.h), // ✅ match itemGap in CustomStoryList
                 child: CustomStorySkeleton(isCompact: true),
               ),
             )

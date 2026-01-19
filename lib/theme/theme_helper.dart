@@ -61,6 +61,16 @@ class ThemeHelper {
       visualDensity: VisualDensity.standard,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colors.gray_900_02,
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: colors.gray_900_01, // dark surface card
+        contentTextStyle: TextStyle(color: colors.gray_50), // light text
+        actionTextColor: colors.deep_purple_A100,
+        behavior: SnackBarBehavior.floating,
+        elevation: 6,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
     );
   }
 
@@ -79,6 +89,16 @@ class ThemeHelper {
       visualDensity: VisualDensity.standard,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colors.gray_900_02,
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: colors.gray_900_01, // light surface token in your LightModeColors
+        contentTextStyle: TextStyle(color: colors.black_900),
+        actionTextColor: colors.deep_purple_A100,
+        behavior: SnackBarBehavior.floating,
+        elevation: 6,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
     );
   }
 
@@ -91,6 +111,16 @@ class ThemeHelper {
       visualDensity: VisualDensity.standard,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colors.gray_900_02,
+        snackBarTheme: SnackBarThemeData(
+          backgroundColor: colors.gray_900_01,
+          contentTextStyle: TextStyle(color: colors.gray_50),
+          actionTextColor: colors.deep_purple_A100,
+          behavior: SnackBarBehavior.floating,
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
     );
   }
 }

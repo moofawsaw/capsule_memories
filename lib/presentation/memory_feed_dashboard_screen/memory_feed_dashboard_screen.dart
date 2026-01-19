@@ -194,39 +194,42 @@ class _MemoryFeedDashboardScreenState
 
   /// Build skeleton loader for action button
   Widget _buildActionButtonSkeleton() {
-    return Container(
-      height: 48.h,
+    return SizedBox(
+      height: 56.h, // EXACT match to CustomButton
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: appTheme.blue_gray_900_01,
-        borderRadius: BorderRadius.circular(12.h),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Icon skeleton
-          Container(
-            width: 20.h,
-            height: 20.h,
-            decoration: BoxDecoration(
-              color: appTheme.blue_gray_300.withAlpha(77),
-              borderRadius: BorderRadius.circular(4.h),
-            ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: appTheme.blue_gray_900_01,
+          borderRadius: BorderRadius.circular(6.h), // match button radius
+        ),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 20.h,
+                height: 20.h,
+                decoration: BoxDecoration(
+                  color: appTheme.blue_gray_300.withAlpha(77),
+                  borderRadius: BorderRadius.circular(4.h),
+                ),
+              ),
+              SizedBox(width: 8.h),
+              Container(
+                width: 110.h, // closer to real text width
+                height: 16.h,
+                decoration: BoxDecoration(
+                  color: appTheme.blue_gray_300.withAlpha(77),
+                  borderRadius: BorderRadius.circular(4.h),
+                ),
+              ),
+            ],
           ),
-          SizedBox(width: 8.h),
-          // Text skeleton
-          Container(
-            width: 100.h,
-            height: 16.h,
-            decoration: BoxDecoration(
-              color: appTheme.blue_gray_300.withAlpha(77),
-              borderRadius: BorderRadius.circular(4.h),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
+
 
   void _onCreateStoryTap(
       BuildContext context, List<Map<String, dynamic>> activeMemories) {

@@ -33,8 +33,8 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
       animation: _shimmerController,
       builder: (context, child) {
         return Container(
-          width: 280.h,
-          height: 340.h,
+          width: 280.w,
+          height: 348.h,
           margin: EdgeInsets.only(right: 12.h),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16.h),
@@ -63,7 +63,7 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
 
               // Content area
               Padding(
-                padding: EdgeInsets.all(16.h),
+                padding: EdgeInsets.all(14.h),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -101,18 +101,21 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
                     SizedBox(height: 12.h),
 
                     // Participant avatars skeleton row
-                    Row(
-                      children: List.generate(3, (index) {
-                        return Container(
-                          width: 28.h,
-                          height: 28.h,
-                          margin: EdgeInsets.only(right: index < 2 ? 8.h : 0),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: appTheme.blue_gray_300.withAlpha(77),
-                          ),
-                        );
-                      }),
+                    SizedBox(
+                      height: 28.h, // ✅ lock row height to avatar size
+                      child: Row(
+                        children: List.generate(3, (index) {
+                          return Container(
+                            width: 28.h,
+                            height: 28.h,
+                            margin: EdgeInsets.only(right: index < 2 ? 8.w : 0), // ✅ .w for horizontal
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: appTheme.blue_gray_300.withAlpha(77),
+                            ),
+                          );
+                        }),
+                      ),
                     ),
                   ],
                 ),

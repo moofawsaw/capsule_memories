@@ -558,6 +558,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     int remainingSeconds = 5;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
+                        backgroundColor: appTheme.gray_900_01, // <-- add this
                         content: StatefulBuilder(
                           builder: (context, setState) {
                             // Start countdown timer

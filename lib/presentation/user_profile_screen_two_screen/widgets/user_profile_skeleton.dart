@@ -21,12 +21,16 @@ class UserProfileSkeleton extends StatelessWidget {
       child: Column(
         children: [
           _buildHeaderSkeleton(),
-          SizedBox(height: 12.h),
+
+          // Matches loaded screen
+          SizedBox(height: 6.h),
+
           _buildStatsSkeleton(),
+
           if (showActions) ...[
-            SizedBox(height: 16.h),
             _buildActionsSkeleton(),
           ],
+
           SizedBox(height: 28.h),
           _buildStoriesGridSkeleton(),
           SizedBox(height: 12.h),
@@ -35,36 +39,48 @@ class UserProfileSkeleton extends StatelessWidget {
     );
   }
 
+  // ============================
+  // HEADER
+  // ============================
   Widget _buildHeaderSkeleton() {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 18.h, vertical: 14.h),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22.h),
-      ),
-      child: Column(
-        children: [
-          // Avatar circle
-          Container(
-            height: 96.h,
-            width: 96.h,
-            decoration: BoxDecoration(
-              color: appTheme.blue_gray_300.withAlpha(35),
-              shape: BoxShape.circle,
-            ),
+    return Stack(
+      children: [
+        Container(
+          margin: EdgeInsets.symmetric(horizontal: 68.h),
+          padding: EdgeInsets.only(
+            left: 18.h,
+            right: 18.h,
+            top: 0.h,
+            bottom: 10.h, // 👈 REDUCED
           ),
-          SizedBox(height: 12.h),
-
-          // Display name line
-          _skeletonLine(width: 110.h, height: 14.h, radius: 10.h),
-          SizedBox(height: 8.h),
-
-          // Username line
-          _skeletonLine(width: 140.h, height: 12.h, radius: 10.h),
-        ],
-      ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22.h),
+          ),
+          child: Column(
+            children: [
+              Container(
+                height: 96.h,
+                width: 96.h,
+                decoration: BoxDecoration(
+                  color: appTheme.blue_gray_300.withAlpha(35),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              SizedBox(height: 20.h),
+              _skeletonLine(width: 110.h, height: 14.h, radius: 10.h),
+              SizedBox(height: 20.h),
+              _skeletonLine(width: 140.h, height: 12.h, radius: 10.h),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
+
+  // ============================
+  // STATS (Followers / Following)
+  // ============================
   Widget _buildStatsSkeleton() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -75,42 +91,49 @@ class UserProfileSkeleton extends StatelessWidget {
       ],
     );
   }
-
+// This is the Following Button
   Widget _statCardSkeleton() {
     return Container(
-      width: 128.h,
-      padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 12.h),
+      height: 46.h, // 👈 lock height (matches real button)
+      padding: EdgeInsets.only(
+        top: 12.h,
+        bottom: 8.h,
+        left: 8.h,
+        right: 8.h,
+      ),
       decoration: BoxDecoration(
         color: appTheme.gray_900_01,
-        borderRadius: BorderRadius.circular(18.h),
+        borderRadius: BorderRadius.circular(6.h),
         border: Border.all(
           color: appTheme.gray_900_01.withAlpha(120),
           width: 1,
         ),
       ),
-      child: Column(
-        children: [
-          _skeletonLine(width: 44.h, height: 16.h, radius: 10.h),
-          SizedBox(height: 8.h),
-          _skeletonLine(width: 60.h, height: 12.h, radius: 10.h),
-        ],
+      child: Center(
+        child: _skeletonLine(width: 72.h, height: 12.h, radius: 10.h),
       ),
-    );
+    )
+    ;
   }
 
+  // ============================
+  // ACTION BUTTONS
+  // ============================
   Widget _buildActionsSkeleton() {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center, // center the two buttons
       children: [
-        Expanded(child: _buttonSkeleton()),
+        _buttonSkeleton(width: 90.h),
         SizedBox(width: 8.h),
-        Expanded(child: _buttonSkeleton()),
+        _buttonSkeleton(width: 90.h),
       ],
     );
   }
 
-  Widget _buttonSkeleton() {
+  Widget _buttonSkeleton({required double width}) {
     return Container(
-      height: 46.h,
+      width: width,          // ✅ fixed width now actually applies
+      height: 46.h,          // ✅ fixed height
       decoration: BoxDecoration(
         color: appTheme.gray_900_01,
         borderRadius: BorderRadius.circular(14.h),
@@ -120,11 +143,15 @@ class UserProfileSkeleton extends StatelessWidget {
         ),
       ),
       child: Center(
-        child: _skeletonLine(width: 90.h, height: 12.h, radius: 10.h),
+        child: _skeletonLine(width: 64.h, height: 12.h, radius: 10.h),
       ),
     );
   }
 
+
+  // ============================
+  // STORIES GRID
+  // ============================
   Widget _buildStoriesGridSkeleton() {
     const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 3,
@@ -137,11 +164,16 @@ class UserProfileSkeleton extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: gridDelegate,
-      itemCount: 9, // 3x3 gives a solid "profile grid loading" look
-      itemBuilder: (_, __) => const CustomStorySkeleton(),
+      itemCount: 9,
+      itemBuilder: (_, __) => const CustomStorySkeleton(
+        squareTop: true,
+      ),
     );
   }
 
+  // ============================
+  // SKELETON LINE
+  // ============================
   Widget _skeletonLine({
     required double width,
     required double height,

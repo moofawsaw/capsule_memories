@@ -60,6 +60,7 @@
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>capsule</string>
+                <string>fb1220121002780015</string>
             </array>
         </dict>
     </array>
@@ -75,5 +76,20 @@
 	<string>Capsule needs access to your location to tag stories with where they were captured</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Capsule needs access to your location to tag stories with where they were captured</string>
+	
+	<key>FacebookAppID</key>
+	<string>1220121002780015</string>
+	<key>FacebookDisplayName</key>
+	<string>Capsule</string>
+	<key>FacebookClientToken</key>
+	<string>YOUR_FACEBOOK_CLIENT_TOKEN</string>
+	
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fb-messenger-share-api</string>
+		<string>fbauth2</string>
+		<string>fbshareextension</string>
+	</array>
 </dict>
 </plist>

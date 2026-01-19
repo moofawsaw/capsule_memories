@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Capsule</string>
-
+    
+    <!-- Facebook App ID Configuration -->
+    <string name="facebook_app_id">1220121002780015</string>
+    <string name="fb_login_protocol_scheme">fb1220121002780015</string>
+    <string name="facebook_client_token">96210f785513f8a8e881be9654f95eda</string>
 </resources>
