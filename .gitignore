@@ -2,7 +2,7 @@
 /.idea/
 /build/
 /.vscode/
-
+**/key.properties
 /.flutter-plugins
 /.flutter-plugins-dependencies
 /.packages
