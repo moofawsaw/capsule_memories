@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_qr_code_card.dart';
 
 /// QR Timeline Share Screen - For CURRENT USER to SHARE memory QR code
 /// This opens when user clicks QR icon on /timeline screen
@@ -299,57 +300,12 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
 
   /// QR Code widget - Display database image with fallback
   Widget _buildQRCode(String deepLinkUrl, String? qrCodeUrl) {
-    // DEBUG: Log what we're displaying
-    print('🖼️ _buildQRCode called:');
-    print('   - deepLinkUrl: $deepLinkUrl');
-    print('   - qrCodeUrl: $qrCodeUrl');
-    print(
-        '   - Using database image: ${qrCodeUrl != null && qrCodeUrl.isNotEmpty}');
-    return Container(
-      padding: EdgeInsets.all(16.h),
-      decoration: BoxDecoration(
-        color: appTheme.white_A700,
-        borderRadius: BorderRadius.circular(16.h),
-      ),
-      child: qrCodeUrl != null && qrCodeUrl.isNotEmpty
-          ? Image.network(
-              qrCodeUrl,
-              width: 200.h,
-              height: 200.h,
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return SizedBox(
-                  width: 200.h,
-                  height: 200.h,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: appTheme.deep_purple_A100,
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                // Fallback to locally generated QR if database image fails
-                print('⚠️ Failed to load QR from database, using fallback');
-                return QrImageView(
-                  data: deepLinkUrl,
-                  version: QrVersions.auto,
-                  size: 200.h,
-                  backgroundColor: appTheme.white_A700,
-                );
-              },
-            )
-          : QrImageView(
-              data: deepLinkUrl,
-              version: QrVersions.auto,
-              size: 200.h,
-              backgroundColor: appTheme.white_A700,
-            ),
+    return CustomQrCodeCard(
+      qrData: deepLinkUrl,     // fallback + generated version
+      qrImageUrl: qrCodeUrl,   // preferred if present
+      qrSize: 200.h,
+      outerPadding: 16.h,
+      borderRadius: 16.h,
     );
   }
 

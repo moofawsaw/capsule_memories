@@ -1,3 +1,7 @@
+// lib/presentation/create_group_screen/create_group_screen.dart
+// FULL COPY/PASTE FILE
+// Updates: selection UI now matches Edit Group (full border + check icon)
+
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
@@ -37,6 +41,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(height: 12.h),
+
               // Drag handle indicator
               Container(
                 width: 48.h,
@@ -46,7 +51,12 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   borderRadius: BorderRadius.circular(2.5),
                 ),
               ),
-              SizedBox(height: 20.h),
+
+              // Title header
+              SizedBox(height: 10.h),
+              _buildSheetTitleHeader(context),
+              SizedBox(height: 8.h),
+
               Flexible(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: 20.h),
@@ -73,18 +83,59 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     );
   }
 
-  /// Section Widget
+  Widget _buildSheetTitleHeader(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20.h),
+      child: Row(
+        children: [
+          SizedBox(width: 44.h, height: 44.h),
+          Expanded(
+            child: Center(
+              child: Text(
+                'Create Group',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                    .copyWith(color: appTheme.gray_50),
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: NavigatorService.goBack,
+            borderRadius: BorderRadius.circular(22.h),
+            child: SizedBox(
+              width: 44.h,
+              height: 44.h,
+              child: Center(
+                child: Icon(
+                  Icons.close,
+                  size: 22.h,
+                  color: appTheme.blue_gray_300,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(createGroupNotifier);
 
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-            padding: EdgeInsets.only(top: 26.h),
-            child: Text('Group Name',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300))),
-        CustomEditText(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(top: 8.h),
+            child: Text(
+              'Group Name',
+              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300),
+            ),
+          ),
+          CustomEditText(
             controller: state.groupNameController,
             hintText: 'e.g., Family, Work Friends, Team',
             validator: (value) {
@@ -92,12 +143,13 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                 return 'Group name is required';
               }
               return null;
-            }),
-      ]);
+            },
+          ),
+        ],
+      );
     });
   }
 
-  /// Section Widget
   Widget _buildFriendsList(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(createGroupNotifier);
@@ -126,27 +178,28 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       }
 
       return Column(
-          children: filteredFriends.map((friend) {
-        final isSelected = state.createGroupModel?.selectedMembers
-                ?.any((member) => member.id == friend.id) ??
-            false;
+        children: filteredFriends.map((friend) {
+          final isSelected = state.createGroupModel?.selectedMembers
+              ?.any((member) => member.id == friend.id) ??
+              false;
 
-        return FriendListItem(
+          return FriendListItem(
             friend: friend,
             isSelected: isSelected,
-            margin: EdgeInsets.only(top: 16.h),
+            margin: EdgeInsets.only(top: 8.h), // closer to Edit Group spacing
             onTap: () {
               if (isSelected) {
                 ref.read(createGroupNotifier.notifier).removeMember(friend);
               } else {
                 ref.read(createGroupNotifier.notifier).addMember(friend);
               }
-            });
-      }).toList());
+            },
+          );
+        }).toList(),
+      );
     });
   }
 
-  /// Section Widget
   Widget _buildActionButtons(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(createGroupNotifier);
@@ -158,35 +211,37 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       });
 
       return Container(
-          margin: EdgeInsets.only(top: 22.h),
-          child: Row(spacing: 12.h, children: [
+        margin: EdgeInsets.only(top: 22.h),
+        child: Row(
+          spacing: 12.h,
+          children: [
             Expanded(
-                child: CustomButton(
-                    text: 'Cancel',
-                    buttonStyle: CustomButtonStyle.fillDark,
-                    buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-                    onPressed: () {
-                      onTapCancel(context);
-                    })),
+              child: CustomButton(
+                text: 'Cancel',
+                buttonStyle: CustomButtonStyle.fillDark,
+                buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
+                onPressed: () => onTapCancel(context),
+              ),
+            ),
             Expanded(
-                child: CustomButton(
-                    text: 'Create',
-                    buttonStyle: CustomButtonStyle.fillPrimary,
-                    buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                    isDisabled: state.isLoading,
-                    onPressed: () {
-                      onTapCreate(context);
-                    })),
-          ]));
+              child: CustomButton(
+                text: 'Create',
+                buttonStyle: CustomButtonStyle.fillPrimary,
+                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                isDisabled: state.isLoading,
+                onPressed: () => onTapCreate(context),
+              ),
+            ),
+          ],
+        ),
+      );
     });
   }
 
-  /// Navigates back to the previous screen
   void onTapCancel(BuildContext context) {
     NavigatorService.goBack();
   }
 
-  /// Creates the group after validation
   void onTapCreate(BuildContext context) {
     if (_formKey.currentState?.validate() ?? false) {
       ref.read(createGroupNotifier.notifier).createGroup();

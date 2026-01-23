@@ -69,18 +69,28 @@ class LoginNotifier extends StateNotifier<LoginState> {
   /// Called when app resumes from background (user returned from OAuth)
   void resetLoadingIfNotAuthenticated() {
     final supabaseClient = SupabaseService.instance.client;
-    final isAuthenticated = supabaseClient?.auth.currentUser != null;
 
-    if (!isAuthenticated && (state.isLoading ?? false)) {
-      debugPrint(
-          '🔄 User returned from OAuth without authentication - resetting button states');
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: null,
-      );
-      _oauthTimeoutTimer?.cancel();
-    }
+    // Only do work if we were in an OAuth loading state
+    if (!(state.isLoading ?? false)) return;
+
+    // Give Supabase a moment to process any deep link callback after resume.
+    Future.delayed(const Duration(milliseconds: 350), () {
+      final session = supabaseClient?.auth.currentSession;
+
+      // If there is still no active session, user backed out/cancelled.
+      if (session == null && (state.isLoading ?? false)) {
+        debugPrint(
+          '🔄 Returned from OAuth without session - resetting loading state',
+        );
+        _oauthTimeoutTimer?.cancel();
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: null,
+        );
+      }
+    });
   }
+
 
   /// Validate email field
   String? validateEmail(String? value) {

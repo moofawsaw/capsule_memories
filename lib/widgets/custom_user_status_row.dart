@@ -1,6 +1,6 @@
 // lib/widgets/custom_user_status_row.dart
 import '../core/app_export.dart';
-import './custom_image_view.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /**
  * CustomUserStatusRow - A reusable user profile row component with status badge
@@ -79,12 +79,29 @@ class CustomUserStatusRow extends StatelessWidget {
   }
 
   Widget _buildProfileImage() {
-    return CustomImageView(
-      imagePath: profileImagePath,
-      height: 36.h,
-      width: 36.h,
-      isCircular: true, // ✅ NEW: enforce true circular avatar
-      fit: BoxFit.cover,
+    return SizedBox.square(
+      dimension: 36.h,
+      child: ClipOval(
+        child: profileImagePath.trim().startsWith('http')
+            ? Image(
+          image: CachedNetworkImageProvider(
+            profileImagePath,
+            cacheKey: Uri.tryParse(profileImagePath)
+                ?.replace(query: '')
+                .toString() ??
+                profileImagePath,
+          ),
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.low,
+        )
+            : Image.asset(
+          profileImagePath.isNotEmpty
+              ? profileImagePath
+              : ImageConstant.imgEllipse826x26,
+          fit: BoxFit.cover,
+        ),
+      ),
     );
   }
 

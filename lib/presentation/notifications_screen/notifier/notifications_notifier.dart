@@ -33,6 +33,34 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
       ),
     );
   }
+  /// Remove a notification from local state by ID
+  void removeNotification(String notificationId) {
+    final currentNotifications = state.notificationsModel?.notifications ?? [];
+    final updatedNotifications = currentNotifications
+        .where((n) => n['id'] != notificationId)
+        .toList();
+
+    state = state.copyWith(
+      notificationsModel: NotificationsModel(notifications: updatedNotifications),
+    );
+  }
+
+  /// Add a notification back to local state (maintains sort order)
+  void addNotification(Map<String, dynamic> notification) {
+    final currentNotifications = state.notificationsModel?.notifications ?? [];
+
+    // Insert and re-sort by created_at descending
+    final updatedNotifications = [...currentNotifications, notification];
+    updatedNotifications.sort((a, b) {
+      final aTime = DateTime.parse(a['created_at'] as String);
+      final bTime = DateTime.parse(b['created_at'] as String);
+      return bTime.compareTo(aTime); // Descending order (newest first)
+    });
+
+    state = state.copyWith(
+      notificationsModel: NotificationsModel(notifications: updatedNotifications),
+    );
+  }
 
   void toggleMarkAllNotifications() {
     final notificationsData = state.notificationsModel?.notifications;

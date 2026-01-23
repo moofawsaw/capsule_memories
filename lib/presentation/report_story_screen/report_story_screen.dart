@@ -47,43 +47,43 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Regular bottom sheet content (no Scaffold, no fixed height)
-    return SafeArea(
-      top: false,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_02,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24.h)),
-          ),
+    // Regular bottom sheet content (no Scaffold, no SafeArea)
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_02,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24.h)),
+        ),
+        padding: EdgeInsets.only(
+          left: 20.h,
+          right: 20.h,
+          top: 12.h,
+          // ✅ manual bottom safe area handling (gesture bar)
+          bottom: 16.h + MediaQuery.of(context).padding.bottom,
+        ),
+        child: SingleChildScrollView(
+          // ✅ keyboard-safe
           padding: EdgeInsets.only(
-            left: 20.h,
-            right: 20.h,
-            top: 12.h,
-            bottom: 16.h + MediaQuery.of(context).padding.bottom,
+            bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
-          child: SingleChildScrollView(
-            // Guarantees no overflow; will only scroll if it must
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildHeaderSection(context),
-                SizedBox(height: 12.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeaderSection(context),
+              SizedBox(height: 12.h),
 
-                _buildUserInfoSection(context),
-                SizedBox(height: 12.h),
+              _buildUserInfoSection(context),
+              SizedBox(height: 12.h),
 
-                _buildReportOptionsSection(context),
-                SizedBox(height: 10.h),
+              _buildReportOptionsSection(context),
+              SizedBox(height: 10.h),
 
-                _buildAdditionalDetailsSection(context),
-                SizedBox(height: 12.h),
+              _buildAdditionalDetailsSection(context),
+              SizedBox(height: 12.h),
 
-                _buildSubmitButton(context),
-              ],
-            ),
+              _buildSubmitButton(context),
+            ],
           ),
         ),
       ),

@@ -16,17 +16,17 @@ class MemoryService {
     required String duration,
     required String categoryId,
     required List<String> invitedUserIds,
+
+    /// ✅ NEW: if created from a group, persist group_id on the memory row
+    String? groupId,
   }) async {
     try {
       print('🚀 MEMORY CREATION START: Creating memory "$title"');
 
-      // Validate categoryId before proceeding
       if (categoryId.isEmpty) {
         throw Exception('Category ID is required');
       }
 
-      // STEP 1: Fetch location data with proper geocoding using LocationService
-      // If geocoding fails after all retries, location_name will be NULL
       print('📍 MEMORY CREATION: Fetching location data...');
       final locationData = await LocationService.getLocationData();
 
@@ -49,13 +49,11 @@ class MemoryService {
         print('   Memory will be created without location data');
       }
 
-      // Get category-based duration
       print('⏱️ MEMORY CREATION: Calculating memory duration...');
       final durationTime = await _getCategoryDuration(categoryId, duration);
       print(
           '✅ MEMORY CREATION: Duration set to: ${durationTime.toIso8601String()}');
 
-      // Set start_time and end_time
       final now = DateTime.now().toUtc();
       final startTime = now;
       final endTime = durationTime;
@@ -64,9 +62,9 @@ class MemoryService {
       print('   - start_time: ${startTime.toIso8601String()}');
       print('   - end_time: ${endTime.toIso8601String()}');
 
-      // STEP 2: Create memory with location data
       print('💾 MEMORY CREATION: Inserting into database...');
-      final memoryData = {
+
+      final memoryData = <String, dynamic>{
         'title': title,
         'creator_id': creatorId,
         'category_id': categoryId,
@@ -79,23 +77,27 @@ class MemoryService {
         'expires_at': durationTime.toIso8601String(),
         'start_time': startTime.toIso8601String(),
         'end_time': endTime.toIso8601String(),
+
+        // ✅ NEW
+        if (groupId != null && groupId.isNotEmpty) 'group_id': groupId,
       };
 
       print('📝 MEMORY DATA TO INSERT:');
       print('   - title: $title');
+      print('   - group_id: ${groupId ?? "NULL"}');
       print('   - latitude: ${latitude ?? "NULL"}');
       print('   - longitude: ${longitude ?? "NULL"}');
       print('   - location_name: ${locationName ?? "NULL"}');
 
-      // Insert and validate response
       final response = await _supabase
           ?.from('memories')
           .insert(memoryData)
           .select(
-              'id, location_name, location_lat, location_lng, start_time, end_time')
+          'id, group_id, location_name, location_lat, location_lng, start_time, end_time')
           .single();
 
       final memoryId = response?['id'] as String?;
+      final dbGroupId = response?['group_id'] as String?;
       final dbLocationName = response?['location_name'] as String?;
       final dbLocationLat = response?['location_lat'];
       final dbLocationLng = response?['location_lng'];
@@ -109,6 +111,7 @@ class MemoryService {
 
       print('✅ MEMORY CREATION: Memory inserted with ID: $memoryId');
       print('🔍 MEMORY CREATION: Database validation:');
+      print('   - group_id: ${dbGroupId ?? "NULL"}');
       print(
           '   - location_name: ${dbLocationName ?? 'NULL (location unavailable)'}');
       print('   - location_lat: $dbLocationLat');
@@ -116,9 +119,7 @@ class MemoryService {
       print('   - start_time: $dbStartTime');
       print('   - end_time: $dbEndTime');
 
-      // CRITICAL FIX: Add creator as a contributor using ONLY valid columns
-      // Schema validation confirms memory_contributors has ONLY: id, memory_id, user_id, joined_at
-      // NO 'role' column exists - this was causing PostgrestException PGRST204
+      // Add creator as contributor
       print('👤 MEMORY CREATION: Adding creator as contributor...');
       await _supabase?.from('memory_contributors').insert({
         'memory_id': memoryId,
@@ -126,10 +127,10 @@ class MemoryService {
         'joined_at': DateTime.now().toUtc().toIso8601String(),
       });
 
-      // Send invitations using ONLY valid columns
+      // Add invited users as contributors (this is NOT an "invite" system; it's direct membership)
       if (invitedUserIds.isNotEmpty) {
         print(
-            '📧 MEMORY CREATION: Sending ${invitedUserIds.length} invitation(s)...');
+            '👥 MEMORY CREATION: Adding ${invitedUserIds.length} member(s) as contributors...');
         for (final userId in invitedUserIds) {
           await _supabase?.from('memory_contributors').insert({
             'memory_id': memoryId,
@@ -137,16 +138,13 @@ class MemoryService {
             'joined_at': DateTime.now().toUtc().toIso8601String(),
           });
         }
-        print('✅ MEMORY CREATION: Invitations sent successfully');
+        print('✅ MEMORY CREATION: Contributors added successfully');
       } else {
-        print('ℹ️ MEMORY CREATION: No invitations to send');
+        print('ℹ️ MEMORY CREATION: No additional members to add');
       }
 
-      print(
-          '🎉 MEMORY CREATION COMPLETE: Memory "$title" created successfully');
+      print('🎉 MEMORY CREATION COMPLETE: Memory "$title" created successfully');
       print('   Final memory ID: $memoryId');
-      print(
-          '   Final location_name: ${dbLocationName ?? 'NULL (location unavailable)'}');
 
       return memoryId;
     } catch (e, stackTrace) {
@@ -157,24 +155,16 @@ class MemoryService {
     }
   }
 
-  /// Get category-based duration
-  /// Calculates memory expiration time based on category settings
-  Future<DateTime> _getCategoryDuration(
-      String categoryId, String duration) async {
-    // Calculate duration based on the duration parameter
-    // This could be enhanced to query category-specific durations from the database
-    return DateTime.now().add(Duration(hours: 12));
+  Future<DateTime> _getCategoryDuration(String categoryId, String duration) async {
+    // TODO: implement real duration mapping; placeholder retained
+    return DateTime.now().add(const Duration(hours: 12));
   }
 
-  /// Update memory location with proper geocoding
-  /// Uses LocationService to ensure location_name is formatted as "City, State"
   Future<Map<String, dynamic>?> updateMemoryLocation(String memoryId) async {
     try {
       print('📍 UPDATE LOCATION: Fetching location for memory: $memoryId');
 
-      // Get location data with proper geocoding
       final locationData = await LocationService.getLocationData();
-
       if (locationData == null) {
         print('❌ UPDATE LOCATION: Failed to get location data');
         return null;
@@ -183,7 +173,6 @@ class MemoryService {
       final locationName = locationData['location_name'] as String?;
       print('✅ UPDATE LOCATION: Got location_name: "$locationName"');
 
-      // Update memory in database
       await _supabase?.from('memories').update({
         'location_name': locationData['location_name'],
         'location_lat': locationData['latitude'],

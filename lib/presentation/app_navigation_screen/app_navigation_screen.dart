@@ -13,264 +13,262 @@ class AppNavigationScreen extends ConsumerStatefulWidget {
 class AppNavigationScreenState extends ConsumerState<AppNavigationScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: Color(0XFFFFFFFF),
-        body: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Container(
-                  padding: EdgeInsets.only(top: 10.h),
-                  child: Column(
-                    children: [
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Memory/AddUsers",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Memory/InviteCard",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Modal/RequestFeature One",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appJoin),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Memory/Create",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Group/Create One",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Group/Create",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Auth/Signup",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.authRegister),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Auth/Login",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.authLogin),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Auth/ForgotPassword",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.authReset),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Reel",
-                        onTapScreenTitle: () => onTapBottomSheetTitle(
-                            context, VideoCallInterfaceScreen()),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Home",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appFeed),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Memory/QuickView",
-                        onTapScreenTitle: () => onTapBottomSheetTitle(
-                            context, EventStoriesViewScreen()),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Drawer/UserAccount",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appMenu),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/User",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appProfile),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Profile",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appProfileUser),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Memories",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appMemories),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Memories/Details",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appTimeline),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Memories/Details(sealed)",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.appTimelineSealed),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Groups",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appGroups),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Friends",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appFriends),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Following One",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appFollowing),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Followers",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appFollowers),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Following",
-                        onTapScreenTitle: () => onTapScreenTitle(
-                            context, AppRoutes.appNotifications),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Profile/Settings",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appSettings),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Splash",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.splash),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Modal/RequestFeature",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appFeedback),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Modal/ReportStory",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appReport),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Story/Editor",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appPost),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Story/Record",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appHome),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Screen/Story/View",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appVideoCall),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "Overlay/StoryEditor/AddText",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appOverlayText),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/StoryEditor/Music",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Story/Share",
-                        onTapScreenTitle: () =>
-                            onTapBottomSheetTitle(context, ShareStoryScreen()),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/StoryEditor/Stickers",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Memory/Members",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Memory/Edit",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Share/Invite",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Share/Group",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/ShareApp",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appBsDownload),
-                      ),
-                      _buildScreenTitle(
-                        context,
-                        screenTitle: "BottomSheet/Share/UserQR",
-                        onTapScreenTitle: () =>
-                            onTapScreenTitle(context, AppRoutes.appNavigation),
-                      ),
-                    ],
-                  ),
+    return Scaffold(
+      backgroundColor: const Color(0XFFFFFFFF),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Container(
+                padding: EdgeInsets.only(top: 10.h),
+                child: Column(
+                  children: [
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Memory/AddUsers",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Memory/InviteCard",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Modal/RequestFeature One",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appJoin),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Memory/Create",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Group/Create One",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Group/Create",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Auth/Signup",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.authRegister),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Auth/Login",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.authLogin),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Auth/ForgotPassword",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.authReset),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Reel",
+                      onTapScreenTitle: () => onTapBottomSheetTitle(
+                          context, VideoCallInterfaceScreen()),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Home",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appFeed),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Memory/QuickView",
+                      onTapScreenTitle: () => onTapBottomSheetTitle(
+                          context, EventStoriesViewScreen()),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Drawer/UserAccount",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appMenu),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/User",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appProfile),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Profile",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appProfileUser),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Memories",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appMemories),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Memories/Details",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appTimeline),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Memories/Details(sealed)",
+                      onTapScreenTitle: () => onTapScreenTitle(
+                          context, AppRoutes.appTimelineSealed),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Groups",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appGroups),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Friends",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appFriends),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Following One",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appFollowing),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Followers",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appFollowers),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Following",
+                      onTapScreenTitle: () => onTapScreenTitle(
+                          context, AppRoutes.appNotifications),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Profile/Settings",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appSettings),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Splash",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.splash),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Modal/RequestFeature",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appFeedback),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Modal/ReportStory",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appReport),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Story/Editor",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appPost),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Story/Record",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appHome),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Screen/Story/View",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appVideoCall),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "Overlay/StoryEditor/AddText",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appOverlayText),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/StoryEditor/Music",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Story/Share",
+                      onTapScreenTitle: () =>
+                          onTapBottomSheetTitle(context, ShareStoryScreen()),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/StoryEditor/Stickers",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Memory/Members",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Memory/Edit",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Share/Invite",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Share/Group",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/ShareApp",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appBsDownload),
+                    ),
+                    _buildScreenTitle(
+                      context,
+                      screenTitle: "BottomSheet/Share/UserQR",
+                      onTapScreenTitle: () =>
+                          onTapScreenTitle(context, AppRoutes.appNavigation),
+                    ),
+                  ],
                 ),
               ),
-            )
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }

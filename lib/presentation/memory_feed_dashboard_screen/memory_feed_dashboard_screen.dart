@@ -53,42 +53,40 @@ class _MemoryFeedDashboardScreenState
     final state = ref.watch(memoryFeedDashboardProvider);
     final notifier = ref.read(memoryFeedDashboardProvider.notifier);
 
-    return SafeArea(
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: RefreshIndicator(
+        color: appTheme.deep_purple_A100,
         backgroundColor: appTheme.gray_900_02,
-        body: RefreshIndicator(
-          color: appTheme.deep_purple_A100,
-          backgroundColor: appTheme.gray_900_02,
-          strokeWidth: 3.0,
-          displacement: 40.0,
-          onRefresh: () async {
-            await notifier.refreshFeed();
-          },
-          child: Container(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              key: const PageStorageKey<String>('memory_feed_scroll'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Container(
-                width: double.maxFinite,
-                decoration: BoxDecoration(
-                  color: appTheme.gray_900_02,
-                ),
-                child: Column(
-                  children: [
-                    SizedBox(height: 20.h),
-                    _buildActionButton(context),
-                    SizedBox(height: 22.h),
-                    _buildHappeningNowOrLatestSection(context),
-                    _buildPublicMemoriesSection(context),
-                    _buildTrendingStoriesSection(context),
-                    if (_isAuthenticated) _buildCategoriesSection(context),
-                    _buildLongestStreakSection(context),
-                    _buildPopularMemoriesSection(context),
-                    _buildPopularUsersSection(context),
-                    SizedBox(height: 30.h),
-                  ],
-                ),
+        strokeWidth: 3.0,
+        displacement: 40.0,
+        onRefresh: () async {
+          await notifier.refreshFeed();
+        },
+        child: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            key: const PageStorageKey<String>('memory_feed_scroll'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Container(
+              width: double.maxFinite,
+              decoration: BoxDecoration(
+                color: appTheme.gray_900_02,
+              ),
+              child: Column(
+                children: [
+                  SizedBox(height: 20.h),
+                  _buildActionButton(context),
+                  SizedBox(height: 22.h),
+                  _buildHappeningNowOrLatestSection(context),
+                  _buildPublicMemoriesSection(context),
+                  _buildTrendingStoriesSection(context),
+                  if (_isAuthenticated) _buildCategoriesSection(context),
+                  _buildLongestStreakSection(context),
+                  _buildPopularMemoriesSection(context),
+                  _buildPopularUsersSection(context),
+                  SizedBox(height: 30.h),
+                ],
               ),
             ),
           ),

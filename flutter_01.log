@@ -1,0 +1,161 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter build ipa --release --dart-define=SUPABASE_URL=https://resdvutqgrbbylknaxjp.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlc2R2dXRxZ3JiYnlsa25heGpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NjE0NzgsImV4cCI6MjA4MTQzNzQ3OH0.ulBP1Kcl0MNL2Gr6FsJGg1f3rqorhsoIeptEUvkaKG4
+
+## exception
+
+ProcessException: ProcessException: Process exited abnormally with exit code 70:
+2026-01-22 11:07:05.295 xcodebuild[10366:289410] [MT] DVTPlugInLoading: Failed to load code for plug-in com.apple.dt.IDESimulatorFoundation (/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework), error = Error Domain=NSCocoaErrorDomain Code=3588 "dlopen(/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, 0x0109): Library not loaded: /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator
+  Referenced from: <C1C8BCA8-A029-3DAA-903C-1BE5DDC46954> /Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/Versions/A/IDESimulatorFoundation
+  Reason: tried: '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file)" UserInfo={NSLocalizedFailureReason=The bundle couldn’t be loaded., NSLocalizedRecoverySuggestion=Try reinstalling the bundle., NSFilePath=/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, NSDebugDescription=dlopen(/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, 0x0109): Library not loaded: /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator
+  Referenced from: <C1C8BCA8-A029-3DAA-903C-1BE5DDC46954> /Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/Versions/A/IDESimulatorFoundation
+  Reason: tried: '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), NSBundlePath=/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework, NSLocalizedDescription=The bundle “IDESimulatorFoundation” couldn’t be loaded.}, dyldError = dlopen(/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, 0x0000): Library not loaded: /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator
+  Referenced from: <C1C8BCA8-A029-3DAA-903C-1BE5DDC46954> /Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/Versions/A/IDESimulatorFoundation
+  Reason: tried: '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file)
+
+A required plugin failed to load. Please ensure system content is up-to-date — try running 'xcodebuild -runFirstLaunch'.
+2026-01-22 11:07:05.296 xcodebuild[10366:289410] [MT] DVTPlugInExtensionFaulting: Failed to fire fault for extension IDESimulatorFoundation/IDESimulatorFoundation.plugindata/plug-in[1]/extension[1]: Error Domain=DVTPlugInErrorDomain Code=2 "Loading a plug-in failed." UserInfo={DVTPlugInIdentifierErrorKey=com.apple.dt.IDESimulatorFoundation, DVTPlugInExecutablePathErrorKey=/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, NSLocalizedRecoverySuggestion=The plug-in or one of its prerequisite plug-ins may be missing or damaged and may need to be reinstalled., DVTPlugInDYLDErrorMessageErrorKey=dlopen(/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, 0x0000): Library not loaded: /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator
+  Referenced from: <C1C8BCA8-A029-3DAA-903C-1BE5DDC46954> /Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/Versions/A/IDESimulatorFoundation
+  Reason: tried: '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), NSLocalizedDescription=Loading a plug-in failed., NSFilePath=/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework, NSLocalizedFailureReason=The plug-in “com.apple.dt.IDESimulatorFoundation” at path “/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework” could not be loaded.  The plug-in or one of its prerequisite plug-ins may be missing or damaged., NSUnderlyingError=0xcaf81c4e0 {Error Domain=NSCocoaErrorDomain Code=3588 "dlopen(/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, 0x0109): Library not loaded: /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator
+  Referenced from: <C1C8BCA8-A029-3DAA-903C-1BE5DDC46954> /Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/Versions/A/IDESimulatorFoundation
+  Reason: tried: '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file)" UserInfo={NSLocalizedFailureReason=The bundle couldn’t be loaded., NSLocalizedRecoverySuggestion=Try reinstalling the bundle., NSFilePath=/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, NSDebugDescription=dlopen(/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/IDESimulatorFoundation, 0x0109): Library not loaded: /Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator
+  Referenced from: <C1C8BCA8-A029-3DAA-903C-1BE5DDC46954> /Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework/Versions/A/IDESimulatorFoundation
+  Reason: tried: '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), '/Library/Developer/PrivateFrameworks/CoreSimulator.framework/Versions/A/CoreSimulator' (no such file), NSBundlePath=/Applications/Xcode.app/Contents/Frameworks/IDESimulatorFoundation.framework, NSLocalizedDescription=The bundle “IDESimulatorFoundation” couldn’t be loaded.}}}
+
+
+xcodebuild failed to load a required plug-in. Ensure your system frameworks are up-to-date by running 'xcodebuild -runFirstLaunch'
+  Command: /usr/bin/arch -arm64e xcrun xcodebuild -list
+
+```
+#0      RunResult.throwException (package:flutter_tools/src/base/process.dart:153:5)
+#1      _DefaultProcessUtils.run (package:flutter_tools/src/base/process.dart:379:19)
+<asynchronous suspension>
+#2      XcodeProjectInterpreter.getInfo (package:flutter_tools/src/ios/xcodeproj.dart:328:30)
+<asynchronous suspension>
+#3      XcodeBasedProject.projectInfo (package:flutter_tools/src/xcode_project.dart:204:29)
+<asynchronous suspension>
+#4      XcodeBasedProject.buildSettingsForBuildInfo (package:flutter_tools/src/xcode_project.dart:240:36)
+<asynchronous suspension>
+#5      IosProject._parseProductName (package:flutter_tools/src/xcode_project.dart:670:55)
+<asynchronous suspension>
+#6      IosProject.productName (package:flutter_tools/src/xcode_project.dart:658:29)
+<asynchronous suspension>
+#7      BuildableIOSApp.fromProject (package:flutter_tools/src/ios/application_package.dart:118:33)
+<asynchronous suspension>
+#8      FlutterApplicationPackageFactory.getPackageForPlatform (package:flutter_tools/src/flutter_application_package.dart:79:15)
+<asynchronous suspension>
+#9      _BuildIOSSubCommand.buildableIOSApp.<anonymous closure> (package:flutter_tools/src/commands/build_ios.dart:710:9)
+<asynchronous suspension>
+#10     _BuildIOSSubCommand.runCommand (package:flutter_tools/src/commands/build_ios.dart:750:33)
+<asynchronous suspension>
+#11     BuildIOSArchiveCommand.runCommand (package:flutter_tools/src/commands/build_ios.dart:476:50)
+<asynchronous suspension>
+#12     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1559:27)
+<asynchronous suspension>
+#13     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#14     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#15     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:487:9)
+<asynchronous suspension>
+#16     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#17     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:422:5)
+<asynchronous suspension>
+#18     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:104:11)
+<asynchronous suspension>
+#19     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#20     main (package:flutter_tools/executable.dart:103:3)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[32m[✓][39m Flutter (Channel stable, 3.38.5, on
+    macOS 26.2 25C56 darwin-arm64, locale
+    en-AU) [12.4s]
+    [32m•[39m Flutter version 3.38.5 on channel
+      stable at /opt/homebrew/share/flutter
+    [32m•[39m Upstream repository
+      https://github.com/flutter/flutter.gi
+      t
+    [32m•[39m Framework revision f6ff1529fd (6
+      weeks ago), 2025-12-11 11:50:07 -0500
+    [32m•[39m Engine revision 1527ae0ec5
+    [32m•[39m Dart version 3.10.4
+    [32m•[39m DevTools version 2.51.1
+    [32m•[39m Feature flags: enable-web,
+      enable-linux-desktop,
+      enable-macos-desktop,
+      enable-windows-desktop,
+      enable-android, enable-ios,
+      cli-animations, enable-native-assets,
+      omit-legacy-version-file,
+      enable-lldb-debugging
+
+[32m[✓][39m Android toolchain - develop for Android
+    devices (Android SDK version 36.1.0)
+    [15.5s]
+    [32m•[39m Android SDK at
+      /Users/kyleunderhill/Library/Android/
+      sdk
+    [32m•[39m Emulator version 36.3.10.0 (build_id
+      14472402) (CL:N/A)
+    [32m•[39m Platform android-36, build-tools
+      36.1.0
+    [32m•[39m ANDROID_HOME =
+      /Users/kyleunderhill/Library/Android/
+      sdk
+    [32m•[39m ANDROID_SDK_ROOT =
+      /Users/kyleunderhill/Library/Android/
+      sdk
+    [32m•[39m Java binary at:
+      /Library/Java/JavaVirtualMachines/tem
+      urin-17.jdk/Contents/Home/bin/java
+      This JDK is specified in your Flutter
+      configuration.
+      To change the current JDK, run:
+      `flutter config
+      --jdk-dir="path/to/jdk"`.
+    [32m•[39m Java version OpenJDK Runtime
+      Environment Temurin-17.0.17+10 (build
+      17.0.17+10)
+    [32m•[39m All Android licenses accepted.
+
+[33m[!][39m Xcode - develop for iOS and macOS
+    (Xcode 26.2) [14.1s]
+    [32m•[39m Xcode at
+      /Applications/Xcode.app/Contents/Deve
+      loper
+    [32m•[39m Build 17C52
+    [31m✗[39m Unable to get list of installed
+      Simulator runtimes.
+    [32m•[39m CocoaPods version 1.16.2
+
+[32m[✓][39m Chrome - develop for the web [6ms]
+    [32m•[39m Chrome at /Applications/Google
+      Chrome.app/Contents/MacOS/Google
+      Chrome
+
+[32m[✓][39m Connected device (3 available) [7.1s]
+    [32m•[39m sdk gphone64 arm64 (mobile) •
+      emulator-5554 • android-arm64  •
+      Android 12 (API 32) (emulator)
+    [32m•[39m macOS (desktop)             • macos
+      • darwin-arm64   • macOS 26.2 25C56
+      darwin-arm64
+    [32m•[39m Chrome (web)                • chrome
+      • web-javascript • Google Chrome
+      144.0.7559.97
+
+[32m[✓][39m Network resources [271ms]
+    [32m•[39m All expected network resources are
+      available.
+
+[33m![39m Doctor found issues in 1 category.
+```

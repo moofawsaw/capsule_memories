@@ -9,6 +9,9 @@ import '../../widgets/custom_story_card.dart';
 import '../../widgets/custom_story_skeleton.dart';
 import 'notifier/user_profile_screen_two_notifier.dart';
 import '../../core/models/feed_story_context.dart';
+import '../../core/utils/story_actions_sheet.dart';
+import '../../services/supabase_service.dart';
+import '../../core/utils/story_actions_sheet.dart';
 
 // ✅ NEW: skeleton
 import './widgets/user_profile_skeleton.dart';
@@ -37,12 +40,27 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
   // ✅ NEW: best-effort for initial skeleton layout (actions visible when viewing other user)
   bool _initialViewingOtherUser = false;
 
+  String? get _currentUserId =>
+      SupabaseService.instance.client?.auth.currentUser?.id;
+
+  /// If the target is the current user, return null so we always show "current user" variant.
+  String? _normalizeUserId(String? candidate) {
+    final c = candidate?.trim();
+    if (c == null || c.isEmpty) return null;
+
+    final me = _currentUserId;
+    if (me != null && c == me) return null;
+
+    return c;
+  }
+
   @override
   void initState() {
     super.initState();
 
     // If the constructor provides a userId, we already know this is "other user"
-    _initialViewingOtherUser = widget.userId != null;
+    // (but normalize in case it points to the current user).
+    _initialViewingOtherUser = _normalizeUserId(widget.userId) != null;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Priority 1: constructor
@@ -58,7 +76,8 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
         }
       }
 
-      _userId = resolvedUserId;
+      // ✅ HARD RULE: never allow current user to be treated as "other user"
+      _userId = _normalizeUserId(resolvedUserId);
 
       // ✅ flip gate BEFORE/AS we start loading
       if (mounted) {
@@ -69,15 +88,36 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       }
 
       // ✅ Kick init (notifier should set isLoading true internally)
-      ref
-          .read(userProfileScreenTwoNotifier.notifier)
-          .initialize(userId: _userId);
+      ref.read(userProfileScreenTwoNotifier.notifier).initialize(userId: _userId);
 
       // Avatar only for current user
       if (_userId == null) {
         ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant UserProfileScreenTwo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final normalizedNew = _normalizeUserId(widget.userId);
+    final normalizedOld = _normalizeUserId(oldWidget.userId);
+
+    if (normalizedNew == normalizedOld) return;
+
+    _userId = normalizedNew;
+
+    // keep skeleton rules consistent
+    _initTriggered = true;
+    _initialViewingOtherUser = _userId != null;
+
+    // re-init for new target
+    ref.read(userProfileScreenTwoNotifier.notifier).initialize(userId: _userId);
+
+    if (_userId == null) {
+      ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar();
+    }
   }
 
   @override
@@ -109,40 +149,38 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
 
     final bool showSkeleton = !_initTriggered || state.isLoading || !hasModel;
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: showSkeleton
-              ? UserProfileSkeleton(showActions: isViewingOtherUser)
-              : RefreshIndicator(
-            color: appTheme.deep_purple_A100,
-            backgroundColor: appTheme.gray_900_02,
-            onRefresh: _onRefresh,
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.only(
-                top: 24.h,
-                left: 18.h,
-                right: 18.h,
-              ),
-              child: Column(
-                children: [
-                  _buildProfileHeader(context),
-                  SizedBox(height: 12.h),
-                  _buildStats(context),
-                  if (_userId != null) ...[
-                    SizedBox(height: 16.h),
-                    _buildActions(context),
-                  ],
-                  SizedBox(height: 28.h),
-                  _buildStories(context),
-                  SizedBox(height: 12.h),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: showSkeleton
+            ? UserProfileSkeleton(showActions: isViewingOtherUser)
+            : RefreshIndicator(
+          color: appTheme.deep_purple_A100,
+          backgroundColor: appTheme.gray_900_02,
+          onRefresh: _onRefresh,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.only(
+              top: 24.h,
+              left: 18.h,
+              right: 18.h,
+            ),
+            child: Column(
+              children: [
+                _buildProfileHeader(context),
+                SizedBox(height: 12.h),
+                _buildStats(context),
+                if (_userId != null) ...[
+                  SizedBox(height: 16.h),
+                  _buildActions(context),
                 ],
-              ),
+                SizedBox(height: 28.h),
+                _buildStories(context),
+                SizedBox(height: 12.h),
+              ],
             ),
           ),
         ),
@@ -353,6 +391,33 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
           categoryIcon: story.categoryIcon ?? ImageConstant.imgVector,
           timestamp: story.timestamp ?? 'Just now',
           onTap: () => _onTapStoryCard(context, index),
+
+          // ✅ Long-press actions (SAFE, MATCHES MODEL)
+          onLongPress: () {
+            final String? storyId = story.storyId;
+            if (storyId == null || storyId.isEmpty) return;
+
+            StoryActionsSheet.show(
+              context: context,
+
+              // REQUIRED
+              storyId: storyId,
+
+              // Profile grid does not expose memoryId yet → pass empty
+              memoryId: '',
+
+              // Owner check: contributorId === owner for profile stories
+              ownerUserId: story.contributorId ?? '',
+
+              // Best available share target for now
+              mediaUrl: story.backgroundImage ?? '',
+
+              // Not available on this model (safe defaults)
+              caption: '',
+              isVideo: false,
+              deepLink: null,
+            );
+          },
         );
       },
     );

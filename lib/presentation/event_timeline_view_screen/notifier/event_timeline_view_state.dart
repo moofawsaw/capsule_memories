@@ -8,11 +8,14 @@ class EventTimelineViewState extends Equatable {
   final bool? isCurrentUserMember;
   final bool? isCurrentUserCreator;
 
-  // CRITICAL FIX: Add state properties for timeline widget
   final List<TimelineStoryItem> timelineStories;
   final DateTime? memoryStartTime;
   final DateTime? memoryEndTime;
   final String? memoryId;
+
+  // NEW: sealed/state source-of-truth
+  final String? memoryState;
+  final bool? isSealed;
 
   EventTimelineViewState({
     this.eventTimelineViewModel,
@@ -25,21 +28,25 @@ class EventTimelineViewState extends Equatable {
     this.memoryStartTime,
     this.memoryEndTime,
     this.memoryId,
+    this.memoryState,
+    this.isSealed,
   });
 
   @override
   List<Object?> get props => [
-        eventTimelineViewModel,
-        isLoading,
-        isSuccess,
-        errorMessage,
-        isCurrentUserMember,
-        isCurrentUserCreator,
-        timelineStories,
-        memoryStartTime,
-        memoryEndTime,
-        memoryId,
-      ];
+    eventTimelineViewModel,
+    isLoading,
+    isSuccess,
+    errorMessage,
+    isCurrentUserMember,
+    isCurrentUserCreator,
+    timelineStories,
+    memoryStartTime,
+    memoryEndTime,
+    memoryId,
+    memoryState,
+    isSealed,
+  ];
 
   EventTimelineViewState copyWith({
     EventTimelineViewModel? eventTimelineViewModel,
@@ -52,10 +59,11 @@ class EventTimelineViewState extends Equatable {
     DateTime? memoryStartTime,
     DateTime? memoryEndTime,
     String? memoryId,
+    String? memoryState,
+    bool? isSealed,
   }) {
     return EventTimelineViewState(
-      eventTimelineViewModel:
-          eventTimelineViewModel ?? this.eventTimelineViewModel,
+      eventTimelineViewModel: eventTimelineViewModel ?? this.eventTimelineViewModel,
       isLoading: isLoading ?? this.isLoading,
       isSuccess: isSuccess ?? this.isSuccess,
       errorMessage: errorMessage,
@@ -65,6 +73,8 @@ class EventTimelineViewState extends Equatable {
       memoryStartTime: memoryStartTime ?? this.memoryStartTime,
       memoryEndTime: memoryEndTime ?? this.memoryEndTime,
       memoryId: memoryId ?? this.memoryId,
+      memoryState: memoryState ?? this.memoryState,
+      isSealed: isSealed ?? this.isSealed,
     );
   }
 }

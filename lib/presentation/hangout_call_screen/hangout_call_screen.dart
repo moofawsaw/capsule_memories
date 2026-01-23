@@ -13,8 +13,7 @@ class HangoutCallScreen extends ConsumerStatefulWidget {
 class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: appTheme.gray_900_02,
         body: Consumer(
           builder: (context, ref, _) {
@@ -57,8 +56,7 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
             );
           },
         ),
-      ),
-    );
+      );
   }
 
   /// Section Widget

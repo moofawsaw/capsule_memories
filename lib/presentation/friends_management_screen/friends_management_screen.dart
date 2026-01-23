@@ -6,6 +6,7 @@ import '../qr_code_share_screen_two_screen/qr_code_share_screen_two_screen.dart'
 import './widgets/friends_section_widget.dart';
 import './widgets/incoming_requests_section_widget.dart';
 import './widgets/qr_scanner_overlay.dart';
+import '../../services/supabase_service.dart';
 import './widgets/sent_requests_section_widget.dart';
 import 'notifier/friends_management_notifier.dart';
 
@@ -34,51 +35,49 @@ class FriendsManagementScreenState
   Widget build(BuildContext context) {
     ref.watch(friendsManagementNotifier);
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: RefreshIndicator(
-          onRefresh: _onRefresh,
-          color: appTheme.deep_purple_A100,
-          backgroundColor: appTheme.gray_900_01,
-          displacement: 30,
-          child: Container(
-            width: double.maxFinite,
-            child: Column(
-              children: [
-                SizedBox(height: 24.h),
-                Expanded(
-                  child: Container(
-                    margin: EdgeInsets.symmetric(horizontal: 16.h),
-                    child: Column(
-                      children: [
-                        _buildFriendsHeaderSection(context),
-                        SizedBox(height: 16.h),
-                        _buildSearchSection(context),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(
-                              parent: BouncingScrollPhysics(),
-                            ),
-                            child: Column(
-                              children: [
-                                SizedBox(height: 20.h),
-                                FriendsSectionWidget(),
-                                SizedBox(height: 20.h),
-                                SentRequestsSectionWidget(),
-                                SizedBox(height: 20.h),
-                                IncomingRequestsSectionWidget(),
-                                SizedBox(height: 24.h),
-                              ],
-                            ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: appTheme.deep_purple_A100,
+        backgroundColor: appTheme.gray_900_01,
+        displacement: 30,
+        child: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            children: [
+              SizedBox(height: 24.h),
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.symmetric(horizontal: 16.h),
+                  child: Column(
+                    children: [
+                      _buildFriendsHeaderSection(context),
+                      SizedBox(height: 16.h),
+                      _buildSearchSection(context),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          child: Column(
+                            children: [
+                              SizedBox(height: 20.h),
+                              FriendsSectionWidget(),
+                              SizedBox(height: 20.h),
+                              SentRequestsSectionWidget(),
+                              SizedBox(height: 20.h),
+                              IncomingRequestsSectionWidget(),
+                              SizedBox(height: 24.h),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -292,7 +291,35 @@ class FriendsManagementScreenState
     });
   }
 
+  // Converts a raw profileImagePath into a usable URL.
+  // - If it's already http(s), use it directly.
+  // - If it's a storage key (e.g. "uid.png" or "avatars/uid.png"), convert to public URL.
+  // NOTE: change bucket name if yours isn't "avatars".
+  String _resolveAvatarUrl(String rawPath) {
+    final path = rawPath.trim();
+    if (path.isEmpty) return '';
+
+    final lower = path.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      return path;
+    }
+
+    try {
+      final supabase = SupabaseService.instance.client;
+      if (supabase == null) return '';
+
+      // If your DB already stores "avatars/xxx.png", strip the folder if needed.
+      // Keep as-is for most setups.
+      final publicUrl = supabase.storage.from('avatars').getPublicUrl(path);
+      return publicUrl;
+    } catch (_) {
+      return '';
+    }
+  }
+
   Widget _buildAvatar(String imagePath) {
+    final url = _resolveAvatarUrl(imagePath);
+
     return Container(
       width: 34.h,
       height: 34.h,
@@ -301,10 +328,35 @@ class FriendsManagementScreenState
         color: appTheme.gray_900_02,
       ),
       child: ClipOval(
-        child: imagePath.isNotEmpty
-            ? CustomImageView(
-          imagePath: imagePath,
+        child: url.isNotEmpty
+            ? Image.network(
+          url,
+          width: 34.h,
+          height: 34.h,
           fit: BoxFit.cover,
+          filterQuality: FilterQuality.low,
+          errorBuilder: (_, __, ___) {
+            return Center(
+              child: Icon(
+                Icons.person,
+                size: 18.h,
+                color: appTheme.gray_50.withAlpha(120),
+              ),
+            );
+          },
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Center(
+              child: SizedBox(
+                width: 16.h,
+                height: 16.h,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: appTheme.deep_purple_A100.withAlpha(180),
+                ),
+              ),
+            );
+          },
         )
             : Center(
           child: Icon(

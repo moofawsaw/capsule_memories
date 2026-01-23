@@ -1,4 +1,6 @@
 // lib/widgets/custom_public_memories.dart
+import 'dart:async';
+
 import '../core/app_export.dart';
 import '../services/avatar_helper_service.dart';
 import '../services/memory_members_service.dart';
@@ -9,6 +11,7 @@ import './custom_button.dart';
 import './custom_image_view.dart';
 import './custom_memory_skeleton.dart';
 import './timeline_widget.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../presentation/memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import '../presentation/event_timeline_view_screen/widgets/timeline_story_widget.dart';
 
@@ -47,7 +50,11 @@ class CustomPublicMemories extends StatelessWidget {
 
     try {
       // ✅ Lightweight existence check (NO profile joins, no heavy selects)
-      final res = await client.from('stories').select('id').eq('memory_id', memoryId).limit(1);
+      final res = await client
+          .from('stories')
+          .select('id')
+          .eq('memory_id', memoryId)
+          .limit(1);
       return (res as List).isNotEmpty;
     } catch (e) {
       // ignore: avoid_print
@@ -56,7 +63,8 @@ class CustomPublicMemories extends StatelessWidget {
     }
   }
 
-  Future<List<CustomMemoryItem>> _filterFeedMemoriesWithStories(List<CustomMemoryItem> input) async {
+  Future<List<CustomMemoryItem>> _filterFeedMemoriesWithStories(
+      List<CustomMemoryItem> input) async {
     final List<CustomMemoryItem> filtered = [];
 
     for (final memory in input) {
@@ -99,7 +107,8 @@ class CustomPublicMemories extends StatelessWidget {
           SizedBox(width: 8.h),
           Text(
             sectionTitle ?? 'Public Memories',
-            style: TextStyleHelper.instance.title16BoldPlusJakartaSans.copyWith(color: appTheme.gray_50),
+            style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
           ),
         ],
       ),
@@ -158,7 +167,8 @@ class CustomPublicMemories extends StatelessWidget {
             );
           }
 
-          final List<CustomMemoryItem> filtered = snapshot.data ?? <CustomMemoryItem>[];
+          final List<CustomMemoryItem> filtered =
+              snapshot.data ?? <CustomMemoryItem>[];
 
           if (filtered.isEmpty) {
             return _buildEmptyState();
@@ -213,12 +223,14 @@ class CustomPublicMemories extends StatelessWidget {
               SizedBox(height: 12.h),
               Text(
                 'No memories yet',
-                style: TextStyleHelper.instance.title16MediumPlusJakartaSans.copyWith(color: appTheme.blue_gray_300),
+                style: TextStyleHelper.instance.title16MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
               ),
               SizedBox(height: 4.h),
               Text(
                 'Check back soon to view open memories',
-                style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(color: appTheme.blue_gray_300),
+                style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
               ),
             ],
           ),
@@ -229,21 +241,14 @@ class CustomPublicMemories extends StatelessWidget {
 }
 
 /// Data model for memory items
-/// Data model for memory items
 class CustomMemoryItem {
   CustomMemoryItem({
     this.id,
     this.userId, // owner id
     this.title,
     this.date,
-
-    // OLD: some call sites pass a full URL (icon_url), some pass just "life.svg"
-    // We'll normalize it.
     String? iconPath,
-
-    // NEW: store the category icon_name (ex: "life", "road-trip")
     this.iconName,
-
     this.profileImages,
     this.mediaItems,
     this.startDate,
@@ -262,7 +267,7 @@ class CustomMemoryItem {
   final String? title;
   final String? date;
 
-  // ✅ NEW: stable identifier from DB (memory_categories.icon_name)
+  // ✅ stable identifier from DB (memory_categories.icon_name)
   final String? iconName;
 
   // Backing field for whatever the caller passed.
@@ -281,12 +286,6 @@ class CustomMemoryItem {
   final String? state;
   final String? visibility;
 
-  /// ✅ The only thing the UI should use.
-  /// Rules:
-  /// 1) If we have iconName -> always build stable bucket URL: category-icons/<iconName>.svg
-  /// 2) Else, if caller already passed a stable bucket url (endsWith .svg and NOT a timestamp-random upload) -> keep it
-  /// 3) Else, if caller passed just "life" or "life.svg" -> build stable URL
-  /// 4) Else, fallback to whatever was passed
   String? get iconPath {
     final String raw = (_iconPath ?? '').trim();
     final String name = (iconName ?? '').trim();
@@ -301,12 +300,11 @@ class CustomMemoryItem {
     if (raw.isEmpty) return null;
 
     // 2) If it's already a stable bucket icon url, keep it:
-    //    ".../category-icons/life.svg"
     final bool isCategoryIconsUrl =
         raw.contains('/storage/v1/object/public/category-icons/') &&
             raw.toLowerCase().endsWith('.svg');
 
-    // A dead "uploaded" icon_url pattern: ".../category-icons/<timestamp>-<rand>.svg"
+    // A dead "uploaded" icon_url pattern
     final bool looksLikeUploadedTemp =
     RegExp(r'/category-icons/\d{10,}-[a-z0-9]+\.svg$', caseSensitive: false)
         .hasMatch(raw);
@@ -316,7 +314,6 @@ class CustomMemoryItem {
     }
 
     // 3) If raw is just an icon file/name, build stable URL
-    //    "life" or "life.svg"
     final bool rawLooksLikeNameOnly =
         !raw.startsWith('http://') && !raw.startsWith('https://');
 
@@ -325,18 +322,9 @@ class CustomMemoryItem {
       return StorageUtils.resolveMemoryCategoryIconUrl(file);
     }
 
-    // 4) If it was a temp uploaded url, try to recover icon_name from the filename
-    //    (this saves you even if callers only pass icon_url)
-    if (looksLikeUploadedTemp) {
-      // If your temp upload filenames ever include the icon name, you can parse it here.
-      // Otherwise, we just return raw.
-      return raw;
-    }
-
     return raw;
   }
 }
-
 
 /// Data model for media items in the timeline (kept for compatibility)
 class CustomMediaItem {
@@ -370,14 +358,120 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   final StoryService _storyService = StoryService();
   final MemoryMembersService _membersService = MemoryMembersService();
 
+  // ✅ Realtime: contributors + stories (story post doesn't change contributors)
+  StreamSubscription<List<Map<String, dynamic>>>? _contributorsStreamSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _storiesStreamSub;
+  String? _rtForMemoryId;
+
+// ============================
+// REALTIME: MEMBERS (contributors)
+// ============================
+
+  RealtimeChannel? _membersChannel;
+  String? _membersSubForMemoryId;
+  Timer? _membersRtDebounce;
+  DateTime? _lastMembersRtAt;
+
+  void _startMembersRealtime() {
+    final client = SupabaseService.instance.client;
+    final memoryId = widget.memory.id;
+
+    if (client == null) return;
+    if (memoryId == null || memoryId.isEmpty) return;
+
+    // Avoid double-subscribing
+    if (_membersChannel != null && _membersSubForMemoryId == memoryId) {
+      _rtLog('🔁 realtime already subscribed');
+      return;
+    }
+
+    _stopMembersRealtime();
+    _membersSubForMemoryId = memoryId;
+
+    _rtLog('🛰️ realtime subscribe -> table=memory_contributors filter=memory_id=eq.$memoryId');
+
+    final ch = client.channel('memory_contributors:$memoryId');
+
+    // ✅ This is the API that exists in supabase_flutter versions where
+    // RealtimeListenTypes / ChannelFilter are NOT available.
+    ch.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'memory_contributors',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'memory_id',
+        value: memoryId,
+      ),
+      callback: (payload) {
+        _lastMembersRtAt = DateTime.now();
+        _rtLog('📡 RT payload event=${payload.eventType} table=${payload.table}');
+
+        if (!mounted) return;
+
+        // Debounce in case multiple rows/events fire back-to-back
+        _membersRtDebounce?.cancel();
+        _membersRtDebounce = Timer(const Duration(milliseconds: 250), () async {
+          if (!mounted) return;
+          _rtLog('🔄 RT -> refetch memberCount + memberAvatars');
+          await _fetchMemberCount();
+          await _fetchMemberAvatars();
+          if (!mounted) return;
+          setState(() {}); // force paint even if list contents are same
+        });
+      },
+    );
+
+    _membersChannel = ch;
+
+    ch.subscribe((status, [ref]) {
+      _rtLog('✅ subscribe status=$status ref=$ref');
+    });
+  }
+
+  void _stopMembersRealtime() {
+    final client = SupabaseService.instance.client;
+    if (client == null) return;
+
+    _membersRtDebounce?.cancel();
+    _membersRtDebounce = null;
+
+    final ch = _membersChannel;
+    _membersChannel = null;
+    _membersSubForMemoryId = null;
+
+    if (ch != null) {
+      _rtLog('🛑 realtime removeChannel');
+      client.removeChannel(ch);
+    }
+  }
+
+// Small log helper
+  void _rtLog(String msg) {
+    final mem = widget.memory.id ?? '';
+    // ignore: avoid_print
+    print('🟣 [PublicMemoryCard] ${DateTime.now().toIso8601String()} mem=$mem | $msg');
+  }
+
   List<TimelineStoryItem> _timelineStories = <TimelineStoryItem>[];
   DateTime? _memoryStartTime;
   DateTime? _memoryEndTime;
   bool _isLoadingTimeline = true;
   bool _isUserCreatedMemory = false;
   int _memberCount = 0;
+  int _rtEventCount = 0;
+  int _avatarsFetchCount = 0;
+  int _countFetchCount = 0;
+  DateTime? _lastRtAt;
 
-  // ✅ NEW: feed-safe member avatars for header (first 3)
+  String _dbgNow() => DateTime.now().toIso8601String();
+
+  void _dbg(String msg) {
+    // ignore: avoid_print
+    print('🟣 [PublicMemoryCard] ${_dbgNow()} mem=${widget.memory.id} | $msg');
+  }
+
+  // ✅ feed-safe member avatars for header (first 3)
   List<String> _memberAvatars = <String>[];
   bool _isLoadingMemberAvatars = false;
 
@@ -389,18 +483,19 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     _deriveOwnershipFast();
     _loadTimelineData();
     _fetchMemberCount();
-    _fetchMemberAvatars(); // ✅ NEW
+    _fetchMemberAvatars();
+
+    // ✅ keep avatars/count correct when members are added after creation
+    _startMembersRealtime();
   }
+
   bool _canCreateStoryForThisMemory() {
     final raw = (widget.memory.state ?? '').toLowerCase().trim();
 
-    // If state is explicitly sealed, don't allow.
     if (raw == 'sealed') return false;
-
-    // If state is explicitly open, allow.
     if (raw == 'open') return true;
 
-    // If state is missing/unknown, default to allow (keeps UX consistent).
+    // If state is missing/unknown, default to allow.
     return true;
   }
 
@@ -446,54 +541,73 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     }
   }
 
-  Future<void> _fetchMemberCount() async {
-    if (widget.memory.id == null || widget.memory.id!.isEmpty) {
+  Future<void> _fetchMemberCount({String debugFrom = 'manual'}) async {
+    _countFetchCount += 1;
+    final memoryId = widget.memory.id;
+
+    _dbg('👥 fetchMemberCount(#$_countFetchCount) from=$debugFrom memoryId=$memoryId');
+
+    if (memoryId == null || memoryId.isEmpty) {
       if (mounted) setState(() => _memberCount = 0);
+      _dbg('👥 fetchMemberCount: memoryId missing -> memberCount=0');
       return;
     }
 
     try {
-      final members = await _membersService.fetchMemoryMembers(widget.memory.id!);
-      if (mounted) {
-        setState(() => _memberCount = members.length);
-      }
+      final members = await _membersService.fetchMemoryMembers(memoryId);
+      _dbg('👥 fetchMemberCount: service returned ${members.length} members');
+
+      if (!mounted) return;
+      setState(() => _memberCount = members.length);
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ Error fetching member count: $e');
+      _dbg('❌ fetchMemberCount error: $e');
       if (mounted) setState(() => _memberCount = 0);
     }
   }
 
-  // ✅ NEW: fetch top 3 member avatars when profileImages isn't provided (feed)
-  Future<void> _fetchMemberAvatars() async {
+
+  // ✅ fetch top 3 member avatars when profileImages isn't provided (feed)
+  Future<void> _fetchMemberAvatars({String debugFrom = 'manual'}) async {
+    _avatarsFetchCount += 1;
     final memoryId = widget.memory.id;
-    if (memoryId == null || memoryId.isEmpty) return;
+
+    _dbg('🧑 fetchMemberAvatars(#$_avatarsFetchCount) from=$debugFrom memoryId=$memoryId');
+
+    if (memoryId == null || memoryId.isEmpty) {
+      _dbg('🧑 fetchMemberAvatars: memoryId missing (return)');
+      return;
+    }
 
     // If caller already provided profileImages (dashboard), prefer that.
     final provided = widget.memory.profileImages ?? <String>[];
+    _dbg('🧑 provided profileImages=${provided.length}');
+
     if (provided.isNotEmpty) {
-      if (mounted) setState(() => _memberAvatars = provided.take(3).toList());
+      final take = provided.take(3).toList();
+      _dbg('🧑 using PROVIDED avatars -> ${take.length}');
+      if (mounted) setState(() => _memberAvatars = take);
       return;
     }
 
     try {
       if (mounted) setState(() => _isLoadingMemberAvatars = true);
 
-      final List<dynamic> members =
-      await _membersService.fetchMemoryMembers(memoryId);
+      final List<dynamic> members = await _membersService.fetchMemoryMembers(memoryId);
+      _dbg('🧑 service.fetchMemoryMembers returned ${members.length} rows');
 
       final List<String> avatars = [];
 
       for (final dynamic m in members) {
         if (m is! Map<String, dynamic>) continue;
 
-        // ✅ CORRECT: read from map
         final String? rawAvatar =
             m['avatar_url'] as String? ??
                 m['user_profiles']?['avatar_url'] as String? ??
                 m['user_profiles_public']?['avatar_url'] as String?;
 
         final String resolved = AvatarHelperService.getAvatarUrl(rawAvatar);
+
+        _dbg('🧑 row user_id=${m['user_id']} rawAvatar=$rawAvatar resolved=$resolved');
 
         if (resolved.isNotEmpty) {
           avatars.add(resolved);
@@ -507,9 +621,10 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         _memberAvatars = avatars;
         _isLoadingMemberAvatars = false;
       });
+
+      _dbg('🧑 fetchMemberAvatars DONE -> stored=${_memberAvatars.length}');
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ Error fetching member avatars: $e');
+      _dbg('❌ fetchMemberAvatars error: $e');
       if (!mounted) return;
       setState(() => _isLoadingMemberAvatars = false);
     }
@@ -520,7 +635,10 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   void didUpdateWidget(covariant _PublicMemoryCard oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.memory.id != widget.memory.id) {
+    final oldId = oldWidget.memory.id;
+    final newId = widget.memory.id;
+
+    if (oldId != newId) {
       setState(() {
         _isLoadingTimeline = true;
         _timelineStories = <TimelineStoryItem>[];
@@ -528,19 +646,57 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         _memoryEndTime = null;
         _memberCount = 0;
 
-        // ✅ reset header avatars too
         _memberAvatars = <String>[];
         _isLoadingMemberAvatars = false;
       });
 
       _deriveOwnershipFast();
       _fetchMemberCount();
-      _fetchMemberAvatars(); // ✅ NEW
+      _fetchMemberAvatars();
       _loadTimelineData();
-    } else if (oldWidget.memory.userId != widget.memory.userId) {
+
+      // ✅ re-bind stream to the new memory id
+      _startMembersRealtime();
+      return;
+    }
+
+    // Same memory id, but data may have updated.
+    final newProvided = widget.memory.profileImages ?? <String>[];
+    final oldProvided = oldWidget.memory.profileImages ?? <String>[];
+
+    final bool providedChanged =
+        oldProvided.length != newProvided.length || !_listEquals(oldProvided, newProvided);
+
+    if (providedChanged) {
+      if (newProvided.isNotEmpty && mounted) {
+        setState(() => _memberAvatars = newProvided.take(3).toList());
+      } else {
+        _fetchMemberAvatars();
+      }
+    } else {
+      if (_memberAvatars.isEmpty && !_isLoadingMemberAvatars) {
+        _fetchMemberAvatars();
+      }
+    }
+
+    if (oldWidget.memory.userId != widget.memory.userId) {
       _deriveOwnershipFast();
       if (mounted) setState(() {});
     }
+  }
+
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  void dispose() {
+    _stopMembersRealtime();
+    super.dispose();
   }
 
   Future<void> _loadTimelineData() async {
@@ -602,8 +758,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
         final String backgroundImage = _storyService.getStoryMediaUrl(storyData);
 
-        final String? avatarUrl =
-        contributor != null ? contributor['avatar_url'] as String? : null;
+        final String? avatarUrl = contributor != null ? contributor['avatar_url'] as String? : null;
         final String profileImage = AvatarHelperService.getAvatarUrl(avatarUrl);
 
         return TimelineStoryItem(
@@ -654,7 +809,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .split(':');
 
       int hour = int.tryParse(timeParts[0]) ?? 0;
-      final int minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final int minute =
+      timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
@@ -682,7 +838,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           .split(':');
 
       int hour = int.tryParse(timeParts[0]) ?? 0;
-      final int minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final int minute =
+      timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
 
       if (timeStr.toLowerCase().contains('pm') && hour != 12) hour += 12;
       if (timeStr.toLowerCase().contains('am') && hour == 12) hour = 0;
@@ -777,12 +934,14 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       children: [
         Text(
           'No stories yet',
-          style: TextStyleHelper.instance.title16BoldPlusJakartaSans.copyWith(color: appTheme.gray_50),
+          style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
         ),
         SizedBox(height: 6.h),
         Text(
           'Create your first story',
-          style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(color: appTheme.blue_gray_300),
+          style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300),
           textAlign: TextAlign.center,
         ),
         SizedBox(height: 12.h),
@@ -834,7 +993,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     );
   }
 
-
   Widget _buildMemoryTimeline() {
     return SizedBox(
       height: 220.h,
@@ -878,7 +1036,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         ),
       );
     }
-
 
     final DateTime start = _memoryStartTime ?? _parseMemoryStartTime();
     final DateTime end = _memoryEndTime ?? _parseMemoryEndTime();
@@ -925,6 +1082,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   @override
   Widget build(BuildContext context) {
+    _dbg('BUILD: memberCount=$_memberCount memberAvatars=${_memberAvatars.length} isLoadingAvatars=$_isLoadingMemberAvatars lastRtAt=$_lastRtAt');
     final bool isFeed = widget.variant == MemoryCardVariant.feed;
     final double cardHeight = isFeed ? 300.h : 330.h;
 
@@ -1023,16 +1181,15 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   Widget _buildMemoryHeader(BuildContext context) {
     final CustomMemoryItem memory = widget.memory;
-    // ✅ DEBUG: see what the card is trying to render
     // ignore: avoid_print
     print('🧩 CARD ICON RAW: ${memory.iconPath}');
+
     final bool showBadges = _shouldShowBadges(memory);
     final double headerHeight = showBadges ? 110.h : 74.h;
 
     // ✅ Use fetched member avatars (feed-safe) if available, else fall back to provided profileImages.
-    final List<String> headerAvatars = _memberAvatars.isNotEmpty
-        ? _memberAvatars
-        : (memory.profileImages ?? <String>[]);
+    final List<String> headerAvatars =
+    _memberAvatars.isNotEmpty ? _memberAvatars : (memory.profileImages ?? <String>[]);
 
     return SizedBox(
       height: headerHeight,
@@ -1075,7 +1232,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
                         memory.title ?? '',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyleHelper.instance.title16BoldPlusJakartaSans.copyWith(color: appTheme.gray_50),
+                        style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
                       ),
                       SizedBox(height: 2.h),
                       Text(
@@ -1104,7 +1262,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     );
   }
 
-  // ✅ UPDATED: enforce circular mode inside CustomImageView (no external ClipOval)
   Widget _buildProfileStack(BuildContext context, List<String> profileImages) {
     if (profileImages.isEmpty) return const SizedBox.shrink();
 
@@ -1141,9 +1298,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   Widget _buildMemoryFooter(BuildContext context) {
     return const SizedBox();
   }
-
 }
-/// Forces true cover behavior, no stretching.
+
 /// Forces true cover behavior, no stretching.
 class _AvatarImage extends StatelessWidget {
   final String imagePath;
@@ -1188,4 +1344,3 @@ class _AvatarImage extends StatelessWidget {
     );
   }
 }
-

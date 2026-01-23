@@ -4,6 +4,7 @@ import '../../widgets/custom_dropdown.dart';
 import '../../widgets/custom_edit_text.dart';
 import '../../widgets/custom_header_section.dart';
 import '../../widgets/custom_icon_button_row.dart';
+import '../../services/groups_service.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_info_row.dart';
 import '../../widgets/custom_settings_row.dart';
@@ -18,14 +19,367 @@ class CreateMemoryScreen extends ConsumerStatefulWidget {
   CreateMemoryScreenState createState() => CreateMemoryScreenState();
 }
 
+class _SelectedGroupMemberAvatars extends StatelessWidget {
+  final String groupId;
+
+  /// Expected shape from GroupsService.fetchGroupMembers:
+  /// [{ 'id': userId, 'avatar': url, ... }]
+  final List<Map<String, dynamic>> members;
+
+  const _SelectedGroupMemberAvatars({
+    required this.groupId,
+    required this.members,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Prefer already-loaded member list (fast, no async)
+    final avatarsFromState = <String>[];
+    for (final m in members) {
+      final a = (m['avatar'] as String?)?.trim();
+      if (a != null && a.isNotEmpty) avatarsFromState.add(a);
+      if (avatarsFromState.length >= 3) break;
+    }
+
+    // If we have avatars already, render immediately
+    if (avatarsFromState.isNotEmpty) {
+      final totalCount = members.length;
+      return _AvatarStack(
+        avatars: avatarsFromState,
+        totalCount: totalCount,
+      );
+    }
+
+    // Fallback: fetch just avatars (in case groupMembers not loaded yet)
+    return FutureBuilder<List<String>>(
+      future: GroupsService.fetchGroupMemberAvatars(groupId, limit: 3),
+      builder: (context, snapshot) {
+        final avatars = snapshot.data ?? const <String>[];
+        if (avatars.isEmpty) {
+          return SizedBox(height: 22.h, width: 54.h);
+        }
+
+        // Unknown total count in this fallback; don’t show +N bubble.
+        return _AvatarStack(
+          avatars: avatars,
+          totalCount: null,
+        );
+      },
+    );
+  }
+}
+
+class _AvatarStack extends StatelessWidget {
+  final List<String> avatars;
+  final int? totalCount;
+
+  const _AvatarStack({
+    required this.avatars,
+    required this.totalCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final int shown = avatars.length;
+    final int extra =
+    (totalCount != null && totalCount! > shown) ? (totalCount! - shown) : 0;
+
+    final double size = 22.h;
+    final double overlap = 14.h;
+
+    final double baseWidth = size + (shown - 1) * overlap;
+    final double extraWidth = extra > 0 ? (overlap + size) : 0;
+    final double totalWidth = baseWidth + extraWidth;
+
+    return SizedBox(
+      height: size,
+      width: totalWidth,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (int i = 0; i < shown; i++)
+            Positioned(
+              left: i * overlap,
+              child: Container(
+                height: size,
+                width: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: appTheme.gray_900_02,
+                    width: 2,
+                  ),
+                ),
+                child: ClipOval(
+                  child: CustomImageView(
+                    imagePath: avatars[i],
+                    height: size,
+                    width: size,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+          if (extra > 0)
+            Positioned(
+              left: shown * overlap,
+              child: Container(
+                height: size,
+                width: size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: appTheme.gray_900,
+                  border: Border.all(
+                    color: appTheme.gray_900_02,
+                    width: 2,
+                  ),
+                ),
+                child: Text(
+                  '+$extra',
+                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                      .copyWith(
+                    color: appTheme.blue_gray_300,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+/// Uses the already-loaded groupMembers list (fast, no async)
+/// Expected member shape: { 'avatar': 'https://...', ... }
+class _AvatarStackFromMembers extends StatelessWidget {
+  final List<Map<String, dynamic>> members;
+  final int? totalCount;
+
+  const _AvatarStackFromMembers({
+    required this.members,
+    this.totalCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Pull up to 3 avatars from loaded members
+    final avatars = <String>[];
+    for (final m in members) {
+      final a = (m['avatar'] as String?)?.trim();
+      if (a != null && a.isNotEmpty) avatars.add(a);
+      if (avatars.length >= 3) break;
+    }
+
+    // If members not loaded yet, keep layout stable
+    if (avatars.isEmpty) {
+      return SizedBox(height: 22.h, width: 54.h);
+    }
+
+    final int shown = avatars.length;
+    final int extra = (totalCount != null && totalCount! > shown)
+        ? (totalCount! - shown)
+        : 0;
+
+    final double size = 22.h;
+    final double overlap = 14.h;
+
+    final double baseWidth = size + (shown - 1) * overlap;
+    final double extraWidth = extra > 0 ? (overlap + size) : 0;
+    final double totalWidth = baseWidth + extraWidth;
+
+    return SizedBox(
+      height: size,
+      width: totalWidth,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (int i = 0; i < shown; i++)
+            Positioned(
+              left: i * overlap,
+              child: Container(
+                height: size,
+                width: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: appTheme.gray_900_02,
+                    width: 2,
+                  ),
+                ),
+                child: ClipOval(
+                  child: CustomImageView(
+                    imagePath: avatars[i],
+                    height: size,
+                    width: size,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+          if (extra > 0)
+            Positioned(
+              left: shown * overlap,
+              child: Container(
+                height: size,
+                width: size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: appTheme.gray_900,
+                  border: Border.all(
+                    color: appTheme.gray_900_02,
+                    width: 2,
+                  ),
+                ),
+                child: Text(
+                  '+$extra',
+                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                      .copyWith(
+                    color: appTheme.blue_gray_300,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+class _GroupMemberAvatars extends StatelessWidget {
+  final String groupId;
+  final int memberCount;
+
+  const _GroupMemberAvatars({
+    required this.groupId,
+    required this.memberCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<String>>(
+      future: GroupsService.fetchGroupMemberAvatars(groupId, limit: 3),
+      builder: (context, snapshot) {
+        final avatars = snapshot.data ?? const <String>[];
+
+        if (avatars.isEmpty) {
+          // keep spacing consistent even if no avatars yet
+          return SizedBox(height: 22.h, width: 54.h);
+        }
+
+        final int shown = avatars.length;
+        final int extra = (memberCount > shown) ? (memberCount - shown) : 0;
+
+        // Overlap amount
+        final double size = 22.h;
+        final double overlap = 14.h;
+
+        // total width = first avatar + (n-1)*overlap + optional +N bubble width
+        final double baseWidth = size + (shown - 1) * overlap;
+        final double extraWidth = extra > 0 ? (overlap + size) : 0;
+        final double totalWidth = baseWidth + extraWidth;
+
+        return SizedBox(
+          height: size,
+          width: totalWidth,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (int i = 0; i < shown; i++)
+                Positioned(
+                  left: i * overlap,
+                  child: Container(
+                    height: size,
+                    width: size,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: appTheme.gray_900_02,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: CustomImageView(
+                        imagePath: avatars[i],
+                        height: size,
+                        width: size,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ),
+
+              if (extra > 0)
+                Positioned(
+                  left: shown * overlap,
+                  child: Container(
+                    height: size,
+                    width: size,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: appTheme.gray_900,
+                      border: Border.all(
+                        color: appTheme.gray_900_02,
+                        width: 2,
+                      ),
+                    ),
+                    child: Text(
+                      '+$extra',
+                      style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                          .copyWith(
+                        color: appTheme.blue_gray_300,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  // ✅ Scroll controller for content area
   final ScrollController _scrollController = ScrollController();
+
+  // ✅ FocusNode for title field
+  final FocusNode _titleFocusNode = FocusNode();
+
+  // ✅ Used to keep title visible when keyboard opens
+  final GlobalKey _nameSectionKey = GlobalKey();
+
+  // ✅ Tune this to match your pinned bar's real height
+  // (buttons row + padding + top border). Keeps content from hiding behind it.
+  final double _pinnedBarReserve =
+      110; // in "logical px" then scaled via .h below
 
   @override
   void initState() {
     super.initState();
-    // Initialize with pre-selected category if provided
+
+    _titleFocusNode.addListener(() {
+      if (_titleFocusNode.hasFocus) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final ctx = _nameSectionKey.currentContext;
+          if (ctx != null) {
+            Scrollable.ensureVisible(
+              ctx,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOut,
+              alignment: 0.08,
+            );
+          }
+        });
+      }
+    });
+
     if (widget.preSelectedCategoryId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await ref
@@ -37,6 +391,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
 
   @override
   void dispose() {
+    _titleFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -47,83 +402,108 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
       builder: (context, ref, _) {
         final state = ref.watch(createMemoryNotifier);
 
+        final double bottomInset = MediaQuery.of(context).viewInsets.bottom;
+        final bool keyboardOpen = bottomInset > 0;
+
         return Material(
           color: Colors.transparent,
-          child: Container(
-            width: double.maxFinite,
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_02,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(20.h),
-                topRight: Radius.circular(20.h),
-              ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              // ✅ Full height only when keyboard is open
+              maxHeight: keyboardOpen
+                  ? MediaQuery.of(context).size.height
+                  : MediaQuery.of(context).size.height * 0.88,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: 12.h),
-                // Drag handle indicator
-                Container(
-                  width: 48.h,
-                  height: 5.h,
-                  decoration: BoxDecoration(
-                    color: appTheme.colorFF3A3A,
-                    borderRadius: BorderRadius.circular(2.5),
-                  ),
+            child: Container(
+              width: double.maxFinite,
+              decoration: BoxDecoration(
+                color: appTheme.gray_900_02,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20.h),
+                  topRight: Radius.circular(20.h),
                 ),
-                SizedBox(height: 20.h),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: 20.h),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CustomHeaderSection(
-                            title: 'Create Memory',
-                            description:
-                            'Invite-only. Every perspective. One timeline. Replay forever',
-                            margin: EdgeInsets.only(left: 10.h, right: 10.h),
-                          ),
-                          _buildNameSection(context),
-                          _buildDurationSelector(context),
-                          _buildCategorySection(context),
-                          _buildPrivacySettings(context),
-                          _buildActionButtons(context),
-                          SizedBox(height: 20.h),
-                        ],
-                      ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 12.h),
+
+                  // Drag handle
+                  Container(
+                    width: 48.h,
+                    height: 5.h,
+                    decoration: BoxDecoration(
+                      color: appTheme.colorFF3A3A,
+                      borderRadius: BorderRadius.circular(2.5),
                     ),
                   ),
-                ),
-              ],
+
+                  SizedBox(height: 20.h),
+
+                  /// ✅ CONTENT
+                  /// No bottom reserve padding here. Ever.
+                  /// Since the pinned bar is OUTSIDE this scroll view,
+                  /// content cannot go behind it.
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: CustomScrollView(
+                      controller: _scrollController,
+                      shrinkWrap: true,
+                      physics: const ClampingScrollPhysics(),
+                      slivers: [
+                        SliverPadding(
+                          padding: EdgeInsets.only(
+                            left: 20.h,
+                            right: 20.h,
+                            bottom: 0, // ✅ removes the gap permanently
+                          ),
+                          sliver: SliverToBoxAdapter(
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CustomHeaderSection(
+                                    title: 'Create Memory',
+                                    description:
+                                    'Invite-only. Every perspective. One timeline. Replay forever',
+                                    margin: EdgeInsets.only(
+                                      left: 10.h,
+                                      right: 10.h,
+                                    ),
+                                  ),
+                                  _buildNameSection(context),
+                                  _buildDurationSelector(context),
+                                  _buildGroupInviteSection(context), // ✅ add this
+                                  _buildCategorySection(context),
+                                  _buildPrivacySettings(context),
+                                  SizedBox(height: 20.h),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  /// ✅ PINNED ACTION BAR (rides keyboard)
+                  AnimatedPadding(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    padding: EdgeInsets.only(bottom: bottomInset),
+                    child: SafeArea(
+                      top: false,
+                      bottom: false, // ✅ IMPORTANT: removes the extra bottom space under buttons
+                      child: _buildPinnedActionBar(context),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
       },
-    );
-  }
-
-  /// Step 1: Memory Creation Form
-  Widget _buildStep1Content(BuildContext context) {
-    return Column(
-      key: ValueKey('step1'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CustomHeaderSection(
-          title: 'Create Memory',
-          description:
-          'Invite-only. Every perspective. One timeline. Replay forever',
-          margin: EdgeInsets.only(left: 10.h, right: 10.h),
-        ),
-        _buildNameSection(context),
-        _buildDurationSelector(context),
-        _buildCategorySection(context),
-        _buildPrivacySettings(context),
-        _buildStep1ActionButtons(context),
-        SizedBox(height: 20.h),
-      ],
     );
   }
 
@@ -134,6 +514,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         final state = ref.watch(createMemoryNotifier);
 
         return Container(
+          key: _nameSectionKey,
           width: double.infinity,
           margin: EdgeInsets.only(top: 28.h),
           child: Column(
@@ -146,6 +527,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
               ),
               SizedBox(height: 10.h),
               CustomEditText(
+                focusNode: _titleFocusNode,
                 controller: state.memoryNameController,
                 hintText: 'e.g Family Xmas 2026',
                 validator: (value) {
@@ -222,14 +604,361 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  /// Helper: Build individual duration tab
-  Widget _buildDurationTab(
+  /// ✅ Group Invite Section (right under Memory duration)
+  Widget _buildGroupInviteSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(createMemoryNotifier);
+        final notifier = ref.read(createMemoryNotifier.notifier);
+
+        final groups = state.createMemoryModel?.availableGroups ?? [];
+        final selectedGroupId = state.createMemoryModel?.selectedGroup;
+        final selectedGroupName = _getGroupNameById(groups, selectedGroupId);
+
+        // Use already-fetched members (preferred) so it’s instant on the selected row
+        final selectedGroupMembers =
+            state.createMemoryModel?.groupMembers ?? const <Map<String, dynamic>>[];
+
+        // Best-effort memberCount (prefer DB field, otherwise fall back to loaded members length)
+        int memberCount = 0;
+        if (selectedGroupId != null && selectedGroupId.isNotEmpty) {
+          final g = groups.firstWhere(
+                (x) => (x['id'] as String?) == selectedGroupId,
+            orElse: () => const {},
+          );
+          final rawCount = g['member_count'];
+          memberCount = (rawCount is int)
+              ? rawCount
+              : int.tryParse('${rawCount ?? ''}') ??
+              (selectedGroupMembers.isNotEmpty ? selectedGroupMembers.length : 0);
+        }
+
+        return Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(top: 20.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Invite group',
+                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+              SizedBox(height: 10.h),
+
+              // Selector row
+              GestureDetector(
+                onTap: () {
+                  _showGroupSelectionBottomSheet(
+                    context,
+                    notifier,
+                    groups,
+                    selectedGroupId,
+                  );
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900,
+                    borderRadius: BorderRadius.circular(8.h),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        height: 26.h,
+                        width: 26.h,
+                        decoration: BoxDecoration(
+                          color: appTheme.deep_purple_A100.withAlpha(51),
+                          borderRadius: BorderRadius.circular(8.h),
+                        ),
+                        child: Icon(
+                          Icons.group,
+                          color: appTheme.deep_purple_A100,
+                          size: 16.h,
+                        ),
+                      ),
+                      SizedBox(width: 10.h),
+
+                      // Group name
+                      Expanded(
+                        child: Text(
+                          groups.isEmpty
+                              ? 'Loading groups...'
+                              : (selectedGroupName ?? 'None'),
+                          style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                              .copyWith(
+                            fontSize: 16.fSize,
+                            fontWeight: FontWeight.w700,
+                            color: selectedGroupName != null
+                                ? appTheme.gray_50
+                                : appTheme.blue_gray_300,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+
+                      // ✅ Show selected group members (avatars) on the closed row
+                      if (selectedGroupId != null && selectedGroupId.isNotEmpty) ...[
+                        SizedBox(width: 10.h),
+                        _AvatarStackFromMembers(
+                          members: selectedGroupMembers,
+                          totalCount: memberCount > 0 ? memberCount : null,
+                        ),
+                      ],
+
+                      SizedBox(width: 6.h),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: appTheme.gray_50,
+                        size: 26.h,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Helper text
+              if (selectedGroupId != null && selectedGroupId.isNotEmpty) ...[
+                SizedBox(height: 10.h),
+                Text(
+                  'All members of this group will be added automatically.',
+                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                      .copyWith(color: appTheme.blue_gray_300, height: 1.35),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String? _getGroupNameById(List<Map<String, dynamic>> groups, String? groupId) {
+    if (groupId == null) return null;
+    for (final g in groups) {
+      if ((g['id'] as String?) == groupId) return g['name'] as String?;
+    }
+    return null;
+  }
+
+// ✅ FULL COPY/PASTE REPLACEMENT
+// Replace your entire _showGroupSelectionBottomSheet(...) with this version.
+
+  void _showGroupSelectionBottomSheet(
       BuildContext context,
-      WidgetRef ref,
-      String label,
-      String value,
-      bool isSelected,
+      CreateMemoryNotifier notifier,
+      List<Map<String, dynamic>> groups,
+      String? selectedGroupId,
       ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: false, // ✅ IMPORTANT: prevents extra SafeArea padding
+      backgroundColor: appTheme.gray_900_02,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.h),
+          topRight: Radius.circular(20.h),
+        ),
+      ),
+      builder: (modalContext) {
+        final maxH = MediaQuery.of(modalContext).size.height * 0.8;
+
+        // ✅ NO SafeArea wrapper here (it adds bottom padding by default)
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxH),
+          child: Padding(
+            padding: EdgeInsets.only(left: 20.h, right: 20.h, top: 20.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Select Group',
+                      style: TextStyleHelper.instance.title20BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(modalContext),
+                      child: Icon(Icons.close,
+                          color: appTheme.gray_50, size: 24.h),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16.h),
+
+                // None option
+                GestureDetector(
+                  onTap: () async {
+                    await notifier.updateSelectedGroup(null);
+                    Navigator.pop(modalContext);
+                  },
+                  child: Container(
+                    padding:
+                    EdgeInsets.symmetric(horizontal: 18.h, vertical: 18.h),
+                    decoration: BoxDecoration(
+                      color: selectedGroupId == null
+                          ? appTheme.deep_purple_A100.withAlpha(26)
+                          : appTheme.gray_900,
+                      borderRadius: BorderRadius.circular(14.h),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          height: 32.h,
+                          width: 32.h,
+                          decoration: BoxDecoration(
+                            color: appTheme.deep_purple_A100.withAlpha(51),
+                            borderRadius: BorderRadius.circular(10.h),
+                          ),
+                          child: Icon(
+                            Icons.remove_circle_outline,
+                            color: appTheme.deep_purple_A100,
+                            size: 21.h,
+                          ),
+                        ),
+                        SizedBox(width: 14.h),
+                        Expanded(
+                          child: Text(
+                            'None',
+                            style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                                .copyWith(
+                              fontSize: 18.fSize,
+                              fontWeight: FontWeight.w700,
+                              color: appTheme.gray_50,
+                            ),
+                          ),
+                        ),
+                        if (selectedGroupId == null)
+                          Icon(Icons.check_circle,
+                              color: appTheme.deep_purple_A100, size: 26.h),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: 16.h),
+
+                Expanded(
+                  child: groups.isEmpty
+                      ? Center(
+                    child: Text(
+                      'No groups found',
+                      style: TextStyleHelper
+                          .instance.body14RegularPlusJakartaSans
+                          .copyWith(color: appTheme.blue_gray_300),
+                    ),
+                  )
+                      : ListView.separated(
+                    itemCount: groups.length,
+                    separatorBuilder: (_, __) => SizedBox(height: 16.h),
+                    itemBuilder: (context, index) {
+                      final group = groups[index];
+                      final groupId = group['id'] as String?;
+                      final groupName = group['name'] as String? ?? '';
+                      final isSelected = groupId == selectedGroupId;
+                      final memberCount = group['member_count'];
+
+                      return GestureDetector(
+                        onTap: () async {
+                          if (groupId == null || groupId.isEmpty) return;
+                          await notifier.updateSelectedGroup(groupId);
+                          Navigator.pop(modalContext);
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 18.h, vertical: 18.h),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? appTheme.deep_purple_A100.withAlpha(26)
+                                : appTheme.gray_900,
+                            borderRadius: BorderRadius.circular(14.h),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                height: 32.h,
+                                width: 32.h,
+                                decoration: BoxDecoration(
+                                  color: appTheme.deep_purple_A100
+                                      .withAlpha(51),
+                                  borderRadius: BorderRadius.circular(10.h),
+                                ),
+                                child: Icon(Icons.group,
+                                    color: appTheme.deep_purple_A100,
+                                    size: 21.h),
+                              ),
+                              SizedBox(width: 14.h),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      groupName.isEmpty
+                                          ? 'Unnamed group'
+                                          : groupName,
+                                      style: TextStyleHelper
+                                          .instance.body16BoldPlusJakartaSans
+                                          .copyWith(
+                                        fontSize: 18.fSize,
+                                        fontWeight: FontWeight.w700,
+                                        color: appTheme.gray_50,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    SizedBox(height: 6.h),
+                                    Row(
+                                      children: [
+                                        if (groupId != null && groupId.isNotEmpty)
+                                          _GroupMemberAvatars(
+                                            groupId: groupId,
+                                            memberCount: (memberCount is int)
+                                                ? memberCount
+                                                : int.tryParse('${memberCount ?? ''}') ?? 0,
+                                          ),
+                                        SizedBox(width: 10.h),
+                                        if (memberCount != null)
+                                          Text(
+                                            '$memberCount members',
+                                            style: TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
+                                              color: appTheme.blue_gray_300,
+                                              height: 1.35,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(Icons.check_circle,
+                                    color: appTheme.deep_purple_A100,
+                                    size: 26.h),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDurationTab(
+    BuildContext context,
+    WidgetRef ref,
+    String label,
+    String value,
+    bool isSelected,
+  ) {
     return GestureDetector(
       onTap: () {
         ref.read(createMemoryNotifier.notifier).updateSelectedDuration(value);
@@ -243,7 +972,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         child: Center(
           child: Text(
             label,
-            style: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
+            style:
+                TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
               color: isSelected ? appTheme.gray_50 : appTheme.blue_gray_300,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             ),
@@ -253,7 +983,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  /// Category Selection Section - SAME UX/UI AS MemoryDetails (closed field + bottom sheet)
+  /// Category Selection Section
   Widget _buildCategorySection(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -275,7 +1005,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         );
 
         final selectedIconUrl =
-        (selectedCategory?['icon_url'] as String?)?.trim();
+            (selectedCategory?['icon_url'] as String?)?.trim();
         final hasSelectedIconUrl =
             selectedIconUrl != null && selectedIconUrl.isNotEmpty;
 
@@ -291,20 +1021,20 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 children: [
                   Text(
                     'Category',
-                    style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                    style: TextStyleHelper
+                        .instance.title16RegularPlusJakartaSans
                         .copyWith(color: appTheme.blue_gray_300),
                   ),
                   SizedBox(width: 4.h),
                   Text(
                     '*',
-                    style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                    style: TextStyleHelper
+                        .instance.title16RegularPlusJakartaSans
                         .copyWith(color: appTheme.colorFFD81E),
                   ),
                 ],
               ),
               SizedBox(height: 10.h),
-
-              // Closed field (tap to open sheet) - matches MemoryDetails style
               GestureDetector(
                 onTap: () {
                   if (availableCategories.isEmpty) return;
@@ -318,7 +1048,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 child: Container(
                   padding: EdgeInsets.symmetric(
                     horizontal: 16.h,
-                    vertical: 16.h, // slightly taller
+                    vertical: 16.h,
                   ),
                   decoration: BoxDecoration(
                     color: appTheme.gray_900,
@@ -326,7 +1056,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   ),
                   child: Row(
                     children: [
-                      // ✅ LEFT ICON (only when a category is selected)
                       if (hasSelection) ...[
                         if (hasSelectedIconUrl)
                           ClipRRect(
@@ -354,14 +1083,13 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                           ),
                         SizedBox(width: 10.h),
                       ],
-
-                      // TEXT
                       Expanded(
                         child: Text(
                           availableCategories.isEmpty
                               ? 'Loading categories...'
                               : (selectedCategoryName ?? 'Select Category'),
-                          style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                          style: TextStyleHelper
+                              .instance.body16BoldPlusJakartaSans
                               .copyWith(
                             fontSize: 16.fSize,
                             fontWeight: FontWeight.w700,
@@ -372,8 +1100,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-
-                      // RIGHT ARROW
                       Icon(
                         Icons.arrow_drop_down,
                         color: appTheme.gray_50,
@@ -391,9 +1117,9 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   }
 
   String? _getCategoryNameById(
-      List<Map<String, dynamic>> categories,
-      String? categoryId,
-      ) {
+    List<Map<String, dynamic>> categories,
+    String? categoryId,
+  ) {
     if (categoryId == null) return null;
     for (final c in categories) {
       final id = c['id'] as String?;
@@ -403,9 +1129,9 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   }
 
   Map<String, dynamic>? _getCategoryById(
-      List<Map<String, dynamic>> categories,
-      String? categoryId,
-      ) {
+    List<Map<String, dynamic>> categories,
+    String? categoryId,
+  ) {
     if (categoryId == null) return null;
     for (final c in categories) {
       final id = c['id'] as String?;
@@ -413,6 +1139,9 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     }
     return null;
   }
+
+// ✅ FULL COPY/PASTE REPLACEMENT
+// Replace your entire _showCategorySelectionBottomSheetCreateMemory(...) with this version.
 
   void _showCategorySelectionBottomSheetCreateMemory(
       BuildContext context,
@@ -423,6 +1152,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: false, // ✅ IMPORTANT: prevents extra SafeArea padding
       backgroundColor: appTheme.gray_900_02,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
@@ -433,144 +1163,142 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
       builder: (modalContext) {
         final maxH = MediaQuery.of(modalContext).size.height * 0.8;
 
-        return SafeArea(
-          top: false,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxH),
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 20.h,
-                right: 20.h,
-                top: 20.h,
-                // bottom: 20.h + MediaQuery.of(modalContext).viewInsets.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.max,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Select Category',
-                        style: TextStyleHelper.instance.title20BoldPlusJakartaSans
-                            .copyWith(color: appTheme.gray_50),
+        // ✅ NO SafeArea wrapper here (it adds bottom padding by default)
+        return ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxH),
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20.h,
+              right: 20.h,
+              top: 20.h,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Select Category',
+                      style: TextStyleHelper.instance.title20BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(modalContext),
+                      child: Icon(
+                        Icons.close,
+                        color: appTheme.gray_50,
+                        size: 24.h,
                       ),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(modalContext),
-                        child: Icon(
-                          Icons.close,
-                          color: appTheme.gray_50,
-                          size: 24.h,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16.h),
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: categories.length,
-                      separatorBuilder: (_, __) => SizedBox(height: 16.h),
-                      itemBuilder: (context, index) {
-                        final category = categories[index];
-                        final categoryId = category['id'] as String;
-                        final categoryName = category['name'] as String;
-                        final isSelected = categoryId == selectedCategoryId;
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16.h),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: categories.length,
+                    separatorBuilder: (_, __) => SizedBox(height: 16.h),
+                    itemBuilder: (context, index) {
+                      final category = categories[index];
+                      final categoryId = category['id'] as String;
+                      final categoryName = category['name'] as String;
+                      final isSelected = categoryId == selectedCategoryId;
 
-                        final iconUrl = (category['icon_url'] as String?)?.trim();
-                        final tagline = (category['tagline'] as String?)?.trim();
+                      final iconUrl = (category['icon_url'] as String?)?.trim();
+                      final tagline = (category['tagline'] as String?)?.trim();
 
-                        final hasIconUrl = iconUrl != null && iconUrl.isNotEmpty;
-                        final hasTagline = tagline != null && tagline.isNotEmpty;
+                      final hasIconUrl = iconUrl != null && iconUrl.isNotEmpty;
+                      final hasTagline = tagline != null && tagline.isNotEmpty;
 
-                        return GestureDetector(
-                          onTap: () {
-                            notifier.updateSelectedCategory(categoryId);
-                            Navigator.pop(modalContext);
-                          },
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 18.h,
-                              vertical: 18.h,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? appTheme.deep_purple_A100.withAlpha(26)
-                                  : appTheme.gray_900,
-                              borderRadius: BorderRadius.circular(14.h),
-                            ),
-                            child: Row(
-                              children: [
-                                if (hasIconUrl)
-                                  ClipRRect(
-                                    child: CustomImageView(
-                                      imagePath: iconUrl,
-                                      height: 32.h,
-                                      width: 32.h,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  )
-                                else
-                                  Container(
+                      return GestureDetector(
+                        onTap: () {
+                          notifier.updateSelectedCategory(categoryId);
+                          Navigator.pop(modalContext);
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 18.h,
+                            vertical: 18.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? appTheme.deep_purple_A100.withAlpha(26)
+                                : appTheme.gray_900,
+                            borderRadius: BorderRadius.circular(14.h),
+                          ),
+                          child: Row(
+                            children: [
+                              if (hasIconUrl)
+                                ClipRRect(
+                                  child: CustomImageView(
+                                    imagePath: iconUrl,
                                     height: 32.h,
                                     width: 32.h,
-                                    decoration: BoxDecoration(
-                                      color: appTheme.deep_purple_A100.withAlpha(51),
-                                    ),
-                                    child: Icon(
-                                      Icons.category,
-                                      color: appTheme.deep_purple_A100,
-                                      size: 21.h,
-                                    ),
+                                    fit: BoxFit.contain,
                                   ),
-                                SizedBox(width: 14.h),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        categoryName,
-                                        style: TextStyleHelper.instance
-                                            .body16BoldPlusJakartaSans
-                                            .copyWith(
-                                          fontSize: 18.fSize,
-                                          fontWeight: FontWeight.w700,
-                                          color: appTheme.gray_50,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (hasTagline) ...[
-                                        SizedBox(height: 3.h),
-                                        Text(
-                                          tagline,
-                                          style: TextStyleHelper.instance
-                                              .body14RegularPlusJakartaSans
-                                              .copyWith(
-                                            color: appTheme.blue_gray_300,
-                                            height: 1.35,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ],
+                                )
+                              else
+                                Container(
+                                  height: 32.h,
+                                  width: 32.h,
+                                  decoration: BoxDecoration(
+                                    color:
+                                    appTheme.deep_purple_A100.withAlpha(51),
+                                  ),
+                                  child: Icon(
+                                    Icons.category,
+                                    color: appTheme.deep_purple_A100,
+                                    size: 21.h,
                                   ),
                                 ),
-                                if (isSelected)
-                                  Icon(
-                                    Icons.check_circle,
-                                    color: appTheme.deep_purple_A100,
-                                    size: 26.h,
-                                  ),
-                              ],
-                            ),
+                              SizedBox(width: 14.h),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      categoryName,
+                                      style: TextStyleHelper
+                                          .instance.body16BoldPlusJakartaSans
+                                          .copyWith(
+                                        fontSize: 18.fSize,
+                                        fontWeight: FontWeight.w700,
+                                        color: appTheme.gray_50,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (hasTagline) ...[
+                                      SizedBox(height: 3.h),
+                                      Text(
+                                        tagline,
+                                        style: TextStyleHelper.instance
+                                            .body14RegularPlusJakartaSans
+                                            .copyWith(
+                                          color: appTheme.blue_gray_300,
+                                          height: 1.35,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(
+                                  Icons.check_circle,
+                                  color: appTheme.deep_purple_A100,
+                                  size: 26.h,
+                                ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      );
+                    },
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -578,46 +1306,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  /// Step 2: Invite People
-  Widget _buildStep2Content(BuildContext context) {
-    // Scroll to bottom when search field is focused
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-
-    return Column(
-      key: ValueKey('step2'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CustomHeaderSection(
-          title: 'Invite people (optional)',
-          description:
-          'Invite-only. Every perspective. One timeline. Replay forever',
-          margin: EdgeInsets.only(left: 10.h, right: 10.h),
-        ),
-        _buildInviteIconButtons(context),
-        SizedBox(height: 16.h),
-        _buildInviteOptionsSection(context),
-        SizedBox(height: 16.h),
-        _buildSearchSection(context),
-        SizedBox(height: 16.h),
-        _buildSearchResults(context),
-        SizedBox(height: 20.h),
-        _buildHelperBadge(context),
-        SizedBox(height: 16.h),
-        _buildStep2ActionButtons(context),
-        SizedBox(height: 20.h),
-      ],
-    );
-  }
-
-  /// Section Widget
   Widget _buildPrivacySettings(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -637,7 +1325,9 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 : 'Only members can view',
             switchValue: isPublic,
             onSwitchChanged: (value) {
-              ref.read(createMemoryNotifier.notifier).togglePrivacySetting(value);
+              ref
+                  .read(createMemoryNotifier.notifier)
+                  .togglePrivacySetting(value);
             },
             margin: EdgeInsets.zero,
           ),
@@ -646,544 +1336,72 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  /// Step 1 Action Buttons
-  Widget _buildStep1ActionButtons(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        return Container(
-          width: double.infinity,
-          margin: EdgeInsets.only(top: 20.h),
-          child: Row(
-            spacing: 12.h,
-            children: [
-              Expanded(
-                child: CustomButton(
-                  text: 'Cancel',
-                  onPressed: () {
-                    ref.read(createMemoryNotifier.notifier).onCancelPressed();
-                  },
-                  buttonStyle: CustomButtonStyle.fillDark,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
-                ),
-              ),
-              Expanded(
-                child: CustomButton(
-                  text: 'Next',
-                  onPressed: () {
-                    if (_formKey.currentState?.validate() ?? false) {
-                      ref.read(createMemoryNotifier.notifier).moveToStep2();
-                    }
-                  },
-                  buttonStyle: CustomButtonStyle.fillPrimary,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// Invite Icon Buttons
-  Widget _buildInviteIconButtons(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        return Container(
-          margin: EdgeInsets.only(top: 20.h),
-          child: CustomIconButtonRow(
-            firstIconPath: ImageConstant.imgButtons,
-            secondIconPath: ImageConstant.imgButtonsGray50,
-            onFirstIconTap: () {
-              ref.read(createMemoryNotifier.notifier).handleQRCodeTap();
-            },
-            onSecondIconTap: () {
-              ref.read(createMemoryNotifier.notifier).handleCameraTap();
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  /// Invite Header Section
-  Widget _buildInviteHeaderSection(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(top: 26.h, left: 10.h, right: 10.h),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            margin: EdgeInsets.only(bottom: 8.h),
-            child: Text(
-              'Invite people (optional)',
-              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
-            ),
-          ),
-          CustomIconButtonRow(
-            firstIconPath: ImageConstant.imgButtons,
-            secondIconPath: ImageConstant.imgButtonsGray50,
-            onFirstIconTap: () {
-              ref.read(createMemoryNotifier.notifier).handleQRCodeTap();
-            },
-            onSecondIconTap: () {
-              ref.read(createMemoryNotifier.notifier).handleCameraTap();
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Invite Options Section
-  Widget _buildInviteOptionsSection(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(createMemoryNotifier);
-        final availableGroups = state.createMemoryModel?.availableGroups ?? [];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CustomDropdown<String>(
-              items: _buildDropdownItemsFromGroups(availableGroups),
-              onChanged: (value) {
-                ref.read(createMemoryNotifier.notifier).updateSelectedGroup(value);
-              },
-              value: state.createMemoryModel?.selectedGroup,
-              placeholder: availableGroups.isEmpty
-                  ? 'No groups available'
-                  : 'Select from group...',
-              leftIcon: ImageConstant.imgIconBlueGray30022x26,
-              rightIcon: ImageConstant.imgIconBlueGray30022x18,
-              margin: EdgeInsets.zero,
-            ),
-            if (state.createMemoryModel?.selectedGroup != null &&
-                (state.createMemoryModel?.groupMembers.isNotEmpty ?? false))
-              _buildGroupMembersList(context),
-          ],
-        );
-      },
-    );
-  }
-
-  /// Section Widget - Group Members List
-  Widget _buildGroupMembersList(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(createMemoryNotifier);
-        final groupMembers = state.createMemoryModel?.groupMembers ?? [];
-
-        return Container(
-          margin: EdgeInsets.only(top: 12.h),
-          padding: EdgeInsets.all(12.h),
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_01,
-            borderRadius: BorderRadius.circular(12.h),
-            border: Border.all(color: appTheme.blue_gray_300.withAlpha(77)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Group Members (${groupMembers.length})',
-                style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
-                  color: appTheme.blue_gray_300,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Container(
-                constraints: BoxConstraints(maxHeight: 150.h),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: ClampingScrollPhysics(),
-                  itemCount: groupMembers.length,
-                  separatorBuilder: (context, index) => SizedBox(height: 8.h),
-                  itemBuilder: (context, index) {
-                    final member = groupMembers[index];
-                    return _buildGroupMemberItem(context, member);
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// Individual group member item
-  Widget _buildGroupMemberItem(
-      BuildContext context,
-      Map<String, dynamic> member,
-      ) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.h, vertical: 6.h),
-      child: Row(
-        children: [
-          ClipOval(
-            child: CustomImageView(
-              imagePath: member['avatar'] ?? '',
-              height: 32.h,
-              width: 32.h,
-              fit: BoxFit.cover,
-            ),
-          ),
-          SizedBox(width: 10.h),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  member['name'] ?? 'Unknown User',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
-                    color: appTheme.gray_50,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '@${member['username'] ?? 'username'}',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
-                    color: appTheme.blue_gray_300,
-                    fontSize: 10.fSize,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Section Widget - Search Input Field
-  Widget _buildSearchSection(BuildContext context) {
+  /// ✅ Pinned action bar
+  Widget _buildPinnedActionBar(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(createMemoryNotifier);
 
-        return Container(
-          decoration: BoxDecoration(
-            color: appTheme.gray_900_01,
-            borderRadius: BorderRadius.circular(12.h),
-            border: Border.all(color: appTheme.blue_gray_300.withAlpha(77)),
-          ),
-          child: TextField(
-            controller: state.searchController,
-            onChanged: (value) {
-              ref.read(createMemoryNotifier.notifier).updateSearchQuery(value);
-            },
-            onTap: () {
-              // Scroll to show the search field when tapped
-              Future.delayed(Duration(milliseconds: 400), () {
-                if (_scrollController.hasClients) {
-                  _scrollController.animateTo(
-                    _scrollController.position.maxScrollExtent,
-                    duration: Duration(milliseconds: 300),
-                    curve: Curves.easeOut,
-                  );
-                }
-              });
-            },
-            style: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
-              color: appTheme.gray_50,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Search by name...',
-              hintStyle: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
-                color: appTheme.blue_gray_300,
-              ),
-              prefixIcon: Padding(
-                padding: EdgeInsets.all(12.h),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgSearch,
-                  height: 20.h,
-                  width: 20.h,
-                ),
-              ),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 16.h,
-                vertical: 14.h,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Section Widget - Search Results Display
-  Widget _buildSearchResults(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(createMemoryNotifier);
-        final searchQuery = state.createMemoryModel?.searchQuery ?? '';
-        final searchResults = state.createMemoryModel?.searchResults ?? [];
-
-        // Only show results if there's a search query
-        if (searchQuery.isEmpty) {
-          return SizedBox.shrink();
-        }
-
-        // Show "No results" if search query exists but no matches
-        if (searchResults.isEmpty) {
-          return Container(
-            padding: EdgeInsets.symmetric(vertical: 16.h),
-            child: Text(
-              'No users found',
-              style: TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
-                color: appTheme.blue_gray_300,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          );
-        }
-
-        // Display search results
-        return Container(
-          constraints: BoxConstraints(maxHeight: 200.h),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: ClampingScrollPhysics(),
-            itemCount: searchResults.length,
-            separatorBuilder: (context, index) => SizedBox(height: 8.h),
-            itemBuilder: (context, index) {
-              final user = searchResults[index];
-              return _buildUserResultItem(context, user);
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  /// Individual user result item
-  Widget _buildUserResultItem(BuildContext context, Map<String, dynamic> user) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 10.h),
-      decoration: BoxDecoration(
-        color: appTheme.gray_900_01,
-        borderRadius: BorderRadius.circular(10.h),
-        border: Border.all(color: appTheme.blue_gray_300.withAlpha(51)),
-      ),
-      child: Row(
-        children: [
-          // User avatar
-          ClipOval(
-            child: CustomImageView(
-              imagePath: user['avatar'] ?? '',
-              height: 40.h,
-              width: 40.h,
-              fit: BoxFit.cover,
-            ),
-          ),
-          SizedBox(width: 12.h),
-          // User name and username
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user['name'] ?? 'Unknown User',
-                  style: TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
-                    color: appTheme.gray_50,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 2.h),
-                Text(
-                  '@${user['username'] ?? 'username'}',
-                  style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
-                    color: appTheme.blue_gray_300,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          // Invite button
-          GestureDetector(
-            onTap: () {
-              ref.read(createMemoryNotifier.notifier).toggleUserInvite(user['id']);
-            },
-            child: Consumer(
-              builder: (context, ref, _) {
-                final state = ref.watch(createMemoryNotifier);
-                final isInvited =
-                    state.createMemoryModel?.invitedUserIds.contains(user['id']) ??
-                        false;
-
-                return Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
-                  decoration: BoxDecoration(
-                    color: isInvited ? appTheme.deep_purple_A100 : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8.h),
-                    border: Border.all(
-                      color: isInvited ? appTheme.deep_purple_A100 : appTheme.blue_gray_300,
-                    ),
-                  ),
-                  child: Text(
-                    isInvited ? 'Invited' : 'Invite',
-                    style: TextStyleHelper.instance.body12BoldPlusJakartaSans.copyWith(
-                      color: isInvited ? appTheme.gray_50 : appTheme.blue_gray_300,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Helper Badge Section
-  Widget _buildHelperBadge(BuildContext context) {
-    return CustomInfoRow(
-      iconPath: ImageConstant.imgFrameBlueGray300,
-      text: 'You can also share a link after creating the memory',
-      textWidth: 0.82,
-      margin: EdgeInsets.zero,
-    );
-  }
-
-  /// Step 2 Action Buttons
-  Widget _buildStep2ActionButtons(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(createMemoryNotifier);
-
-        // Listen for navigation and errors
         ref.listen(
           createMemoryNotifier,
-              (previous, current) {
-            if (current.shouldNavigateBack ?? false) {
-              NavigatorService.goBack();
-            }
-            if (current.errorMessage != null &&
-                previous?.errorMessage != current.errorMessage) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(current.errorMessage!),
-                  backgroundColor: appTheme.colorFFD81E,
-                ),
-              );
-            }
-          },
-        );
-
-        return Container(
-          margin: EdgeInsets.only(top: 20.h),
-          child: Row(
-            spacing: 12.h,
-            children: [
-              Expanded(
-                child: CustomButton(
-                  text: 'Back',
-                  buttonStyle: CustomButtonStyle.fillDark,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  onPressed: () {
-                    ref.read(createMemoryNotifier.notifier).backToStep1();
-                  },
-                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
-                ),
-              ),
-              Expanded(
-                child: CustomButton(
-                  text: 'Create',
-                  buttonStyle: CustomButtonStyle.fillPrimary,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  isDisabled: state.isLoading,
-                  onPressed: () {
-                    ref.read(createMemoryNotifier.notifier).createMemory();
-                  },
-                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// Dropdown items builder from real groups
-  List<DropdownMenuItem<String>> _buildDropdownItemsFromGroups(
-      List<Map<String, dynamic>> groups,
-      ) {
-    if (groups.isEmpty) {
-      return [];
-    }
-
-    return groups.map((group) {
-      return DropdownMenuItem<String>(
-        value: group['id'] as String,
-        child: Text(group['name'] as String),
-      );
-    }).toList();
-  }
-
-  /// Action Buttons - Create memory directly
-  Widget _buildActionButtons(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(createMemoryNotifier);
-
-        // Listen for navigation to confirmation screen
-        ref.listen(
-          createMemoryNotifier,
-              (previous, current) {
-            // CRITICAL FIX: Close bottom sheet FIRST, then navigate
+          (previous, current) {
             if (current.shouldNavigateToConfirmation == true &&
                 (previous?.shouldNavigateToConfirmation != true)) {
-              print('🔔 LISTENER TRIGGERED: shouldNavigateToConfirmation = true');
-              print('📍 Memory ID: ${current.createdMemoryId}');
-              print('📝 Memory Name: ${current.memoryNameController?.text.trim()}');
-
-              // Close bottom sheet FIRST
-              print('🚀 Closing bottom sheet first...');
               if (Navigator.canPop(context)) {
                 Navigator.of(context).pop();
-                print('✅ Bottom sheet closed');
               }
+              Future.delayed(const Duration(milliseconds: 200), () {
+                final model = current.createMemoryModel;
 
-              // THEN navigate after bottom sheet is dismissed
-              Future.delayed(Duration(milliseconds: 200), () {
-                print('🚀 Navigating to confirmation screen...');
+// pull selected category map from availableCategories
+                final selectedCategoryId = model?.selectedCategory;
+                final categories = model?.availableCategories ??
+                    const <Map<String, dynamic>>[];
+
+                Map<String, dynamic>? selectedCategory;
+                if (selectedCategoryId != null) {
+                  for (final c in categories) {
+                    if ((c['id'] as String?) == selectedCategoryId) {
+                      selectedCategory = c;
+                      break;
+                    }
+                  }
+                }
+
+// prefer icon_url from the category map
+                final iconUrl =
+                    (selectedCategory?['icon_url'] as String?)?.trim();
+                final cleanedIconUrl = (iconUrl == null ||
+                        iconUrl.isEmpty ||
+                        iconUrl == 'null' ||
+                        iconUrl == 'undefined')
+                    ? null
+                    : iconUrl;
 
                 NavigatorService.pushNamed(
                   AppRoutes.memoryConfirmationScreen,
                   arguments: {
                     'memory_id': current.createdMemoryId,
                     'memory_name': current.memoryNameController?.text.trim(),
+                    'category_id': selectedCategoryId,
+                    // optional but useful
+                    'category_icon': cleanedIconUrl,
+                    // ✅ this fixes recorder header
+                    'visibility':
+                        model?.isPublic == true ? 'public' : 'private',
+                    // optional
                   },
                 );
-
-                print('✅ Navigation initiated');
               });
             }
 
-            // Show error messages
             if (current.errorMessage != null &&
                 previous?.errorMessage != current.errorMessage) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(current.errorMessage!),
                   backgroundColor: appTheme.colorFFD81E,
-                  duration: Duration(seconds: 3),
+                  duration: const Duration(seconds: 3),
                 ),
               );
             }
@@ -1191,41 +1409,57 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         );
 
         return Container(
-          width: double.infinity,
-          margin: EdgeInsets.only(top: 20.h),
+          padding: EdgeInsets.only(
+            left: 20.h,
+            right: 20.h,
+            top: 12.h,
+            bottom: 12.h,
+          ),
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02,
+            border: Border(
+              top: BorderSide(
+                color: appTheme.blue_gray_300.withAlpha(25),
+                width: 1,
+              ),
+            ),
+          ),
           child: Row(
-            spacing: 12.h,
             children: [
               Expanded(
                 child: CustomButton(
                   text: 'Cancel',
                   onPressed: () {
-                    ref.read(createMemoryNotifier.notifier).onCancelPressed();
+                    if (Navigator.canPop(context)) {
+                      Navigator.of(context).pop();
+                    } else {
+                      NavigatorService.goBack();
+                    }
                   },
                   buttonStyle: CustomButtonStyle.fillDark,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 ),
               ),
+              SizedBox(width: 12.h),
               Expanded(
                 child: CustomButton(
                   text: state.isLoading ? 'Creating...' : 'Create Memory',
                   onPressed: state.isLoading
                       ? null
                       : () {
-                    print('🎯 Create Memory button pressed');
-
-                    if (_formKey.currentState?.validate() ?? false) {
-                      print('✅ Form validation passed');
-                      ref.read(createMemoryNotifier.notifier).createMemory();
-                    } else {
-                      print('❌ Form validation failed');
-                    }
-                  },
+                          if (_formKey.currentState?.validate() ?? false) {
+                            ref
+                                .read(createMemoryNotifier.notifier)
+                                .createMemory();
+                          }
+                        },
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   isDisabled: state.isLoading,
-                  padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
                 ),
               ),
             ],

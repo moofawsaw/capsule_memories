@@ -1,4 +1,13 @@
 // lib/presentation/groups_management_screen/groups_management_screen.dart
+// FULL COPY/PASTE FILE
+//
+// Fix: If creator makes a group and adds nobody, UI should show:
+// - Creator avatar (not a static placeholder)
+// - "1 member" (not "0 members")
+//
+// This is handled entirely in _buildGroupsList by:
+// - effectiveMemberCount = max(1, group.memberCount) when current user is creator
+// - memberImages fallback to current user's avatar (if available), else existing placeholder
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
@@ -56,59 +65,78 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
     await ref.read(groupsManagementNotifier.notifier).refresh();
   }
 
+  // ✅ Fetch avatar from YOUR profiles table (NOT auth provider)
+  Future<String?> _getProfileAvatarUrlFromDb(String userId) async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) return null;
+
+      final result = await client
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final avatarUrl = result?['avatar_url'] as String?;
+      if (avatarUrl == null || avatarUrl.trim().isEmpty) return null;
+
+      return avatarUrl;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            children: [
-              SizedBox(height: 24.h),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.symmetric(horizontal: 16.h),
-                  child: Column(
-                    children: [
-                      _buildGroupsHeaderSection(context),
-                      SizedBox(height: 16.h),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          children: [
+            SizedBox(height: 24.h),
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 16.h),
+                child: Column(
+                  children: [
+                    _buildGroupsHeaderSection(context),
+                    SizedBox(height: 16.h),
 
-                      // ✅ Pull-to-refresh (matches MemoriesDashboard pattern)
-                      Expanded(
-                        child: RefreshIndicator(
-                          color: appTheme.deep_purple_A100,
-                          backgroundColor: appTheme.gray_900_01,
-                          displacement: 30,
-                          onRefresh: _onRefresh,
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(
-                              parent: BouncingScrollPhysics(),
-                            ),
-                            child: Column(
-                              children: [
-                                SizedBox(height: 12.h),
+                    // ✅ Pull-to-refresh (matches MemoriesDashboard pattern)
+                    Expanded(
+                      child: RefreshIndicator(
+                        color: appTheme.deep_purple_A100,
+                        backgroundColor: appTheme.gray_900_01,
+                        displacement: 30,
+                        onRefresh: _onRefresh,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          child: Column(
+                            children: [
+                              SizedBox(height: 12.h),
 
-                                // Invites (if any)
-                                _buildInvitesSection(context),
-                                _buildGroupInvitationList(context),
+                              // Invites (if any)
+                              _buildInvitesSection(context),
+                              _buildGroupInvitationList(context),
 
-                                // Groups
-                                SizedBox(height: 16.h),
-                                _buildGroupsList(context),
+                              // Groups
+                              SizedBox(height: 16.h),
+                              _buildGroupsList(context),
 
-                                SizedBox(height: 24.h),
-                              ],
-                            ),
+                              SizedBox(height: 24.h),
+                            ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -232,6 +260,11 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
   }
 
   /// Groups list (non-scrollable Column inside main scroll)
+// lib/presentation/groups_management_screen/groups_management_screen.dart
+// PATCH: sort creator-owned groups to top + keep DB avatar fallback for creator-only groups
+//
+// Apply these changes inside _buildGroupsList (replace the whole method).
+
   Widget _buildGroupsList(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
@@ -274,21 +307,68 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
           );
         }
 
-        return Column(
-          children: groups.map((group) {
-            final isCreator = (group.creatorId != null &&
-                currentUserId != null &&
-                group.creatorId == currentUserId);
+        // ✅ Sort: creator-owned groups first
+        final sortedGroups = List<GroupModel>.from(groups)
+          ..sort((a, b) {
+            final aIsCreator = a.creatorId == currentUserId;
+            final bIsCreator = b.creatorId == currentUserId;
+            if (aIsCreator == bIsCreator) return 0;
+            return aIsCreator ? -1 : 1;
+          });
 
+        return Column(
+          children: sortedGroups.map((group) {
+            final isCreator = group.creatorId == currentUserId;
+            final rawCount = group.memberCount ?? 0;
+            final effectiveCount =
+            (isCreator && rawCount == 0) ? 1 : rawCount;
+
+            final memberImages = group.memberImages ?? <String>[];
+
+            // ✅ Creator-only group with no images → fetch DB avatar
+            if (isCreator && rawCount == 0 && memberImages.isEmpty && currentUserId != null) {
+              return FutureBuilder<String?>(
+                future: _getProfileAvatarUrlFromDb(currentUserId),
+                builder: (context, snapshot) {
+                  final avatar = snapshot.data;
+
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 6.h),
+                    child: CustomGroupCard(
+                      groupData: CustomGroupData(
+                        title: group.name ?? 'Unnamed Group',
+                        memberCountText:
+                        '$effectiveCount member${effectiveCount == 1 ? '' : 's'}',
+                        memberImages: avatar != null
+                            ? [avatar]
+                            : [ImageConstant.imgEllipse81],
+                        isCreator: isCreator,
+                      ),
+                      onActionTap: () => onTapGroupQR(context, group),
+                      onDeleteTap:
+                      isCreator ? () => onTapDeleteGroup(context, group) : null,
+                      onLeaveTap:
+                      !isCreator ? () => onTapLeaveGroup(context, group) : null,
+                      onEditTap:
+                      isCreator ? () => onTapEditGroup(context, group) : null,
+                      onInfoTap:
+                      !isCreator ? () => onTapViewGroupInfo(context, group) : null,
+                    ),
+                  );
+                },
+              );
+            }
+
+            // ✅ Normal path
             return Padding(
               padding: EdgeInsets.only(bottom: 6.h),
               child: CustomGroupCard(
                 groupData: CustomGroupData(
                   title: group.name ?? 'Unnamed Group',
                   memberCountText:
-                  '${group.memberCount ?? 0} member${(group.memberCount ?? 0) == 1 ? '' : 's'}',
-                  memberImages: group.memberImages?.isNotEmpty == true
-                      ? group.memberImages!
+                  '$effectiveCount member${effectiveCount == 1 ? '' : 's'}',
+                  memberImages: memberImages.isNotEmpty
+                      ? memberImages
                       : [ImageConstant.imgEllipse81],
                   isCreator: isCreator,
                 ),
@@ -299,9 +379,8 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                 !isCreator ? () => onTapLeaveGroup(context, group) : null,
                 onEditTap:
                 isCreator ? () => onTapEditGroup(context, group) : null,
-                onInfoTap: !isCreator
-                    ? () => onTapViewGroupInfo(context, group)
-                    : null,
+                onInfoTap:
+                !isCreator ? () => onTapViewGroupInfo(context, group) : null,
               ),
             );
           }).toList(),

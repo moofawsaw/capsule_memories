@@ -1,5 +1,7 @@
 import '../core/app_export.dart';
 import './custom_button.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
 import './custom_image_view.dart';
 
 /** 
@@ -59,23 +61,43 @@ class CustomFriendItem extends StatelessWidget {
         child: Row(
           children: [
             // Profile Image with proper circular clipping
+// Profile Image (Friends list) - single clip only (perfect circle)
             GestureDetector(
               onTap: onProfileTap ?? onTap,
               child: Container(
                 margin: EdgeInsets.only(left: 16.h),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24.h),
-                  child: CustomImageView(
-                    imagePath: profileImagePath.isNotEmpty
-                        ? profileImagePath
-                        : ImageConstant.imgEllipse842x42,
-                    height: 48.h,
-                    width: 48.h,
-                    fit: BoxFit.cover,
+                child: SizedBox.square(
+                  dimension: 48.h,
+                  child: ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: profileImagePath.isNotEmpty
+                          ? profileImagePath
+                          : '',
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: appTheme.gray_900_02,
+                        child: Center(
+                          child: SizedBox(
+                            width: 18.h,
+                            height: 18.h,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: appTheme.gray_50.withAlpha(140),
+                            ),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Image.asset(
+                        ImageConstant.imgEllipse842x42,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
+
+
 
             // User Name
             Expanded(

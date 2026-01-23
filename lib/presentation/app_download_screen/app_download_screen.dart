@@ -3,6 +3,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_qr_info_card.dart';
 import 'notifier/app_download_notifier.dart';
+import '../../widgets/custom_qr_code_card.dart';
 
 class AppDownloadScreen extends ConsumerStatefulWidget {
   AppDownloadScreen({Key? key}) : super(key: key);
@@ -76,18 +77,17 @@ class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
   }
 
   /// Section Widget
+
   Widget _buildQRCodeSection(BuildContext context) {
-    return Container(
+    return CustomQrCodeCard(
+      assetImagePath: ImageConstant.imgCapsuleDownloadQR,
+      qrSize: 200.h,
+      outerPadding: 16.h,
+      borderRadius: 16.h,
       margin: EdgeInsets.only(
         top: 14.h,
         left: 62.h,
         right: 62.h,
-      ),
-      child: CustomImageView(
-        imagePath: ImageConstant.imgCapsuleDownloadQR,
-        height: 200.h,
-        width: 200.h,
-        fit: BoxFit.contain,
       ),
     );
   }

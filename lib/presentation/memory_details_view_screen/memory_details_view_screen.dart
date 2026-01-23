@@ -201,40 +201,38 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
 
     // Error state
     if (state.errorMessage != null) {
-      return SafeArea(
-        child: Scaffold(
-          backgroundColor: appTheme.gray_900_02,
-          body: Center(
-            child: Padding(
-              padding: EdgeInsets.all(24.h),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 64.h, color: appTheme.red_500),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'Failed to Load Memory',
-                    style: TextStyleHelper.instance.body16BoldPlusJakartaSans
-                        .copyWith(color: appTheme.gray_50),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    state.errorMessage!,
-                    style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                        .copyWith(color: appTheme.gray_300),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 24.h),
-                  CustomButton(
-                    text: 'Go Back',
-                    width: double.infinity,
-                    buttonStyle: CustomButtonStyle.fillPrimary,
-                    buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                    onPressed: NavigatorService.goBack,
-                  ),
-                ],
-              ),
+      return Scaffold(
+        backgroundColor: appTheme.gray_900_02,
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24.h),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64.h, color: appTheme.red_500),
+                SizedBox(height: 16.h),
+                Text(
+                  'Failed to Load Memory',
+                  style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  state.errorMessage!,
+                  style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+                      .copyWith(color: appTheme.gray_300),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24.h),
+                CustomButton(
+                  text: 'Go Back',
+                  width: double.infinity,
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  onPressed: NavigatorService.goBack,
+                ),
+              ],
             ),
           ),
         ),
@@ -247,41 +245,44 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
     // ✅ EXACT SAME AS REFERENCE
     final effectiveLoading = isLoading || (_booting && !hasSnapshot);
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: RefreshIndicator(
-          onRefresh: () async {
-            final memoryId = ref.read(memoryDetailsViewNotifier).memoryDetailsViewModel?.memoryId;
-            if (memoryId != null && memoryId.isNotEmpty) {
-              await ref.read(memoryDetailsViewNotifier.notifier).refreshMemory(memoryId);
-            }
-          },
-          color: appTheme.deep_purple_A100,
-          backgroundColor: appTheme.gray_900_01,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              children: [
-                _buildEventHeader(context),
-                _buildTimelineSection(context),
-                _buildStoriesSection(context),
-                SizedBox(height: 18.h),
-                effectiveLoading
-                    ? Container(
-                  margin: EdgeInsets.symmetric(horizontal: 24.h),
-                  child: Column(
-                    children: [
-                      CustomButtonSkeleton(),
-                      SizedBox(height: 12.h),
-                      CustomButtonSkeleton(),
-                    ],
-                  ),
-                )
-                    : _buildActionButtons(context),
-                SizedBox(height: 20.h),
-              ],
-            ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final memoryId = ref
+              .read(memoryDetailsViewNotifier)
+              .memoryDetailsViewModel
+              ?.memoryId;
+          if (memoryId != null && memoryId.isNotEmpty) {
+            await ref
+                .read(memoryDetailsViewNotifier.notifier)
+                .refreshMemory(memoryId);
+          }
+        },
+        color: appTheme.deep_purple_A100,
+        backgroundColor: appTheme.gray_900_01,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildEventHeader(context),
+              _buildTimelineSection(context),
+              _buildStoriesSection(context),
+              SizedBox(height: 18.h),
+              effectiveLoading
+                  ? Container(
+                margin: EdgeInsets.symmetric(horizontal: 24.h),
+                child: Column(
+                  children: [
+                    CustomButtonSkeleton(),
+                    SizedBox(height: 12.h),
+                    CustomButtonSkeleton(),
+                  ],
+                ),
+              )
+                  : _buildActionButtons(context),
+              SizedBox(height: 20.h),
+            ],
           ),
         ),
       ),

@@ -17,8 +17,11 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   final NotificationService _notificationService = NotificationService.instance;
 
-  // Stack to maintain deleted notifications (most recent at end)
+  // Stack to maintain deleted notifications for undo (most recent at end)
   final List<Map<String, dynamic>> _deletedNotificationsStack = [];
+
+  // Suppress "new notification" snackbar for notifications restored via UNDO
+  final Set<String> _suppressNewSnackbarsForNotificationIds = {};
 
   @override
   void initState() {
@@ -39,18 +42,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     try {
       _notificationService.subscribeToNotifications(
         onNewNotification: (notification) {
-          // CRITICAL FIX: Reload notifications list silently without showing snackbar
-          // This prevents duplicate notifications when user restores deleted notifications
+          // Always refresh list silently to reflect latest DB state
           _loadNotifications();
 
-          // ONLY show snackbar for truly new notifications (not restored ones)
-          // Check if this notification was just created (within last 2 seconds)
+          // If this notification was restored via UNDO, don't show snackbar
+          final id = notification['id'] as String?;
+          if (id != null &&
+              _suppressNewSnackbarsForNotificationIds.remove(id)) {
+            return;
+          }
+
+          // Only show snackbar for truly new notifications
           final createdAt = notification['created_at'] as String?;
           if (createdAt != null) {
             final notificationTime = DateTime.parse(createdAt);
             final timeDifference = DateTime.now().difference(notificationTime);
 
-            // Only show snackbar if notification is brand new (created within last 2 seconds)
+            // Only show snackbar if notification is brand new (within last 2 seconds)
             if (timeDifference.inSeconds <= 2 && mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -145,7 +153,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     if (confirmed == true) {
       try {
-        // Add delete notification logic here
+        await _notificationService.deleteNotification(notificationId);
         await _loadNotifications();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -167,7 +175,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       context: context,
       title: 'Delete All Notifications?',
       message:
-          'Are you sure you want to delete all notifications? This action cannot be undone.',
+      'Are you sure you want to delete all notifications? This action cannot be undone.',
       confirmText: 'Delete All',
       cancelText: 'Cancel',
       icon: Icons.delete_sweep_outlined,
@@ -175,7 +183,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     if (confirmed == true) {
       try {
-        // Add delete all notifications logic here
+        // TODO: Implement bulk soft delete
         await _loadNotifications();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -227,11 +235,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       final memoryId = data?['memory_id'];
       if (memoryId != null) {
         debugPrint('🔔 Navigating to memory timeline: $memoryId');
-        // CRITICAL FIX: Use 'id' key instead of 'memoryId' to match MemoryNavArgs.fromMap expectation
         Navigator.pushNamed(
           context,
           AppRoutes.appTimeline,
-          arguments: {'id': memoryId}, // Changed from 'memoryId' to 'id'
+          arguments: {'id': memoryId},
         );
       } else {
         debugPrint('⚠️ Missing memory_id for memory notification');
@@ -284,6 +291,134 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     debugPrint('⚠️ Unknown notification type: $type - no navigation handler');
   }
 
+  /// Handle swipe-to-delete with optimistic UI update
+  void _handleSwipeDelete(Map<String, dynamic> notification, String notificationId) {
+    // 1. Save notification for potential undo
+    final deletedNotification = Map<String, dynamic>.from(notification);
+    _deletedNotificationsStack.add(deletedNotification);
+
+    // 2. IMMEDIATE: Remove from local state (fixes Dismissible error)
+    final notifier = ref.read(notificationsNotifier.notifier);
+    notifier.removeNotification(notificationId);
+
+    // 3. Call API async (soft delete)
+    _notificationService.deleteNotification(notificationId).catchError((error) {
+      // On error, restore to local state
+      _deletedNotificationsStack.removeLast();
+      notifier.addNotification(deletedNotification);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete: $error')),
+        );
+      }
+    });
+
+    // 4. Show undo snackbar
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _showUndoSnackbar(deletedNotification, notificationId);
+    }
+  }
+
+  /// Show undo snackbar with countdown
+  void _showUndoSnackbar(Map<String, dynamic> deletedNotification, String notificationId) {
+    int remainingSeconds = 5;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: appTheme.gray_900_01,
+        content: StatefulBuilder(
+          builder: (context, setState) {
+            Future.delayed(Duration.zero, () async {
+              for (int i = remainingSeconds; i > 0; i--) {
+                await Future.delayed(const Duration(seconds: 1));
+                if (!context.mounted) return;
+                setState(() {
+                  remainingSeconds = i - 1;
+                });
+              }
+            });
+
+            return Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Notification deleted${_deletedNotificationsStack.length > 1 ? ' (${_deletedNotificationsStack.length} in stack)' : ''}',
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: appTheme.deep_purple_A100.withAlpha(77),
+                    borderRadius: BorderRadius.circular(4.h),
+                  ),
+                  child: Text(
+                    '${remainingSeconds}s',
+                    style: TextStyle(
+                      color: appTheme.white_A700,
+                      fontSize: 12.fSize,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        duration: const Duration(seconds: 5),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(bottom: 16.h, left: 16.w, right: 16.w),
+        action: SnackBarAction(
+          label: 'UNDO',
+          textColor: appTheme.deep_purple_A100,
+          onPressed: () => _handleUndo(),
+        ),
+      ),
+    );
+  }
+
+  /// Handle undo action - restore the last deleted notification
+  void _handleUndo() {
+    if (_deletedNotificationsStack.isEmpty) return;
+
+    final notificationToRestore = _deletedNotificationsStack.removeLast();
+    final restoreId = notificationToRestore['id'] as String;
+
+    // Suppress snackbar for this restored notification
+    _suppressNewSnackbarsForNotificationIds.add(restoreId);
+
+    // IMMEDIATE: Add back to local state
+    final notifier = ref.read(notificationsNotifier.notifier);
+    notifier.addNotification(notificationToRestore);
+
+    // Call restore API (UPDATE, not INSERT - no push triggered!)
+    _notificationService.restoreNotification(restoreId).then((_) {
+      debugPrint('✅ Notification restored in DB');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Notification restored${_deletedNotificationsStack.isNotEmpty ? ' (${_deletedNotificationsStack.length} remaining)' : ''}',
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(bottom: 16.h, left: 16.w, right: 16.w),
+          ),
+        );
+      }
+    }).catchError((error) {
+      // On error, remove from local state again
+      _suppressNewSnackbarsForNotificationIds.remove(restoreId);
+      notifier.removeNotification(restoreId);
+      _deletedNotificationsStack.add(notificationToRestore);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to restore: $error')),
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -314,7 +449,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         final state = ref.watch(notificationsNotifier);
         final notifications = state.notificationsModel?.notifications ?? [];
         final hasUnread =
-            notifications.any((n) => !(n['is_read'] as bool? ?? false));
+        notifications.any((n) => !(n['is_read'] as bool? ?? false));
         final buttonText = hasUnread ? 'mark all read' : 'mark all unread';
 
         return Container(
@@ -421,65 +556,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           if (notificationType == 'memory_invite') {
             return Dismissible(
               key: Key(notificationId),
-              direction: DismissDirection
-                  .endToStart, // Only allow delete swipe for invites
+              direction: DismissDirection.endToStart,
               confirmDismiss: (direction) async => true,
-              onDismissed: (direction) async {
-                // Store notification data in stack (most recent at end)
-                final deletedNotification =
-                    Map<String, dynamic>.from(notification);
-                _deletedNotificationsStack.add(deletedNotification);
-
-                // Delete notification from database
-                try {
-                  await _notificationService.deleteNotification(notificationId);
-                  await _loadNotifications();
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Notification deleted'),
-                        duration: const Duration(seconds: 5),
-                        behavior: SnackBarBehavior.floating,
-                        margin: EdgeInsets.only(
-                            bottom: 16.h, left: 16.w, right: 16.w),
-                        action: SnackBarAction(
-                          label: 'UNDO',
-                          textColor: appTheme.deep_purple_A100,
-                          onPressed: () async {
-                            if (_deletedNotificationsStack.isNotEmpty) {
-                              final notificationToRestore =
-                                  _deletedNotificationsStack.removeLast();
-                              try {
-                                await _notificationService
-                                    .restoreNotification(notificationToRestore);
-                                await _loadNotifications();
-                              } catch (error) {
-                                _deletedNotificationsStack
-                                    .add(notificationToRestore);
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content:
-                                            Text('Failed to restore: $error')),
-                                  );
-                                }
-                              }
-                            }
-                          },
-                        ),
-                      ),
-                    );
-                  }
-                } catch (error) {
-                  _deletedNotificationsStack.removeLast();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to delete: $error')),
-                    );
-                  }
-                }
+              onDismissed: (direction) {
+                // Use centralized delete handler with optimistic UI
+                _handleSwipeDelete(notification, notificationId);
               },
               background: Container(
                 alignment: Alignment.centerRight,
@@ -505,16 +586,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   ],
                 ),
               ),
-              child: MemoryInviteNotificationCard(
-                notification: notification,
-                onActionCompleted: _loadNotifications,
-                onNavigateToMemory: (memoryId) {
-                  Navigator.pushNamed(
-                    context,
-                    AppRoutes.appTimeline,
-                    arguments: {'id': memoryId},
-                  );
-                },
+              child: SizedBox(
+                width: double.infinity,
+                child: MemoryInviteNotificationCard(
+                  notification: notification,
+                  onActionCompleted: _loadNotifications,
+                  onNavigateToMemory: (memoryId) {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.appTimeline,
+                      arguments: {'id': memoryId},
+                    );
+                  },
+                ),
               ),
             );
           }
@@ -527,170 +611,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             direction: DismissDirection.horizontal,
             confirmDismiss: (direction) async {
               if (direction == DismissDirection.endToStart) {
-                // Swiped left - delete action
+                // Delete - allow dismissal
                 return true;
               } else if (direction == DismissDirection.startToEnd) {
-                // Swiped right - toggle read/unread action
+                // Toggle read state - don't dismiss, just toggle
                 await _toggleReadState(notificationId, isRead);
-                return false; // Don't dismiss, just toggle state
+                return false;
               }
               return false;
             },
-            onDismissed: (direction) async {
+            onDismissed: (direction) {
               if (direction == DismissDirection.endToStart) {
-                // Store notification data in stack (most recent at end)
-                final deletedNotification =
-                    Map<String, dynamic>.from(notification);
-                _deletedNotificationsStack.add(deletedNotification);
-
-                // Delete notification from database
-                try {
-                  await _notificationService.deleteNotification(notificationId);
-
-                  // Reload notifications to update UI
-                  await _loadNotifications();
-
-                  if (mounted) {
-                    // Dismiss any existing snackbar to show new one
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-                    // Show undo toast with countdown timer at bottom
-                    int remainingSeconds = 5;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: appTheme.gray_900_01, // <-- add this
-                        content: StatefulBuilder(
-                          builder: (context, setState) {
-                            // Start countdown timer
-                            Future.delayed(Duration.zero, () async {
-                              for (int i = remainingSeconds; i > 0; i--) {
-                                await Future.delayed(const Duration(seconds: 1));
-                                if (!context.mounted) return;
-
-                                setState(() {
-                                  remainingSeconds = i - 1;
-                                });
-                              }
-
-                              // ✅ When countdown finishes, explicitly dismiss the snackbar
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                              }
-                            });
-
-                            return Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Notification deleted (${_deletedNotificationsStack.length} in stack)',
-                                  ),
-                                ),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8.w,
-                                    vertical: 4.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        appTheme.deep_purple_A100.withAlpha(77),
-                                    borderRadius: BorderRadius.circular(4.h),
-                                  ),
-                                  child: Text(
-                                    '${remainingSeconds}s',
-                                    style: TextStyle(
-                                      color: appTheme.white_A700,
-                                      fontSize: 12.fSize,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        duration: const Duration(seconds: 5),
-                        behavior: SnackBarBehavior.floating,
-                        margin: EdgeInsets.only(
-                          bottom: 16.h,
-                          left: 16.w,
-                          right: 16.w,
-                        ),
-                        action: SnackBarAction(
-                          label: 'UNDO',
-                          textColor: appTheme.deep_purple_A100,
-                          onPressed: () async {
-                            // Restore the most recently deleted notification (LIFO)
-                            if (_deletedNotificationsStack.isNotEmpty) {
-                              final notificationToRestore =
-                                  _deletedNotificationsStack.removeLast();
-
-                              try {
-                                await _notificationService
-                                    .restoreNotification(notificationToRestore);
-                                await _loadNotifications();
-
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Notification restored (${_deletedNotificationsStack.length} remaining in stack)',
-                                      ),
-                                      duration: const Duration(seconds: 2),
-                                      behavior: SnackBarBehavior.floating,
-                                      margin: EdgeInsets.only(
-                                        bottom: 16.h,
-                                        left: 16.w,
-                                        right: 16.w,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              } catch (error) {
-                                // If restore fails, add it back to stack
-                                _deletedNotificationsStack
-                                    .add(notificationToRestore);
-
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content:
-                                          Text('Failed to restore: $error'),
-                                      duration: const Duration(seconds: 2),
-                                      behavior: SnackBarBehavior.floating,
-                                      margin: EdgeInsets.only(
-                                        bottom: 16.h,
-                                        left: 16.w,
-                                        right: 16.w,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              }
-                            }
-                          },
-                        ),
-                      ),
-                    );
-                  }
-                } catch (error) {
-                  // If delete fails, remove from stack
-                  _deletedNotificationsStack.removeLast();
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Failed to delete notification: $error'),
-                        duration: const Duration(seconds: 2),
-                        behavior: SnackBarBehavior.floating,
-                        margin: EdgeInsets.only(
-                          bottom: 80.h,
-                          left: 16.w,
-                          right: 16.w,
-                        ),
-                      ),
-                    );
-                  }
-                }
+                // Use centralized delete handler with optimistic UI
+                _handleSwipeDelete(notification, notificationId);
               }
             },
             background: Container(
@@ -782,7 +715,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final notifications =
         ref.read(notificationsNotifier).notificationsModel?.notifications ?? [];
     final hasUnread =
-        notifications.any((n) => !(n['is_read'] as bool? ?? false));
+    notifications.any((n) => !(n['is_read'] as bool? ?? false));
 
     if (hasUnread) {
       _markAllAsRead();

@@ -102,6 +102,80 @@ class MemoryTimelinePlaybackScreenState
     );
   }
 
+  // ✅ New: image badge under the top countdown/progress pill
+  Widget _buildImageStoryBadge(MemoryTimelinePlaybackState state) {
+    final story = state.currentStory;
+    if (story == null) return const SizedBox.shrink();
+
+    // Treat anything not video as image for this badge.
+    final isImage = story.mediaType != 'video';
+    if (!isImage) return const SizedBox.shrink();
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: Colors.black.withAlpha(150),
+        borderRadius: BorderRadius.circular(999.h),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.image,
+            color: Colors.white.withAlpha(220),
+            size: 14.h,
+          ),
+          SizedBox(width: 6.h),
+          Text(
+            'IMAGE',
+            style: TextStyle(
+              color: Colors.white.withAlpha(235),
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: cinema-mode subtitle above thumbnails row
+  Widget _buildCinemaOrderSubtitle(MemoryTimelinePlaybackState state) {
+    final stories = state.stories ?? [];
+    if (stories.isEmpty) return const SizedBox.shrink();
+
+    // If your state ever exposes a sort choice, you can branch here later.
+    const label = 'Playing in chronological order (first posted → last)';
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h),
+      child: Row(
+        children: [
+          Icon(
+            Icons.swap_vert,
+            color: Colors.white.withAlpha(170),
+            size: 14.h,
+          ),
+          SizedBox(width: 6.h),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: Colors.white.withAlpha(170),
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _playbackSub?.close();
@@ -200,6 +274,13 @@ class MemoryTimelinePlaybackScreenState
               left: 16.h,
               right: 16.h,
               child: _buildTopStoryProgress(context, state),
+            ),
+
+            // ✅ NEW: Image badge (top-right) under the countdown/progress pill
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10.h + 46.h,
+              right: 16.h,
+              child: _buildImageStoryBadge(state),
             ),
 
             if (_showControls) _buildTopOverlay(context, state),
@@ -313,7 +394,6 @@ class MemoryTimelinePlaybackScreenState
       decoration: BoxDecoration(
         color: Colors.black.withAlpha(80),
         borderRadius: BorderRadius.circular(999.h),
-        border: Border.all(color: Colors.white.withAlpha(20)),
       ),
       child: Row(
         children: [
@@ -525,9 +605,8 @@ class MemoryTimelinePlaybackScreenState
     final notifier = ref.read(memoryTimelinePlaybackNotifier.notifier);
 
     // ✅ Only show volume button when we have a usable video controller
-    final showVolumeButton =
-        (state.currentStory?.mediaType == 'video') &&
-            (notifier.currentVideoController != null);
+    final showVolumeButton = (state.currentStory?.mediaType == 'video') &&
+        (notifier.currentVideoController != null);
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -689,6 +768,9 @@ class MemoryTimelinePlaybackScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ✅ NEW subtitle above thumbnails (cinema mode context)
+              _buildCinemaOrderSubtitle(state),
+
               _buildStoryThumbnailsRow(state),
 
               SizedBox(height: 12.h),
@@ -837,8 +919,7 @@ class MemoryTimelinePlaybackScreenState
                 itemCount: state.stories?.length ?? 0,
                 itemBuilder: (context, index) {
                   final story = state.stories![index];
-                  final isCurrentStory =
-                      index == (state.currentStoryIndex ?? 0);
+                  final isCurrentStory = index == (state.currentStoryIndex ?? 0);
 
                   return _buildTimelineStoryItem(
                       context, story, index, isCurrentStory);

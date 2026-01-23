@@ -12,13 +12,15 @@ class CustomStoryCard extends StatelessWidget {
     this.categoryIcon,
     this.timestamp,
     this.onTap,
+    this.onLongPress,
+    this.enableLongPressActions = true,
     this.width,
     this.height,
     this.margin,
     this.showDelete = false,
     this.onDelete,
 
-    // ✅ NEW: optional, so you can override ONLY on /profile
+    // ✅ optional, so you can override ONLY on /profile
     this.borderRadius,
   }) : super(key: key);
 
@@ -32,6 +34,12 @@ class CustomStoryCard extends StatelessWidget {
 
   final VoidCallback? onTap;
 
+  /// ✅ Long-press hook (parent shows action sheet/dialog)
+  final VoidCallback? onLongPress;
+
+  /// ✅ Allows disabling long-press even if handler is passed
+  final bool enableLongPressActions;
+
   final double? width;
   final double? height;
   final EdgeInsetsGeometry? margin;
@@ -40,7 +48,7 @@ class CustomStoryCard extends StatelessWidget {
   final bool showDelete;
   final VoidCallback? onDelete;
 
-  // ✅ NEW: override card radius per usage (profile-only, feed can keep default)
+  // ✅ override card radius per usage (profile-only, feed can keep default)
   final BorderRadius? borderRadius;
 
   @override
@@ -52,12 +60,18 @@ class CustomStoryCard extends StatelessWidget {
     // ✅ Single source of truth for this card's radius
     final BorderRadius cardRadius = borderRadius ?? BorderRadius.circular(8.h);
 
+    // ✅ Long-press enabled only if a handler is provided and flag is true
+    final bool longPressEnabled =
+        enableLongPressActions && onLongPress != null;
+
     return Container(
       width: width ?? 116.h,
       height: height ?? 202.h,
       margin: margin,
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
+        onLongPress: longPressEnabled ? () => onLongPress!.call() : null,
         child: Container(
           decoration: BoxDecoration(
             color: appTheme.gray_900_01,
@@ -65,14 +79,14 @@ class CustomStoryCard extends StatelessWidget {
               color: appTheme.gray_900_02,
               width: 1,
             ),
-            borderRadius: cardRadius, // ✅ updated
+            borderRadius: cardRadius,
           ),
           child: Stack(
             children: [
               // Background story image (FULL CARD)
               Positioned.fill(
                 child: ClipRRect(
-                  borderRadius: cardRadius, // ✅ updated
+                  borderRadius: cardRadius,
                   child: _CoverImage(
                     imagePath: backgroundImage,
                   ),
@@ -85,6 +99,7 @@ class CustomStoryCard extends StatelessWidget {
                   top: 8.h,
                   right: 8.h,
                   child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: onDelete,
                     child: Container(
                       padding: EdgeInsets.all(6.h),
@@ -140,7 +155,7 @@ class CustomStoryCard extends StatelessWidget {
           color: appTheme.deep_purple_A100,
           width: 2,
         ),
-        color: const Color(0xFF222D3E), // optional: consistent avatar bg
+        color: const Color(0xFF222D3E),
       ),
       child: ClipOval(
         child: _CoverAvatar(

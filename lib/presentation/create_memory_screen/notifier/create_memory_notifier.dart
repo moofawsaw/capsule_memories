@@ -10,8 +10,8 @@ import '../models/create_memory_model.dart';
 part 'create_memory_state.dart';
 
 final createMemoryNotifier =
-    StateNotifierProvider.autoDispose<CreateMemoryNotifier, CreateMemoryState>(
-  (ref) => CreateMemoryNotifier(
+StateNotifierProvider.autoDispose<CreateMemoryNotifier, CreateMemoryState>(
+      (ref) => CreateMemoryNotifier(
     CreateMemoryState(
       createMemoryModel: CreateMemoryModel(),
     ),
@@ -51,22 +51,19 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         availableCategories: [],
       ),
     );
-    // Fetch available groups and categories on initialization
+
     _fetchAvailableGroups();
     _fetchAvailableCategories();
   }
 
-  /// FIXED: Initialize with pre-selected category - now properly waits for categories to load
   Future<void> initializeWithCategory(String categoryId) async {
-    // Wait for categories to be loaded with timeout
     int attempts = 0;
-    const maxAttempts = 50; // 50 attempts * 100ms = 5 seconds max wait
+    const maxAttempts = 50;
 
     while (attempts < maxAttempts) {
       final categories = state.createMemoryModel?.availableCategories ?? [];
 
       if (categories.isNotEmpty) {
-        // Categories loaded - check if the requested category exists
         final categoryExists = categories.any((cat) => cat['id'] == categoryId);
 
         if (categoryExists) {
@@ -83,15 +80,13 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         }
       }
 
-      // Categories not loaded yet - wait and retry
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 100));
       attempts++;
     }
 
     print('⚠️ Timeout waiting for categories to load');
   }
 
-  /// Fetch available groups from Supabase
   Future<void> _fetchAvailableGroups() async {
     try {
       final groups = await GroupsService.fetchUserGroups();
@@ -106,7 +101,6 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     }
   }
 
-  /// NEW: Fetch available categories from Supabase
   Future<void> _fetchAvailableCategories() async {
     try {
       final supabase = SupabaseService.instance.client;
@@ -120,12 +114,12 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
       final categories = (response as List)
           .map<Map<String, dynamic>>((category) => {
-                'id': category['id'] as String,
-                'name': category['name'] as String,
-                'tagline': category['tagline'] as String?,
-                'icon_name': category['icon_name'] as String?,
-                'icon_url': category['icon_url'] as String?,
-              })
+        'id': category['id'] as String,
+        'name': category['name'] as String,
+        'tagline': category['tagline'] as String?,
+        'icon_name': category['icon_name'] as String?,
+        'icon_url': category['icon_url'] as String?,
+      })
           .toList();
 
       state = state.copyWith(
@@ -148,7 +142,6 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     return null;
   }
 
-  /// NEW: Validate category selection
   String? validateCategory(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please select a category';
@@ -156,7 +149,6 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     return null;
   }
 
-  /// NEW: Update selected duration
   void updateSelectedDuration(String? duration) {
     state = state.copyWith(
       createMemoryModel: state.createMemoryModel?.copyWith(
@@ -173,7 +165,6 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     );
   }
 
-  /// NEW: Update selected category
   void updateSelectedCategory(String? categoryId) {
     state = state.copyWith(
       createMemoryModel: state.createMemoryModel?.copyWith(
@@ -183,12 +174,10 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   }
 
   void moveToStep2() {
-    // Validate memory name
     if (state.memoryNameController?.text.trim().isEmpty ?? true) {
       return;
     }
 
-    // Validate category selection
     if (state.createMemoryModel?.selectedCategory == null) {
       state = state.copyWith(
         errorMessage: 'Please select a category for your memory',
@@ -196,7 +185,6 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       return;
     }
 
-    // Update model with current form data and move to step 2
     state = state.copyWith(
       createMemoryModel: state.createMemoryModel?.copyWith(
         memoryName: state.memoryNameController?.text.trim(),
@@ -212,33 +200,48 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     );
   }
 
+  /// ✅ Group selection now auto-populates invitedUserIds from group members.
   Future<void> updateSelectedGroup(String? groupId) async {
+    // Clear group
     if (groupId == null) {
       state = state.copyWith(
         createMemoryModel: state.createMemoryModel?.copyWith(
           selectedGroup: null,
           groupMembers: [],
+          invitedUserIds: {}, // ✅ clear auto-added members too
         ),
       );
       return;
     }
 
-    // Set loading state
+    // Set selected group, clear while loading
     state = state.copyWith(
       createMemoryModel: state.createMemoryModel?.copyWith(
         selectedGroup: groupId,
-        groupMembers: [], // Clear current members while loading
+        groupMembers: [],
+        invitedUserIds: {}, // ✅ reset before loading
       ),
     );
 
     try {
-      // Fetch group members from Supabase
       final members = await _fetchGroupMembers(groupId);
+
+      // Convert group members -> invitedUserIds set (exclude current user)
+      final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
+      final Set<String> autoInvites = {};
+
+      for (final m in members) {
+        final uid = (m['id'] as String?)?.trim(); // GroupsService returns 'id' as profile/user id
+        if (uid == null || uid.isEmpty) continue;
+        if (currentUserId != null && uid == currentUserId) continue;
+        autoInvites.add(uid);
+      }
 
       state = state.copyWith(
         createMemoryModel: state.createMemoryModel?.copyWith(
           selectedGroup: groupId,
           groupMembers: members,
+          invitedUserIds: autoInvites, // ✅ key behavior
         ),
       );
     } catch (e) {
@@ -247,15 +250,14 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         createMemoryModel: state.createMemoryModel?.copyWith(
           selectedGroup: groupId,
           groupMembers: [],
+          invitedUserIds: {},
         ),
       );
     }
   }
 
-  /// Fetch group members from Supabase
   Future<List<Map<String, dynamic>>> _fetchGroupMembers(String groupId) async {
     try {
-      // Use the existing GroupsService.fetchGroupMembers method
       return await GroupsService.fetchGroupMembers(groupId);
     } catch (e) {
       print('Error fetching group members: $e');
@@ -265,8 +267,8 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
   void updateSearchQuery(String query) {
     final filteredUsers = state.createMemoryModel
-            ?.copyWith(searchQuery: query)
-            .getFilteredUsers() ??
+        ?.copyWith(searchQuery: query)
+        .getFilteredUsers() ??
         [];
 
     state = state.copyWith(
@@ -279,7 +281,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
   void toggleUserInvite(String userId) {
     final currentInvitedUsers =
-        Set<String>.from(state.createMemoryModel?.invitedUserIds ?? {});
+    Set<String>.from(state.createMemoryModel?.invitedUserIds ?? {});
 
     if (currentInvitedUsers.contains(userId)) {
       currentInvitedUsers.remove(userId);
@@ -294,13 +296,9 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     );
   }
 
-  void handleQRCodeTap() {
-    // Handle QR code functionality
-    // Navigate to QR code screen or show QR scanner
-  }
+  void handleQRCodeTap() {}
 
   Future<void> handleCameraTap() async {
-    // Open QR scanner to add users via friend QR code scanning
     final context = NavigatorService.navigatorKey.currentContext;
     if (context == null) return;
 
@@ -311,11 +309,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
           fullscreenDialog: true,
           builder: (_) => QRScannerOverlay(
             scanType: 'friend',
-            onSuccess: () async {
-              // ✅ Success messaging is now handled inside QRScannerOverlay
-              // Only refresh local state here if needed
-              // Example: refresh invites / members list
-            },
+            onSuccess: () async {},
           ),
         ),
       );
@@ -327,14 +321,12 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   Future<void> createMemory() async {
     print('🎯 Create Memory button pressed');
 
-    // Validate memory name
     final memoryName = state.memoryNameController?.text.trim();
     if (memoryName == null || memoryName.isEmpty) {
       print('❌ Memory name is required');
       return;
     }
 
-    // Validate category selection
     final categoryId = state.createMemoryModel?.selectedCategory;
     if (categoryId == null || categoryId.isEmpty) {
       state = state.copyWith(
@@ -343,38 +335,59 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       return;
     }
 
-    print('✅ Form validation passed');
-
-    // Get selected duration
     final duration = state.createMemoryModel?.selectedDuration ?? '12_hours';
 
-    // Set loading state
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      // Get current user
-      final currentUser = SupabaseService.instance.client?.auth.currentUser;
+      final supabase = SupabaseService.instance.client;
+      final currentUser = supabase?.auth.currentUser;
       if (currentUser == null) {
         throw Exception('User not authenticated');
       }
 
-      // Determine visibility
       final visibility =
-          state.createMemoryModel?.isPublic == true ? 'public' : 'private';
+      state.createMemoryModel?.isPublic == true ? 'public' : 'private';
 
-      // Get invited user IDs from state
-      final invitedUserIds =
-          state.createMemoryModel?.invitedUserIds.toList() ?? [];
+      final selectedGroupId = state.createMemoryModel?.selectedGroup;
+
+      // ✅ If a group is selected, invitedUserIds is already auto-populated in updateSelectedGroup.
+      // (Still defensively compute it here in case selection happened without fetch finishing.)
+      Set<String> finalInvitedSet =
+      Set<String>.from(state.createMemoryModel?.invitedUserIds ?? {});
+
+      if (selectedGroupId != null && selectedGroupId.isNotEmpty) {
+        if ((state.createMemoryModel?.groupMembers ?? []).isNotEmpty) {
+          finalInvitedSet = {};
+          for (final m in state.createMemoryModel!.groupMembers) {
+            final uid = (m['id'] as String?)?.trim();
+            if (uid == null || uid.isEmpty) continue;
+            if (uid == currentUser.id) continue;
+            finalInvitedSet.add(uid);
+          }
+        } else {
+          // If groupMembers somehow empty, fetch quickly here
+          final members = await _fetchGroupMembers(selectedGroupId);
+          finalInvitedSet = {};
+          for (final m in members) {
+            final uid = (m['id'] as String?)?.trim();
+            if (uid == null || uid.isEmpty) continue;
+            if (uid == currentUser.id) continue;
+            finalInvitedSet.add(uid);
+          }
+        }
+      }
+
+      final invitedUserIds = finalInvitedSet.toList();
 
       print('📋 Creating memory with:');
       print('   - Title: $memoryName');
       print('   - Category: $categoryId');
       print('   - Duration: $duration');
       print('   - Visibility: $visibility');
-      print('   - Invited users: ${invitedUserIds.length}');
+      print('   - Group: ${selectedGroupId ?? "none"}');
+      print('   - Auto-added users: ${invitedUserIds.length}');
 
-      // CRITICAL FIX: Use MemoryService.createMemory instead of direct database insertion
-      // This ensures proper location fetching, geocoding, and contributor management
       final memoryId = await _memoryService.createMemory(
         title: memoryName,
         creatorId: currentUser.id,
@@ -382,18 +395,31 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         duration: duration,
         categoryId: categoryId,
         invitedUserIds: invitedUserIds,
+        groupId: state.createMemoryModel?.selectedGroup, // ✅
       );
 
       if (memoryId == null) {
         throw Exception('Failed to create memory - service returned null');
       }
 
+      // ✅ Persist group_id on the memory (so MemoryMembersService.fetchMemoryGroupInfo works)
+      if (selectedGroupId != null && selectedGroupId.isNotEmpty) {
+        try {
+          await supabase!
+              .from('memories')
+              .update({'group_id': selectedGroupId})
+              .eq('id', memoryId);
+          print('✅ Set memories.group_id = $selectedGroupId');
+        } catch (e) {
+          print('⚠️ Failed to set group_id on memory: $e');
+          // Non-fatal: members are still added via invitedUserIds
+        }
+      }
+
       print('✅ Memory created successfully with ID: $memoryId');
 
-      // Force refresh cache BEFORE navigation to ensure /memories screen shows new data
       await _cacheService.refreshMemoryCache(currentUser.id);
 
-      // CRITICAL FIX: Store memory data in state variables for navigation
       state = state.copyWith(
         isLoading: false,
         shouldNavigateToConfirmation: true,
@@ -401,15 +427,10 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         errorMessage: null,
       );
 
-      print('🚀 Set shouldNavigateToConfirmation flag');
-
-      // Clear form and reset after a short delay to allow navigation to complete
-      Future.delayed(Duration(milliseconds: 500), () {
+      Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          // Clear form data
           state.memoryNameController?.clear();
 
-          // Reset state to initial values
           state = state.copyWith(
             shouldNavigateToConfirmation: false,
             createdMemoryId: null,
@@ -420,6 +441,12 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
               selectedGroup: null,
               selectedCategory: null,
               selectedDuration: '12_hours',
+              invitedUserIds: {},
+              groupMembers: [],
+              availableGroups:
+              state.createMemoryModel?.availableGroups ?? const [],
+              availableCategories:
+              state.createMemoryModel?.availableCategories ?? const [],
             ),
           );
 
@@ -437,7 +464,6 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   }
 
   void onCancelPressed() {
-    // Clear form data
     state.memoryNameController?.clear();
 
     state = state.copyWith(
@@ -448,10 +474,14 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         memoryName: null,
         selectedGroup: null,
         selectedDuration: '12_hours',
+        invitedUserIds: {},
+        groupMembers: [],
+        availableGroups: state.createMemoryModel?.availableGroups ?? const [],
+        availableCategories:
+        state.createMemoryModel?.availableCategories ?? const [],
       ),
     );
 
-    // Reset navigation flag
     Future.delayed(Duration.zero, () {
       state = state.copyWith(shouldNavigateBack: false);
     });

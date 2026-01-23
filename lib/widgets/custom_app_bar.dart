@@ -81,7 +81,7 @@ class CustomAppBar extends ConsumerStatefulWidget implements PreferredSizeWidget
 
   @override
   Size get preferredSize => Size.fromHeight(
-    (customHeight ?? 102.h) + (showBottomBorder ? 1.h : 0),
+    (customHeight ?? 86.h) + (showBottomBorder ? 1.h : 0),
   );
 }
 

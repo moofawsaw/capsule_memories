@@ -32,6 +32,42 @@ class NotificationService {
 
   RealtimeChannel? _subscription;
 
+  /// Join a memory directly by memoryId (sealed-safe).
+  /// This makes invites effectively "always valid" even if the invite row is gone/closed.
+  ///
+  /// IMPORTANT:
+  /// - Uses UPSERT so it's idempotent (safe to call multiple times).
+  /// - Assumes your membership table is `memory_contributors` with columns:
+  ///   memory_id, user_id, joined_at
+  /// - If your schema differs, change table/columns + onConflict string.
+  Future<void> joinMemoryById(String memoryId) async {
+    try {
+      final client = _client;
+      if (client == null) {
+        throw Exception('Supabase client not initialized');
+      }
+
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      await client.from('memory_contributors').upsert(
+        {
+          'memory_id': memoryId,
+          'user_id': userId,
+          'joined_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'memory_id,user_id',
+      );
+
+      debugPrint('✅ Joined memory directly: $memoryId');
+    } catch (error) {
+      debugPrint('❌ Failed to join memory directly: $error');
+      throw Exception('Failed to join memory: $error');
+    }
+  }
+
   /// Accept a memory invite - updates status to 'accepted'
   /// The database trigger will automatically add user to memory_contributors
   Future<void> acceptMemoryInvite(String inviteId) async {
@@ -114,40 +150,27 @@ class NotificationService {
       _subscription = client
           .channel('notifications')
           .onPostgresChanges(
-            event: PostgresChangeEvent.insert,
-            schema: 'public',
-            table: 'notifications',
-            filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'user_id',
-              value: userId,
-            ),
-            callback: (payload) {
-              debugPrint('🔔 New notification received');
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'notifications',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'user_id',
+          value: userId,
+        ),
+        callback: (payload) {
+          debugPrint('🔔 New notification received');
 
-              // CRITICAL FIX: Do NOT show push notification if this is the current user's own action
-              // This prevents push notifications when user restores deleted notifications (undo action)
-              final notificationUserId =
-                  payload.newRecord['user_id'] as String?;
-              final currentUserId = client.auth.currentUser?.id;
+          // Skip if notification is soft-deleted (restored notifications won't trigger INSERT anyway)
+          final deletedAt = payload.newRecord['deleted_at'];
+          if (deletedAt != null) {
+            debugPrint('🔕 Skipping soft-deleted notification');
+            return;
+          }
 
-              // Only trigger callback and push notification if it's truly a NEW notification
-              // (not a restored notification from the current user)
-              final isRestoredNotification =
-                  notificationUserId == currentUserId;
-
-              if (!isRestoredNotification) {
-                // This is a genuine new notification, show it
-                onNewNotification(payload.newRecord);
-              } else {
-                // This is likely a restored notification from undo action
-                // Just refresh the list silently without push notification
-                debugPrint(
-                    '🔕 Skipping push notification for restored notification');
-                onNewNotification(payload.newRecord);
-              }
-            },
-          )
+          onNewNotification(payload.newRecord);
+        },
+      )
           .subscribe();
 
       debugPrint('✅ Subscribed to notification updates');
@@ -158,9 +181,9 @@ class NotificationService {
 
   /// Debounced notification update to batch rapid consecutive updates
   void _debouncedNotificationUpdate(
-    Map<String, dynamic> notification,
-    Function(Map<String, dynamic>) callback,
-  ) {
+      Map<String, dynamic> notification,
+      Function(Map<String, dynamic>) callback,
+      ) {
     // Cancel previous timer if still pending
     _debounceTimer?.cancel();
 
@@ -178,8 +201,8 @@ class NotificationService {
 
   /// Process batched notification updates for better performance
   Future<void> _processBatchUpdates(
-    Function(Map<String, dynamic>) callback,
-  ) async {
+      Function(Map<String, dynamic>) callback,
+      ) async {
     if (_isProcessingBatch) return;
 
     _isProcessingBatch = true;
@@ -224,9 +247,9 @@ class NotificationService {
 
   /// Attempt automatic reconnection with exponential backoff
   void _attemptReconnection(
-    String userId,
-    Function(Map<String, dynamic>) onNewNotification,
-  ) {
+      String userId,
+      Function(Map<String, dynamic>) onNewNotification,
+      ) {
     if (_reconnectAttempts >= _maxReconnectAttempts) {
       debugPrint('❌ Max reconnection attempts reached');
       return;
@@ -264,7 +287,7 @@ class NotificationService {
     }
   }
 
-  /// Get all notifications for the current user
+  /// Get all notifications for the current user (excludes soft-deleted)
   Future<List<Map<String, dynamic>>> getNotifications() async {
     try {
       final client = _client;
@@ -284,6 +307,7 @@ class NotificationService {
           .from('notifications')
           .select()
           .eq('user_id', userId)
+          .isFilter('deleted_at', null) // Only fetch non-deleted notifications
           .order('created_at', ascending: false);
 
       // Enrich memory_invite notifications with inviter and memory names
@@ -299,13 +323,13 @@ class NotificationService {
                 final memoryResponse = await client
                     .from('memories')
                     .select(
-                        'title, creator_id, user_profiles!memories_creator_id_fkey(display_name)')
+                    'title, creator_id, user_profiles!memories_creator_id_fkey(display_name)')
                     .eq('id', memoryId)
                     .single();
 
                 final memoryName = memoryResponse['title'] as String?;
                 final creatorProfile =
-                    memoryResponse['user_profiles'] as Map<String, dynamic>?;
+                memoryResponse['user_profiles'] as Map<String, dynamic>?;
                 final inviterName = creatorProfile?['display_name'] as String?;
 
                 // Update message with enriched information
@@ -336,7 +360,7 @@ class NotificationService {
     }
   }
 
-  /// Get unread notification count with caching
+  /// Get unread notification count with caching (excludes soft-deleted)
   Future<int> getUnreadCount() async {
     try {
       final userId = _client?.auth.currentUser?.id;
@@ -349,6 +373,7 @@ class NotificationService {
           .select()
           .eq('user_id', userId)
           .eq('is_read', false)
+          .isFilter('deleted_at', null) // Exclude soft-deleted
           .count();
 
       return response?.count ?? 0;
@@ -406,13 +431,15 @@ class NotificationService {
           ?.from('notifications')
           .update({'is_read': true})
           .eq('user_id', userId)
-          .eq('is_read', false);
+          .eq('is_read', false)
+          .isFilter('deleted_at', null); // Only update non-deleted
     } catch (error) {
       throw Exception('Failed to mark all notifications as read: $error');
     }
   }
 
-  /// Delete a notification
+  /// Soft delete a notification (sets deleted_at timestamp)
+  /// This prevents push notifications on restore since we use UPDATE not INSERT
   Future<void> deleteNotification(String notificationId) async {
     try {
       final userId = _client?.auth.currentUser?.id;
@@ -420,36 +447,39 @@ class NotificationService {
         throw Exception('User not authenticated');
       }
 
+      // SOFT DELETE: Set deleted_at timestamp instead of hard delete
       await _client
           ?.from('notifications')
-          .delete()
+          .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
           .eq('id', notificationId)
           .eq('user_id', userId);
+
+      debugPrint('✅ Notification soft-deleted: $notificationId');
     } catch (error) {
+      debugPrint('❌ Failed to delete notification: $error');
       throw Exception('Failed to delete notification: $error');
     }
   }
 
-  /// Restore a deleted notification
-  Future<void> restoreNotification(Map<String, dynamic> notification) async {
+  /// Restore a soft-deleted notification (clears deleted_at)
+  /// IMPORTANT: This uses UPDATE, not INSERT - so NO push notification is triggered
+  Future<void> restoreNotification(String notificationId) async {
     try {
       final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
         throw Exception('User not authenticated');
       }
 
-      // Re-insert the notification with all its original data
-      await _client?.from('notifications').insert({
-        'id': notification['id'],
-        'user_id': notification['user_id'],
-        'type': notification['type'],
-        'title': notification['title'],
-        'message': notification['message'],
-        'data': notification['data'],
-        'is_read': notification['is_read'],
-        'created_at': notification['created_at'],
-      });
+      // RESTORE: Clear deleted_at (UPDATE only - no push trigger fires)
+      await _client
+          ?.from('notifications')
+          .update({'deleted_at': null})
+          .eq('id', notificationId)
+          .eq('user_id', userId);
+
+      debugPrint('✅ Notification restored: $notificationId');
     } catch (error) {
+      debugPrint('❌ Failed to restore notification: $error');
       throw Exception('Failed to restore notification: $error');
     }
   }
@@ -468,22 +498,21 @@ class NotificationService {
           .select()
           .eq('id', notificationId)
           .eq('user_id', userId)
-          .single();
+          .isFilter('deleted_at', null) // Only fetch if not deleted
+          .maybeSingle();
 
       return response;
     } catch (error) {
-      if (error.toString().contains('PGRST301')) {
-        return null;
-      }
-      throw Exception('Failed to fetch notification: $error');
+      debugPrint('❌ Failed to fetch notification: $error');
+      return null;
     }
   }
 
-  /// Get notifications by type with real-time support
+  /// Get notifications by type with real-time support (excludes soft-deleted)
   Future<List<Map<String, dynamic>>> getNotificationsByType(
-    String notificationType, {
-    int limit = 20,
-  }) async {
+      String notificationType, {
+        int limit = 20,
+      }) async {
     try {
       final userId = _client?.auth.currentUser?.id;
       if (userId == null) {
@@ -498,6 +527,7 @@ class NotificationService {
           .select()
           .eq('user_id', userId)
           .eq('type', notificationType)
+          .isFilter('deleted_at', null) // Exclude soft-deleted
           .order('created_at', ascending: false)
           .limit(limit);
 
@@ -513,9 +543,9 @@ class NotificationService {
 
   /// Handle notification action based on type and navigate appropriately
   Future<void> handleNotificationAction(
-    Map<String, dynamic> notification,
-    Function(String, Map<String, dynamic>?) navigateToScreen,
-  ) async {
+      Map<String, dynamic> notification,
+      Function(String, Map<String, dynamic>?) navigateToScreen,
+      ) async {
     try {
       final notificationType = notification['type'] as String?;
       final data = notification['data'] as Map<String, dynamic>?;
@@ -617,10 +647,10 @@ class NotificationService {
       await _client
           ?.from('notifications')
           .update({
-            'message': newMessage,
-            'data': updatedData,
-            'is_read': true,
-          })
+        'message': newMessage,
+        'data': updatedData,
+        'is_read': true,
+      })
           .eq('id', notificationId)
           .eq('user_id', userId);
 

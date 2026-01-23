@@ -12,7 +12,7 @@ class SentRequestsSectionWidget extends ConsumerWidget {
     final sentRequests = state.filteredSentRequestsList ?? [];
 
     if (sentRequests.isEmpty) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     return Column(
@@ -27,19 +27,47 @@ class SentRequestsSectionWidget extends ConsumerWidget {
         SizedBox(height: 12.h),
         ListView.separated(
           shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
+          physics: const NeverScrollableScrollPhysics(),
           itemCount: sentRequests.length,
           separatorBuilder: (context, index) => SizedBox(height: 12.h),
           itemBuilder: (context, index) {
             final request = sentRequests[index];
-            return CustomFriendRequestCard(
-              profileImagePath: request.profileImagePath ?? '',
-              userName: request.displayName ?? request.userName ?? '',
-              buttonText: 'Cancel',
-              onButtonPressed: () {
-                _showCancelRequestConfirmation(context, ref, request.id ?? '',
-                    request.displayName ?? request.userName ?? '');
+
+            // IMPORTANT:
+            // Use the *target user's id* here.
+            // If your model has something like request.userId / request.toUserId / request.recipientId,
+            // use that instead of request.id.
+            final String targetUserId =
+                (request.userId as String?) ?? (request.id ?? '');
+
+            final String displayName =
+                request.displayName ?? request.userName ?? '';
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(12.h),
+              onTap: () {
+                if (targetUserId.isEmpty) return;
+
+                Navigator.of(context).pushNamed(
+                  AppRoutes.appProfileUser,
+                  arguments: <String, dynamic>{
+                    'userId': targetUserId,
+                  },
+                );
               },
+              child: CustomFriendRequestCard(
+                profileImagePath: request.profileImagePath ?? '',
+                userName: displayName,
+                buttonText: 'Cancel',
+                onButtonPressed: () {
+                  _showCancelRequestConfirmation(
+                    context,
+                    ref,
+                    request.id ?? '',
+                    displayName,
+                  );
+                },
+              ),
             );
           },
         ),
@@ -48,12 +76,15 @@ class SentRequestsSectionWidget extends ConsumerWidget {
   }
 
   void _showCancelRequestConfirmation(
-      BuildContext context, WidgetRef ref, String requestId, String userName) {
+      BuildContext context,
+      WidgetRef ref,
+      String requestId,
+      String userName,
+      ) {
     CustomConfirmationDialog.show(
       context: context,
       title: 'Cancel Request',
-      message:
-          'Are you sure you want to cancel the friend request to $userName?',
+      message: 'Are you sure you want to cancel the friend request to $userName?',
       confirmText: 'Cancel Request',
       cancelText: 'Keep',
     ).then((confirmed) {

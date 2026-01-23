@@ -37,28 +37,26 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        appBar: _buildAppBar(context) as PreferredSizeWidget,
-        body: Container(
-          width: double.maxFinite,
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.only(top: 32.h, left: 16.h, right: 16.h),
-                  child: Column(
-                    children: [
-                      SizedBox(height: 8.h),
-                      _buildStoryContent(context),
-                    ],
-                  ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      appBar: _buildAppBar(context) as PreferredSizeWidget,
+      body: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(top: 32.h, left: 16.h, right: 16.h),
+                child: Column(
+                  children: [
+                    SizedBox(height: 8.h),
+                    _buildStoryContent(context),
+                  ],
                 ),
               ),
-              _buildBottomSection(context),
-            ],
-          ),
+            ),
+            _buildBottomSection(context),
+          ],
         ),
       ),
     );

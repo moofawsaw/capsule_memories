@@ -1,3 +1,5 @@
+// lib/services/story_service.dart
+
 import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -30,7 +32,6 @@ class StoryService {
         .getPublicUrl(normalized);
   }
 
-  // ✅ UPDATED: caller can choose whether to apply the 24h filter
   Future<List<Map<String, dynamic>>> fetchUserStories(
       String userId, {
         bool onlyLast24Hours = true,
@@ -44,7 +45,6 @@ class StoryService {
     );
   }
 
-  // ✅ UPDATED: supports 24h OR ALL, and fixes null receiver issues by requiring supabase
   Future<List<Map<String, dynamic>>> _fetchUserStoriesInternal(
       String userId, {
         required bool onlyLast24Hours,
@@ -53,7 +53,6 @@ class StoryService {
     if (supabase == null) return [];
 
     try {
-      // ✅ Get memory IDs where user is creator or contributor
       final creatorMemories =
       await supabase.from('memories').select('id').eq('creator_id', userId);
 
@@ -62,11 +61,8 @@ class StoryService {
           .select('memory_id')
           .eq('user_id', userId);
 
-      // Combine memory IDs from both sources
       final memoryIds = <String>{
-        ...(creatorMemories as List)
-            .map((m) => m['id'] as String)
-            .toList(),
+        ...(creatorMemories as List).map((m) => m['id'] as String).toList(),
         ...(contributorMemories as List)
             .map((m) => m['memory_id'] as String)
             .toList(),
@@ -101,7 +97,6 @@ class StoryService {
             )
           ''').inFilter('memory_id', memoryIds);
 
-      // ✅ Only apply 24h filter if requested (Happening Now keeps this ON)
       if (onlyLast24Hours) {
         query = query.gte(
           'created_at',
@@ -112,7 +107,6 @@ class StoryService {
       }
 
       final response = await query.order('created_at', ascending: false);
-
       return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
       print('❌ STORY SERVICE: Error fetching user stories: $e');
@@ -279,15 +273,16 @@ class StoryService {
       )
     ''').eq('memory_id', memoryId).order('created_at', ascending: false);
 
-
       return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
       rethrow;
     }
   }
 
-
-
+  /// ✅ FIXED:
+  /// - Collect coords BEFORE insert (so first post can include location)
+  /// - Optional best-effort reverse geocode BEFORE insert (short timeout)
+  /// - NO background location backfill (prevents iOS prompting AFTER post)
   Future<Map<String, dynamic>?> createStory({
     required String memoryId,
     required String contributorId,
@@ -299,8 +294,8 @@ class StoryService {
     DateTime? captureTimestamp,
     bool isFromCameraRoll = false,
 
-    // ✅ NEW: control async location behavior
-    bool backfillLocationAsync = true,
+    // Keep the param for compatibility, but default it OFF to avoid post-submit prompts.
+    bool backfillLocationAsync = false,
   }) async {
     if (_supabase == null) {
       throw Exception('Supabase client is null (not initialized)');
@@ -310,7 +305,33 @@ class StoryService {
       final nowUtc = DateTime.now().toUtc();
       final captureUtc = (captureTimestamp ?? nowUtc).toUtc();
 
-      // ✅ FAST INSERT: no getLocationData() here
+      // ✅ Coords first (this is what triggers iOS permission prompt, and it happens BEFORE insert)
+      Map<String, dynamic>? coords;
+      try {
+        coords = await LocationService.getCoordsOnly(
+          timeout: const Duration(seconds: 3),
+        );
+      } catch (_) {
+        coords = null;
+      }
+
+      final double? lat = (coords?['latitude'] as num?)?.toDouble();
+      final double? lng = (coords?['longitude'] as num?)?.toDouble();
+
+      // ✅ Best-effort name (does not cause permission prompt; uses coords)
+      String? locationName;
+      if (lat != null && lng != null) {
+        try {
+          locationName = await LocationService.getLocationNameBestEffort(
+            lat,
+            lng,
+            timeout: const Duration(seconds: 6),
+          );
+        } catch (_) {
+          locationName = null;
+        }
+      }
+
       final storyData = <String, dynamic>{
         'memory_id': memoryId,
         'contributor_id': contributorId,
@@ -319,10 +340,10 @@ class StoryService {
         'thumbnail_url': thumbnailUrl,
         'media_type': mediaType,
 
-        // insert null for now; fill after
-        'location_lat': null,
-        'location_lng': null,
-        'location_name': null,
+        // ✅ Insert with location (first post has it if permission granted)
+        'location_lat': lat,
+        'location_lng': lng,
+        'location_name': locationName,
 
         'created_at': nowUtc.toIso8601String(),
         'capture_timestamp': captureUtc.toIso8601String(),
@@ -331,21 +352,34 @@ class StoryService {
         'text_overlays': caption != null ? [{'text': caption}] : [],
       };
 
-      final inserted = await _supabase.from('stories').insert(storyData).select('''
-      id,
-      contributor_id,
-      memory_id,
-      location_name,
-      location_lat,
-      location_lng
-    ''').single();
+      final inserted = await _supabase!.from('stories').insert(storyData).select('''
+        id,
+        contributor_id,
+        memory_id,
+        created_at,
+        capture_timestamp,
+        location_name,
+        location_lat,
+        location_lng
+      ''').single();
 
       final insertedMap = Map<String, dynamic>.from(inserted);
-      final storyId = insertedMap['id']?.toString();
 
-      // ✅ Async backfill in background
-      if (backfillLocationAsync && storyId != null && storyId.isNotEmpty) {
-        unawaited(_backfillStoryLocation(storyId));
+      // 🚫 Intentionally do NOT do background location fetch here.
+      // This prevents iOS from prompting after the post completes.
+
+      // If you still want async backfill, it MUST NOT request permission after insert.
+      // Only safe if you pass lat/lng from earlier and ONLY reverse-geocode.
+      if (backfillLocationAsync) {
+        final storyId = insertedMap['id']?.toString();
+        if (storyId != null &&
+            storyId.isNotEmpty &&
+            (locationName == null || locationName.trim().isEmpty) &&
+            lat != null &&
+            lng != null) {
+          // Reverse geocode only; no permission request here.
+          unawaited(_backfillStoryLocationNameOnly(storyId, lat, lng));
+        }
       }
 
       return insertedMap;
@@ -365,43 +399,31 @@ class StoryService {
     }
   }
 
-  /// ✅ Background backfill: coords quickly, geocode best-effort, then update story row.
-  Future<void> _backfillStoryLocation(String storyId) async {
+  /// ✅ SAFE background backfill:
+  /// - DOES NOT request location permission
+  /// - DOES NOT call getCoordsOnly / getCurrentLocation
+  /// - ONLY reverse-geocodes using provided lat/lng, then updates location_name
+  Future<void> _backfillStoryLocationNameOnly(
+      String storyId,
+      double lat,
+      double lng,
+      ) async {
     try {
-      // 1) Get coords fast (don’t hang)
-      final coords = await LocationService.getCoordsOnly(
-        timeout: const Duration(seconds: 3),
-      );
-
-      if (coords == null) {
-        print('⚠️ Backfill: no coords available');
-        return;
-      }
-
-      final lat = coords['latitude'] as double?;
-      final lng = coords['longitude'] as double?;
-      if (lat == null || lng == null) return;
-
-      // 2) Get name best-effort (short cap)
       final name = await LocationService.getLocationNameBestEffort(
         lat,
         lng,
         timeout: const Duration(seconds: 6),
       );
 
-      // 3) Update story (coords always, name if available)
-      final updateData = <String, dynamic>{
-        'location_lat': lat,
-        'location_lng': lng,
+      if (name == null || name.trim().isEmpty) return;
+
+      await _supabase!.from('stories').update({
         'location_name': name,
-      };
+      }).eq('id', storyId);
 
-      await _supabase!.from('stories').update(updateData).eq('id', storyId);
-
-      print('✅ Backfilled story location for $storyId: ${name ?? "coords-only"}');
+      print('✅ Backfilled story location_name for $storyId: $name');
     } catch (e) {
-      // swallow: posting already succeeded
-      print('⚠️ Backfill location failed for $storyId: $e');
+      print('⚠️ Backfill location_name failed for $storyId: $e');
     }
   }
 
@@ -417,10 +439,7 @@ class StoryService {
         return await operation();
       } catch (e) {
         attempt++;
-
-        if (attempt >= _maxRetries) {
-          rethrow;
-        }
+        if (attempt >= _maxRetries) rethrow;
 
         await Future.delayed(delay);
         delay *= 2;
@@ -450,7 +469,6 @@ class StoryService {
   }
 
   String getStoryMediaUrl(Map<String, dynamic> story) {
-    // Priority: thumbnail_url > video_url > image_url
     if (story['thumbnail_url'] != null &&
         (story['thumbnail_url'] as String).isNotEmpty) {
       return resolveStoryMediaUrl(story['thumbnail_url'] as String) ?? '';
@@ -466,14 +484,12 @@ class StoryService {
   }
 
   String getContributorAvatar(Map<String, dynamic> story) {
-    final contributor =
-        (story['user_profiles_public'] as Map<String, dynamic>?) ??
-            (story['user_profiles'] as Map<String, dynamic>?);
+    final contributor = (story['user_profiles_public'] as Map<String, dynamic>?) ??
+        (story['user_profiles'] as Map<String, dynamic>?);
 
     final avatarUrl = contributor?['avatar_url'] as String?;
     return AvatarHelperService.getAvatarUrl(avatarUrl);
   }
-
 
   String getMemoryThumbnail(Map<String, dynamic> memory) {
     final stories = memory['stories'] as List?;
@@ -577,9 +593,8 @@ class StoryService {
       String mediaUrl = '';
 
       if (mediaType == 'video') {
-        final videoPath = (response['video_url'] ??
-            response['thumbnail_url'] ??
-            '') as String;
+        final videoPath =
+        (response['video_url'] ?? response['thumbnail_url'] ?? '') as String;
 
         if (videoPath.isNotEmpty &&
             !videoPath.startsWith('http://') &&
@@ -589,9 +604,8 @@ class StoryService {
           mediaUrl = videoPath;
         }
       } else {
-        final imagePath = (response['image_url'] ??
-            response['thumbnail_url'] ??
-            '') as String;
+        final imagePath =
+        (response['image_url'] ?? response['thumbnail_url'] ?? '') as String;
 
         if (imagePath.isNotEmpty &&
             !imagePath.startsWith('http://') &&
@@ -623,11 +637,11 @@ class StoryService {
     final now = DateTime.now();
     switch (duration) {
       case '24_hours':
-        return now.add(Duration(hours: 24));
+        return now.add(const Duration(hours: 24));
       case '12_hours':
-        return now.add(Duration(hours: 12));
+        return now.add(const Duration(hours: 12));
       default:
-        return now.add(Duration(hours: 12));
+        return now.add(const Duration(hours: 12));
     }
   }
 }

@@ -17,7 +17,7 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
     super.initState();
     _shimmerController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1500),
     )..repeat();
   }
 
@@ -33,9 +33,13 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
       animation: _shimmerController,
       builder: (context, child) {
         return Container(
-          width: 280.w,
+          // ✅ Match loaded card width
+          width: 300.h,
           height: 348.h,
-          margin: EdgeInsets.only(right: 12.h),
+
+          // ✅ IMPORTANT: spacing is handled by CustomPublicMemories wrapper margins
+          margin: EdgeInsets.zero,
+
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16.h),
             gradient: LinearGradient(
@@ -51,23 +55,19 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Skeleton image area (top section)
               Container(
                 height: 180.h,
                 decoration: BoxDecoration(
                   borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(16.h)),
+                  BorderRadius.vertical(top: Radius.circular(16.h)),
                   color: appTheme.blue_gray_300.withAlpha(51),
                 ),
               ),
-
-              // Content area
               Padding(
                 padding: EdgeInsets.all(14.h),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Category icon skeleton
                     Container(
                       width: 40.h,
                       height: 40.h,
@@ -77,8 +77,6 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
                       ),
                     ),
                     SizedBox(height: 12.h),
-
-                    // Title skeleton
                     Container(
                       width: 180.h,
                       height: 20.h,
@@ -88,8 +86,6 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
                       ),
                     ),
                     SizedBox(height: 8.h),
-
-                    // Date skeleton
                     Container(
                       width: 120.h,
                       height: 14.h,
@@ -99,16 +95,16 @@ class _CustomMemorySkeletonState extends State<CustomMemorySkeleton>
                       ),
                     ),
                     SizedBox(height: 12.h),
-
-                    // Participant avatars skeleton row
                     SizedBox(
-                      height: 28.h, // ✅ lock row height to avatar size
+                      height: 28.h,
                       child: Row(
                         children: List.generate(3, (index) {
                           return Container(
                             width: 28.h,
                             height: 28.h,
-                            margin: EdgeInsets.only(right: index < 2 ? 8.w : 0), // ✅ .w for horizontal
+                            margin: EdgeInsets.only(
+                              right: index < 2 ? 8.w : 0,
+                            ),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: appTheme.blue_gray_300.withAlpha(77),

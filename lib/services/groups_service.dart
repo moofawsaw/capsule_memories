@@ -190,56 +190,128 @@ class GroupsService {
   }
 
   /// Fetches group members with their profile information
-  /// Fetches group members with their profile information
-  static Future<List<Map<String, dynamic>>> fetchGroupMembers(
-      String groupId) async {
+  /// ✅ Includes creator even if creator is missing from group_members (legacy groups)
+  static Future<List<Map<String, dynamic>>> fetchGroupMembers(String groupId) async {
     try {
+      // A) Get creator_id (so we can ensure creator is present)
+      final group = await _client
+          .from('groups')
+          .select('creator_id')
+          .eq('id', groupId)
+          .maybeSingle();
+
+      final creatorId = group?['creator_id'] as String?;
+
+      // B) Fetch members from group_members
       final response = await _client
           .from('group_members')
           .select(
         'user_id, joined_at, user_profiles!inner(id, display_name, username, avatar_url)',
       )
           .eq('group_id', groupId)
-      // Optional but useful: deterministic ordering
           .order('joined_at', ascending: true);
 
-      final members = <Map<String, dynamic>>[];
+      final Map<String, Map<String, dynamic>> byUserId = {};
 
-      for (final member in response) {
+      for (final member in (response as List)) {
         final profile = member['user_profiles'];
-        if (profile != null) {
-          final avatarPath = profile['avatar_url'];
+        if (profile == null) continue;
+
+        final userId = (member['user_id'] as String?)?.trim();
+        if (userId == null || userId.isEmpty) continue;
+
+        final avatarPath = (profile['avatar_url'] as String?)?.trim();
+        String avatarUrl = '';
+
+        if (avatarPath != null && avatarPath.isNotEmpty) {
+          if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+            avatarUrl = avatarPath;
+          } else {
+            try {
+              final cleanPath = avatarPath.startsWith('/') ? avatarPath.substring(1) : avatarPath;
+              avatarUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
+            } catch (e) {
+              print('Error generating avatar URL: $e');
+            }
+          }
+        }
+
+        byUserId[userId] = {
+          // ✅ IMPORTANT: use user_id as the stable id (not profile['id'])
+          'id': userId,
+          'profile_id': profile['id'],
+          'name': profile['display_name'] ?? 'Unknown User',
+          'username': profile['username'] ?? 'username',
+          'avatar': avatarUrl,
+          'joined_at': member['joined_at'],
+          'is_creator': (creatorId != null && userId == creatorId),
+        };
+      }
+
+      // C) If creator missing from group_members, fetch creator profile and inject
+      if (creatorId != null && creatorId.isNotEmpty && !byUserId.containsKey(creatorId)) {
+        final creatorProfile = await _client
+            .from('user_profiles')
+            .select('id, display_name, username, avatar_url')
+            .eq('id', creatorId)
+            .maybeSingle();
+
+        if (creatorProfile != null) {
+          final avatarPath = (creatorProfile['avatar_url'] as String?)?.trim();
           String avatarUrl = '';
 
           if (avatarPath != null && avatarPath.isNotEmpty) {
-            if (avatarPath.startsWith('http://') ||
-                avatarPath.startsWith('https://')) {
+            if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
               avatarUrl = avatarPath;
             } else {
               try {
-                final cleanPath = avatarPath.startsWith('/')
-                    ? avatarPath.substring(1)
-                    : avatarPath;
-                avatarUrl =
-                    _client.storage.from('avatars').getPublicUrl(cleanPath);
+                final cleanPath = avatarPath.startsWith('/') ? avatarPath.substring(1) : avatarPath;
+                avatarUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
               } catch (e) {
-                print('Error generating avatar URL: $e');
+                print('Error generating avatar URL for creator: $e');
               }
             }
           }
 
-          members.add({
-            // Keep what your UI already expects
-            'id': profile['id'],
-            'name': profile['display_name'] ?? 'Unknown User',
-            'username': profile['username'] ?? 'username',
+          // Put creator at top (joined_at null, but we sort below)
+          byUserId[creatorId] = {
+            'id': creatorId,
+            'profile_id': creatorProfile['id'],
+            'name': creatorProfile['display_name'] ?? 'You',
+            'username': creatorProfile['username'] ?? 'username',
             'avatar': avatarUrl,
+            'joined_at': null,
+            'is_creator': true,
+          };
 
-            // IMPORTANT: add joined_at as top-level so UI can read it
-            'joined_at': member['joined_at'],
-          });
+          // Optional: also backfill group_members so future fetches are consistent
+          try {
+            await _client.from('group_members').insert({
+              'group_id': groupId,
+              'user_id': creatorId,
+            });
+          } catch (_) {}
         }
       }
+
+      final members = byUserId.values.toList();
+
+      // D) Sort: creator first, then joined_at
+      members.sort((a, b) {
+        final aCreator = (a['is_creator'] as bool?) ?? false;
+        final bCreator = (b['is_creator'] as bool?) ?? false;
+        if (aCreator && !bCreator) return -1;
+        if (!aCreator && bCreator) return 1;
+
+        final aJoined = a['joined_at'];
+        final bJoined = b['joined_at'];
+
+        if (aJoined == null && bJoined != null) return 1;
+        if (aJoined != null && bJoined == null) return -1;
+        if (aJoined == null && bJoined == null) return 0;
+
+        return (aJoined as String).compareTo(bJoined as String);
+      });
 
       return members;
     } catch (e) {
@@ -249,9 +321,21 @@ class GroupsService {
   }
 
   /// Fetches member avatars for a specific group
-  static Future<List<String>> fetchGroupMemberAvatars(String groupId,
-      {int limit = 3}) async {
+  /// ✅ Includes creator if group_members is missing creator (legacy groups)
+  static Future<List<String>> fetchGroupMemberAvatars(
+      String groupId, {
+        int limit = 3,
+      }) async {
     try {
+      // A) Read creator_id
+      final group = await _client
+          .from('groups')
+          .select('creator_id')
+          .eq('id', groupId)
+          .maybeSingle();
+      final creatorId = group?['creator_id'] as String?;
+
+      // B) Fetch avatars from group_members
       final response = await _client
           .from('group_members')
           .select('user_id, user_profiles!inner(avatar_url)')
@@ -259,28 +343,60 @@ class GroupsService {
           .limit(limit);
 
       final List<String> avatars = [];
-      for (final member in response) {
-        final avatarPath = member['user_profiles']?['avatar_url'];
+      final Set<String> seenUserIds = {};
+
+      for (final member in (response as List)) {
+        final userId = (member['user_id'] as String?)?.trim();
+        if (userId == null || userId.isEmpty) continue;
+        seenUserIds.add(userId);
+
+        final avatarPath = (member['user_profiles']?['avatar_url'] as String?)?.trim();
+        if (avatarPath == null || avatarPath.isEmpty) continue;
+
+        String avatarUrl = '';
+        if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+          avatarUrl = avatarPath;
+        } else {
+          try {
+            final cleanPath = avatarPath.startsWith('/') ? avatarPath.substring(1) : avatarPath;
+            avatarUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
+          } catch (e) {
+            print('Error generating avatar URL: $e');
+          }
+        }
+
+        if (avatarUrl.isNotEmpty) avatars.add(avatarUrl);
+        if (avatars.length >= limit) break;
+      }
+
+      // C) If creator missing, inject creator avatar (legacy groups)
+      if (avatars.length < limit &&
+          creatorId != null &&
+          creatorId.isNotEmpty &&
+          !seenUserIds.contains(creatorId)) {
+        final creatorProfile = await _client
+            .from('user_profiles')
+            .select('avatar_url')
+            .eq('id', creatorId)
+            .maybeSingle();
+
+        final avatarPath = (creatorProfile?['avatar_url'] as String?)?.trim();
         if (avatarPath != null && avatarPath.isNotEmpty) {
-          // Use same inline URL conversion logic as current user
           String avatarUrl = '';
-          if (avatarPath.startsWith('http://') ||
-              avatarPath.startsWith('https://')) {
+          if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
             avatarUrl = avatarPath;
           } else {
             try {
-              final cleanPath = avatarPath.startsWith('/')
-                  ? avatarPath.substring(1)
-                  : avatarPath;
-              avatarUrl =
-                  _client.storage.from('avatars').getPublicUrl(cleanPath);
-            } catch (e) {
-              print('Error generating avatar URL: $e');
-            }
+              final cleanPath = avatarPath.startsWith('/') ? avatarPath.substring(1) : avatarPath;
+              avatarUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
+            } catch (_) {}
           }
 
           if (avatarUrl.isNotEmpty) {
-            avatars.add(avatarUrl);
+            avatars.insert(0, avatarUrl); // put creator first
+            if (avatars.length > limit) {
+              avatars.removeLast();
+            }
           }
         }
       }
@@ -293,6 +409,7 @@ class GroupsService {
   }
 
   /// Creates a new group and returns the group ID
+  /// ✅ Ensures creator is also inserted into group_members
   static Future<String?> createGroup(String groupName) async {
     try {
       final userId = _client.auth.currentUser?.id;
@@ -300,16 +417,44 @@ class GroupsService {
         throw Exception('User not authenticated');
       }
 
+      // 1) Create group
       final response = await _client
           .from('groups')
           .insert({
-            'name': groupName,
-            'creator_id': userId,
-          })
+        'name': groupName,
+        'creator_id': userId,
+      })
           .select('id')
           .single();
 
-      return response['id'] as String;
+      final groupId = response['id'] as String?;
+
+      if (groupId == null || groupId.isEmpty) {
+        return null;
+      }
+
+      // 2) Add creator as a member (idempotent-ish)
+      // If you have a unique constraint on (group_id, user_id), this will be safe.
+      try {
+        await _client.from('group_members').insert({
+          'group_id': groupId,
+          'user_id': userId,
+        });
+      } catch (e) {
+        // Non-fatal: group exists; member insert may fail if already present
+        print('⚠️ createGroup: could not add creator to group_members: $e');
+      }
+
+      // 3) Optional: keep member_count accurate if you use it
+      // Only do this if your schema doesn't already update member_count via trigger.
+      try {
+        await _client.from('groups').update({'member_count': 1}).eq('id', groupId);
+      } catch (e) {
+        // Non-fatal
+        print('⚠️ createGroup: could not update member_count: $e');
+      }
+
+      return groupId;
     } catch (e) {
       print('Error creating group: $e');
       return null;

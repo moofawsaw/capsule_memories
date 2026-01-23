@@ -3,6 +3,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../services/avatar_state_service.dart';
+import '../../widgets/custom_qr_code_card.dart';
 import 'notifier/qr_code_share_screen_two_notifier.dart';
 
 class QRCodeShareScreenTwoScreen extends ConsumerStatefulWidget {
@@ -243,26 +244,18 @@ class QRCodeShareScreenTwoScreenState
           margin: EdgeInsets.symmetric(horizontal: 68.h),
           child: RepaintBoundary(
             key: _qrKey,
-            child: Container(
-              padding: EdgeInsets.all(16.h),
-              decoration: BoxDecoration(
-                color: appTheme.whiteCustom,
-                borderRadius: BorderRadius.circular(12.h),
-              ),
-              child: QrImageView(
-                data: qrData,
-                version: QrVersions.auto,
-                size: 200.h,
-                padding: EdgeInsets.zero, // ✅ KEY FIX (removes default padding)
-                backgroundColor: appTheme.whiteCustom,
-                foregroundColor: appTheme.blackCustom,
-              ),
+            child: CustomQrCodeCard(
+              qrData: qrData,
+              qrSize: 200.h,
+              outerPadding: 16.h,
+              borderRadius: 16.h,
             ),
           ),
         );
       },
     );
   }
+
 
   Widget _buildUrlSection(BuildContext context) {
     return Consumer(

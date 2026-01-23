@@ -36,41 +36,49 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
 
   @override
   Widget build(BuildContext context) {
-    // IMPORTANT:
-    // MemoriesDashboardScreen compact skeleton wrapper uses:
-    // - item width: 120.h
-    // - available height: 140.h
-    //
-    // So compact MUST be 120.h x 140.h to match the real cards and avoid overflow/mismatch.
-// Compact card matches real story card height
-    final double containerHeight = widget.isCompact ? 120.h : 202.h;
-    final double containerWidth  = widget.isCompact ? 90.h  : 140.h;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool hasTightWidth =
+            constraints.maxWidth.isFinite && constraints.maxWidth > 0;
+        final bool hasTightHeight =
+            constraints.maxHeight.isFinite && constraints.maxHeight > 0;
 
-// ✅ Compact internals must sum to 120:
-// imageHeight (74) + padding*2 (12) + row(16) + spacing(4) + badge(14) = 120
-    final double imageHeight = widget.isCompact ? 74.h : 140.h;
-    final double padding     = widget.isCompact ? 6.h  : 8.h;
+        // Fallbacks (used only when not tightly constrained)
+        final double fallbackW = widget.isCompact ? 90.h : 140.h;
+        final double fallbackH = widget.isCompact ? 120.h : 202.h;
 
-    final double avatarSize  = widget.isCompact ? 16.h : 20.h;
-    final double textWidth   = widget.isCompact ? 46.h : 50.h;
-    final double textHeight  = widget.isCompact ? 8.h  : 10.h;
+        // GridView cells will drive these sizes (profile case = third size)
+        final double w = hasTightWidth ? constraints.maxWidth : fallbackW;
+        final double h = hasTightHeight ? constraints.maxHeight : fallbackH;
 
-    final double badgeWidth  = widget.isCompact ? 54.h : 70.h;
-    final double badgeHeight = widget.isCompact ? 14.h : 16.h;
+        // ✅ CRITICAL:
+        // If squareTop=true (profile grid), the entire card MUST be square,
+        // including the header block.
+        final bool forceSquare = widget.squareTop;
+        final double cardRadius =
+        forceSquare ? 0.h : 12.h;
 
-    final double spacing     = widget.isCompact ? 4.h  : 6.h;
+        // Internal layout scales to any size
+        final double pad = (h * 0.06).clamp(6.h, 10.h);
+        final double avatar = (h * 0.13).clamp(16.h, 22.h);
+        final double lineH = (h * 0.07).clamp(8.h, 12.h);
+        final double badgeH = (h * 0.10).clamp(14.h, 18.h);
+        final double gap = (h * 0.035).clamp(4.h, 8.h);
 
+        final double bottomArea = pad * 2 + avatar + gap + badgeH;
+        final double imageH = (h - bottomArea).clamp(50.h, h);
 
-    return AnimatedBuilder(
-      animation: _shimmerController,
-      builder: (context, child) {
-        return ClipRRect( // ✅ ADD THIS
-            borderRadius: BorderRadius.circular(12.h),
-            child: Container(
-              height: containerHeight,
-              width: containerWidth,
+        final double textW = (w * 0.52).clamp(40.h, 70.h);
+        final double badgeW = (w * 0.62).clamp(52.h, 90.h);
+
+        return AnimatedBuilder(
+          animation: _shimmerController,
+          builder: (context, _) {
+            return Container(
+              width: w,
+              height: h,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12.h), // ✅ ADD THIS
+                borderRadius: BorderRadius.circular(cardRadius),
                 gradient: LinearGradient(
                   begin: Alignment(-1.0 - _shimmerController.value * 2, 0.0),
                   end: Alignment(1.0 - _shimmerController.value * 2, 0.0),
@@ -82,62 +90,69 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
                 ),
               ),
               child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Skeleton image area
-              Container(
-                height: imageHeight,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: appTheme.blue_gray_300.withAlpha(51),
-                  borderRadius: widget.squareTop
-                      ? null
-                      : BorderRadius.vertical(top: Radius.circular(12.h)),
-                ),
-              ),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header / image block
+                  Container(
+                    height: imageH,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: appTheme.blue_gray_300.withAlpha(51),
+                      // ✅ GUARANTEED: profile grid passes squareTop:true => no rounding here
+                      borderRadius: forceSquare
+                          ? BorderRadius.zero
+                          : BorderRadius.vertical(
+                        top: Radius.circular(12.h),
+                      ),
+                    ),
+                  ),
 
-              // Skeleton meta/text area
-              Padding(
-                padding: EdgeInsets.all(padding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                  // Meta area
+                  Padding(
+                    padding: EdgeInsets.all(pad),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: avatarSize,
-                          height: avatarSize,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: appTheme.blue_gray_300.withAlpha(77),
+                        SizedBox(
+                          height: avatar,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: avatar,
+                                height: avatar,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: appTheme.blue_gray_300.withAlpha(77),
+                                ),
+                              ),
+                              SizedBox(width: gap),
+                              Container(
+                                width: textW,
+                                height: lineH,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4.h),
+                                  color: appTheme.blue_gray_300.withAlpha(77),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(width: spacing),
+                        SizedBox(height: gap),
                         Container(
-                          width: textWidth,
-                          height: textHeight,
+                          width: badgeW,
+                          height: badgeH,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(12.h),
                             color: appTheme.blue_gray_300.withAlpha(77),
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: spacing),
-                    Container(
-                      width: badgeWidth,
-                      height: badgeHeight,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: appTheme.blue_gray_300.withAlpha(77),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-            ),
+            );
+          },
         );
       },
     );

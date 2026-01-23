@@ -1,10 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen for Android 21+ -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Background color - Deep Purple matching app theme -->
-    <item android:drawable="@color/splash_background" />
-    
-    <!-- Note: Flutter assets cannot be referenced here. -->
-    <!-- The splash logo image will be displayed by Flutter's splash screen widget -->
-    <!-- See lib/presentation/splash_screen/splash_screen.dart for the logo implementation -->
-</layer-list>
+<resources>
+  <color name="ic_launcher_background">#8249df</color>
+</resources>

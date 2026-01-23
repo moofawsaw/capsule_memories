@@ -33,6 +33,10 @@ class EventTimelineViewScreen extends ConsumerStatefulWidget {
 // SKELETONS (MATCH SEALED VIEW)
 // ============================
 
+// ============================
+// SKELETONS (MATCH CustomMemorySkeleton)
+// ============================
+
 class _OpenTimelineViewSkeleton extends StatelessWidget {
   const _OpenTimelineViewSkeleton();
 
@@ -51,7 +55,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(16.h),
               decoration: BoxDecoration(
-                color: appTheme.gray_900_01,
+                color: appTheme.gray_900_01, // surface
                 borderRadius: BorderRadius.circular(16.h),
               ),
               child: Column(
@@ -63,7 +67,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
                         width: 44.h,
                         height: 44.h,
                         decoration: BoxDecoration(
-                          color: appTheme.blue_gray_900,
+                          color: appTheme.blue_gray_300.withAlpha(77),
                           borderRadius: BorderRadius.circular(14.h),
                         ),
                       ),
@@ -76,8 +80,10 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
                               height: 14.h,
                               width: 180.h,
                               decoration: BoxDecoration(
-                                color: appTheme.blue_gray_900,
-                                borderRadius: BorderRadius.circular(6.h),
+                                color:
+                                appTheme.blue_gray_300.withAlpha(77),
+                                borderRadius:
+                                BorderRadius.circular(6.h),
                               ),
                             ),
                             SizedBox(height: 10.h),
@@ -85,8 +91,10 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
                               height: 12.h,
                               width: 140.h,
                               decoration: BoxDecoration(
-                                color: appTheme.blue_gray_900,
-                                borderRadius: BorderRadius.circular(6.h),
+                                color:
+                                appTheme.blue_gray_300.withAlpha(77),
+                                borderRadius:
+                                BorderRadius.circular(6.h),
                               ),
                             ),
                           ],
@@ -97,7 +105,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
                         width: 56.h,
                         height: 28.h,
                         decoration: BoxDecoration(
-                          color: appTheme.blue_gray_900,
+                          color: appTheme.blue_gray_300.withAlpha(77),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -108,7 +116,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
                     height: 12.h,
                     width: 220.h,
                     decoration: BoxDecoration(
-                      color: appTheme.blue_gray_900,
+                      color: appTheme.blue_gray_300.withAlpha(77),
                       borderRadius: BorderRadius.circular(6.h),
                     ),
                   ),
@@ -119,7 +127,6 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
 
           SizedBox(height: 16.h),
 
-          // Timeline skeleton
           const _OpenTimelineSkeletonSection(),
 
           SizedBox(height: 18.h),
@@ -131,7 +138,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
               height: 14.h,
               width: 120.h,
               decoration: BoxDecoration(
-                color: appTheme.blue_gray_900,
+                color: appTheme.blue_gray_300.withAlpha(77),
                 borderRadius: BorderRadius.circular(6.h),
               ),
             ),
@@ -139,12 +146,11 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
 
           SizedBox(height: 14.h),
 
-          // Story cards skeleton row
           const _StoriesSkeletonRow(),
 
           SizedBox(height: 24.h),
 
-          // Buttons skeleton
+          // Button skeleton shells
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 24.h),
             child: Column(
@@ -201,7 +207,7 @@ class _OpenTimelineSkeletonSection extends StatelessWidget {
           Container(
             width: double.maxFinite,
             height: 1,
-            color: appTheme.blue_gray_900,
+            color: appTheme.blue_gray_300.withAlpha(51),
           ),
           SizedBox(height: 16.h),
         ],
@@ -229,6 +235,35 @@ class _StoriesSkeletonRow extends StatelessWidget {
             decoration: BoxDecoration(
               color: appTheme.gray_900_01,
               borderRadius: BorderRadius.circular(16.h),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(12.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color:
+                        appTheme.blue_gray_300.withAlpha(51),
+                        borderRadius:
+                        BorderRadius.circular(12.h),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 10.h),
+                  Container(
+                    height: 12.h,
+                    width: 70.h,
+                    decoration: BoxDecoration(
+                      color:
+                      appTheme.blue_gray_300.withAlpha(77),
+                      borderRadius:
+                      BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -433,52 +468,41 @@ class EventTimelineViewScreenState
     // Single source of truth for initial-load skeleton
     final effectiveLoading = isLoading || (_booting && !hasSnapshot);
 
-    // if (effectiveLoading && !hasSnapshot) {
-    //   return SafeArea(
-    //     child: Scaffold(
-    //       backgroundColor: appTheme.gray_900_02,
-    //       body: const _OpenTimelineViewSkeleton(),
-    //     ),
-    //   );
-    // }
-
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: RefreshIndicator(
-          onRefresh: () async {
-            final memoryId = ref.read(eventTimelineViewNotifier).memoryId;
-            if (memoryId != null) {
-              await ref
-                  .read(eventTimelineViewNotifier.notifier)
-                  .validateMemoryData(memoryId);
-            }
-          },
-          color: appTheme.deep_purple_A100,
-          backgroundColor: appTheme.gray_900_01,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              children: [
-                _buildEventHeader(context),
-                _buildTimelineSection(context),
-                _buildStoriesSection(context),
-                SizedBox(height: 18.h),
-                effectiveLoading
-                    ? Container(
-                  margin: EdgeInsets.symmetric(horizontal: 24.h),
-                  child: Column(
-                    children: [
-                      CustomButtonSkeleton(),
-                      SizedBox(height: 12.h),
-                      CustomButtonSkeleton(),
-                    ],
-                  ),
-                )
-                    : _buildActionButtons(context),
-                SizedBox(height: 20.h),
-              ],
-            ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final memoryId = ref.read(eventTimelineViewNotifier).memoryId;
+          if (memoryId != null) {
+            await ref
+                .read(eventTimelineViewNotifier.notifier)
+                .validateMemoryData(memoryId);
+          }
+        },
+        color: appTheme.deep_purple_A100,
+        backgroundColor: appTheme.gray_900_01,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildEventHeader(context),
+              _buildTimelineSection(context),
+              _buildStoriesSection(context),
+              SizedBox(height: 18.h),
+              effectiveLoading
+                  ? Container(
+                margin: EdgeInsets.symmetric(horizontal: 24.h),
+                child: Column(
+                  children: [
+                    CustomButtonSkeleton(),
+                    SizedBox(height: 12.h),
+                    CustomButtonSkeleton(),
+                  ],
+                ),
+              )
+                  : _buildActionButtons(context),
+              SizedBox(height: 20.h),
+            ],
           ),
         ),
       ),

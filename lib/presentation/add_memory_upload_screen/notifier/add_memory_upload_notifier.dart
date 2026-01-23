@@ -5,13 +5,19 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:native_exif/native_exif.dart';
+import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 
 import '../models/add_memory_upload_model.dart';
 import '../../../core/app_export.dart';
+import '../../../services/network_quality_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
-import '../../../utils/storage_utils.dart';
+import '../../../services/supabase_tus_uploader.dart';
+import '../../../services/video_compression_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../../services/android_media_store_service.dart';
+
 
 part 'add_memory_upload_state.dart';
 
@@ -29,11 +35,12 @@ class AddMemoryUploadNotifier extends StateNotifier<AddMemoryUploadState> {
     initialize();
   }
 
-  static const int _maxBytes = 50 * 1024 * 1024; // 50MB
+  static const int _maxBytes = 50 * 1024 * 1024;
 
-  // ✅ Readable formats
   static final DateFormat _readableDate = DateFormat('MMM d, yyyy');
   static final DateFormat _readableDateTime = DateFormat('MMM d, yyyy • h:mm a');
+
+  final _uuid = const Uuid();
 
   void initialize() {
     state = state.copyWith(
@@ -50,7 +57,6 @@ class AddMemoryUploadNotifier extends StateNotifier<AddMemoryUploadState> {
     );
   }
 
-  /// ✅ Set memory window immediately + fetch memory name async
   Future<void> setMemoryDetails({
     required String memoryId,
     required DateTime startDate,
@@ -72,11 +78,8 @@ class AddMemoryUploadNotifier extends StateNotifier<AddMemoryUploadState> {
           .eq('id', memoryId)
           .single();
 
-      state = state.copyWith(
-        memoryName: data['name'] as String?,
-      );
+      state = state.copyWith(memoryName: data['name']);
     } catch (_) {
-      // Non-fatal (UI only)
       state = state.copyWith(memoryName: null);
     }
   }
@@ -100,12 +103,9 @@ class AddMemoryUploadNotifier extends StateNotifier<AddMemoryUploadState> {
     );
   }
 
-  void clearError() {
-    state = state.copyWith(errorMessage: null);
-  }
-
   Future<void> validateFileMetadata() async {
-    if (state.selectedFile == null) {
+    final file = state.selectedFile;
+    if (file == null) {
       setError('No file selected');
       return;
     }
@@ -115,111 +115,171 @@ class AddMemoryUploadNotifier extends StateNotifier<AddMemoryUploadState> {
       return;
     }
 
-    final file = state.selectedFile!;
-    final filePath = file.path;
-
-    if (filePath == null || filePath.isEmpty) {
-      setError('Unable to access file path');
-      return;
-    }
-
     if (file.size > _maxBytes) {
       setError('File size must be less than 50MB');
       return;
     }
 
+    final name = file.name.toLowerCase();
+
+    final isImage = name.endsWith('.jpg') ||
+        name.endsWith('.jpeg') ||
+        name.endsWith('.png');
+
+    final isVideo = name.endsWith('.mp4') || name.endsWith('.mov');
+
+    // Path might be temp (or null on some Android picker flows); identifier can carry content://
+    final p = file.path;
+    final id = file.identifier;
+
     try {
-      DateTime? captureDate;
-      final lowerName = file.name.toLowerCase();
+      DateTime? captureLocal;
 
-      if (lowerName.endsWith('.jpg') ||
-          lowerName.endsWith('.jpeg') ||
-          lowerName.endsWith('.png')) {
-        captureDate = await _extractImageMetadata(filePath);
-      } else if (lowerName.endsWith('.mp4') || lowerName.endsWith('.mov')) {
-        captureDate = await _extractVideoMetadata(filePath);
+      if (isImage) {
+        // 1) Try EXIF from local path if available
+        if (p != null && p.isNotEmpty) {
+          captureLocal = await _extractImageMetadataLocal(p);
+        }
+
+        // 2) ✅ If EXIF missing, try Android MediaStore DATE_TAKEN using content:// identifier
+        if (captureLocal == null && !kIsWeb && id != null && id.startsWith('content://')) {
+          final millis = await AndroidMediaStoreService.getDateTakenMillis(id);
+          if (millis != null && millis > 0) {
+            captureLocal = DateTime.fromMillisecondsSinceEpoch(millis).toLocal();
+          }
+        }
+
+        // 3) Still nothing -> strict block (your existing behavior)
+        if (captureLocal == null) {
+          state = state.copyWith(
+            captureTimestamp: null,
+            isWithinMemoryWindow: false,
+            uploadSuccess: false,
+            errorMessage:
+            'Unable to read this photo’s original capture time (EXIF missing/stripped). '
+                'Please select a different photo (not edited/screenshot) or export the original.',
+          );
+          return;
+        }
+      } else if (isVideo) {
+        // Keep existing behavior for video
+        if (p == null || p.isEmpty) {
+          setError('Unable to access file path');
+          return;
+        }
+
+        captureLocal = await _extractVideoMetadataLocal(p);
+        captureLocal ??= await File(p).lastModified();
+      } else {
+        // Other types: fall back to lastModified
+        if (p == null || p.isEmpty) {
+          setError('Unable to access file path');
+          return;
+        }
+        captureLocal = await File(p).lastModified();
       }
 
-      if (captureDate == null) {
-        captureDate = await File(filePath).lastModified();
-      }
-
-      final captureUtc = captureDate.toUtc();
-      final startUtc = state.memoryStartDate!.toUtc();
-      final endUtc = state.memoryEndDate!.toUtc();
-
-      final within = !captureUtc.isBefore(startUtc) && !captureUtc.isAfter(endUtc);
+      final startLocal = state.memoryStartDate!.toLocal();
+      final endLocal = state.memoryEndDate!.toLocal();
+      final within = !captureLocal!.isBefore(startLocal) && !captureLocal.isAfter(endLocal);
 
       if (!within) {
         state = state.copyWith(
-          captureTimestamp: captureUtc,
+          captureTimestamp: captureLocal,
           isWithinMemoryWindow: false,
           uploadSuccess: false,
-          errorMessage:
-          'This media was captured on ${_formatReadableDateTime(captureUtc)}, '
-              'which is outside the memory timeline '
-              '(${_formatReadableDate(startUtc)} → ${_formatReadableDate(endUtc)}). '
-              'Please select media captured during the memory period.',
+          errorMessage: 'Please upload a photo or video taken between:',
         );
         return;
       }
 
       state = state.copyWith(
-        captureTimestamp: captureUtc,
+        captureTimestamp: captureLocal,
         isWithinMemoryWindow: true,
         errorMessage: null,
       );
-    } catch (e) {
-      setError('Failed to read media metadata: ${e.toString()}');
+    } catch (_) {
+      setError('Failed to read metadata');
     }
   }
 
-  Future<DateTime?> _extractImageMetadata(String filePath) async {
+  Future<DateTime?> _extractImageMetadataLocal(String path) async {
+    Exif? exif;
     try {
-      final exif = await Exif.fromPath(filePath);
-      final dateTimeOriginal = await exif.getOriginalDate();
-      await exif.close();
-      return dateTimeOriginal;
+      exif = await Exif.fromPath(path);
+
+      DateTime? dt = await exif.getOriginalDate();
+
+      if (dt == null) {
+        final attrs = await exif.getAttributes();
+
+        final candidates = <String?>[
+          attrs?['DateTimeOriginal'] as String?,
+          attrs?['DateTimeDigitized'] as String?,
+          attrs?['DateTime'] as String?,
+        ];
+
+        for (final s in candidates) {
+          final parsed = _parseExifLikeDateTime(s);
+          if (parsed != null) {
+            dt = parsed;
+            break;
+          }
+        }
+      }
+
+      return dt?.toLocal();
+    } catch (_) {
+      return null;
+    } finally {
+      try {
+        await exif?.close();
+      } catch (_) {}
+    }
+  }
+
+  DateTime? _parseExifLikeDateTime(String? s) {
+    if (s == null) return null;
+    final v = s.trim();
+    if (v.isEmpty) return null;
+
+    final normalized = v.replaceFirstMapped(
+      RegExp(r'^(\d{4}):(\d{2}):(\d{2})'),
+          (m) => '${m[1]}-${m[2]}-${m[3]}',
+    );
+
+    return DateTime.tryParse(normalized);
+  }
+
+  Future<DateTime?> _extractVideoMetadataLocal(String path) async {
+    try {
+      final stat = await File(path).stat();
+      final changed = stat.changed.toLocal();
+      final modified = stat.modified.toLocal();
+      return changed.isBefore(modified) ? changed : modified;
     } catch (_) {
       return null;
     }
   }
 
-  Future<DateTime?> _extractVideoMetadata(String filePath) async {
-    try {
-      final stat = await File(filePath).stat();
-      return stat.modified;
-    } catch (_) {
-      return null;
-    }
-  }
+  String _formatReadableDate(DateTime dt) => _readableDate.format(dt.toLocal());
+  String _formatReadableDateTime(DateTime dt) =>
+      _readableDateTime.format(dt.toLocal());
 
-  String _formatReadableDate(DateTime utc) {
-    return _readableDate.format(utc.toLocal());
-  }
-
-  String _formatReadableDateTime(DateTime utc) {
-    return _readableDateTime.format(utc.toLocal());
-  }
-
-  /// ✅ Computes duration_seconds:
-  /// - images => 0
-  /// - videos => real duration (fallback to 0 if any issue)
   Future<int> _computeDurationSeconds({
     required PlatformFile file,
     required bool isImage,
   }) async {
     if (isImage) return 0;
 
-    final path = file.path;
-    if (path == null || path.isEmpty) return 0;
+    final p = file.path;
+    if (p == null) return 0;
 
     VideoPlayerController? controller;
     try {
-      controller = VideoPlayerController.file(File(path));
+      controller = VideoPlayerController.file(File(p));
       await controller.initialize();
-      final seconds = controller.value.duration.inSeconds;
-      return seconds < 0 ? 0 : seconds;
+      return controller.value.duration.inSeconds;
     } catch (_) {
       return 0;
     } finally {
@@ -229,76 +289,103 @@ class AddMemoryUploadNotifier extends StateNotifier<AddMemoryUploadState> {
     }
   }
 
-  /// ✅ Upload file + create story
-  /// Leaves bottom sheet open on errors (screen controls navigation).
   Future<void> uploadFile() async {
-    if (state.selectedFile == null) {
-      setError('No file selected');
+    if (state.selectedFile == null || state.memoryId == null) {
+      setError('Upload prerequisites missing');
       return;
     }
 
-    if (state.memoryId == null) {
-      setError('Memory not specified');
-      return;
-    }
-
-    // Re-validate before upload
     await validateFileMetadata();
     if (state.isWithinMemoryWindow != true) return;
 
-    state = state.copyWith(
-      isUploading: true,
-      errorMessage: null,
-      uploadSuccess: false,
-    );
+    state = state.copyWith(isUploading: true);
+
+    File? tempThumb;
 
     try {
-      final supabaseService = SupabaseService.instance;
-      final userId = supabaseService.client?.auth.currentUser?.id;
+      final client = SupabaseService.instance.client;
+      final userId = client?.auth.currentUser?.id;
+      if (client == null || userId == null) throw Exception('Not authenticated');
 
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
+      final pf = state.selectedFile!;
+      final path = pf.path;
+      if (path == null || path.isEmpty) throw Exception('Invalid file path');
 
-      final fileName = state.selectedFile!.name.toLowerCase();
-      final isImage = fileName.endsWith('.jpg') ||
-          fileName.endsWith('.jpeg') ||
-          fileName.endsWith('.png');
+      final name = pf.name.toLowerCase();
+      final isImage =
+          name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png');
+      final isVideo = name.endsWith('.mp4') || name.endsWith('.mov');
 
-      final mediaType = isImage ? 'image' : 'video';
-
-      // ✅ duration_seconds (NOT NULL in DB)
       final durationSeconds = await _computeDurationSeconds(
-        file: state.selectedFile!,
+        file: pf,
         isImage: isImage,
       );
 
-      final uploadResult = await StorageUtils.uploadMedia(
-        file: state.selectedFile!,
-        bucket: 'story-media',
-        folder: 'stories',
-      );
+      final uploadId = _uuid.v4();
 
-      if (uploadResult == null) {
-        throw Exception('Failed to upload file');
+      File uploadFile = File(path);
+
+      // Compress video before upload (now has fast-path skips in VideoCompressionService)
+      if (isVideo) {
+        final net = await NetworkQualityService.getQuality();
+        uploadFile = await VideoCompressionService.compressForNetwork(
+          input: uploadFile,
+          quality: net,
+        );
       }
 
-      final storyService = StoryService();
+      final tus = SupabaseTusUploader(client);
 
-      final story = await storyService.createStory(
+      final mediaObjectName = isVideo ? 'stories/$uploadId.mp4' : 'stories/$uploadId.jpg';
+      final String? thumbObjectName = isVideo ? 'stories/${uploadId}_thumb.jpg' : null;
+
+      String? uploadedMediaPath;
+      String? uploadedThumbPath;
+
+      // ✅ Start media upload immediately (don’t block on thumbnail work)
+      final mediaUploadFuture = tus.uploadResumable(
+        bucketName: 'story-media',
+        objectName: mediaObjectName,
+        file: uploadFile,
+      ).then((p) {
+        uploadedMediaPath = p;
+      });
+
+      // ✅ Thumbnail pipeline runs in parallel
+      Future<void> thumbFuture = Future.value();
+      if (isVideo && thumbObjectName != null) {
+        thumbFuture = () async {
+          tempThumb = await VideoCompressionService.generateThumbnail(input: uploadFile);
+
+          if (tempThumb != null && await tempThumb!.exists()) {
+            final p = await tus.uploadResumable(
+              bucketName: 'story-media',
+              objectName: thumbObjectName,
+              file: tempThumb!,
+            );
+            uploadedThumbPath = p;
+          }
+        }();
+      }
+
+      await Future.wait([mediaUploadFuture, thumbFuture]);
+
+      if (uploadedMediaPath == null) throw Exception('Upload failed');
+
+      final story = await StoryService().createStory(
         memoryId: state.memoryId!,
         contributorId: userId,
-        mediaUrl: uploadResult,
-        mediaType: mediaType,
-        thumbnailUrl: uploadResult,
-        captureTimestamp: state.captureTimestamp?.toUtc(),
+        mediaUrl: uploadedMediaPath!,
+        mediaType: isImage ? 'image' : 'video',
+        thumbnailUrl: isImage
+            ? uploadedMediaPath!
+            : (uploadedThumbPath ?? uploadedMediaPath!),
+        captureTimestamp: state.captureTimestamp!.toUtc(),
         isFromCameraRoll: true,
-        durationSeconds: durationSeconds, // ✅ NEW REQUIRED FIELD
+        durationSeconds: durationSeconds,
       );
 
-      if (story == null) {
-        throw Exception('Create story failed');
-      }
+      if (story == null) throw Exception('Story creation failed');
 
       state = state.copyWith(
         isUploading: false,
@@ -309,9 +396,14 @@ class AddMemoryUploadNotifier extends StateNotifier<AddMemoryUploadState> {
       state = state.copyWith(
         isUploading: false,
         uploadSuccess: false,
-        isWithinMemoryWindow: false,
-        errorMessage: 'Failed to upload file: ${e.toString()}',
+        errorMessage: e.toString(),
       );
+    } finally {
+      if (tempThumb != null) {
+        try {
+          await tempThumb!.delete();
+        } catch (_) {}
+      }
     }
   }
 

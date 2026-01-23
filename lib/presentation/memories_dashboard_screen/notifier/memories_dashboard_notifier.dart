@@ -521,7 +521,10 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         categoryIconUrl: category?['icon_url'] ?? '',
         categoryName: category?['name'] ?? '',
         participantAvatars: contributors
-            .map((c) => c['user_profiles']?['avatar_url'] as String? ?? '')
+            .map((c) {
+          final rawUrl = c['user_profiles']?['avatar_url'] as String?;
+          return StorageUtils.resolveAvatarUrl(rawUrl) ?? '';
+        })
             .where((url) => url.isNotEmpty)
             .toList(),
         state: response['state'] ?? 'open',
@@ -626,7 +629,10 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
         categoryIconUrl: category?['icon_url'] ?? '',
         categoryName: category?['name'] ?? '',
         participantAvatars: contributors
-            .map((c) => c['user_profiles']?['avatar_url'] as String? ?? '')
+            .map((c) {
+          final rawUrl = c['user_profiles']?['avatar_url'] as String?;
+          return StorageUtils.resolveAvatarUrl(rawUrl) ?? '';
+        })
             .where((url) => url.isNotEmpty)
             .toList(),
         state: response['state'] ?? 'open',

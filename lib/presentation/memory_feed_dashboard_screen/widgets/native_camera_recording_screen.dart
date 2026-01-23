@@ -4,10 +4,11 @@ import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
+import '../../../services/supabase_service.dart';
+import '../../../services/network_quality_service.dart';
 
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
-import '../../story_edit_screen/story_edit_screen.dart';
 
 enum CameraState {
   idle,
@@ -42,34 +43,65 @@ class _NativeCameraRecordingScreenState
 
   CameraState _state = CameraState.idle;
 
-  // NEW: Track current camera direction
+  // Track current camera direction
   bool _isRearCamera = true;
 
   Timer? _releaseToleranceTimer;
 
   // Progress animation
   AnimationController? _progressController;
-  static const int _maxRecordingDurationSeconds = 60;
+  static const int _maxRecordingDurationSeconds = 15;
   Timer? _recordingTimer;
   int _elapsedSeconds = 0;
   DateTime? _recordingStartTime;
 
-  // NEW: Lock animation controller
+  // Lock animation controller
   AnimationController? _lockAnimationController;
   Animation<double>? _lockScaleAnimation;
+
+  // Instant-tap warm-up + buffering
+  Future<void>? _warmupFuture;
+  bool _warmupDone = false;
+  bool _pendingPhotoTap = false;
+  bool _isCapturing = false;
+
+  // Orientation locking (native camera feel)
+  bool _orientationLocked = false;
+
+  // -----------------------------
+  // OPTIMIZATION: Cache the mirror matrix for front camera
+  // Avoids allocating a new Matrix4 on every frame
+  // -----------------------------
+  static final Matrix4 _frontCameraMirrorMatrix = Matrix4.identity()..rotateY(math.pi);
+
+  // -----------------------------
+  // OPTIMIZATION: Cache preview aspect ratio to avoid recalculating
+  // -----------------------------
+  double? _cachedPreviewAspectRatio;
+  bool? _cachedIsPortrait;
 
   @override
   void initState() {
     super.initState();
+
+    // Native camera apps commonly lock the capture UI to portrait.
+    // This prevents "stretch/warp on rotation" issues.
+    _lockCameraUiToPortrait();
+
+    print('✅ RECORDER: categoryIcon="${widget.categoryIcon}"');
+
     _initializeCamera();
 
-    // Initialize progress animation controller
+    // ✅ Warm upload pipeline early while user is recording/previewing
+    unawaited(SupabaseService.instance.warmUploadPipeline());
+    NetworkQualityService.prime();
+
+
     _progressController = AnimationController(
       vsync: this,
       duration: Duration(seconds: _maxRecordingDurationSeconds),
     );
 
-    // NEW: Initialize lock animation controller
     _lockAnimationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -90,7 +122,119 @@ class _NativeCameraRecordingScreenState
     _lockAnimationController?.dispose();
     _recordingTimer?.cancel();
     _releaseToleranceTimer?.cancel();
+
+    // Restore normal app orientations
+    _restoreUiOrientation();
+
     super.dispose();
+  }
+
+  // -----------------------------
+  // OPTIMIZED: True native preview render with caching and RepaintBoundary
+  // -----------------------------
+  Widget _buildCameraPreviewNative() {
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) {
+      return const SizedBox.shrink();
+    }
+    return ClipRect(
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: controller.value.previewSize!.height,
+          height: controller.value.previewSize!.width,
+          child: CameraPreview(controller),
+        ),
+      ),
+    );
+  }
+
+  // -----------------------------
+  // Warm-up pipeline so first tap never fails
+  // -----------------------------
+  void _startWarmup() {
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    _warmupDone = false;
+    _warmupFuture = () async {
+      try {
+        if (!kIsWeb) {
+          // Explicit defaults help many devices stabilize faster
+          await controller.setFlashMode(FlashMode.off);
+          await controller.setExposureMode(ExposureMode.auto);
+          await controller.setFocusMode(FocusMode.auto);
+        }
+      } catch (_) {
+        // Ignore unsupported settings
+      }
+
+      // Let preview + AE/AF settle
+      await Future.delayed(const Duration(milliseconds: 250));
+
+      // Optional: nudge focus/exposure points to center (safe if unsupported)
+      try {
+        await controller.setFocusPoint(const Offset(0.5, 0.5));
+        await controller.setExposurePoint(const Offset(0.5, 0.5));
+      } catch (_) {}
+    }();
+
+    _warmupFuture!.then((_) {
+      if (!mounted) return;
+
+      setState(() {
+        _warmupDone = true;
+      });
+
+      // If user tapped during warmup, fire immediately now
+      if (_pendingPhotoTap) {
+        _pendingPhotoTap = false;
+        _takePhotoInternal();
+      }
+    });
+  }
+  int _quarterTurnsFor(DeviceOrientation o) {
+    // These turns make the preview stay upright as the device rotates.
+    // If you see left/right swapped on a specific device, swap 1 and 3.
+    switch (o) {
+      case DeviceOrientation.portraitUp:
+        return 0;
+      case DeviceOrientation.landscapeLeft:
+        return 1;
+      case DeviceOrientation.portraitDown:
+        return 2;
+      case DeviceOrientation.landscapeRight:
+        return 3;
+    }
+  }
+
+  bool _isLandscape(DeviceOrientation o) {
+    return o == DeviceOrientation.landscapeLeft ||
+        o == DeviceOrientation.landscapeRight;
+  }
+
+  // -----------------------------
+  // Orientation lock helpers
+  // -----------------------------
+  Future<void> _lockCameraUiToPortrait() async {
+    if (_orientationLocked) return;
+    _orientationLocked = true;
+
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
+  }
+
+  Future<void> _restoreUiOrientation() async {
+    if (!_orientationLocked) return;
+    _orientationLocked = false;
+
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
   }
 
   Future<void> _initializeCamera() async {
@@ -106,24 +250,41 @@ class _NativeCameraRecordingScreenState
       // Use rear camera on mobile, front camera on web
       final camera = kIsWeb
           ? _cameras.firstWhere(
-              (c) => c.lensDirection == CameraLensDirection.front,
-              orElse: () => _cameras.first)
+            (c) => c.lensDirection == CameraLensDirection.front,
+        orElse: () => _cameras.first,
+      )
           : _cameras.firstWhere(
-              (c) => c.lensDirection == CameraLensDirection.back,
-              orElse: () => _cameras.first);
+            (c) => c.lensDirection == CameraLensDirection.back,
+        orElse: () => _cameras.first,
+      );
 
-      // Update rear camera state
       _isRearCamera = camera.lensDirection == CameraLensDirection.back;
+
+      // Reset cached aspect ratio when reinitializing
+      _cachedPreviewAspectRatio = null;
+      _cachedIsPortrait = null;
 
       _cameraController = CameraController(
         camera,
-        kIsWeb ? ResolutionPreset.medium : ResolutionPreset.high,
+        kIsWeb ? ResolutionPreset.high : ResolutionPreset.high,
         enableAudio: true,
+        // OPTIMIZATION: Use more efficient pixel format
+        imageFormatGroup: kIsWeb ? null : ImageFormatGroup.yuv420,
       );
 
       await _cameraController!.initialize();
 
-      // Apply platform-specific settings
+      // Lock capture orientation too (prevents capture pipeline rotating/warping)
+      if (!kIsWeb) {
+        try {
+          await _cameraController!.lockCaptureOrientation(
+            DeviceOrientation.portraitUp,
+          );
+        } catch (_) {
+          // Some devices/plugins don't support it
+        }
+      }
+
       if (!kIsWeb) {
         try {
           await _cameraController!.setFocusMode(FocusMode.auto);
@@ -134,7 +295,12 @@ class _NativeCameraRecordingScreenState
 
       setState(() {
         _isInitialized = true;
+        _warmupDone = false;
+        _pendingPhotoTap = false;
       });
+
+      // Start warm-up AFTER showing preview so it feels instant
+      _startWarmup();
     } catch (e) {
       print('❌ Error initializing camera: $e');
       setState(() {
@@ -143,9 +309,7 @@ class _NativeCameraRecordingScreenState
     }
   }
 
-  // NEW: Camera flip method
   Future<void> _flipCamera() async {
-    // Prevent flip during recording
     if (_state == CameraState.recording ||
         _state == CameraState.recordingLocked) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -169,26 +333,36 @@ class _NativeCameraRecordingScreenState
     }
 
     try {
-      // Light haptic feedback
       await HapticFeedback.lightImpact();
 
       setState(() {
         _isInitialized = false;
+        _warmupDone = false;
+        _pendingPhotoTap = false;
+        _warmupFuture = null;
+        // Reset cached aspect ratio when flipping
+        _cachedPreviewAspectRatio = null;
+        _cachedIsPortrait = null;
       });
 
-      // Dispose current controller
+      // Unlock before dispose (safe if unsupported)
+      if (!kIsWeb) {
+        try {
+          await _cameraController?.unlockCaptureOrientation();
+        } catch (_) {}
+      }
+
       await _cameraController?.dispose();
 
-      // Find opposite camera
       final newCamera = _cameras.firstWhere(
-        (camera) =>
-            camera.lensDirection ==
+            (camera) =>
+        camera.lensDirection ==
             (_isRearCamera
                 ? CameraLensDirection.front
                 : CameraLensDirection.back),
         orElse: () => _cameras.firstWhere(
-          (camera) =>
-              camera.lensDirection !=
+              (camera) =>
+          camera.lensDirection !=
               (_isRearCamera
                   ? CameraLensDirection.back
                   : CameraLensDirection.front),
@@ -196,19 +370,27 @@ class _NativeCameraRecordingScreenState
         ),
       );
 
-      // Update camera direction state
       _isRearCamera = newCamera.lensDirection == CameraLensDirection.back;
 
-      // Initialize new controller
       _cameraController = CameraController(
         newCamera,
-        kIsWeb ? ResolutionPreset.medium : ResolutionPreset.high,
+        kIsWeb ? ResolutionPreset.high : ResolutionPreset.high,
         enableAudio: true,
+        // OPTIMIZATION: Use more efficient pixel format
+        imageFormatGroup: kIsWeb ? null : ImageFormatGroup.yuv420,
       );
 
       await _cameraController!.initialize();
 
-      // Apply platform-specific settings
+      // Keep capture orientation locked
+      if (!kIsWeb) {
+        try {
+          await _cameraController!.lockCaptureOrientation(
+            DeviceOrientation.portraitUp,
+          );
+        } catch (_) {}
+      }
+
       if (!kIsWeb) {
         try {
           await _cameraController!.setFocusMode(FocusMode.auto);
@@ -220,6 +402,8 @@ class _NativeCameraRecordingScreenState
       setState(() {
         _isInitialized = true;
       });
+
+      _startWarmup();
     } catch (e) {
       print('❌ Error flipping camera: $e');
       setState(() {
@@ -231,14 +415,12 @@ class _NativeCameraRecordingScreenState
   Future<void> _handleLongPressStart(LongPressStartDetails details) async {
     if (_state != CameraState.idle) return;
 
-    // Light haptic feedback on press start
     await HapticFeedback.lightImpact();
 
     setState(() {
       _state = CameraState.preparingVideo;
     });
 
-    // Start recording after brief preparation
     await Future.delayed(const Duration(milliseconds: 100));
 
     if (_state == CameraState.preparingVideo) {
@@ -248,12 +430,10 @@ class _NativeCameraRecordingScreenState
 
   void _handleLongPressEnd(LongPressEndDetails details) {
     if (_state == CameraState.recordingLocked) {
-      // Locked - ignore release, tap to stop instead
       return;
     }
 
     if (_state == CameraState.recording && _elapsedSeconds < 2) {
-      // Not locked yet - add release tolerance buffer
       _releaseToleranceTimer?.cancel();
       _releaseToleranceTimer = Timer(const Duration(milliseconds: 150), () {
         if (_state == CameraState.recording) {
@@ -283,7 +463,6 @@ class _NativeCameraRecordingScreenState
 
   Future<void> _handleRecordingStop() async {
     if (_elapsedSeconds < 1) {
-      // Too short - discard and show toast
       await _stopRecording(discard: true);
 
       if (mounted) {
@@ -296,83 +475,124 @@ class _NativeCameraRecordingScreenState
         );
       }
     } else {
-      // Valid recording - save it
       await _stopRecording();
     }
   }
 
-  /// Take a photo (single tap)
+  bool _hasCategoryIcon() {
+    final s = widget.categoryIcon?.trim();
+    if (s == null) return false;
+    if (s.isEmpty) return false;
+    if (s == 'null' || s == 'undefined') return false;
+    return true;
+  }
+
+  bool _looksLikeEmoji(String s) {
+    // quick heuristic: if it doesn't look like a path/url and is short, treat as emoji
+    final v = s.trim();
+    final isUrl = v.startsWith('http://') || v.startsWith('https://');
+    final isAssetLike =
+        v.contains('/') || v.contains('.') || v.startsWith('assets');
+    return !isUrl && !isAssetLike && v.runes.length <= 4;
+  }
+
+  /// Take a photo (single tap) - INSTANT TAP SAFE
   Future<void> _takePhoto() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (_state != CameraState.idle) return;
+
+    // If camera warm-up not finished yet, buffer the tap and take photo ASAP
+    if (!_warmupDone) {
+      _pendingPhotoTap = true;
       return;
     }
 
+    await _takePhotoInternal();
+  }
+
+  Future<void> _takePhotoInternal() async {
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) return;
     if (_state != CameraState.idle) return;
 
+    if (_isCapturing) return;
+    _isCapturing = true;
+
     try {
-      // Light haptic feedback
       await HapticFeedback.lightImpact();
 
-      final photoFile = await _cameraController!.takePicture();
+      XFile photoFile;
 
-      // Navigate to story edit screen with photo
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => StoryEditScreen(
-              mediaPath: photoFile.path,
-              isVideo: false,
-              memoryId: widget.memoryId,
-              memoryTitle: widget.memoryTitle,
-              categoryIcon: widget.categoryIcon,
-            ),
-          ),
-        );
+      try {
+        photoFile = await controller.takePicture();
+      } on CameraException catch (e) {
+        // One retry removes edge-device first-capture failures
+        debugPrint(
+            '⚠️ takePicture failed (first attempt): ${e.code} ${e.description}');
+        await Future.delayed(const Duration(milliseconds: 160));
+        photoFile = await controller.takePicture();
       }
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushNamed(
+        AppRoutes.appStoryEdit,
+        arguments: {
+          'video_path': photoFile.path,
+          'is_video': false,
+          'memory_id': widget.memoryId,
+          'memory_title': widget.memoryTitle,
+          'category_icon': widget.categoryIcon,
+        },
+      );
     } catch (e) {
       print('❌ Error taking photo: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to take photo')),
+          const SnackBar(content: Text('Failed to take photo')),
         );
       }
+    } finally {
+      _isCapturing = false;
     }
   }
 
   Future<void> _startRecording() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) {
       setState(() {
         _state = CameraState.idle;
       });
       return;
     }
 
+    // If warmup isn't done yet, wait briefly (prevents first-record failures too)
+    if (!_warmupDone) {
+      try {
+        await _warmupFuture;
+      } catch (_) {}
+    }
+
     try {
-      // Medium haptic feedback when recording begins
       await HapticFeedback.mediumImpact();
 
-      // Start recording
-      await _cameraController!.startVideoRecording();
+      await controller.startVideoRecording();
       _recordingStartTime = DateTime.now();
 
-      // Start progress animation
       _progressController?.reset();
       _progressController?.forward();
       _elapsedSeconds = 0;
 
-      // Start timer to track elapsed time
       _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
           _elapsedSeconds++;
         });
 
-        // Auto-lock after 2 seconds
         if (_elapsedSeconds == 2 && _state == CameraState.recording) {
           _lockRecording();
         }
 
-        // Auto-stop at max duration
         if (_elapsedSeconds >= _maxRecordingDurationSeconds) {
           _stopRecording();
         }
@@ -395,14 +615,12 @@ class _NativeCameraRecordingScreenState
   }
 
   Future<void> _lockRecording() async {
-    // Light haptic feedback when locking
     await HapticFeedback.lightImpact();
 
     setState(() {
       _state = CameraState.recordingLocked;
     });
 
-    // Animate lock icon appearance
     _lockAnimationController?.forward();
   }
 
@@ -413,10 +631,8 @@ class _NativeCameraRecordingScreenState
     }
 
     try {
-      // Light haptic feedback when stopping
       await HapticFeedback.lightImpact();
 
-      // Stop timers and animation
       _recordingTimer?.cancel();
       _progressController?.stop();
       _lockAnimationController?.reset();
@@ -429,23 +645,19 @@ class _NativeCameraRecordingScreenState
       });
 
       if (discard) {
-        // Just discard the file, don't navigate
         return;
       }
 
-      // Navigate to story edit screen with video
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => StoryEditScreen(
-              mediaPath: videoFile.path,
-              isVideo: true,
-              memoryId: widget.memoryId,
-              memoryTitle: widget.memoryTitle,
-              categoryIcon: widget.categoryIcon,
-            ),
-          ),
+        Navigator.of(context).pushNamed(
+          AppRoutes.appStoryEdit,
+          arguments: {
+            'video_path': videoFile.path,
+            'is_video': true,
+            'memory_id': widget.memoryId,
+            'memory_title': widget.memoryTitle,
+            'category_icon': widget.categoryIcon,
+          },
         );
       }
     } catch (e) {
@@ -469,21 +681,17 @@ class _NativeCameraRecordingScreenState
         body: _errorMessage != null
             ? _buildErrorView()
             : !_isInitialized
-                ? _buildLoadingView()
-                : Stack(
-                    children: [
-                      // Camera preview
-                      Positioned.fill(
-                        child: CameraPreview(_cameraController!),
-                      ),
-
-                      // Top header with close button
-                      _buildTopHeader(),
-
-                      // Bottom recording controls
-                      _buildRecordingControls(),
-                    ],
-                  ),
+            ? _buildLoadingView()
+            : Stack(
+          children: [
+            // OPTIMIZATION: Wrap camera preview in RepaintBoundary
+            Positioned.fill(
+              child: _buildCameraPreviewNative(),
+            ),
+            _buildTopHeader(),
+            _buildRecordingControls(),
+          ],
+        ),
       ),
     );
   }
@@ -507,8 +715,12 @@ class _NativeCameraRecordingScreenState
           ),
           SizedBox(height: 24.h),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Go Back'),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('Go Back'),
           ),
         ],
       ),
@@ -516,9 +728,9 @@ class _NativeCameraRecordingScreenState
   }
 
   Widget _buildLoadingView() {
-    return Center(
+    return const Center(
       child: CircularProgressIndicator(
-        color: appTheme.deep_purple_A100,
+        color: Colors.deepPurpleAccent,
       ),
     );
   }
@@ -543,7 +755,6 @@ class _NativeCameraRecordingScreenState
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Close button
             GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
@@ -559,17 +770,23 @@ class _NativeCameraRecordingScreenState
                 ),
               ),
             ),
-
-            // Memory title
             Row(
               children: [
-                if (widget.categoryIcon != null)
-                  CustomImageView(
-                    imagePath: widget.categoryIcon!,
-                    height: 20.h,
-                    width: 20.h,
-                    fit: BoxFit.contain,
-                  ),
+                if (_hasCategoryIcon()) ...[
+                  if (_looksLikeEmoji(widget.categoryIcon!))
+                    Text(
+                      widget.categoryIcon!,
+                      style: TextStyle(fontSize: 18.h),
+                    )
+                  else
+                    CustomImageView(
+                      imagePath: widget.categoryIcon!,
+                      height: 20.h,
+                      width: 20.h,
+                      fit: BoxFit.contain,
+                    ),
+                  SizedBox(width: 8.h),
+                ],
                 SizedBox(width: 8.h),
                 Text(
                   widget.memoryTitle,
@@ -578,8 +795,6 @@ class _NativeCameraRecordingScreenState
                 ),
               ],
             ),
-
-            // Empty spacer to maintain layout balance
             SizedBox(width: 40.h),
           ],
         ),
@@ -594,21 +809,16 @@ class _NativeCameraRecordingScreenState
       right: 0,
       child: Stack(
         children: [
-          // Main recording button in center - EXPLICITLY CENTERED
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Recording indicator with timer
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
                   child: _buildStateIndicator(),
                 ),
-
                 SizedBox(height: 16.h),
-
-                // Record button with gestures - INCREASED SIZE
                 GestureDetector(
                   onTap: _state == CameraState.recordingLocked
                       ? _handleTapWhenLocked
@@ -622,7 +832,6 @@ class _NativeCameraRecordingScreenState
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Animated circular progress ring - INCREASED SIZE
                         if (_state == CameraState.recording ||
                             _state == CameraState.recordingLocked)
                           AnimatedBuilder(
@@ -638,8 +847,6 @@ class _NativeCameraRecordingScreenState
                               );
                             },
                           ),
-
-                        // Static border when idle or preparing - INCREASED SIZE
                         if (_state == CameraState.idle ||
                             _state == CameraState.preparingVideo)
                           Container(
@@ -657,37 +864,35 @@ class _NativeCameraRecordingScreenState
                               ),
                             ),
                           ),
-
-                        // Inner button with smooth shape transition - INCREASED SIZE
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           curve: Curves.easeInOut,
                           width: (_state == CameraState.recording ||
-                                  _state == CameraState.recordingLocked)
+                              _state == CameraState.recordingLocked)
                               ? 38.h
                               : 95.h,
                           height: (_state == CameraState.recording ||
-                                  _state == CameraState.recordingLocked)
+                              _state == CameraState.recordingLocked)
                               ? 38.h
                               : 95.h,
                           decoration: BoxDecoration(
                             color: appTheme.red_500,
                             shape: (_state == CameraState.recording ||
-                                    _state == CameraState.recordingLocked)
+                                _state == CameraState.recordingLocked)
                                 ? BoxShape.rectangle
                                 : BoxShape.circle,
                             borderRadius: (_state == CameraState.recording ||
-                                    _state == CameraState.recordingLocked)
+                                _state == CameraState.recordingLocked)
                                 ? BorderRadius.circular(6.h)
                                 : null,
                             boxShadow: (_state != CameraState.idle)
                                 ? [
-                                    BoxShadow(
-                                      color: appTheme.red_500.withAlpha(128),
-                                      blurRadius: 12.h,
-                                      spreadRadius: 2.h,
-                                    ),
-                                  ]
+                              BoxShadow(
+                                color: appTheme.red_500.withAlpha(128),
+                                blurRadius: 12.h,
+                                spreadRadius: 2.h,
+                              ),
+                            ]
                                 : null,
                           ),
                         ),
@@ -698,8 +903,6 @@ class _NativeCameraRecordingScreenState
               ],
             ),
           ),
-
-          // TikTok-style vertical control stack on bottom right
           Positioned(
             right: 16.h,
             bottom: 20.h,
@@ -710,47 +913,42 @@ class _NativeCameraRecordingScreenState
     );
   }
 
-  /// NEW METHOD: TikTok-style vertical button stack (lock + volume/mute)
   Widget _buildVerticalControlStack() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Lock button - shows when recording is locked
         AnimatedOpacity(
           opacity: _state == CameraState.recordingLocked ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 300),
           child: _state == CameraState.recordingLocked
               ? GestureDetector(
-                  onTap: _handleTapWhenLocked,
-                  child: Container(
-                    padding: EdgeInsets.all(12.h),
-                    decoration: BoxDecoration(
-                      color: appTheme.deep_purple_A100,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: appTheme.deep_purple_A100.withAlpha(102),
-                          blurRadius: 8.h,
-                          spreadRadius: 2.h,
-                        ),
-                      ],
-                    ),
-                    child: ScaleTransition(
-                      scale: _lockScaleAnimation!,
-                      child: Icon(
-                        Icons.lock,
-                        color: appTheme.gray_50,
-                        size: 24.h,
-                      ),
-                    ),
+            onTap: _handleTapWhenLocked,
+            child: Container(
+              padding: EdgeInsets.all(12.h),
+              decoration: BoxDecoration(
+                color: appTheme.deep_purple_A100,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: appTheme.deep_purple_A100.withAlpha(102),
+                    blurRadius: 8.h,
+                    spreadRadius: 2.h,
                   ),
-                )
-              : SizedBox.shrink(),
+                ],
+              ),
+              child: ScaleTransition(
+                scale: _lockScaleAnimation!,
+                child: Icon(
+                  Icons.lock,
+                  color: appTheme.gray_50,
+                  size: 24.h,
+                ),
+              ),
+            ),
+          )
+              : const SizedBox.shrink(),
         ),
-
         if (_state == CameraState.recordingLocked) SizedBox(height: 16.h),
-
-        // Camera flip button - always visible
         GestureDetector(
           onTap: _flipCamera,
           child: Container(
@@ -774,7 +972,7 @@ class _NativeCameraRecordingScreenState
     switch (_state) {
       case CameraState.recording:
         return Container(
-          key: ValueKey('recording'),
+          key: const ValueKey('recording'),
           padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
           decoration: BoxDecoration(
             color: appTheme.red_500,
@@ -803,7 +1001,7 @@ class _NativeCameraRecordingScreenState
 
       case CameraState.recordingLocked:
         return Container(
-          key: ValueKey('locked'),
+          key: const ValueKey('locked'),
           padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
           decoration: BoxDecoration(
             color: appTheme.deep_purple_A100,
@@ -832,7 +1030,7 @@ class _NativeCameraRecordingScreenState
 
       case CameraState.preparingVideo:
         return Container(
-          key: ValueKey('preparing'),
+          key: const ValueKey('preparing'),
           padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
           decoration: BoxDecoration(
             color: appTheme.red_500.withAlpha(179),
@@ -861,15 +1059,17 @@ class _NativeCameraRecordingScreenState
 
       case CameraState.idle:
       default:
+        final idleLabel =
+        _warmupDone ? 'Tap for photo • Hold for video' : 'Opening camera...';
         return Container(
-          key: ValueKey('idle'),
+          key: const ValueKey('idle'),
           padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 8.h),
           decoration: BoxDecoration(
             color: Colors.black.withAlpha(128),
             borderRadius: BorderRadius.circular(20.h),
           ),
           child: Text(
-            'Tap for photo • Hold for video',
+            idleLabel,
             style: TextStyleHelper.instance.body12MediumPlusJakartaSans
                 .copyWith(color: appTheme.gray_50),
           ),
@@ -877,7 +1077,6 @@ class _NativeCameraRecordingScreenState
     }
   }
 
-  /// Format seconds to MM:SS
   String _formatTime(int seconds) {
     final minutes = seconds ~/ 60;
     final remainingSeconds = seconds % 60;
@@ -885,7 +1084,6 @@ class _NativeCameraRecordingScreenState
   }
 }
 
-/// Custom painter for circular progress indicator
 class _CircularProgressPainter extends CustomPainter {
   final double progress;
   final double strokeWidth;
@@ -902,20 +1100,17 @@ class _CircularProgressPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
 
-    // Draw progress arc (starts at top, goes clockwise)
     final progressPaint = Paint()
       ..color = progressColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    // Calculate sweep angle (0 to 2π)
     final sweepAngle = 2 * math.pi * progress;
 
-    // Draw arc starting from top (-π/2 radians = 12 o'clock)
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2, // Start at 12 o'clock
+      -math.pi / 2,
       sweepAngle,
       false,
       progressPaint,

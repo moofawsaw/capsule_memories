@@ -13,6 +13,7 @@ import '../../widgets/custom_settings_row.dart';
 import '../../widgets/custom_support_settings.dart';
 import '../../widgets/custom_warning_modal.dart';
 import 'notifier/notification_settings_notifier.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
   NotificationSettingsScreen({Key? key}) : super(key: key);
@@ -33,14 +34,10 @@ class NotificationSettingsScreenState
   Future<void> _openExternalUrl(String url) async {
     final uri = Uri.parse(url);
 
-    final launched = await launchUrl(
+    await launchUrl(
       uri,
-      mode: LaunchMode.externalApplication,
+      mode: LaunchMode.inAppWebView,
     );
-
-    if (!launched) {
-      debugPrint('Could not launch $url');
-    }
   }
 
   final BlockedUsersService _blockedUsersService = BlockedUsersService();
@@ -122,26 +119,23 @@ class NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: SingleChildScrollView(
-          child: Container(
-            width: double.maxFinite,
-            padding: EdgeInsets.symmetric(vertical: 26.h),
-            child: Column(
-              spacing: 30.h,
-              children: [
-                _buildSettingsHeader(context),
-                _buildDarkModeSection(context),
-                _buildNotificationSettings(context),
-                _buildPrivacySettings(context),
-                _buildAccountSettings(context),
-                _buildBlockedUsersSettings(context),
-                _buildSupportSettings(context),
-                _buildAboutSettings(context),
-              ],
-            ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: SingleChildScrollView(
+        child: Container(
+          width: double.maxFinite,
+          padding: EdgeInsets.symmetric(vertical: 26.h),
+          child: Column(
+            spacing: 30.h,
+            children: [
+              _buildSettingsHeader(context),
+              _buildDarkModeSection(context),
+              _buildNotificationSettings(context),
+              _buildAccountSettings(context),
+              _buildBlockedUsersSettings(context),
+              _buildSupportSettings(context),
+              _buildAboutSettings(context),
+            ],
           ),
         ),
       ),
@@ -290,67 +284,7 @@ class NotificationSettingsScreenState
     );
   }
 
-  /// Section Widget - Privacy Settings
-  Widget _buildPrivacySettings(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final state = ref.watch(notificationSettingsNotifier);
-
-        return CustomPrivacySettings(
-          headerIcon: ImageConstant.imgIcon,
-          headerTitle: 'Privacy',
-          privacyOptions: [
-            CustomPrivacyOption(
-              title: 'Private Account',
-              isEnabled: state.privateAccountEnabled ?? false,
-              onChanged: (value) {
-                ref
-                    .read(notificationSettingsNotifier.notifier)
-                    .updatePrivateAccount(value);
-              },
-            ),
-            CustomPrivacyOption(
-              title: 'Show Location on Stories',
-              isEnabled: state.showLocationEnabled ?? true,
-              onChanged: (value) {
-                ref
-                    .read(notificationSettingsNotifier.notifier)
-                    .updateShowLocation(value);
-              },
-            ),
-            CustomPrivacyOption(
-              title: 'Who Can Invite Me to Memories',
-              isEnabled: state.allowMemoryInvitesEnabled ?? true,
-              onChanged: (value) {
-                ref
-                    .read(notificationSettingsNotifier.notifier)
-                    .updateAllowMemoryInvites(value);
-              },
-            ),
-            CustomPrivacyOption(
-              title: 'Allow Story Reactions',
-              isEnabled: state.allowStoryReactionsEnabled ?? true,
-              onChanged: (value) {
-                ref
-                    .read(notificationSettingsNotifier.notifier)
-                    .updateAllowStoryReactions(value);
-              },
-            ),
-            CustomPrivacyOption(
-              title: 'Allow Story Sharing',
-              isEnabled: state.allowStorySharingEnabled ?? true,
-              onChanged: (value) {
-                ref
-                    .read(notificationSettingsNotifier.notifier)
-                    .updateAllowStorySharing(value);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
+  /// Section Widget - Account Settings
   /// Section Widget - Account Settings
   Widget _buildAccountSettings(BuildContext context) {
     return Consumer(
@@ -364,25 +298,29 @@ class NotificationSettingsScreenState
             ? '${createdAt.day}/${createdAt.month}/${createdAt.year}'
             : 'N/A';
 
+        // ✅ Email comes from Supabase Auth user (not UserMenuModel)
+        final userEmail =
+            Supabase.instance.client.auth.currentUser?.email ?? 'Unknown email';
+
+        final providerLabel =
+        _getAccountTypeLabel(userProfile?.authProvider ?? 'email');
+
         return CustomAccountSettings(
           headerIcon: ImageConstant.imgIcon2,
           headerTitle: 'Account',
           accountOptions: [
             CustomAccountOption(
               title: 'Linked Accounts',
-              subtitle:
-              _getAccountTypeLabel(userProfile?.authProvider ?? 'email'),
-              trailingText: 'Created $formattedDate',
+              // ✅ keep provider label + created date on the left
+              subtitle: '$providerLabel • Created $formattedDate',
+              // ✅ show the email on the right
+              trailingText: userEmail,
               onTap: () {
-                // Show linked accounts details
+                // Read-only informational row
               },
             ),
-            CustomAccountOption(
-              title: 'Change Email',
-              onTap: () {
-                // Navigate to change email screen
-              },
-            ),
+            // ✅ Change Email removed (per your request)
+
             CustomAccountOption(
               title: 'Reset Password',
               onTap: () => _showResetPasswordWarning(context),
@@ -448,15 +386,11 @@ class NotificationSettingsScreenState
         ),
         CustomSupportOption(
           title: 'Report a Problem',
-          onTap: () {
-            NavigatorService.pushNamed(AppRoutes.appReport);
-          },
+          onTap: () => NavigatorService.pushNamed(AppRoutes.appReport),
         ),
         CustomSupportOption(
           title: 'Suggest a Feature',
-          onTap: () {
-            NavigatorService.pushNamed(AppRoutes.appFeedback);
-          },
+          onTap: () => NavigatorService.pushNamed(AppRoutes.appFeedback),
         ),
       ],
     );
@@ -476,12 +410,6 @@ class NotificationSettingsScreenState
         CustomAboutOption(
           title: 'Privacy Policy',
           onTap: () => _openExternalUrl(_privacyUrl),
-        ),
-        CustomAboutOption(
-          title: 'Open Source Licenses',
-          onTap: () {
-            // keep internal or wire later
-          },
         ),
       ],
     );

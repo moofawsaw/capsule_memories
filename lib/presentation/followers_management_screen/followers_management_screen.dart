@@ -16,24 +16,22 @@ class FollowersManagementScreenState
     extends ConsumerState<FollowersManagementScreen> {
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: Container(
-          width: double.maxFinite,
-          padding: EdgeInsets.only(
-            top: 24.h,
-            left: 16.h,
-            right: 16.h,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTabSection(context),
-              SizedBox(height: 20.h),
-              _buildFollowersList(context),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: Container(
+        width: double.maxFinite,
+        padding: EdgeInsets.only(
+          top: 24.h,
+          left: 16.h,
+          right: 16.h,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTabSection(context),
+            SizedBox(height: 20.h),
+            _buildFollowersList(context),
+          ],
         ),
       ),
     );
@@ -167,11 +165,16 @@ class FollowersManagementScreenState
       onTap: () => onTapFollower(context, follower),
       child: Row(
         children: [
-          CustomImageView(
-            imagePath: follower.profileImage,
-            height: 52.h,
-            width: 52.h,
-            radius: BorderRadius.circular(26.h),
+          SizedBox.square(
+            dimension: 48.h,
+            child: CustomImageView(
+              imagePath: follower.profileImage,
+              height: 48.h,
+              width: 48.h,
+              fit: BoxFit.cover,
+              isCircular: true,
+              enableCategoryIconResolution: false,
+            ),
           ),
           SizedBox(width: 12.h),
           Expanded(
@@ -200,7 +203,7 @@ class FollowersManagementScreenState
                 .bodySmall, // Modified: Fixed CustomButtonTextStyle type
             padding: EdgeInsets.symmetric(
               horizontal: 16.h,
-              vertical: 12.h,
+              vertical: 6.h,
             ),
             onPressed: () => onTapBlock(context, follower, index),
           ),

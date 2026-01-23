@@ -10,7 +10,7 @@ class NotificationPreferencesService {
   factory NotificationPreferencesService() => instance;
   NotificationPreferencesService._internal();
 
-  final SupabaseClient? _client = SupabaseService.instance.client;
+  SupabaseClient? get _client => SupabaseService.instance.client;
 
   /// Load user's notification preferences from database
   Future<Map<String, dynamic>?> loadPreferences() async {

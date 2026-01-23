@@ -1,0 +1,198 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../app_export.dart';
+import '../../services/supabase_service.dart';
+
+class StoryActionsSheet {
+  static Future<void> show({
+    required BuildContext context,
+    required String storyId,
+    required String memoryId,
+    required String ownerUserId,
+    required String mediaUrl,
+    required String caption,
+    required bool isVideo,
+    String? deepLink,
+  }) async {
+    // ✅ Your SupabaseService.client is nullable in this codebase
+    final SupabaseClient? client = SupabaseService.instance.client;
+    if (client == null) return; // safety: app not initialized yet
+
+    final String? currentUserId = client.auth.currentUser?.id;
+    final bool canDelete =
+        currentUserId != null && currentUserId == ownerUserId;
+
+    HapticFeedback.selectionClick();
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            decoration: BoxDecoration(
+              color: appTheme.gray_900_01,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: appTheme.gray_900_02),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ActionTile(
+                  icon: Icons.ios_share,
+                  label: 'Share',
+                  onTap: () async {
+                    Navigator.pop(ctx);
+
+                    final String text =
+                    (deepLink != null && deepLink.trim().isNotEmpty)
+                        ? deepLink
+                        : mediaUrl;
+
+                    if (text.trim().isEmpty) return;
+                    await Share.share(text);
+                  },
+                ),
+                _ActionTile(
+                  icon: Icons.flag_outlined,
+                  label: 'Report',
+                  onTap: () async {
+                    Navigator.pop(ctx);
+
+                    // If your DB requires memory_id NOT NULL, ensure memoryId is set.
+                    await client.from('story_reports').insert({
+                      'story_id': storyId,
+                      'memory_id': memoryId.isEmpty ? null : memoryId,
+                      'reporter_id': currentUserId,
+                    });
+
+                    _toast(context, 'Reported');
+                  },
+                ),
+                if (canDelete) ...[
+                  const SizedBox(height: 6),
+                  _ActionTile(
+                    icon: Icons.delete_outline,
+                    label: 'Delete',
+                    isDestructive: true,
+                    onTap: () async {
+                      Navigator.pop(ctx);
+
+                      final bool? confirm = await _confirmDelete(context);
+                      if (confirm != true) return;
+
+                      try {
+                        await _deleteStory(
+                          client: client,
+                          storyId: storyId,
+                        );
+                        _toast(context, 'Deleted');
+                      } catch (_) {
+                        _toast(context, 'Delete failed');
+                      }
+                    },
+                  ),
+                ],
+                const SizedBox(height: 10),
+                _ActionTile(
+                  icon: Icons.close,
+                  label: 'Cancel',
+                  onTap: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static Future<void> _deleteStory({
+    required SupabaseClient client,
+    required String storyId,
+  }) async {
+    // 1) fetch paths (if they exist)
+    final story = await client
+        .from('stories')
+        .select('media_path, thumb_path')
+        .eq('id', storyId)
+        .single();
+
+    final String? mediaPath = story['media_path'] as String?;
+    final String? thumbPath = story['thumb_path'] as String?;
+
+    // 2) delete row
+    await client.from('stories').delete().eq('id', storyId);
+
+    // 3) delete objects (bucket name may differ in your project)
+    final storage = client.storage.from('stories');
+
+    if (mediaPath != null && mediaPath.isNotEmpty) {
+      await storage.remove([mediaPath]);
+    }
+    if (thumbPath != null && thumbPath.isNotEmpty) {
+      await storage.remove([thumbPath]);
+    }
+  }
+
+  static Future<bool?> _confirmDelete(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete story?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _toast(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color color =
+    isDestructive ? Colors.redAccent : appTheme.white_A700;
+
+    return ListTile(
+      dense: true,
+      leading: Icon(icon, color: color),
+      title: Text(label, style: TextStyle(color: color)),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+    );
+  }
+}

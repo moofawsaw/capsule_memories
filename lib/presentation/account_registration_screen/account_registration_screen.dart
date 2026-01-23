@@ -1,4 +1,8 @@
+// lib/presentation/account_registration_screen/account_registration_screen.dart
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
@@ -18,28 +22,30 @@ class AccountRegistrationScreenState
     extends ConsumerState<AccountRegistrationScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  // ✅ Font Awesome brand icons
+  static const IconData _googleIcon = FontAwesomeIcons.google;
+  static const IconData _facebookIcon = FontAwesomeIcons.facebookF;
+
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: Form(
-          key: _formKey,
-          child: AutofillGroup(
-            child: Container(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Container(
-                  padding: EdgeInsets.all(24.h),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildLogo(context),
-                      _buildCreateAccountText(context),
-                      _buildRegistrationForm(context),
-                      _buildSignInLink(context),
-                    ],
-                  ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: Form(
+        key: _formKey,
+        child: AutofillGroup(
+          child: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(24.h),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLogo(context),
+                    _buildCreateAccountText(context),
+                    _buildRegistrationForm(context),
+                    _buildSignInLink(context),
+                  ],
                 ),
               ),
             ),
@@ -87,30 +93,31 @@ class AccountRegistrationScreenState
 
         ref.listen(
           accountRegistrationNotifier,
-          (previous, current) {
+              (previous, current) {
             if (current.isSuccess ?? false) {
               TextInput.finishAutofillContext();
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Account created successfully!'),
+                  content: const Text('Account created successfully!'),
                   backgroundColor: appTheme.colorFF52D1,
                 ),
               );
-              // Clear form fields after successful registration
               ref.read(accountRegistrationNotifier.notifier).clearForm();
-              // Navigate to feed screen after successful signup
               NavigatorService.pushNamed(AppRoutes.appFeed);
             }
             if (current.hasError ?? false) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(current.errorMessage ?? 'Registration failed'),
+                  content:
+                  Text(current.errorMessage ?? 'Registration failed'),
                   backgroundColor: appTheme.colorFFD81E,
                 ),
               );
             }
           },
         );
+
+        final bool isBusy = state.isLoading ?? false;
 
         return Container(
           margin: EdgeInsets.only(top: 34.h),
@@ -122,7 +129,7 @@ class AccountRegistrationScreenState
                 hintText: 'Name',
                 prefixIcon: ImageConstant.imgIcon,
                 keyboardType: TextInputType.name,
-                autofillHints: [AutofillHints.name],
+                autofillHints: const [AutofillHints.name],
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validateName(value),
@@ -140,7 +147,7 @@ class AccountRegistrationScreenState
                 hintText: 'Email',
                 prefixIcon: ImageConstant.imgMail,
                 keyboardType: TextInputType.emailAddress,
-                autofillHints: [AutofillHints.email],
+                autofillHints: const [AutofillHints.email],
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validateEmail(value),
@@ -158,7 +165,7 @@ class AccountRegistrationScreenState
                 hintText: 'Password',
                 prefixIcon: ImageConstant.imgIcon,
                 isPassword: true,
-                autofillHints: [AutofillHints.newPassword],
+                autofillHints: const [AutofillHints.newPassword],
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validatePassword(value),
@@ -182,7 +189,7 @@ class AccountRegistrationScreenState
                 hintText: 'Password',
                 prefixIcon: ImageConstant.imgIcon,
                 isPassword: true,
-                autofillHints: [AutofillHints.newPassword],
+                autofillHints: const [AutofillHints.newPassword],
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validateConfirmPassword(value),
@@ -204,46 +211,30 @@ class AccountRegistrationScreenState
                 text: 'Sign up',
                 width: double.infinity,
                 height: 60.h,
-                onPressed: (state.isLoading ?? false)
-                    ? null
-                    : () {
-                        onTapSignUp(context);
-                      },
+                onPressed: isBusy ? null : () => onTapSignUp(context),
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 margin: EdgeInsets.only(top: 28.h),
-                isDisabled: state.isLoading ?? false,
+                isDisabled: isBusy,
               ),
 
               // OR Divider
               _buildOrDivider(context),
+              SizedBox(height: 24.h),
 
-              // Google Login Button
-              CustomButton(
-                text: 'Log in with Google',
-                width: double.infinity,
-                leftIcon: ImageConstant.imgImage5,
-                onPressed: () {
-                  onTapGoogleLogin(context);
-                },
-                buttonStyle: CustomButtonStyle.outlineDark,
-                buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-                padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 10.h),
-                margin: EdgeInsets.only(top: 28.h),
+              // ✅ Social signup buttons (Font Awesome)
+              _SocialAuthButton(
+                text: 'Sign up with Google',
+                iconData: _googleIcon,
+                onPressed: isBusy ? null : () => onTapGoogleLogin(context),
+                isDisabled: isBusy,
               ),
-
-              // Facebook Login Button
-              CustomButton(
-                text: 'Log in with Facebook',
-                width: double.infinity,
-                leftIcon: ImageConstant.imgSocialMedia,
-                onPressed: () {
-                  onTapFacebookLogin(context);
-                },
-                buttonStyle: CustomButtonStyle.outlineDark,
-                buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
-                padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 10.h),
-                margin: EdgeInsets.only(top: 20.h),
+              SizedBox(height: 20.h),
+              _SocialAuthButton(
+                text: 'Sign up with Facebook',
+                iconData: _facebookIcon,
+                onPressed: isBusy ? null : () => onTapFacebookLogin(context),
+                isDisabled: isBusy,
               ),
             ],
           ),
@@ -317,12 +308,12 @@ class AccountRegistrationScreenState
     }
   }
 
-  /// Handles Google login button tap
+  /// Handles Google signup button tap
   void onTapGoogleLogin(BuildContext context) {
     ref.read(accountRegistrationNotifier.notifier).signUpWithGoogle();
   }
 
-  /// Handles Facebook login button tap
+  /// Handles Facebook signup button tap
   void onTapFacebookLogin(BuildContext context) {
     ref.read(accountRegistrationNotifier.notifier).signUpWithFacebook();
   }
@@ -330,5 +321,84 @@ class AccountRegistrationScreenState
   /// Navigates to login screen
   void onTapSignInLink(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.authLogin);
+  }
+}
+
+///
+/// Social auth button that matches your existing style.
+/// Supports iconData (Font Awesome / Material / etc).
+///
+class _SocialAuthButton extends StatelessWidget {
+  final String text;
+  final IconData iconData;
+  final VoidCallback? onPressed;
+  final bool isDisabled;
+
+  const _SocialAuthButton({
+    required this.text,
+    required this.iconData,
+    required this.onPressed,
+    required this.isDisabled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final double height = 48.h;
+    final BorderRadius radius = BorderRadius.circular(12.h);
+
+    final Color borderColor = appTheme.blue_gray_300.withAlpha(70);
+    final Color bgColor = Colors.transparent;
+
+    final TextStyle textStyle = TextStyleHelper.instance.body14MediumPlusJakartaSans
+        .copyWith(color: appTheme.blue_gray_300);
+
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1.0,
+      child: InkWell(
+        onTap: isDisabled ? null : onPressed,
+        borderRadius: radius,
+        child: Container(
+          height: height,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: radius,
+            border: Border.all(color: borderColor, width: 1),
+          ),
+          padding: EdgeInsets.symmetric(horizontal: 16.h),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _NormalizedProviderIcon(iconData: iconData),
+              SizedBox(width: 12.h),
+              Text(text, style: textStyle),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NormalizedProviderIcon extends StatelessWidget {
+  final IconData iconData;
+
+  const _NormalizedProviderIcon({required this.iconData});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 24.h,
+      height: 24.h,
+      child: Center(
+        child: Icon(
+          iconData,
+          // Font Awesome brands often look smaller at the same size as Material.
+          // 20.h generally matches your button text better.
+          size: 20.h,
+          color: appTheme.blue_gray_300,
+        ),
+      ),
+    );
   }
 }

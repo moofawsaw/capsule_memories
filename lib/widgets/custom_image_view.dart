@@ -14,20 +14,15 @@ extension ImageTypeExtension on String {
     final raw = trim();
     if (raw.isEmpty) return ImageType.unknown;
 
-    // ✅ IMPORTANT: ignore query params / fragments when checking extensions
-    // ex: road-trip.svg?token=... should still be treated as svg
-    String normalized = raw;
-    final q = normalized.indexOf('?');
-    if (q != -1) normalized = normalized.substring(0, q);
-    final h = normalized.indexOf('#');
-    if (h != -1) normalized = normalized.substring(0, h);
+    // ignore query params / fragments when checking extensions
+    final normalized = raw.split('?').first.split('#').first;
 
-    if (raw.startsWith('http') || raw.startsWith('https')) {
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
       if (normalized.toLowerCase().endsWith('.svg')) return ImageType.networkSvg;
       return ImageType.network;
     } else if (normalized.toLowerCase().endsWith('.svg')) {
       return ImageType.svg;
-    } else if (raw.startsWith('file://')) {
+    } else if (raw.startsWith('file://') || raw.startsWith('/')) {
       return ImageType.file;
     } else {
       return ImageType.png;
@@ -37,12 +32,17 @@ extension ImageTypeExtension on String {
 
 enum ImageType { svg, png, network, networkSvg, file, unknown }
 
-/// ✅ Centralized resolver:
-/// - If a string is a raw category `icon_name` (ex: "road-trip") resolve via StorageUtils.
+bool _isEffectivelyEmpty(String? s) {
+  final v = (s ?? '').trim().toLowerCase();
+  return v.isEmpty || v == 'null' || v == 'undefined';
+}
+
+/// Centralized resolver:
+/// - If a string is a raw category `icon_name` resolve via StorageUtils.
 /// - If already a URL / asset path, leave as-is.
 String _resolveMaybeCategoryIcon(String? input) {
-  if (input == null) return '';
-  final s = input.trim();
+  if (_isEffectivelyEmpty(input)) return '';
+  final s = input!.trim();
   if (s.isEmpty) return s;
 
   // Already a URL
@@ -58,8 +58,7 @@ String _resolveMaybeCategoryIcon(String? input) {
   final hasExt =
   RegExp(r'\.(png|jpg|jpeg|webp|svg)$', caseSensitive: false).hasMatch(s);
   if (hasExt) {
-    // Could still be a bare filename (road-trip.svg) intended for storage resolution.
-    // If it's not an asset path, try resolving it anyway.
+    // Could still be a bare filename intended for storage resolution.
     final maybe = StorageUtils.resolveMemoryCategoryIconUrl(s);
     if (maybe.trim().isNotEmpty) return maybe.trim();
     return s;
@@ -68,8 +67,6 @@ String _resolveMaybeCategoryIcon(String? input) {
   // Looks like icon_name
   final looksLikeIconName = !s.contains('/') && !s.contains('.');
   if (looksLikeIconName) {
-    // Your bucket uses .svg files, but icon_name in DB is without extension.
-    // Try plain name first, then common extensions.
     final direct = StorageUtils.resolveMemoryCategoryIconUrl(s);
     if (direct.trim().isNotEmpty) return direct.trim();
 
@@ -99,8 +96,14 @@ class CustomImageView extends StatefulWidget {
     this.border,
     this.placeHolder,
     this.isCircular = false,
+    this.enableCategoryIconResolution = true,
+
+    /// ✅ NEW: if true, only render actual http(s) URLs as images.
+    /// Otherwise fallback placeholder is shown (prevents “stretched” assets).
+    this.networkOnly = false,
   }) : super(key: key) {
-    if (imagePath == null || imagePath!.trim().isEmpty) {
+    // Keep legacy behavior: if null/empty, use placeholder immediately.
+    if (_isEffectivelyEmpty(imagePath)) {
       imagePath = ImageConstant.imgImageNotFound;
     }
   }
@@ -109,20 +112,19 @@ class CustomImageView extends StatefulWidget {
 
   final double? height;
   final double? width;
-
   final Color? color;
   final BoxFit? fit;
-
   final String? placeHolder;
-
   final Alignment? alignment;
   final VoidCallback? onTap;
-
   final EdgeInsetsGeometry? margin;
   final BorderRadius? radius;
   final BoxBorder? border;
-
   final bool isCircular;
+
+  final bool enableCategoryIconResolution;
+
+  final bool networkOnly;
 
   @override
   State<CustomImageView> createState() => _CustomImageViewState();
@@ -136,15 +138,23 @@ class _CustomImageViewState extends State<CustomImageView>
   bool _hasAnimationCompleted = false;
 
   String _resolvedPathOrFallback(String? raw) {
-    final resolved = _resolveMaybeCategoryIcon(raw);
-    if (resolved.trim().isEmpty) return ImageConstant.imgImageNotFound;
+    if (_isEffectivelyEmpty(raw)) return widget.placeHolder ?? ImageConstant.imgImageNotFound;
+
+    final input = (raw ?? '').trim();
+
+    final resolved = widget.enableCategoryIconResolution
+        ? _resolveMaybeCategoryIcon(input)
+        : input;
+
+    if (_isEffectivelyEmpty(resolved)) {
+      return widget.placeHolder ?? ImageConstant.imgImageNotFound;
+    }
     return resolved;
   }
 
   bool _isNetworkImage(String? path) {
-    if (path == null) return false;
-    final p = path.trim();
-    if (p.isEmpty) return false;
+    if (_isEffectivelyEmpty(path)) return false;
+    final p = path!.trim();
     return p.startsWith('http://') || p.startsWith('https://');
   }
 
@@ -243,17 +253,23 @@ class _CustomImageViewState extends State<CustomImageView>
   }
 
   Widget _buildWidget() {
+    final resolved = _resolvedPathOrFallback(widget.imagePath);
+
+    // ✅ If networkOnly is true and this isn't an http(s) URL, force placeholder.
+    final effectivePath =
+    (widget.networkOnly && !_isNetworkImage(resolved))
+        ? (widget.placeHolder ?? ImageConstant.imgImageNotFound)
+        : resolved;
+
     Widget imageContent = Padding(
       padding: widget.margin ?? EdgeInsets.zero,
       child: InkWell(
         onTap: widget.onTap,
-        child: _buildCircleImage(),
+        child: _buildCircleImage(effectivePath),
       ),
     );
 
-    final resolved = _resolvedPathOrFallback(widget.imagePath);
-
-    if (_isNetworkImage(resolved)) {
+    if (_isNetworkImage(effectivePath)) {
       return ScaleTransition(
         scale: _scaleAnimation,
         child: imageContent,
@@ -263,41 +279,39 @@ class _CustomImageViewState extends State<CustomImageView>
     return imageContent;
   }
 
-  Widget _buildCircleImage() {
+  Widget _buildCircleImage(String resolvedPath) {
     if (widget.isCircular) {
       return ClipOval(
-        child: _buildImageWithBorder(),
+        child: _buildImageWithBorder(resolvedPath),
       );
     }
 
     if (widget.radius != null) {
       return ClipRRect(
         borderRadius: widget.radius ?? BorderRadius.zero,
-        child: _buildImageWithBorder(),
+        child: _buildImageWithBorder(resolvedPath),
       );
     }
 
-    return _buildImageWithBorder();
+    return _buildImageWithBorder(resolvedPath);
   }
 
-  Widget _buildImageWithBorder() {
+  Widget _buildImageWithBorder(String resolvedPath) {
     if (widget.border != null) {
       return Container(
         decoration: BoxDecoration(
           border: widget.border,
           borderRadius: widget.radius,
         ),
-        child: _buildImageView(),
+        child: _buildImageView(resolvedPath),
       );
     }
-    return _buildImageView();
+    return _buildImageView(resolvedPath);
   }
 
-  Widget _buildImageView() {
+  Widget _buildImageView(String resolvedPath) {
     final safeH = _safeFiniteDouble(widget.height);
     final safeW = _safeFiniteDouble(widget.width);
-
-    final resolvedPath = _resolvedPathOrFallback(widget.imagePath);
 
     switch (resolvedPath.imageType) {
       case ImageType.svg:
@@ -320,7 +334,7 @@ class _CustomImageViewState extends State<CustomImageView>
 
       case ImageType.file:
         return Image.file(
-          File(resolvedPath),
+          File(resolvedPath.replaceFirst('file://', '')),
           height: safeH,
           width: safeW,
           fit: widget.fit ?? BoxFit.cover,
@@ -342,58 +356,30 @@ class _CustomImageViewState extends State<CustomImageView>
         );
 
       case ImageType.network:
-        final cacheH = _safeCacheDim(widget.height, fallback: 200) * 2;
-        final cacheW = _safeCacheDim(widget.width, fallback: 200) * 2;
+      // ✅ Match CustomAppBar: render using Image(ImageProvider) for consistent cover behavior.
+        final provider = CachedNetworkImageProvider(
+          resolvedPath,
+          cacheKey: Uri.parse(resolvedPath).replace(query: '').toString(),
+          cacheManager: CacheManager(
+            Config(
+              'capsule_image_cache_v1',
+              stalePeriod: const Duration(days: 14),
+              maxNrOfCacheObjects: 500,
+              repo: JsonCacheInfoRepository(databaseName: 'capsule_image_cache_v1'),
+              fileService: HttpFileService(httpClient: http.Client()),
+            ),
+          ),
+        );
 
-        return CachedNetworkImage(
+        return Image(
+          image: provider,
           height: safeH,
           width: safeW,
           fit: widget.fit ?? BoxFit.cover,
-          imageUrl: resolvedPath,
           color: widget.color,
-          cacheManager: CacheManager(
-            Config(
-              'customCacheKey',
-              stalePeriod: const Duration(days: 7),
-              maxNrOfCacheObjects: 200,
-              repo: JsonCacheInfoRepository(databaseName: 'customCacheKey'),
-              fileService: HttpFileService(
-                httpClient: http.Client(),
-              ),
-            ),
-          ),
-          placeholder: (context, url) => Container(
-            height: safeH,
-            width: safeW,
-            color: appTheme.grey100,
-            child: Center(
-              child: SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: appTheme.gray_300,
-                ),
-              ),
-            ),
-          ),
-          errorWidget: (context, url, error) {
-            // If the URL is an svg with query params but got misrouted here,
-            // the ImageTypeExtension fix above prevents that now.
-            final isInvalidUrl = url.isEmpty ||
-                url == 'null' ||
-                url == 'undefined' ||
-                !url.startsWith('http');
-
-            if (isInvalidUrl) {
-              return Image.asset(
-                widget.placeHolder ?? ImageConstant.imgImageNotFound,
-                height: safeH,
-                width: safeW,
-                fit: widget.fit ?? BoxFit.cover,
-              );
-            }
-
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.low,
+          errorBuilder: (_, __, ___) {
             return Image.asset(
               widget.placeHolder ?? ImageConstant.imgImageNotFound,
               height: safeH,
@@ -401,9 +387,6 @@ class _CustomImageViewState extends State<CustomImageView>
               fit: widget.fit ?? BoxFit.cover,
             );
           },
-          fadeInDuration: const Duration(milliseconds: 200),
-          memCacheHeight: cacheH,
-          memCacheWidth: cacheW,
         );
 
       case ImageType.png:

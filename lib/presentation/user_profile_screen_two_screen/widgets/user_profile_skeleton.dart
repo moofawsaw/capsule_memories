@@ -28,6 +28,7 @@ class UserProfileSkeleton extends StatelessWidget {
           _buildStatsSkeleton(),
 
           if (showActions) ...[
+            SizedBox(height: 16.h), // ✅ MATCHES LOADED STATE
             _buildActionsSkeleton(),
           ],
 
@@ -51,7 +52,7 @@ class UserProfileSkeleton extends StatelessWidget {
             left: 18.h,
             right: 18.h,
             top: 0.h,
-            bottom: 10.h, // 👈 REDUCED
+            bottom: 10.h,
           ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22.h),
@@ -68,7 +69,7 @@ class UserProfileSkeleton extends StatelessWidget {
               ),
               SizedBox(height: 20.h),
               _skeletonLine(width: 110.h, height: 14.h, radius: 10.h),
-              SizedBox(height: 20.h),
+              SizedBox(height: 14.h),
               _skeletonLine(width: 140.h, height: 12.h, radius: 10.h),
             ],
           ),
@@ -76,7 +77,6 @@ class UserProfileSkeleton extends StatelessWidget {
       ],
     );
   }
-
 
   // ============================
   // STATS (Followers / Following)
@@ -91,59 +91,67 @@ class UserProfileSkeleton extends StatelessWidget {
       ],
     );
   }
-// This is the Following Button
+
+  // This is following / followers count
   Widget _statCardSkeleton() {
     return Container(
-      height: 46.h, // 👈 lock height (matches real button)
-      padding: EdgeInsets.only(
-        top: 12.h,
-        bottom: 8.h,
-        left: 8.h,
-        right: 8.h,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 19.h, vertical: 12.h), // ✅ wider
       decoration: BoxDecoration(
-        color: appTheme.gray_900_01,
-        borderRadius: BorderRadius.circular(6.h),
-        border: Border.all(
-          color: appTheme.gray_900_01.withAlpha(120),
-          width: 1,
-        ),
+        color: const Color(0xFF151319),
+        borderRadius: BorderRadius.circular(8.h),
       ),
-      child: Center(
-        child: _skeletonLine(width: 72.h, height: 12.h, radius: 10.h),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _skeletonLine(width: 56.h, height: 18.h, radius: 6.h),
+        ],
       ),
-    )
-    ;
+    );
   }
+
 
   // ============================
   // ACTION BUTTONS
   // ============================
   Widget _buildActionsSkeleton() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center, // center the two buttons
       children: [
-        _buttonSkeleton(width: 90.h),
+        Expanded(
+          child: _buttonSkeleton(),
+        ),
         SizedBox(width: 8.h),
-        _buttonSkeleton(width: 90.h),
+        Expanded(
+          child: _buttonSkeleton(),
+        ),
       ],
     );
   }
 
-  Widget _buttonSkeleton({required double width}) {
+
+  /// ✅ Updated:
+  /// - True "pill" button shape (radius = height/2)
+  /// - ClipRRect prevents 1px overflow / shimmer bleed
+  /// - Inner line width scales with the button width
+  Widget _buttonSkeleton() {
+    final double height = 56.h; // match CustomButton
+    final double radius = 6.h;  // match CustomButton default radius
+
     return Container(
-      width: width,          // ✅ fixed width now actually applies
-      height: 46.h,          // ✅ fixed height
+      height: height,
       decoration: BoxDecoration(
         color: appTheme.gray_900_01,
-        borderRadius: BorderRadius.circular(14.h),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(
           color: appTheme.gray_900_01.withAlpha(120),
           width: 1,
         ),
       ),
       child: Center(
-        child: _skeletonLine(width: 64.h, height: 12.h, radius: 10.h),
+        child: _skeletonLine(
+          width: 72.h, // label width only
+          height: 12.h,
+          radius: 10.h,
+        ),
       ),
     );
   }

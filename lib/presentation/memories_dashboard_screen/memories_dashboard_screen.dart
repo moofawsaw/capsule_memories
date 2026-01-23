@@ -78,27 +78,25 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
       _livePulseController.stop();
     }
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: RefreshIndicator(
-          color: appTheme.deep_purple_A100,
-          backgroundColor: appTheme.gray_900_01,
-          displacement: 30,
-          onRefresh: _onRefresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            slivers: [
-              SliverToBoxAdapter(child: _buildMemoriesHeader(context)),
-              SliverToBoxAdapter(child: _buildLatestStoriesSection(context)),
-              SliverToBoxAdapter(child: _buildTabsAndLiveFilterRow(context)),
-              SliverToBoxAdapter(child: SizedBox(height: 6.h)),
-              SliverToBoxAdapter(child: _buildMemoriesContent(context)),
-              SliverToBoxAdapter(child: SizedBox(height: 24.h)),
-            ],
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: RefreshIndicator(
+        color: appTheme.deep_purple_A100,
+        backgroundColor: appTheme.gray_900_01,
+        displacement: 30,
+        onRefresh: _onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
           ),
+          slivers: [
+            SliverToBoxAdapter(child: _buildMemoriesHeader(context)),
+            SliverToBoxAdapter(child: _buildLatestStoriesSection(context)),
+            SliverToBoxAdapter(child: _buildTabsAndLiveFilterRow(context)),
+            SliverToBoxAdapter(child: SizedBox(height: 6.h)),
+            SliverToBoxAdapter(child: _buildMemoriesContent(context)),
+            SliverToBoxAdapter(child: SizedBox(height: 24.h)),
+          ],
         ),
       ),
     );
@@ -424,19 +422,20 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
   }
 
 
-  // ================= MEMORIES =================
+// ================= MEMORIES =================
 
   Widget _buildMemoriesContent(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(memoriesDashboardNotifier);
       final notifier = ref.read(memoriesDashboardNotifier.notifier);
 
+      // ✅ LOADING: use the SAME component + SAME spacing rules as the working feeds
       if (state.isLoading ?? false) {
-        return Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.h),
-          child: Row(
-            children: List.generate(3, (_) => CustomMemorySkeleton()),
-          ),
+        return unified_widget.CustomPublicMemories(
+          variant: unified_widget.MemoryCardVariant.dashboard,
+          isLoading: true,
+          // Match your screen’s layout (no extra top gap since you already have spacing above)
+          margin: EdgeInsets.only(top: 16.h),
         );
       }
 
@@ -458,40 +457,97 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
         );
       }
 
-      // ✅ IMPORTANT: render ONE instance of the horizontal list (no duplicates)
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: unified_widget.CustomPublicMemories(
-          variant: unified_widget.MemoryCardVariant.dashboard,
-          memories: memories.map((mm) {
-            return unified_widget.CustomMemoryItem(
-              id: mm.id,
-              userId: mm.creatorId,
-              title: mm.title,
-              date: mm.date,
-              iconPath: mm.categoryIconUrl,
-              profileImages: mm.participantAvatars,
-              startDate: mm.eventDate,
-              startTime: mm.eventTime,
-              endDate: mm.endDate,
-              endTime: mm.endTime,
-              location: mm.location,
-              distance: mm.distance,
-              isLiked: false,
-              state: mm.state,
-              visibility: mm.visibility,
-            );
-          }).toList(),
-          onMemoryTap: (memoryItem) {
-            final found = memories.firstWhere((x) => x.id == memoryItem.id);
-            MemoryNavigationWrapper.navigateFromMemoryItem(
-              context: context,
-              memoryItem: found,
-            );
-          },
-        ),
+      // ✅ IMPORTANT: do NOT wrap this in another SingleChildScrollView
+      // CustomPublicMemories already scrolls horizontally and controls margins.
+      return unified_widget.CustomPublicMemories(
+        variant: unified_widget.MemoryCardVariant.dashboard,
+        margin: EdgeInsets.only(top: 16.h),
+        memories: memories.map((mm) {
+          return unified_widget.CustomMemoryItem(
+            id: mm.id,
+            userId: mm.creatorId,
+            title: mm.title,
+            date: mm.date,
+            iconPath: mm.categoryIconUrl,
+            profileImages: mm.participantAvatars,
+            startDate: mm.eventDate,
+            startTime: mm.eventTime,
+            endDate: mm.endDate,
+            endTime: mm.endTime,
+            location: mm.location,
+            distance: mm.distance,
+            isLiked: false,
+            state: mm.state,
+            visibility: mm.visibility,
+          );
+        }).toList(),
+        onMemoryTap: (memoryItem) {
+          final found = memories.firstWhere((x) => x.id == memoryItem.id);
+          MemoryNavigationWrapper.navigateFromMemoryItem(
+            context: context,
+            memoryItem: found,
+          );
+        },
       );
     });
+  }
+
+  Widget _buildLoadedMemoriesList(
+      BuildContext context,
+      MemoriesDashboardState state,
+      MemoriesDashboardNotifier notifier,
+      ) {
+    final user = SupabaseService.instance.client?.auth.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    final memories = notifier.getFilteredMemories(user.id);
+
+    if (memories.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 40.h),
+          child: Text(
+            state.showOnlyOpen ? 'No open memories right now' : 'No memories yet',
+            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                .copyWith(color: appTheme.gray_50.withAlpha(128)),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      // IMPORTANT: start at same origin as skeleton list
+      child: unified_widget.CustomPublicMemories(
+        variant: unified_widget.MemoryCardVariant.dashboard,
+        memories: memories.map((mm) {
+          return unified_widget.CustomMemoryItem(
+            id: mm.id,
+            userId: mm.creatorId,
+            title: mm.title,
+            date: mm.date,
+            iconPath: mm.categoryIconUrl,
+            profileImages: mm.participantAvatars,
+            startDate: mm.eventDate,
+            startTime: mm.eventTime,
+            endDate: mm.endDate,
+            endTime: mm.endTime,
+            location: mm.location,
+            distance: mm.distance,
+            isLiked: false,
+            state: mm.state,
+            visibility: mm.visibility,
+          );
+        }).toList(),
+        onMemoryTap: (memoryItem) {
+          final found = memories.firstWhere((x) => x.id == memoryItem.id);
+          MemoryNavigationWrapper.navigateFromMemoryItem(
+            context: context,
+            memoryItem: found,
+          );
+        },
+      ),
+    );
   }
 
   // ================= NAV =================

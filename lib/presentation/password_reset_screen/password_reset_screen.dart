@@ -22,29 +22,27 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: Form(
-          key: _formKey,
-          child: Container(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.all(24.h),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(height: 36.h),
-                    _buildLogoSection(),
-                    SizedBox(height: 24.h),
-                    _buildForgotPasswordTitle(),
-                    SizedBox(height: 68.h),
-                    _buildResetPasswordForm(),
-                    SizedBox(height: 50.h),
-                    _buildSignInLink(),
-                  ],
-                ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: Form(
+        key: _formKey,
+        child: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.all(24.h),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(height: 36.h),
+                  _buildLogoSection(),
+                  SizedBox(height: 24.h),
+                  _buildForgotPasswordTitle(),
+                  SizedBox(height: 68.h),
+                  _buildResetPasswordForm(),
+                  SizedBox(height: 50.h),
+                  _buildSignInLink(),
+                ],
               ),
             ),
           ),

@@ -11,7 +11,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-
+import '../../widgets/custom_qr_code_card.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_qr_info_card.dart';
@@ -151,50 +151,45 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   /// QR Code section
   Widget _buildQRCodeSection(GroupQRInviteModel model) {
     final qrCodeUrl = model.qrCodeUrl;
+    final fallbackData = (model.qrCodeData ?? model.invitationUrl ?? '').trim();
 
     const double qrSize = 200;
-    const double containerPadding = 12;
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 68.h),
       child: RepaintBoundary(
         key: _qrKey,
         child: Container(
-          padding: EdgeInsets.all(containerPadding.h),
+          padding: EdgeInsets.all(16.h), // ✅ match reference
           decoration: BoxDecoration(
-            color: appTheme.whiteCustom,
-            borderRadius: BorderRadius.circular(12.h),
+            color: appTheme.white_A700,  // ✅ match reference
+            borderRadius: BorderRadius.circular(16.h), // ✅ match reference
           ),
           child: SizedBox(
             width: qrSize.h,
             height: qrSize.h,
-            child: ClipRect(
-              child: FittedBox(
-                fit: BoxFit.cover, // crops baked padding for symmetry
-                child: SizedBox(
-                  width: qrSize,
-                  height: qrSize,
-                  child: (qrCodeUrl != null && qrCodeUrl.isNotEmpty)
-                      ? _buildQrFromUrl(
-                    qrCodeUrl,
-                    qrSize,
-                    fallbackData:
-                    model.qrCodeData ?? model.invitationUrl ?? '',
-                  )
-                      : SizedBox(
-                    width: qrSize,
-                    height: qrSize,
-                    child: Center(
-                      child: Icon(
-                        Icons.error_outline,
-                        color: appTheme.gray_400,
-                        size: 32,
-                      ),
-                    ),
-                  ),
-                ),
+            child: (qrCodeUrl != null && qrCodeUrl.trim().isNotEmpty)
+                ? _buildQrFromUrl(
+              qrCodeUrl,
+              qrSize.h,
+              fallbackData: fallbackData,
+            )
+                : (fallbackData.isNotEmpty
+                ? QrImageView(
+              data: fallbackData,
+              version: QrVersions.auto,
+              size: qrSize.h,
+              padding: EdgeInsets.zero, // ✅ critical
+              backgroundColor: appTheme.white_A700,
+              foregroundColor: appTheme.blackCustom,
+            )
+                : Center(
+              child: Icon(
+                Icons.error_outline,
+                color: appTheme.gray_400,
+                size: 32,
               ),
-            ),
+            )),
           ),
         ),
       ),
@@ -234,7 +229,9 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
                 data: fallbackData,
                 version: QrVersions.auto,
                 size: size,
-                backgroundColor: appTheme.whiteCustom,
+                padding: EdgeInsets.zero, // ✅ REQUIRED
+                backgroundColor: appTheme.white_A700,
+                foregroundColor: appTheme.blackCustom,
               );
             }
             return SizedBox(
@@ -290,7 +287,9 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
             data: fallbackData,
             version: QrVersions.auto,
             size: size,
-            backgroundColor: appTheme.whiteCustom,
+            padding: EdgeInsets.zero, // ✅ REQUIRED
+            backgroundColor: appTheme.white_A700,
+            foregroundColor: appTheme.blackCustom,
           );
         }
         return SizedBox(

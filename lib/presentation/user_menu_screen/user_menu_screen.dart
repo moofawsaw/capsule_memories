@@ -41,6 +41,7 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
             child: Material(
               color: Colors.transparent,
               child: SafeArea(
+                bottom: false, // ✅ removes the extra gap at the bottom
                 child: Container(
                   width: 310.h,
                   height: double.infinity,

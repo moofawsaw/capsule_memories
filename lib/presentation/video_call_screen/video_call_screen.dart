@@ -22,37 +22,34 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: Container(
-          width: double.maxFinite,
-          child: Column(
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    Container(
-                      margin: EdgeInsets.symmetric(horizontal: 8.h),
-                      padding:
-                          EdgeInsets.symmetric(vertical: 6.h, horizontal: 8.h),
-                      child: Column(
-                        spacing: 8.h,
-                        children: [
-                          _buildStatusLines(context),
-                          _buildUserInfoSection(context),
-                        ],
-                      ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: Container(
+        width: double.maxFinite,
+        child: Column(
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  Container(
+                    margin: EdgeInsets.symmetric(horizontal: 8.h),
+                    padding: EdgeInsets.symmetric(vertical: 6.h, horizontal: 8.h),
+                    child: Column(
+                      spacing: 8.h,
+                      children: [
+                        _buildStatusLines(context),
+                        _buildUserInfoSection(context),
+                      ],
                     ),
-                    _buildParticipantsSection(context),
-                    Spacer(),
-                    _buildControlButtons(context),
-                    _buildBottomActions(context),
-                  ],
-                ),
+                  ),
+                  _buildParticipantsSection(context),
+                  Spacer(),
+                  _buildControlButtons(context),
+                  _buildBottomActions(context),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

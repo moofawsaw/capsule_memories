@@ -3,9 +3,11 @@ import 'dart:math' as math;
 
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import '../../core/app_export.dart';
 import '../../services/friends_service.dart';
+import '../../services/groups_service.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
@@ -29,12 +31,19 @@ class _MemoryConfirmationScreenState
   String memoryName = '';
   String? qrCodeUrl;
   String? inviteCode;
+  String? categoryIcon;
   DateTime? createdAt;
   String visibility = 'private';
   int memberCount = 1;
   DateTime? expiresAt;
 
-  // NEW: Loading and error states
+  // ✅ NEW: group header data
+  String? groupId;
+  String? groupName;
+  List<Map<String, dynamic>> _groupMembers = [];
+  Set<String> _existingMemberUserIds = {};
+
+  // Loading and error states
   bool _isLoadingDetails = false;
   String? _fetchError;
 
@@ -57,17 +66,12 @@ class _MemoryConfirmationScreenState
       duration: const Duration(seconds: 3),
     );
 
-    // Generate confetti particles
     _generateConfetti();
 
-    // Start confetti animation after a brief delay
     Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        _confettiController.forward();
-      }
+      if (mounted) _confettiController.forward();
     });
 
-    // Initialize memory data and load friends
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeMemoryData();
       _loadFriends();
@@ -82,19 +86,18 @@ class _MemoryConfirmationScreenState
       setState(() {
         memoryId = args['memory_id'] as String? ?? '';
         memoryName = args['memory_name'] as String? ?? '';
-        // NEW: Set createdAt to now if not provided
+        categoryIcon = args['category_icon'] as String?;
         createdAt = DateTime.now();
         _isLoadingDetails = true;
+
+        // ✅ optional if you pass these through route args
+        groupId = args['group_id'] as String?;
+        groupName = args['group_name'] as String?;
       });
 
-      print(
-          '📍 CONFIRMATION SCREEN: Initialized with memoryId=$memoryId, memoryName=$memoryName');
-
-      // Fetch complete memory details from database (with error handling)
       if (memoryId.isNotEmpty) {
         await _fetchMemoryDetails();
       } else {
-        print('⚠️ CONFIRMATION SCREEN: No memory ID provided');
         setState(() {
           _isLoadingDetails = false;
           _fetchError = 'Memory ID not provided';
@@ -107,7 +110,6 @@ class _MemoryConfirmationScreenState
     try {
       final supabase = SupabaseService.instance.client;
       if (supabase == null) {
-        print('⚠️ CONFIRMATION SCREEN: Supabase client not available');
         setState(() {
           _isLoadingDetails = false;
           _fetchError = 'Database connection unavailable';
@@ -115,76 +117,49 @@ class _MemoryConfirmationScreenState
         return;
       }
 
-      print('🔍 CONFIRMATION SCREEN: Fetching details for memory $memoryId');
-
-      // FIXED: Add timeout and error handling with proper column name (creator_id instead of user_id)
-      // CRITICAL FIX: Query only safe columns that exist in memories table
       final response = await supabase
           .from('memories')
           .select(
-          'qr_code_url, invite_code, created_at, visibility, expires_at, contributor_count, creator_id')
+          'qr_code_url, invite_code, created_at, visibility, expires_at, contributor_count, creator_id, group_id')
           .eq('id', memoryId)
-          .maybeSingle() // Use maybeSingle() instead of single() to handle 0 rows gracefully
+          .maybeSingle()
           .timeout(
-        Duration(seconds: 10),
-        onTimeout: () {
-          print('⏱️ CONFIRMATION SCREEN: Query timeout after 10 seconds');
-          return null;
-        },
+        const Duration(seconds: 10),
+        onTimeout: () => null,
       );
 
-      // FIXED: Handle null response (0 rows or timeout)
       if (response == null) {
-        print('⚠️ CONFIRMATION SCREEN: No data returned from query');
         setState(() {
           _isLoadingDetails = false;
           _fetchError = 'Memory details not yet available';
-          // Keep displaying with data we have from arguments
         });
         return;
       }
 
-      print('✅ CONFIRMATION SCREEN: Successfully fetched memory details');
+      DateTime parsedCreatedAt;
+      DateTime parsedExpiresAt;
 
-      // CRITICAL FIX: Add robust date parsing with try-catch
-      DateTime? parsedCreatedAt;
-      DateTime? parsedExpiresAt;
-
-      // Parse created_at with error handling
       if (response['created_at'] != null) {
         try {
           parsedCreatedAt = DateTime.parse(response['created_at'] as String);
-          print('✅ Successfully parsed created_at: $parsedCreatedAt');
-        } catch (e) {
-          print(
-              '⚠️ WARNING: Failed to parse created_at: ${response['created_at']}');
-          print('   Error: $e');
-          parsedCreatedAt = DateTime.now(); // Fallback to now
+        } catch (_) {
+          parsedCreatedAt = DateTime.now();
         }
       } else {
-        print('⚠️ WARNING: created_at is null, using current time');
         parsedCreatedAt = DateTime.now();
       }
 
-      // Parse expires_at with error handling
       if (response['expires_at'] != null) {
         try {
           parsedExpiresAt = DateTime.parse(response['expires_at'] as String);
-          print('✅ Successfully parsed expires_at: $parsedExpiresAt');
-        } catch (e) {
-          print(
-              '⚠️ WARNING: Failed to parse expires_at: ${response['expires_at']}');
-          print('   Error: $e');
-          // Calculate default 12-hour expiration from created_at as fallback
-          parsedExpiresAt = parsedCreatedAt.add(Duration(hours: 12));
-          print(
-              '   Using fallback expires_at: $parsedExpiresAt (created_at + 12 hours)');
+        } catch (_) {
+          parsedExpiresAt = parsedCreatedAt.add(const Duration(hours: 12));
         }
       } else {
-        print(
-            '⚠️ WARNING: expires_at is null, calculating default 12-hour window');
-        parsedExpiresAt = parsedCreatedAt.add(Duration(hours: 12));
+        parsedExpiresAt = parsedCreatedAt.add(const Duration(hours: 12));
       }
+
+      final dbGroupId = response['group_id'] as String?;
 
       setState(() {
         qrCodeUrl = response['qr_code_url'] as String?;
@@ -195,25 +170,64 @@ class _MemoryConfirmationScreenState
         expiresAt = parsedExpiresAt;
         _isLoadingDetails = false;
         _fetchError = null;
+
+        // ✅ save groupId from DB if present
+        if (dbGroupId != null && dbGroupId.trim().isNotEmpty) {
+          groupId = dbGroupId.trim();
+        }
       });
 
-      // Start countdown timer
-      if (expiresAt != null) {
-        _startCountdownTimer();
+      if (expiresAt != null) _startCountdownTimer();
+
+      // ✅ Load group header + members (avatars) and exclude them from invite list
+      if (groupId != null && groupId!.isNotEmpty) {
+        await _loadGroupHeaderAndMembers(groupId!);
       }
-
-      print(
-          '📊 CONFIRMATION SCREEN: Updated state - visibility=$visibility, memberCount=$memberCount');
-    } catch (e, stackTrace) {
-      print('❌ CONFIRMATION SCREEN: Error fetching memory details: $e');
-      print('📚 Stack trace: $stackTrace');
-
-      // FIXED: Better error handling - don't let database errors crash the UI
+    } catch (_) {
       setState(() {
         _isLoadingDetails = false;
         _fetchError = 'Could not load all details';
-        // Keep displaying with data we have from arguments
       });
+    }
+  }
+
+  Future<void> _loadGroupHeaderAndMembers(String gid) async {
+    try {
+      final supabase = SupabaseService.instance.client;
+      if (supabase == null) return;
+
+      // Fetch group name if needed
+      if (groupName == null || groupName!.trim().isEmpty) {
+        final g = await supabase
+            .from('groups')
+            .select('name')
+            .eq('id', gid)
+            .maybeSingle();
+        if (g != null) {
+          setState(() => groupName = (g['name'] as String?)?.trim());
+        }
+      }
+
+      final members = await GroupsService.fetchGroupMembers(gid);
+
+      final ids = <String>{};
+      for (final m in members) {
+        // GroupsService.fetchGroupMembers returns: { id, name, username, avatar, joined_at }
+        final uid = (m['id'] ?? m['user_id'] ?? '').toString().trim();
+        if (uid.isNotEmpty) ids.add(uid);
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _groupMembers = members;
+        _existingMemberUserIds = ids;
+      });
+
+      // Re-filter the friends list after we know member ids
+      _filterFriends(_searchController.text);
+    } catch (_) {
+      // non-fatal
     }
   }
 
@@ -234,7 +248,6 @@ class _MemoryConfirmationScreenState
     if (expiresAt != null) {
       final now = DateTime.now();
       final remaining = expiresAt!.difference(now);
-
       setState(() {
         _remainingTime = remaining.isNegative ? Duration.zero : remaining;
       });
@@ -245,8 +258,9 @@ class _MemoryConfirmationScreenState
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
-
-    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    return '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
   }
 
   Future<void> _loadFriends() async {
@@ -259,28 +273,44 @@ class _MemoryConfirmationScreenState
         _filteredFriends = friends;
         _isLoadingFriends = false;
       });
+
+      // Apply filter to exclude existing members (if already loaded)
+      _filterFriends(_searchController.text);
     } catch (e) {
-      print('Error loading friends: $e');
       setState(() => _isLoadingFriends = false);
     }
   }
 
   void _filterFriends(String query) {
+    final memberIds = _existingMemberUserIds;
+
     setState(() {
       if (query.isEmpty) {
-        _filteredFriends = _allFriends;
+        _filteredFriends = _allFriends.where((f) {
+          final fid = (f['id'] ?? '').toString().trim();
+          return fid.isNotEmpty && !memberIds.contains(fid);
+        }).toList();
       } else {
+        final q = query.toLowerCase();
         _filteredFriends = _allFriends.where((friend) {
+          final fid = (friend['id'] ?? '').toString().trim();
+          if (fid.isEmpty || memberIds.contains(fid)) return false;
+
           final name = (friend['display_name'] as String? ?? '').toLowerCase();
           final username = (friend['username'] as String? ?? '').toLowerCase();
-          final searchQuery = query.toLowerCase();
-          return name.contains(searchQuery) || username.contains(searchQuery);
+          return name.contains(q) || username.contains(q);
         }).toList();
       }
+
+      // If someone is now a member, ensure they cannot remain selected
+      _selectedFriendIds.removeWhere((id) => memberIds.contains(id));
     });
   }
 
   void _toggleFriendSelection(String friendId) {
+    // safety: never allow selecting an existing group member
+    if (_existingMemberUserIds.contains(friendId)) return;
+
     setState(() {
       if (_selectedFriendIds.contains(friendId)) {
         _selectedFriendIds.remove(friendId);
@@ -294,7 +324,6 @@ class _MemoryConfirmationScreenState
     if (_selectedFriendIds.isEmpty) return;
 
     try {
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -303,38 +332,30 @@ class _MemoryConfirmationScreenState
         ),
       );
 
-      // Get the current user's ID (the person sending the invite)
       final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
 
-      // Send invites to selected friends
       for (final friendId in _selectedFriendIds) {
-        // Create memory invite (pending status by default)
-        await SupabaseService.instance.client
-            ?.from('memory_invites')
-            .insert({
+        await SupabaseService.instance.client?.from('memory_invites').insert({
           'memory_id': memoryId,
           'user_id': friendId,
-          'invited_by': currentUserId,  // ← This is required!
+          'invited_by': currentUserId,
         });
       }
 
-      // Close loading dialog
       if (mounted) Navigator.pop(context);
 
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Invites sent successfully!'),
+          content: const Text('Invites sent successfully!'),
           backgroundColor: appTheme.deep_purple_A100,
         ),
       );
 
-      // Clear selections
       setState(() => _selectedFriendIds.clear());
-    } catch (e) {
+    } catch (_) {
       if (mounted) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Failed to send invites'),
           backgroundColor: Colors.red,
         ),
@@ -387,30 +408,25 @@ class _MemoryConfirmationScreenState
         actions: [
           IconButton(
             icon: Icon(Icons.close, color: appTheme.gray_50),
-            onPressed: () {
-              print('🚪 CONFIRMATION SCREEN: Closing and navigating back');
-              NavigatorService.goBack();
-            },
+            onPressed: () => NavigatorService.goBack(),
           ),
         ],
       ),
-      // FIXED: Wrap body in SafeArea to prevent RenderBox layout issues
       body: SafeArea(
+        bottom: false,
         child: Stack(
           children: [
-            // FIXED: Add SingleChildScrollView with proper constraints
             LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
                   padding: EdgeInsets.symmetric(horizontal: 20.h),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
+                    constraints:
+                    BoxConstraints(minHeight: constraints.maxHeight),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Congratulations Header
+                        // Header
                         Container(
                           width: double.infinity,
                           padding: EdgeInsets.all(20.h),
@@ -418,7 +434,7 @@ class _MemoryConfirmationScreenState
                             gradient: LinearGradient(
                               colors: [
                                 appTheme.deep_purple_A100,
-                                appTheme.deep_purple_A200
+                                appTheme.deep_purple_A200,
                               ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -442,7 +458,6 @@ class _MemoryConfirmationScreenState
 
                         SizedBox(height: 20.h),
 
-                        // NEW: Show loading indicator if fetching details
                         if (_isLoadingDetails)
                           Container(
                             width: double.infinity,
@@ -473,7 +488,6 @@ class _MemoryConfirmationScreenState
                             ),
                           ),
 
-                        // NEW: Show error message if fetch failed (but don't block UI)
                         if (_fetchError != null && !_isLoadingDetails)
                           Container(
                             width: double.infinity,
@@ -503,7 +517,7 @@ class _MemoryConfirmationScreenState
                             ),
                           ),
 
-                        // Memory Details Card - ALWAYS SHOW with whatever data we have
+                        // Memory Details
                         Container(
                           width: double.infinity,
                           padding: EdgeInsets.all(20.h),
@@ -514,18 +528,37 @@ class _MemoryConfirmationScreenState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Memory name - use data from arguments
-                              Text(
-                                memoryName.isNotEmpty
-                                    ? memoryName
-                                    : 'New Memory',
-                                style: TextStyleHelper
-                                    .instance.title18BoldPlusJakartaSans
-                                    .copyWith(color: appTheme.gray_50),
+                              Row(
+                                children: [
+                                  if (categoryIcon != null &&
+                                      categoryIcon!.trim().isNotEmpty &&
+                                      categoryIcon != 'null' &&
+                                      categoryIcon != 'undefined') ...[
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8.h),
+                                      child: CustomImageView(
+                                        imagePath: categoryIcon!.trim(),
+                                        height: 22.h,
+                                        width: 22.h,
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                    SizedBox(width: 10.h),
+                                  ],
+                                  Expanded(
+                                    child: Text(
+                                      memoryName.isNotEmpty
+                                          ? memoryName
+                                          : 'New Memory',
+                                      style: TextStyleHelper
+                                          .instance.title18BoldPlusJakartaSans
+                                          .copyWith(color: appTheme.gray_50),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                               SizedBox(height: 12.h),
-
-                              // Creation timestamp
                               Row(
                                 children: [
                                   Icon(Icons.access_time,
@@ -536,14 +569,11 @@ class _MemoryConfirmationScreenState
                                     'Created ${createdAt != null ? _formatTimestamp(createdAt!) : 'just now'}',
                                     style: TextStyleHelper
                                         .instance.body14RegularPlusJakartaSans
-                                        .copyWith(
-                                        color: appTheme.blue_gray_300),
+                                        .copyWith(color: appTheme.blue_gray_300),
                                   ),
                                 ],
                               ),
                               SizedBox(height: 8.h),
-
-                              // Privacy status
                               Row(
                                 children: [
                                   Icon(
@@ -562,36 +592,62 @@ class _MemoryConfirmationScreenState
                                         : 'Private',
                                     style: TextStyleHelper
                                         .instance.body14RegularPlusJakartaSans
-                                        .copyWith(
-                                        color: appTheme.blue_gray_300),
+                                        .copyWith(color: appTheme.blue_gray_300),
                                   ),
                                 ],
                               ),
                               SizedBox(height: 8.h),
 
-                              // Current member count
-                              Row(
-                                children: [
-                                  Icon(Icons.people,
-                                      color: appTheme.blue_gray_300,
-                                      size: 16.h),
-                                  SizedBox(width: 8.h),
-                                  Text(
-                                    '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
-                                    style: TextStyleHelper
-                                        .instance.body14RegularPlusJakartaSans
-                                        .copyWith(
-                                        color: appTheme.blue_gray_300),
-                                  ),
-                                ],
-                              ),
+                              // ✅ Replace memberCount row with group name + member avatars when group exists
+                              if (groupId != null &&
+                                  (groupName?.trim().isNotEmpty ?? false)) ...[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.groups,
+                                        color: appTheme.blue_gray_300,
+                                        size: 16.h),
+                                    SizedBox(width: 8.h),
+                                    Expanded(
+                                      child: Text(
+                                        groupName!.trim(),
+                                        style: TextStyleHelper.instance
+                                            .body14RegularPlusJakartaSans
+                                            .copyWith(
+                                            color: appTheme.blue_gray_300),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 10.h),
+                                _buildMemberAvatarRow(
+                                  members: _groupMembers,
+                                  maxVisible: 6,
+                                ),
+                              ] else ...[
+                                Row(
+                                  children: [
+                                    Icon(Icons.people,
+                                        color: appTheme.blue_gray_300,
+                                        size: 16.h),
+                                    SizedBox(width: 8.h),
+                                    Text(
+                                      '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
+                                      style: TextStyleHelper.instance
+                                          .body14RegularPlusJakartaSans
+                                          .copyWith(
+                                          color: appTheme.blue_gray_300),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),
 
                         SizedBox(height: 20.h),
 
-                        // 12-hour countdown timer
                         if (_remainingTime != null)
                           Container(
                             width: double.infinity,
@@ -611,8 +667,8 @@ class _MemoryConfirmationScreenState
                                 SizedBox(height: 8.h),
                                 Text(
                                   _formatCountdown(_remainingTime!),
-                                  style: TextStyleHelper.instance
-                                      .headline24ExtraBoldPlusJakartaSans
+                                  style: TextStyleHelper
+                                      .instance.headline24ExtraBoldPlusJakartaSans
                                       .copyWith(
                                       color: appTheme.deep_purple_A100),
                                 ),
@@ -622,7 +678,7 @@ class _MemoryConfirmationScreenState
 
                         SizedBox(height: 20.h),
 
-                        // QR Code Section
+                        // QR
                         Container(
                           width: double.infinity,
                           padding: EdgeInsets.all(20.h),
@@ -639,8 +695,6 @@ class _MemoryConfirmationScreenState
                                     .copyWith(color: appTheme.gray_50),
                               ),
                               SizedBox(height: 16.h),
-
-                              // Display QR code
                               if (qrCodeUrl != null && qrCodeUrl!.isNotEmpty)
                                 Container(
                                   padding: EdgeInsets.all(16.h),
@@ -653,17 +707,15 @@ class _MemoryConfirmationScreenState
                                     width: 200.h,
                                     height: 200.h,
                                     fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) {
+                                    errorBuilder:
+                                        (context, error, stackTrace) {
                                       return _buildLocalQRCode();
                                     },
                                   ),
                                 )
                               else
                                 _buildLocalQRCode(),
-
                               SizedBox(height: 16.h),
-
-                              // Invite code
                               if (inviteCode != null)
                                 Text(
                                   'Code: $inviteCode',
@@ -674,10 +726,7 @@ class _MemoryConfirmationScreenState
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-
                               SizedBox(height: 16.h),
-
-                              // Share QR Code button
                               CustomButton(
                                 text: 'Share QR Code',
                                 buttonStyle: CustomButtonStyle.outlinePrimary,
@@ -693,7 +742,7 @@ class _MemoryConfirmationScreenState
 
                         SizedBox(height: 20.h),
 
-                        // Invite Friends Section
+                        // Invite Friends
                         Text(
                           'Invite Friends',
                           style: TextStyleHelper
@@ -702,7 +751,7 @@ class _MemoryConfirmationScreenState
                         ),
                         SizedBox(height: 12.h),
 
-                        // Search bar
+                        // Search
                         Container(
                           decoration: BoxDecoration(
                             color: appTheme.gray_900_01,
@@ -732,164 +781,204 @@ class _MemoryConfirmationScreenState
 
                         SizedBox(height: 12.h),
 
-                        // Friends list
-                        Container(
-                          constraints: BoxConstraints(maxHeight: 250.h),
-                          decoration: BoxDecoration(
-                            color: appTheme.gray_900_01,
-                            borderRadius: BorderRadius.circular(12.h),
-                          ),
-                          child: _isLoadingFriends
-                              ? Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20.h),
-                              child: CircularProgressIndicator(
-                                color: appTheme.deep_purple_A100,
-                              ),
-                            ),
-                          )
-                              : _filteredFriends.isEmpty
-                              ? Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20.h),
-                              child: Text(
-                                _searchController.text.isEmpty
-                                    ? 'No friends to invite'
-                                    : 'No friends found',
-                                style: TextStyleHelper.instance
-                                    .body14RegularPlusJakartaSans
-                                    .copyWith(
-                                    color:
-                                    appTheme.blue_gray_300),
-                              ),
-                            ),
-                          )
-                              : ListView.separated(
-                            padding: EdgeInsets.all(12.h),
-                            itemCount: _filteredFriends.length,
-                            separatorBuilder: (context, index) =>
-                                Divider(
-                                  color: appTheme.blue_gray_300
-                                      .withAlpha(51),
-                                  height: 1,
-                                ),
-                            itemBuilder: (context, index) {
-                              final friend = _filteredFriends[index];
-                              final friendId =
-                              (friend['id'] ?? '').toString();
-                              final isSelected = _selectedFriendIds
-                                  .contains(friendId);
+                        // Friends list + buttons (SINGLE INSTANCE ONLY)
+                        Builder(
+                          builder: (context) {
+                            final double friendsListMaxHeight =
+                            _selectedFriendIds.isNotEmpty
+                                ? 160.h
+                                : 220.h;
 
-                              return ListTile(
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 12.h,
-                                  vertical: 8.h,
-                                ),
-                                leading: ClipOval(
-                                  child: CustomImageView(
-                                    imagePath:
-                                    friend['avatar_url'] ?? '',
-                                    height: 40.h,
-                                    width: 40.h,
-                                    fit: BoxFit.cover,
+                            return Column(
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOut,
+                                  constraints: BoxConstraints(
+                                      maxHeight: friendsListMaxHeight),
+                                  decoration: BoxDecoration(
+                                    color: appTheme.gray_900_01,
+                                    borderRadius: BorderRadius.circular(12.h),
                                   ),
-                                ),
-                                title: Text(
-                                  friend['display_name'] ?? 'Unknown',
-                                  style: TextStyleHelper.instance
-                                      .body14MediumPlusJakartaSans
-                                      .copyWith(
-                                    color: appTheme.gray_50,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  '@${friend['username'] ?? 'username'}',
-                                  style: TextStyleHelper.instance
-                                      .body12MediumPlusJakartaSans
-                                      .copyWith(
-                                    color: appTheme.blue_gray_300,
-                                  ),
-                                ),
-
-                                // ✅ FIX: Use Material Icons instead of Checkbox widget (prevents the "empty square" bug)
-                                trailing: InkWell(
-                                  onTap: () =>
-                                      _toggleFriendSelection(friendId),
-                                  borderRadius:
-                                  BorderRadius.circular(24.h),
-                                  child: Padding(
-                                    padding: EdgeInsets.all(8.h),
-                                    child: Icon(
-                                      isSelected
-                                          ? Icons.check_box
-                                          : Icons
-                                          .check_box_outline_blank,
-                                      size: 24.h,
-                                      color: isSelected
-                                          ? appTheme.deep_purple_A100
-                                          : appTheme.blue_gray_300,
-                                    ),
-                                  ),
-                                ),
-
-                                onTap: () =>
-                                    _toggleFriendSelection(friendId),
-                              );
-                            },
-                          ),
-                        ),
-
-                        SizedBox(height: 20.h),
-
-                        // Action Buttons
-                        Row(
-                          children: [
-                            if (_selectedFriendIds.isNotEmpty)
-                              Expanded(
-                                child: CustomButton(
-                                  text: 'Send Invites',
-                                  buttonStyle: CustomButtonStyle.fillPrimary,
-                                  buttonTextStyle:
-                                  CustomButtonTextStyle.bodyMedium,
-                                  onPressed: _sendInvites,
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 30.h, vertical: 12.h),
-                                ),
-                              ),
-                            if (_selectedFriendIds.isNotEmpty)
-                              SizedBox(width: 12.h),
-                            Expanded(
-                              child: CustomButton(
-                                text: 'Create Story',
-                                buttonStyle: _selectedFriendIds.isEmpty
-                                    ? CustomButtonStyle.fillPrimary
-                                    : CustomButtonStyle.outlinePrimary,
-                                buttonTextStyle:
-                                CustomButtonTextStyle.bodyMedium,
-                                onPressed: () {
-                                  if (memoryId.isEmpty) return;
-
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => NativeCameraRecordingScreen(
-                                        memoryId: memoryId,
-                                        memoryTitle: memoryName.isNotEmpty ? memoryName : 'Memory',
-                                        categoryIcon: null, // you don't have it on this screen currently
+                                  child: _isLoadingFriends
+                                      ? Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(20.h),
+                                      child: CircularProgressIndicator(
+                                        color: appTheme.deep_purple_A100,
                                       ),
                                     ),
-                                  );
-                                },
+                                  )
+                                      : _filteredFriends.isEmpty
+                                      ? Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(20.h),
+                                      child: Text(
+                                        _searchController.text.isEmpty
+                                            ? 'No friends to invite'
+                                            : 'No friends found',
+                                        style: TextStyleHelper
+                                            .instance
+                                            .body14RegularPlusJakartaSans
+                                            .copyWith(
+                                            color: appTheme
+                                                .blue_gray_300),
+                                      ),
+                                    ),
+                                  )
+                                      : ListView.separated(
+                                    padding: EdgeInsets.all(12.h),
+                                    itemCount: _filteredFriends.length,
+                                    separatorBuilder:
+                                        (context, index) => Divider(
+                                      color: appTheme.blue_gray_300
+                                          .withAlpha(51),
+                                      height: 1,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final friend =
+                                      _filteredFriends[index];
+                                      final friendId = (friend['id'] ??
+                                          '')
+                                          .toString()
+                                          .trim();
 
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 30.h, vertical: 12.h),
-                              ),
-                            ),
-                          ],
+                                      final isSelected =
+                                      _selectedFriendIds
+                                          .contains(friendId);
+
+                                      return ListTile(
+                                        contentPadding:
+                                        EdgeInsets.symmetric(
+                                          horizontal: 12.h,
+                                          vertical: 8.h,
+                                        ),
+                                        leading: ClipOval(
+                                          child: CustomImageView(
+                                            imagePath:
+                                            friend['avatar_url'] ??
+                                                '',
+                                            height: 40.h,
+                                            width: 40.h,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                        title: Text(
+                                          friend['display_name'] ??
+                                              'Unknown',
+                                          style: TextStyleHelper
+                                              .instance
+                                              .body14MediumPlusJakartaSans
+                                              .copyWith(
+                                            color: appTheme.gray_50,
+                                            fontWeight:
+                                            FontWeight.w600,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          '@${friend['username'] ?? 'username'}',
+                                          style: TextStyleHelper
+                                              .instance
+                                              .body12MediumPlusJakartaSans
+                                              .copyWith(
+                                              color: appTheme
+                                                  .blue_gray_300),
+                                        ),
+                                        trailing: InkWell(
+                                          onTap: () =>
+                                              _toggleFriendSelection(
+                                                  friendId),
+                                          borderRadius:
+                                          BorderRadius.circular(
+                                              24.h),
+                                          child: Padding(
+                                            padding:
+                                            EdgeInsets.all(8.h),
+                                            child: Icon(
+                                              isSelected
+                                                  ? Icons.check_box
+                                                  : Icons
+                                                  .check_box_outline_blank,
+                                              size: 24.h,
+                                              color: isSelected
+                                                  ? appTheme
+                                                  .deep_purple_A100
+                                                  : appTheme
+                                                  .blue_gray_300,
+                                            ),
+                                          ),
+                                        ),
+                                        onTap: () =>
+                                            _toggleFriendSelection(
+                                                friendId),
+                                      );
+                                    },
+                                  ),
+                                ),
+
+                                SizedBox(
+                                    height: _selectedFriendIds.isNotEmpty
+                                        ? 10.h
+                                        : 16.h),
+
+                                if (_selectedFriendIds.isNotEmpty) ...[
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: CustomButton(
+                                          text: 'Send Invites',
+                                          buttonStyle:
+                                          CustomButtonStyle.outlinePrimary,
+                                          buttonTextStyle:
+                                          CustomButtonTextStyle.bodyMedium,
+                                          onPressed: _sendInvites,
+                                          padding: EdgeInsets.symmetric(
+                                              horizontal: 30.h, vertical: 12.h),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 12.h),
+                                ],
+
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: CustomButton(
+                                        text: 'Create Story',
+                                        buttonStyle: CustomButtonStyle.fillPrimary,
+                                        buttonTextStyle:
+                                        CustomButtonTextStyle.bodyMedium,
+                                        onPressed: () {
+                                          if (memoryId.isEmpty) return;
+                                          print(
+                                              '✅ CONFIRM: categoryIcon="$categoryIcon"');
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  NativeCameraRecordingScreen(
+                                                    memoryId: memoryId,
+                                                    memoryTitle: memoryName.isNotEmpty
+                                                        ? memoryName
+                                                        : 'Memory',
+                                                    categoryIcon: categoryIcon,
+                                                  ),
+                                            ),
+                                          );
+                                        },
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 30.h, vertical: 12.h),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                SizedBox(height: 12.h),
+                              ],
+                            );
+                          },
                         ),
-
-                        SizedBox(height: 40.h),
                       ],
                     ),
                   ),
@@ -915,6 +1004,70 @@ class _MemoryConfirmationScreenState
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMemberAvatarRow({
+    required List<Map<String, dynamic>> members,
+    int maxVisible = 6,
+  }) {
+    if (members.isEmpty) {
+      return Row(
+        children: [
+          Icon(Icons.people, color: appTheme.blue_gray_300, size: 16.h),
+          SizedBox(width: 8.h),
+          Text(
+            '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
+            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300),
+          ),
+        ],
+      );
+    }
+
+    final visible = members.take(maxVisible).toList();
+    final extraCount = members.length - visible.length;
+
+    return Row(
+      children: [
+        ...visible.map((m) {
+          final avatar =
+          (m['avatar'] ?? m['avatar_url'] ?? '').toString().trim();
+          final name =
+          (m['name'] ?? m['display_name'] ?? 'User').toString().trim();
+
+          return Padding(
+            padding: EdgeInsets.only(right: 6.h),
+            child: Tooltip(
+              message: name.isEmpty ? 'User' : name,
+              child: ClipOval(
+                child: CustomImageView(
+                  imagePath: avatar,
+                  height: 28.h,
+                  width: 28.h,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          );
+        }),
+        if (extraCount > 0)
+          Container(
+            height: 28.h,
+            padding: EdgeInsets.symmetric(horizontal: 10.h),
+            decoration: BoxDecoration(
+              color: appTheme.gray_900,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: appTheme.gray_700),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '+$extraCount',
+              style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+          ),
+      ],
     );
   }
 
@@ -958,15 +1111,10 @@ class _MemoryConfirmationScreenState
     final now = DateTime.now();
     final difference = now.difference(dateTime);
 
-    if (difference.inMinutes < 1) {
-      return 'just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${difference.inDays}d ago';
-    }
+    if (difference.inMinutes < 1) return 'just now';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}m ago';
+    if (difference.inHours < 24) return '${difference.inHours}h ago';
+    return '${difference.inDays}d ago';
   }
 
   void _shareQRCode() {
@@ -1030,11 +1178,7 @@ class ConfettiPainter extends CustomPainter {
 
       final isCircle = particle.size % 2 == 0;
       if (isCircle) {
-        canvas.drawCircle(
-          Offset.zero,
-          particle.size / 2,
-          paint,
-        );
+        canvas.drawCircle(Offset.zero, particle.size / 2, paint);
       } else {
         canvas.drawRect(
           Rect.fromCenter(

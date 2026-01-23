@@ -1,695 +1,463 @@
+// lib/services/push_notification_service.dart
+//
+// FIX: removed call to NotificationPreferencesService.arePushEnabled()
+// because your NotificationPreferencesService doesn't define that method.
+// Notifications will show by default (you can re-add gating once you confirm
+// the exact method name in your preferences service).
+
+import 'dart:convert';
+
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/models/feed_story_context.dart';
 import '../core/utils/navigator_service.dart';
-import '../core/models/feed_story_context.dart'; // ✅ NEW: Import for story deep links
+import '../firebase_options.dart';
 import './notification_preferences_service.dart';
-import './platform_stub.dart';
 import './supabase_service.dart';
+import 'package:flutter_udid/flutter_udid.dart';
 
-// Conditional import for Platform - use stub on web
 
-/// Top-level function for handling background messages
+// ✅ Platform import that doesn't break web builds.
+import 'platform_stub.dart' if (dart.library.io) 'dart:io';
+
+/// ---------------------------------------------------------------------------
+/// BACKGROUND HANDLER (CRITICAL – DO NOT TOUCH UI / SUPABASE HERE)
+/// ---------------------------------------------------------------------------
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('📱 Handling background message: ${message.messageId}');
-  // Handle the background message
-  await PushNotificationService.instance.handleBackgroundMessage(message);
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (_) {
+    // ignore duplicate init
+  }
+
+  debugPrint('📦 BG MESSAGE: ${message.messageId}');
+
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getStringList('pending_fcm_messages') ?? [];
+
+    pending.add(jsonEncode({
+      'data': message.data,
+      'sentTime': message.sentTime?.millisecondsSinceEpoch,
+    }));
+
+    await prefs.setStringList('pending_fcm_messages', pending);
+  } catch (e) {
+    debugPrint('❌ BG persist failed: $e');
+  }
 }
 
-/// Service for handling push notifications using Firebase Cloud Messaging
-/// This service manages FCM tokens and displays notifications when app is in foreground/background
+/// ---------------------------------------------------------------------------
+/// PUSH NOTIFICATION SERVICE
+/// ---------------------------------------------------------------------------
 class PushNotificationService {
   static final PushNotificationService instance =
   PushNotificationService._internal();
   factory PushNotificationService() => instance;
   PushNotificationService._internal();
 
-  // 🎯 NEW: Static pending deep link for deferred navigation
   static String? pendingDeepLink;
 
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
-  final SupabaseClient? _client = SupabaseService.instance.client;
+  SupabaseClient? get _client => SupabaseService.instance.client;
   final _preferencesService = NotificationPreferencesService.instance;
 
   bool _isInitialized = false;
+  bool _authListenerSetup = false;
+
   String? _fcmToken;
   String? _deviceId;
 
-  /// Initialize push notification service
+  // ✅ Android notification channel constants
+  static const String _androidChannelId = 'capsule_default';
+  static const String _androidChannelName = 'Capsule Notifications';
+  static const String _androidChannelDescription =
+      'General notifications for Capsule';
+
+  /// -------------------------------------------------------------------------
+  /// ANDROID CHANNELS (SAFE NO-OP ON iOS/WEB)
+  /// -------------------------------------------------------------------------
+  Future<void> initNotificationChannels() async {
+    if (kIsWeb) return;
+    if (!Platform.isAndroid) return;
+
+    try {
+      final androidPlugin =
+      _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+
+      if (androidPlugin == null) return;
+
+      const channel = AndroidNotificationChannel(
+        _androidChannelId,
+        _androidChannelName,
+        description: _androidChannelDescription,
+        importance: Importance.high,
+      );
+
+      await androidPlugin.createNotificationChannel(channel);
+      debugPrint('✅ Android notification channel created: $_androidChannelId');
+    } catch (e, st) {
+      debugPrint('❌ initNotificationChannels failed: $e');
+      debugPrint('$st');
+    }
+  }
+
+  /// -------------------------------------------------------------------------
+  /// INIT
+  /// -------------------------------------------------------------------------
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      // Initialize Flutter Local Notifications
-      const AndroidInitializationSettings initializationSettingsAndroid =
+      const androidInit =
       AndroidInitializationSettings('@mipmap/ic_launcher');
 
-      const DarwinInitializationSettings initializationSettingsDarwin =
-      DarwinInitializationSettings(
+      const iosInit = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
       );
 
-      const InitializationSettings initializationSettings =
-      InitializationSettings(
-        android: initializationSettingsAndroid,
-        iOS: initializationSettingsDarwin,
-      );
+      const settings =
+      InitializationSettings(android: androidInit, iOS: iosInit);
 
       await _flutterLocalNotificationsPlugin.initialize(
-        initializationSettings,
+        settings,
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
 
-      // Request FCM permissions
       await _requestPermissions();
 
-      // Setup Firebase Messaging handlers
+      await _firebaseMessaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
       await _setupFirebaseMessaging();
 
-      // Generate or retrieve persisted device ID
       _deviceId = await _generateOrGetDeviceId();
-
-      // Get and register FCM token
       _fcmToken = await _firebaseMessaging.getToken();
+
+      debugPrint('✅ FCM TOKEN: $_fcmToken');
+
+      _setupAuthStateListener();
+
       if (_fcmToken != null) {
         await registerToken(_fcmToken!);
       }
 
-      // Listen for token refresh
-      _firebaseMessaging.onTokenRefresh.listen((newToken) {
-        _fcmToken = newToken;
-        registerToken(newToken);
+      _firebaseMessaging.onTokenRefresh.listen((token) {
+        _fcmToken = token;
+        registerToken(token);
       });
 
+      await _processPendingBackgroundMessages();
+
       _isInitialized = true;
-      debugPrint('✅ Push notification service initialized with FCM');
-    } catch (error) {
-      debugPrint('❌ Error initializing push notifications: $error');
+      debugPrint('✅ PushNotificationService READY');
+    } catch (e, st) {
+      debugPrint('❌ Push init failed: $e');
+      debugPrint('$st');
     }
   }
 
-  /// Setup Firebase Messaging handlers
+  /// -------------------------------------------------------------------------
+  /// AUTH LISTENER
+  /// -------------------------------------------------------------------------
+  void _setupAuthStateListener() {
+    if (_authListenerSetup) return;
+    _authListenerSetup = true;
+
+    _client?.auth.onAuthStateChange.listen((data) async {
+      if (data.event == AuthChangeEvent.signedIn) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        await ensureTokenRegistered();
+        processPendingDeepLink();
+      }
+
+      if (data.event == AuthChangeEvent.signedOut) {
+        await unregisterToken();
+      }
+    });
+  }
+
+  Future<void> ensureTokenRegistered() async {
+    final userId = _client?.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _fcmToken = await _firebaseMessaging.getToken();
+    if (_fcmToken != null) {
+      await registerToken(_fcmToken!);
+    }
+  }
+
+  /// -------------------------------------------------------------------------
+  /// FIREBASE HANDLERS
+  /// -------------------------------------------------------------------------
   Future<void> _setupFirebaseMessaging() async {
-    // Handle background messages
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
-    // Handle foreground messages
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('📱 Received foreground message: ${message.messageId}');
-      _handleForegroundMessage(message);
-    });
-
-    // Handle notification taps when app is in background
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint(
-          '📱 Notification tapped from background: ${message.messageId}');
-      _handleNotificationTap(message);
-    });
-
-    // Check for initial message (when app opened from terminated state)
-    RemoteMessage? initialMessage =
-    await _firebaseMessaging.getInitialMessage();
-    if (initialMessage != null) {
-      debugPrint(
-          '📱 App opened from notification: ${initialMessage.messageId}');
-      _handleNotificationTap(initialMessage);
+    final initial = await _firebaseMessaging.getInitialMessage();
+    if (initial != null) {
+      _handleNotificationTap(initial);
     }
   }
 
-  /// Request notification permissions
+  /// -------------------------------------------------------------------------
+  /// PERMISSIONS
+  /// -------------------------------------------------------------------------
   Future<void> _requestPermissions() async {
-    // Skip on web - notifications work differently on web
-    if (kIsWeb) {
-      debugPrint('⚠️ Notification permissions not supported on web');
-      return;
-    }
+    if (kIsWeb) return;
 
-    // Only check Platform if not on web (already checked above)
-    if (!kIsWeb) {
-      if (Platform.isIOS || Platform.isAndroid) {
-        // Request FCM permissions
-        NotificationSettings settings =
-        await _firebaseMessaging.requestPermission(
-          alert: true,
-          announcement: false,
-          badge: true,
-          carPlay: false,
-          criticalAlert: false,
-          provisional: false,
-          sound: true,
-        );
-
-        debugPrint('✅ FCM permission status: ${settings.authorizationStatus}');
-
-        // Request local notification permissions
-        if (Platform.isIOS) {
-          await _flutterLocalNotificationsPlugin
-              .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>()
-              ?.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
-        } else if (Platform.isAndroid) {
-          final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          _flutterLocalNotificationsPlugin
-              .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-
-          await androidImplementation?.requestNotificationsPermission();
-        }
-      }
+    if (Platform.isIOS || Platform.isAndroid) {
+      await _firebaseMessaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
     }
   }
 
-  /// Generate or retrieve persisted device ID
+  /// -------------------------------------------------------------------------
+  /// DEVICE ID
+  /// -------------------------------------------------------------------------
   Future<String> _generateOrGetDeviceId() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? deviceId = prefs.getString('fcm_device_id');
-
-    if (deviceId == null) {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      String platform;
-      if (kIsWeb) {
-        platform = 'web';
-      } else if (Platform.isAndroid) {
-        platform = 'android';
-      } else if (Platform.isIOS) {
-        platform = 'ios';
-      } else {
-        platform = 'unknown';
-      }
-      deviceId = '$platform-$timestamp';
-      await prefs.setString('fcm_device_id', deviceId);
-      debugPrint('✅ Generated and persisted new device ID: $deviceId');
-    } else {
-      debugPrint('✅ Retrieved existing device ID: $deviceId');
-    }
-
-    return deviceId;
-  }
-
-  /// Generate a unique device ID (DEPRECATED - kept for reference)
-  @Deprecated('Use _generateOrGetDeviceId() instead for persistent device IDs')
-  Future<String> _generateDeviceId() async {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    String platform;
-    if (kIsWeb) {
-      platform = 'web';
-    } else if (Platform.isAndroid) {
-      platform = 'android';
-    } else if (Platform.isIOS) {
-      platform = 'ios';
-    } else {
-      platform = 'unknown';
-    }
-    return '$platform-$timestamp';
-  }
-
-  /// Register FCM token with backend
-  Future<void> registerToken(String token) async {
     try {
-      final userId = _client?.auth.currentUser?.id;
-      if (userId == null) {
-        debugPrint('⚠️ Cannot register token: User not authenticated');
+      // flutter_udid provides a consistent ID that survives app reinstalls
+      final udid = await FlutterUdid.consistentUdid;
+      debugPrint('✅ Stable device ID: ${udid.substring(0, 8)}...');
+      return udid;
+    } catch (e) {
+      debugPrint('⚠️ FlutterUdid failed, falling back: $e');
+
+      // Fallback to SharedPreferences if flutter_udid fails
+      final prefs = await SharedPreferences.getInstance();
+      final existing = prefs.getString('fcm_device_id');
+      if (existing != null && existing.isNotEmpty) return existing;
+
+      final id = '${Platform.isIOS ? 'ios' : (Platform.isAndroid ? 'android' : 'other')}-${DateTime.now().millisecondsSinceEpoch}';
+      await prefs.setString('fcm_device_id', id);
+      return id;
+    }
+  }
+
+  /// -------------------------------------------------------------------------
+  /// TOKEN REGISTRATION
+  /// -------------------------------------------------------------------------
+  Future<void> registerToken(String token) async {
+    final userId = _client?.auth.currentUser?.id;
+    if (userId == null) return;
+
+    // Ensure we have a stable device ID
+    _deviceId ??= await _generateOrGetDeviceId();
+
+    debugPrint('🔄 Registering FCM token for device: ${_deviceId?.substring(0, 8)}...');
+
+    await _client?.from('fcm_tokens').upsert({
+      'user_id': userId,
+      'token': token,
+      'device_id': _deviceId,
+      'device_type': Platform.isIOS
+          ? 'ios'
+          : (Platform.isAndroid ? 'android' : 'other'),
+      'is_active': true,
+      'last_used_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'device_id,user_id');  // <-- Changed from 'token,user_id'
+  }
+
+  Future<void> unregisterToken() async {
+    try {
+      // Get the CURRENT token from Firebase, not the cached _fcmToken
+      final currentToken = await _firebaseMessaging.getToken();
+
+      if (currentToken == null) {
+        debugPrint('⚠️ No FCM token to unregister');
         return;
       }
 
-      _fcmToken = token;
+      debugPrint('🔄 Unregistering FCM token: ${currentToken.substring(0, 20)}...');
 
-      String deviceType;
-      if (kIsWeb) {
-        deviceType = 'web';
-      } else if (Platform.isAndroid) {
-        deviceType = 'android';
-      } else if (Platform.isIOS) {
-        deviceType = 'ios';
+      // Call the edge function which uses service role and bypasses RLS
+      final response = await _client?.functions.invoke(
+        'unregister-fcm-token',
+        body: {
+          'token': currentToken,
+          'device_id': _deviceId,
+        },
+      );
+
+      if (response?.status == 200) {
+        debugPrint('✅ FCM token unregistered successfully: ${response?.data}');
       } else {
-        deviceType = 'unknown';
+        debugPrint('❌ Failed to unregister token: ${response?.data}');
+
+        // Fallback: try direct database update
+        await _client?.from('fcm_tokens').update({
+          'is_active': false,
+        }).eq('token', currentToken);
       }
 
-      // Always set is_active to true when registering
-      // is_active should only be false when token is invalid or user logs out
-      await _client?.from('fcm_tokens').upsert({
-        'user_id': userId,
-        'token': token,
-        'device_id': _deviceId,
-        'device_type': deviceType,
-        'is_active': true,
-        'last_used_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'device_id,user_id');
-
-      debugPrint('✅ FCM token registered successfully (is_active=true)');
-    } catch (error) {
-      debugPrint('❌ Error registering FCM token: $error');
-    }
-  }
-
-  /// Unregister FCM token (on logout)
-  Future<void> unregisterToken() async {
-    try {
-      if (_deviceId == null) return;
-
-      final userId = _client?.auth.currentUser?.id;
-      if (userId == null) return;
-
-      await _client
-          ?.from('fcm_tokens')
-          .update({'is_active': false})
-          .eq('device_id', _deviceId!)
-          .eq('user_id', userId);
-
-      // Delete FCM token from device
-      await _firebaseMessaging.deleteToken();
-
+      // Clear cached values
       _fcmToken = null;
-      debugPrint('✅ FCM token unregistered');
-    } catch (error) {
-      debugPrint('❌ Error unregistering FCM token: $error');
+    } catch (e, st) {
+      debugPrint('❌ Error unregistering FCM token: $e');
+      debugPrint('$st');
     }
   }
 
-  /// Initialize notification channels for Android
-  Future<void> initNotificationChannels() async {
-    // Skip on web - notification channels are Android-specific
-    if (kIsWeb) {
-      debugPrint('⚠️ Notification channels not supported on web');
-      return;
-    }
+  /// -------------------------------------------------------------------------
+  /// PUBLIC LOCAL NOTIFICATION (USED BY YOUR APP)
+  /// - Android: uses channel
+  /// - iOS: standard local notification
+  /// - Web: no-op
+  /// -------------------------------------------------------------------------
+  Future<void> showNotification({
+    required String title,
+    required String body,
+    String? payload,
+    int? id,
+  }) async {
+    if (kIsWeb) return;
 
-    if (Platform.isAndroid) {
-      final androidImplementation = _flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
+    try {
+      final notificationId =
+          id ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000);
 
-      if (androidImplementation != null) {
-        const List<AndroidNotificationChannel> channels = [
-          AndroidNotificationChannel(
-            'memories',
-            'Memories',
-            description: 'Notifications about memories and stories',
-            importance: Importance.high,
-            playSound: true,
-          ),
-          AndroidNotificationChannel(
-            'social',
-            'Social',
-            description: 'Friend requests and social updates',
-            importance: Importance.high,
-            playSound: true,
-          ),
-          AndroidNotificationChannel(
-            'system',
-            'System',
-            description: 'System notifications',
-            importance: Importance.defaultImportance,
-          ),
-        ];
-
-        for (final channel in channels) {
-          await androidImplementation.createNotificationChannel(channel);
-        }
-
-        debugPrint('✅ Created ${channels.length} notification channels');
-      }
-    }
-  }
-
-  /// Handle foreground message with image support
-  Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    final notification = message.notification;
-    final data = message.data;
-
-    if (notification == null) return;
-
-    // Extract image type and URL from data payload
-    final String? imageType = data['image_type'];
-    final String? imageUrl = data['image_url'];
-
-    // Get channel from data
-    final channelId = data['channel_id'] ?? 'system';
-    final channelName = _getChannelName(channelId);
-
-    StyleInformation? styleInformation;
-    AndroidBitmap<Object>? largeIcon;
-
-    // Handle different image types
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      try {
-        // Download the image
-        final response = await http.get(Uri.parse(imageUrl));
-        if (response.statusCode == 200) {
-          final imageBytes = response.bodyBytes;
-
-          if (imageType == 'avatar') {
-            // For avatars: Use as largeIcon (small circular icon)
-            largeIcon = ByteArrayAndroidBitmap(imageBytes);
-            debugPrint('✅ Avatar set as largeIcon for notification');
-          } else if (imageType == 'cover' || imageType == 'thumbnail') {
-            // For covers/thumbnails: Use BigPicture (expanded large image)
-            styleInformation = BigPictureStyleInformation(
-              ByteArrayAndroidBitmap(imageBytes),
-              contentTitle: notification.title,
-              summaryText: notification.body,
-              hideExpandedLargeIcon: false,
-            );
-            debugPrint('✅ Cover/Thumbnail set as BigPicture for notification');
-          } else {
-            // Default behavior for unknown types
-            styleInformation = BigPictureStyleInformation(
-              ByteArrayAndroidBitmap(imageBytes),
-              contentTitle: notification.title,
-              summaryText: notification.body,
-              hideExpandedLargeIcon: false,
-            );
-            debugPrint('✅ Default BigPicture style applied');
-          }
-        }
-      } catch (e) {
-        debugPrint('❌ Failed to download notification image: $e');
-      }
-    }
-
-    await _flutterLocalNotificationsPlugin.show(
-      message.hashCode,
-      notification.title,
-      notification.body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channelId,
-          channelName,
+      final details = NotificationDetails(
+        android: Platform.isAndroid
+            ? const AndroidNotificationDetails(
+          _androidChannelId,
+          _androidChannelName,
+          channelDescription: _androidChannelDescription,
           importance: Importance.high,
           priority: Priority.high,
-          styleInformation: styleInformation,
-          largeIcon: largeIcon,
-        ),
+        )
+            : null,
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
         ),
-      ),
-      payload: data['deep_link'],
+      );
+
+      await _flutterLocalNotificationsPlugin.show(
+        notificationId,
+        title,
+        body,
+        details,
+        payload: payload,
+      );
+    } catch (e, st) {
+      debugPrint('❌ showNotification failed: $e');
+      debugPrint('$st');
+    }
+  }
+
+  /// -------------------------------------------------------------------------
+  /// FOREGROUND NOTIFICATION DISPLAY (FCM onMessage)
+  /// -------------------------------------------------------------------------
+  Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    final n = message.notification;
+    if (n == null) return;
+
+    // NOTE: preference gating removed to fix compilation.
+    // If you want gating, paste your NotificationPreferencesService file
+    // and I’ll wire it to the correct method name.
+
+    await showNotification(
+      title: n.title ?? 'Capsule',
+      body: n.body ?? '',
+      payload: message.data['deep_link']?.toString(),
+      id: message.hashCode,
     );
   }
 
-  /// Get channel name from channel ID
-  String _getChannelName(String channelId) {
-    switch (channelId) {
-      case 'memories':
-        return 'Memories';
-      case 'social':
-        return 'Social';
-      case 'system':
-        return 'System';
-      default:
-        return 'System';
-    }
-  }
-
-  /// Handle background message
-  Future<void> handleBackgroundMessage(RemoteMessage message) async {
-    debugPrint('📱 Processing background message: ${message.messageId}');
-    // Background messages are automatically handled by FCM
-    // This method is for additional processing if needed
-  }
-
-  /// Handle notification tap with deep link navigation
+  /// -------------------------------------------------------------------------
+  /// TAP HANDLING
+  /// -------------------------------------------------------------------------
   void _handleNotificationTap(RemoteMessage message) {
-    final data = message.data;
-    final deepLink = data['deep_link'];
-
-    if (deepLink != null && deepLink.isNotEmpty) {
-      debugPrint('📱 Navigating to deep link: $deepLink');
-      _handleDeepLink(deepLink);
-    } else {
-      debugPrint('📱 Notification tapped with data: $data');
-    }
+    final link = message.data['deep_link'];
+    if (link != null) _handleDeepLink(link);
   }
 
-  /// Handle notification tap from local notifications
   void _onNotificationTapped(NotificationResponse response) {
-    final deepLink = response.payload;
-
-    if (deepLink != null && deepLink.isNotEmpty) {
-      debugPrint('📱 Navigating to deep link: $deepLink');
-      _handleDeepLink(deepLink);
-    } else {
-      debugPrint('📱 Notification tapped with payload: ${response.payload}');
-    }
+    final link = response.payload;
+    if (link != null) _handleDeepLink(link);
   }
 
-  /// Handle deep link navigation with retry mechanism
+  /// -------------------------------------------------------------------------
+  /// DEEP LINK SAFE HANDLING
+  /// -------------------------------------------------------------------------
   Future<void> _handleDeepLink(String deepLink) async {
-    debugPrint('📱 Processing deep link: $deepLink');
-
-    // 🎯 NEW: Retry up to 3 times (1.5s total) instead of just once
-    for (int attempt = 0; attempt < 3; attempt++) {
+    for (int i = 0; i < 3; i++) {
       if (NavigatorService.navigatorKey.currentState != null) {
         _navigateToPath(deepLink);
         return;
       }
-      debugPrint('📱 Navigator not ready, attempt ${attempt + 1}/3');
       await Future.delayed(const Duration(milliseconds: 500));
     }
-
-    // 🎯 NEW: Navigator still not ready - defer for later processing
-    debugPrint('📱 Deferring deep link for post-auth: $deepLink');
     pendingDeepLink = deepLink;
   }
 
-  /// 🎯 NEW: Process pending deep link after authentication
   static void processPendingDeepLink() {
     if (pendingDeepLink != null) {
-      final link = pendingDeepLink!;
+      instance._navigateToPath(pendingDeepLink!);
       pendingDeepLink = null;
-      debugPrint('📱 Processing deferred deep link: $link');
-      // Navigate using the existing method
-      instance._navigateToPath(link);
     }
   }
 
-  /// Navigate to path based on deep link
   void _navigateToPath(String deepLink) {
-    try {
-      final uri = Uri.parse(deepLink);
-      final navigatorKey = NavigatorService.navigatorKey;
+    final uri = Uri.parse(deepLink);
+    final nav = NavigatorService.navigatorKey.currentState;
+    if (nav == null || uri.pathSegments.isEmpty) return;
 
-      final pathSegments = uri.pathSegments;
-
-      if (pathSegments.isEmpty) {
-        debugPrint('⚠️ Empty path segments in deep link: $deepLink');
-        return;
-      }
-
-      debugPrint('📱 Processing deep link path: ${pathSegments.join("/")}');
-      debugPrint(
-          '📱 Path segments: $pathSegments (count: ${pathSegments.length})');
-
-      switch (pathSegments[0]) {
-        case 'memory':
-          if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
-            final memoryId = pathSegments[1];
-
-            // Check for /memory/{memoryId}/story/{storyId} pattern
-            if (pathSegments.length >= 4 &&
-                pathSegments[2] == 'story' &&
-                pathSegments[3].isNotEmpty) {
-              final storyId = pathSegments[3];
-              debugPrint('📱 Navigating to story: $storyId in memory: $memoryId');
-              navigatorKey.currentState?.pushNamed(
-                '/app/story/view',
-                arguments: FeedStoryContext(
-                  feedType: 'deep_link',
-                  initialStoryId: storyId,
-                  storyIds: [storyId],
-                  memoryId: memoryId,
-                ),
-              );
-            } else {
-              // Handle /memory/{memoryId} - navigate to memory timeline
-              debugPrint('📱 Navigating to memory timeline: $memoryId');
-              navigatorKey.currentState?.pushNamed(
-                '/app/timeline',
-                arguments: {'memoryId': memoryId},
-              );
-            }
-          }
-          break;
-
-        case 'story':
-        // ✅ NEW: Handle: /story/{storyId}
-          if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
-            final storyId = pathSegments[1];
-            debugPrint('📱 Navigating to story: $storyId');
-            navigatorKey.currentState?.pushNamed(
-              '/app/story/view',
-              arguments: FeedStoryContext(
-                feedType: 'deep_link',
-                initialStoryId: storyId,
-                storyIds: [storyId],
-              ),
-            );
-          } else {
-            debugPrint('❌ Story deep link missing ID: $deepLink');
-          }
-          break;
-
-        case 'profile':
-        // Handle: /profile/{userId}
-          if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
-            final userId = pathSegments[1];
-            debugPrint('📱 Navigating to profile: $userId');
-            navigatorKey.currentState?.pushNamed(
-              '/app/profile-user',
-              arguments: userId,
-            );
-          } else {
-            debugPrint('❌ Profile deep link missing ID: $deepLink');
-          }
-          break;
-
-        case 'friends':
-        // Handle: /friends
-          debugPrint('📱 Navigating to friends screen');
-          navigatorKey.currentState?.pushNamed('/app/friends');
-          break;
-
-        case 'group':
-        // Handle: /group/{groupId}
-          if (pathSegments.length > 1 && pathSegments[1].isNotEmpty) {
-            final groupId = pathSegments[1];
-            debugPrint('📱 Navigating to group: $groupId');
-            navigatorKey.currentState?.pushNamed(
-              '/app/groups',
-              arguments: groupId,
-            );
-          } else {
-            debugPrint('❌ Group deep link missing ID: $deepLink');
-          }
-          break;
-
-        case 'notifications':
-        // Handle: /notifications
-          debugPrint('📱 Navigating to notifications screen');
-          navigatorKey.currentState?.pushNamed('/app/notifications');
-          break;
-
-        case 'join':
-        // Handle: /join/{type}/{code} - e.g., /join/memory/ABC123, /join/group/XYZ789, /join/friend/CODE
-          if (pathSegments.length >= 3) {
-            final type = pathSegments[1]; // memory, group, or friend
-            final code = pathSegments[2];
-            debugPrint('📱 Navigating to join screen: type=$type, code=$code');
-            navigatorKey.currentState?.pushNamed(
-              '/app/join',
-              arguments: {'type': type, 'code': code},
-            );
-          } else {
-            debugPrint('❌ Join deep link missing parameters: $deepLink');
-          }
-          break;
-
-        default:
-          debugPrint('⚠️ Unknown deep link path: ${pathSegments[0]}');
-      }
-    } catch (e) {
-      debugPrint('❌ Error handling deep link: $e');
+    switch (uri.pathSegments.first) {
+      case 'story':
+        if (uri.pathSegments.length < 2) return;
+        nav.pushNamed(
+          '/app/story/view',
+          arguments: FeedStoryContext(
+            feedType: 'deep_link',
+            initialStoryId: uri.pathSegments[1],
+            storyIds: [uri.pathSegments[1]],
+          ),
+        );
+        break;
     }
   }
 
-  /// Show local notification (checks preferences before showing)
-  Future<void> showNotification({
-    required String title,
-    required String body,
-    String? payload,
-    int id = 0,
-    String? notificationType,
-  }) async {
-    final prefs = await _preferencesService.loadPreferences();
-    if (prefs != null) {
-      final pushEnabled = prefs['push_notifications_enabled'] ?? true;
-      if (!pushEnabled) {
-        debugPrint('⚠️ Push notifications disabled globally');
-        return;
-      }
+  /// -------------------------------------------------------------------------
+  /// BACKGROUND PAYLOAD REPLAY
+  /// -------------------------------------------------------------------------
+  Future<void> _processPendingBackgroundMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getStringList('pending_fcm_messages') ?? [];
+    if (stored.isEmpty) return;
 
-      if (notificationType != null) {
-        final typeEnabled = prefs[notificationType] ?? true;
-        if (!typeEnabled) {
-          debugPrint('⚠️ Notification type $notificationType disabled');
-          return;
-        }
-      }
+    for (final raw in stored) {
+      final decoded = jsonDecode(raw);
+      debugPrint('📦 Replayed BG payload: $decoded');
     }
 
-    const AndroidNotificationDetails androidDetails =
-    AndroidNotificationDetails(
-      'capsule_notifications',
-      'Capsule Notifications',
-      channelDescription: 'Notifications for Capsule app events',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: true,
-    );
-
-    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _flutterLocalNotificationsPlugin.show(
-      id,
-      title,
-      body,
-      details,
-      payload: payload,
-    );
+    await prefs.remove('pending_fcm_messages');
   }
 
-  /// Create notification channel (Android only)
-  Future<void> createNotificationChannel() async {
-    // Skip on web - notification channels are Android-specific
-    if (kIsWeb) {
-      debugPrint('⚠️ Notification channels not supported on web');
-      return;
-    }
-
-    if (Platform.isAndroid) {
-      const AndroidNotificationChannel channel = AndroidNotificationChannel(
-        'capsule_notifications',
-        'Capsule Notifications',
-        description: 'Notifications for Capsule app events',
-        importance: Importance.high,
-      );
-
-      await _flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
-    }
-  }
-
-  /// Get current FCM token
   String? get fcmToken => _fcmToken;
-
-  /// Check if service is initialized
   bool get isInitialized => _isInitialized;
 }

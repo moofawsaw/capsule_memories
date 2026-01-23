@@ -2,7 +2,7 @@
 
 import '../core/app_export.dart';
 import '../services/supabase_service.dart';
-import './custom_image_view.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CustomProfileHeader extends StatefulWidget {
   const CustomProfileHeader({
@@ -287,6 +287,13 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
         resolvedAvatarPath.isEmpty ||
         widget.avatarImagePath == ImageConstant.imgDefaultAvatar;
 
+    // Strip query so cacheKey is stable (same as your header logic)
+    String _stripQuery(String url) {
+      final uri = Uri.tryParse(url);
+      if (uri == null) return url;
+      return uri.replace(query: '').toString();
+    }
+
     return SizedBox(
       width: size,
       height: size + (_showAvatarEdit ? 6.h : 0),
@@ -324,12 +331,16 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
                     : SizedBox(
                   width: size,
                   height: size,
-                  child: CustomImageView(
-                    imagePath: resolvedAvatarPath!,
-                    width: size,
-                    height: size,
-                    fit: BoxFit.cover,
-                    isCircular: true,
+                  child: ClipOval(
+                    child: Image(
+                      image: CachedNetworkImageProvider(
+                        resolvedAvatarPath!,
+                        cacheKey: _stripQuery(resolvedAvatarPath),
+                      ),
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      filterQuality: FilterQuality.low,
+                    ),
                   ),
                 ),
               ),

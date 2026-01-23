@@ -24,33 +24,31 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            children: [
-              SizedBox(height: 24.h),
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.symmetric(horizontal: 16.h),
-                  child: Column(
-                    children: [
-                      _buildTabSection(context),
-                      SizedBox(height: 14.h),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          children: [
+            SizedBox(height: 24.h),
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 16.h),
+                child: Column(
+                  children: [
+                    _buildTabSection(context),
+                    SizedBox(height: 14.h),
 
-                      // ✅ Search lives on Following screen
-                      _buildSearchSection(context),
+                    // ✅ Search lives on Following screen
+                    _buildSearchSection(context),
 
-                      SizedBox(height: 14.h),
-                      Expanded(child: _buildFollowingList(context)),
-                    ],
-                  ),
+                    SizedBox(height: 14.h),
+                    Expanded(child: _buildFollowingList(context)),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -276,31 +274,20 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     });
   }
 
+// ONLY THE AVATAR PART MATTERS — everything else stays the same
+
   Widget _buildAvatar(String imagePath) {
-    return Container(
-      width: 34.h,
-      height: 34.h,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: appTheme.gray_900_02,
-        border: Border.all(
-          color: appTheme.gray_50.withAlpha(18),
-          width: 1,
-        ),
-      ),
-      child: ClipOval(
-        child: imagePath.isNotEmpty
-            ? CustomImageView(
-          imagePath: imagePath,
-          fit: BoxFit.cover,
-        )
-            : Center(
-          child: Icon(
-            Icons.person,
-            size: 18.h,
-            color: appTheme.gray_50.withAlpha(120),
-          ),
-        ),
+    return SizedBox.square(
+      dimension: 34.h,
+      child: CustomImageView(
+        imagePath: imagePath,
+        height: 34.h,
+        width: 34.h,
+        fit: BoxFit.cover,
+        isCircular: true,
+        networkOnly: true,
+        enableCategoryIconResolution: false,
+        placeHolder: ImageConstant.imgImageNotFound,
       ),
     );
   }

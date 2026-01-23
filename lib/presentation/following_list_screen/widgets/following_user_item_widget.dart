@@ -21,11 +21,14 @@ class FollowingUserItemWidget extends StatelessWidget {
       child: Row(
         spacing: 12.h,
         children: [
-          CustomImageView(
-            imagePath: user?.profileImagePath ?? '',
-            height: 52.h,
-            width: 52.h,
-            radius: BorderRadius.circular(26.h),
+          ClipOval(
+            child: CustomImageView(
+              imagePath: user?.profileImagePath ?? '',
+              height: 48.h,
+              width: 48.h,
+              isCircular: true,
+              fit: BoxFit.cover,
+            ),
           ),
           Expanded(
             child: Column(

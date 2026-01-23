@@ -44,32 +44,30 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final args = ModalRoute.of(context)?.settings.arguments;
     final userId = args is Map ? args['userId'] as String? : null;
 
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: RefreshIndicator(
-          onRefresh: () async {
-            await ref
-                .read(userProfileNotifier.notifier)
-                .initialize(userId: userId);
-          },
-          color: appTheme.deep_purple_A100,
-          backgroundColor: appTheme.gray_900_01,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: Column(
-                  children: [
-                    _buildProfileHeader(context),
-                    _buildStatsRow(context),
-                    _buildActionButtons(context),
-                  ],
-                ),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref
+              .read(userProfileNotifier.notifier)
+              .initialize(userId: userId);
+        },
+        color: appTheme.deep_purple_A100,
+        backgroundColor: appTheme.gray_900_01,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  _buildProfileHeader(context),
+                  _buildStatsRow(context),
+                  _buildActionButtons(context),
+                ],
               ),
-              _buildStoriesSection(context),
-            ],
-          ),
+            ),
+            _buildStoriesSection(context),
+          ],
         ),
       ),
     );

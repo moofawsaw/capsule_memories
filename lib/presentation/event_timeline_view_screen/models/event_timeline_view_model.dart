@@ -15,6 +15,10 @@ class EventTimelineViewModel extends Equatable {
     this.customStoryItems,
     this.timelineDetail,
     this.memoryId,
+
+    // NEW: sealed/state support
+    this.memoryState,
+    this.isSealed,
   });
 
   String? eventTitle;
@@ -26,6 +30,12 @@ class EventTimelineViewModel extends Equatable {
   TimelineDetailModel? timelineDetail;
   String? memoryId;
 
+  // NEW: exact memory state string from DB (ex: 'open', 'sealed', etc.)
+  String? memoryState;
+
+  // NEW: normalized boolean derived from memoryState
+  bool? isSealed;
+
   EventTimelineViewModel copyWith({
     String? eventTitle,
     String? eventDate,
@@ -35,6 +45,9 @@ class EventTimelineViewModel extends Equatable {
     List<CustomStoryItem>? customStoryItems,
     TimelineDetailModel? timelineDetail,
     String? memoryId,
+
+    String? memoryState,
+    bool? isSealed,
   }) {
     return EventTimelineViewModel(
       eventTitle: eventTitle ?? this.eventTitle,
@@ -45,6 +58,8 @@ class EventTimelineViewModel extends Equatable {
       customStoryItems: customStoryItems ?? this.customStoryItems,
       timelineDetail: timelineDetail ?? this.timelineDetail,
       memoryId: memoryId ?? this.memoryId,
+      memoryState: memoryState ?? this.memoryState,
+      isSealed: isSealed ?? this.isSealed,
     );
   }
 
@@ -58,5 +73,7 @@ class EventTimelineViewModel extends Equatable {
     customStoryItems,
     timelineDetail,
     memoryId,
+    memoryState,
+    isSealed,
   ];
 }

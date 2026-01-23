@@ -1,3 +1,9 @@
+// lib/presentation/create_group_screen/widgets/friend_list_item.dart
+// FULL COPY/PASTE FILE
+// Matches Edit Group selection UI:
+// - selected: full border + tinted background + check_circle icon
+// - unselected: same row layout, subtle background
+
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
 import '../models/create_group_model.dart';
@@ -8,7 +14,7 @@ class FriendListItem extends StatelessWidget {
   final VoidCallback? onTap;
   final EdgeInsetsGeometry? margin;
 
-  FriendListItem({
+  const FriendListItem({
     Key? key,
     required this.friend,
     this.isSelected = false,
@@ -22,42 +28,42 @@ class FriendListItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.maxFinite,
-        padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 6.h),
         margin: margin,
+        padding: EdgeInsets.all(12.h),
         decoration: BoxDecoration(
-          color: appTheme.gray_900_01,
-          borderRadius: BorderRadius.circular(6.h),
+          color: isSelected
+              ? appTheme.deep_purple_A100.withAlpha(26)
+              : appTheme.gray_50.withAlpha(13),
+          borderRadius: BorderRadius.circular(12.h),
+          border: Border.all(
+            color: isSelected ? appTheme.deep_purple_A100 : Colors.transparent,
+            width: 1.5,
+          ),
         ),
         child: Row(
           children: [
             CustomImageView(
               imagePath: friend.profileImage,
-              height: 36.h,
-              width: 36.h,
+              height: 40.h,
+              width: 40.h,
               fit: BoxFit.cover,
-              radius: BorderRadius.circular(18.h),
+              radius: BorderRadius.circular(20.h),
             ),
-            SizedBox(width: 8.h),
+            SizedBox(width: 12.h),
             Expanded(
               child: Text(
                 friend.name ?? '',
-                style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyleHelper.instance.body14MediumPlusJakartaSans
                     .copyWith(color: appTheme.gray_50),
               ),
             ),
             if (isSelected)
-              Container(
-                width: 20.h,
-                height: 20.h,
-                decoration: BoxDecoration(
-                  color: appTheme.colorFF52D1,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check,
-                  size: 14.h,
-                  color: appTheme.whiteCustom,
-                ),
+              Icon(
+                Icons.check_circle,
+                color: appTheme.deep_purple_A100,
+                size: 24.h,
               ),
           ],
         ),

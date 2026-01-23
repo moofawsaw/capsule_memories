@@ -97,7 +97,8 @@ class AppRoutes {
   // ✅ Correct story workflow
   static const String appNativeCamera = '/app/native-camera';
   static const String appStoryEdit = '/app/story/edit';
-  static const String appStoryRecord = '/app/story/record'; // alias -> native camera
+  static const String appStoryRecord =
+      '/app/story/record'; // alias -> native camera
   static const String appStoryView = '/app/story/view';
 
   static const String appTimeline = '/app/timeline';
@@ -125,11 +126,10 @@ class AppRoutes {
       '/friend-request-confirmation-dialog';
   static const String deepLinkHandler = '/deep-link-handler';
 
-// Choose ONE depending on desired default behavior
+  // Choose ONE depending on desired default behavior
   static const String initialRoute = appFeed;
-// OR
-// static const String initialRoute = authLogin;
-
+  // OR
+  // static const String initialRoute = authLogin;
 
   static const String memoryTimelinePlayback =
       '/memory-timeline-playback-screen';
@@ -153,27 +153,61 @@ class AppRoutes {
   /// Get the child widget for a given app route
   static Widget _getAppChild(String routeName, RouteSettings settings) {
     switch (routeName) {
-      case appStoryEdit:
-        return PostStoryScreen();
+    // ✅ /app/story/edit MUST build StoryEditScreen (not PostStoryScreen)
+      case appStoryEdit: {
+        final args = _argsMap(settings);
+
+        // supports both argument key styles:
+        // - video_path / is_video / memory_id / memory_title / category_icon
+        // - mediaPath / isVideo / memoryId / memoryTitle / categoryIcon
+        final String mediaPath =
+            (args['video_path'] as String?) ?? (args['mediaPath'] as String?) ?? '';
+        final bool isVideo =
+            (args['is_video'] as bool?) ?? (args['isVideo'] as bool?) ?? true;
+        final String memoryId =
+            (args['memory_id'] as String?) ?? (args['memoryId'] as String?) ?? '';
+        final String memoryTitle = (args['memory_title'] as String?) ??
+            (args['memoryTitle'] as String?) ??
+            '';
+        final String? categoryIcon =
+            (args['category_icon'] as String?) ?? (args['categoryIcon'] as String?);
+
+        return StoryEditScreen(
+          mediaPath: mediaPath,
+          isVideo: isVideo,
+          memoryId: memoryId,
+          memoryTitle: memoryTitle,
+          categoryIcon: categoryIcon,
+        );
+      }
+
+    // ✅ Alias route -> native camera
+      case appNativeCamera:
+      case appStoryRecord:
+        return PostStoryScreen(); // NOTE: do NOT const unless your constructor is const
+
       case appStoryView:
         return const EventStoriesViewScreen();
-      case appTimeline:
+
+      case appTimeline: {
         final args = _argsMap(settings);
         final memoryId = args['memoryId'] as String? ?? args['id'] as String?;
-        final initialStoryId = args['initialStoryId'] as String?; // NEW
+        final initialStoryId = args['initialStoryId'] as String?;
         return EventTimelineViewScreen(
           memoryId: memoryId,
-          initialStoryId: initialStoryId, // NEW
+          initialStoryId: initialStoryId,
         );
+      }
 
     // App tabs/screens
       case appFeed:
         return const MemoryFeedDashboardScreen();
       case appMemories:
         return const MemoriesDashboardScreen();
-      case appProfileUser:
+      case appProfileUser: {
         final userId = _argNullableString(settings, 'userId');
         return UserProfileScreenTwo(userId: userId);
+      }
       case appNotifications:
         return const NotificationsScreen();
       case appSettings:
@@ -184,16 +218,14 @@ class AppRoutes {
         return FollowersManagementScreen();
       case appFollowing:
         return FollowingListScreen();
-      case appGroups:
+      case appGroups: {
         final groupId = _argNullableString(settings, 'groupId');
         return GroupsManagementScreen(groupId: groupId);
+      }
       case appMenu:
         return UserMenuScreen();
       case appNavigation:
         return const AppNavigationScreen();
-      case appTimeline:
-        final memoryId = _argNullableString(settings, 'memoryId');
-        return EventTimelineViewScreen(memoryId: memoryId);
       case appTimelineSealed:
         return MemoryDetailsViewScreen();
       case appReels:
@@ -224,25 +256,26 @@ class AppRoutes {
         return GroupQRInviteScreen();
       case appBsStories:
         return const EventStoriesViewScreen();
-      case appBsUpload:
+
+      case appBsUpload: {
         final uploadArgs = NavigatorService.navigatorKey.currentContext != null
-            ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)
-            ?.settings
+            ? ModalRoute.of(NavigatorService.navigatorKey.currentContext!)?.settings
             .arguments as Map<String, dynamic>?
             : null;
+
         return AddMemoryUploadScreen(
           memoryId: uploadArgs?['memoryId'] as String? ?? '',
-          memoryStartDate:
-          uploadArgs?['memoryStartDate'] as DateTime? ?? DateTime.now(),
-          memoryEndDate:
-          uploadArgs?['memoryEndDate'] as DateTime? ?? DateTime.now(),
+          memoryStartDate: uploadArgs?['memoryStartDate'] as DateTime? ?? DateTime.now(),
+          memoryEndDate: uploadArgs?['memoryEndDate'] as DateTime? ?? DateTime.now(),
         );
+      }
 
     // ✅ FIXED: Use settings.arguments directly instead of ModalRoute.of()
-      case appBsDetails:
+      case appBsDetails: {
         final args = settings.arguments;
         final memoryId = args is String ? args : null;
         return MemoryDetailsScreen(memoryId: memoryId ?? '');
+      }
 
       case appBsVibes:
         return VibeSelectionScreen();
@@ -287,10 +320,7 @@ class AppRoutes {
       }
     }
 
-    // ✅ PUBLIC STORY DEEP LINK:
-    // Supports BOTH:
-    // 1) DeepLinkService pushing '/story/view' with FeedStoryContext args
-    // 2) Universal link '/story/view/<id>' which we convert into FeedStoryContext
+    // ✅ PUBLIC STORY DEEP LINK
     if (routeName.startsWith(storyViewPublic)) {
       FeedStoryContext? ctx;
 
@@ -300,8 +330,7 @@ class AppRoutes {
       } else {
         // Case B: Parse '/story/view/<id>'
         final uri = Uri.parse(routeName);
-        final String? id =
-        (uri.pathSegments.length >= 3) ? uri.pathSegments[2] : null;
+        final String? id = (uri.pathSegments.length >= 3) ? uri.pathSegments[2] : null;
 
         if (id != null && id.isNotEmpty) {
           ctx = FeedStoryContext(
@@ -329,8 +358,7 @@ class AppRoutes {
       return _buildRoute(LoginScreen(), settings, shouldAnimate: true);
     }
     if (routeName == authRegister) {
-      return _buildRoute(AccountRegistrationScreen(), settings,
-          shouldAnimate: true);
+      return _buildRoute(AccountRegistrationScreen(), settings, shouldAnimate: true);
     }
     if (routeName == authReset) {
       return _buildRoute(PasswordResetScreen(), settings, shouldAnimate: true);
@@ -360,7 +388,7 @@ class AppRoutes {
       return _buildSlideOverlayRoute(UserMenuScreen(), settings);
     }
 
-    // App routes (with persistent header)
+    // App routes (with persistent header by default)
     if (routeName.startsWith('/app')) {
       final child = _getAppChild(routeName, settings);
       final shouldAnimate = _shouldAnimate(routeName);
@@ -378,7 +406,17 @@ class AppRoutes {
       )
           : child;
 
-      final shellChild = AppShell(child: protectedChild);
+      // ✅ FULLSCREEN EXCEPTIONS: these must NOT sit under the AppShell header
+      final bool hideHeader =
+          routeName == AppRoutes.appNativeCamera ||
+              routeName == AppRoutes.appStoryRecord ||
+              routeName == AppRoutes.appStoryEdit ||
+              routeName == AppRoutes.appStoryView;
+
+      final shellChild = AppShell(
+        child: protectedChild,
+        hideHeader: hideHeader,
+      );
 
       return _buildRoute(shellChild, settings, shouldAnimate: shouldAnimate);
     }
@@ -455,10 +493,9 @@ class AppRoutes {
     friendRequestConfirmationDialog: (context) =>
     const FriendRequestConfirmationDialog(),
 
-    // ✅ Keep StoryEditScreen mapping as-is
+    // ✅ Keep StoryEditScreen mapping as-is (fallback)
     appStoryEdit: (context) {
-      final args =
-      ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+      final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
       return StoryEditScreen(
         mediaPath: args['video_path'] as String,
         isVideo: args['is_video'] as bool? ?? true,

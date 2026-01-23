@@ -33,6 +33,12 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
   void initState() {
     super.initState();
     groupNameController.text = widget.group.name ?? '';
+
+    final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
+    if (currentUserId != null) {
+      _myProfileFuture = _fetchMyProfileFromDb(currentUserId);
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(groupEditNotifier.notifier).initialize(widget.group);
     });
@@ -97,6 +103,39 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
         ),
       ),
     );
+  }
+
+  // ✅ Cache current user's DB profile fetch (used to inject creator as a member if missing)
+  Future<Map<String, dynamic>?>? _myProfileFuture;
+
+  Future<Map<String, dynamic>?> _fetchMyProfileFromDb(String userId) async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) return null;
+
+      // Pull from YOUR DB profile table (adjust column names if different)
+      final res = await client
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (res == null) return null;
+
+      final avatar = (res['avatar_url'] as String?)?.trim();
+      final displayName = (res['display_name'] as String?)?.trim();
+      final username = (res['username'] as String?)?.trim();
+
+      return <String, dynamic>{
+        'id': userId,
+        'name': (displayName != null && displayName.isNotEmpty)
+            ? displayName
+            : (username != null && username.isNotEmpty ? username : 'You'),
+        'avatar': (avatar != null && avatar.isNotEmpty) ? avatar : null,
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   // ----------------------------
@@ -313,75 +352,46 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           return Center(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 16.h),
-              child:
-              CircularProgressIndicator(color: appTheme.deep_purple_A100),
+              child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
             ),
           );
         }
 
-        // Sort members: Creator first, then current user (if not creator), then others
-        final sortedMembers =
-        List<Map<String, dynamic>>.from(state.currentMembers);
-        sortedMembers.sort((a, b) {
-          final aIsCreator = a['id'] == widget.group.creatorId;
-          final bIsCreator = b['id'] == widget.group.creatorId;
-          final aIsCurrentUser = a['id'] == currentUserId;
-          final bIsCurrentUser = b['id'] == currentUserId;
+        final isCreator = currentUserId != null && currentUserId == widget.group.creatorId;
 
-          // Creator always first
-          if (aIsCreator && !bIsCreator) return -1;
-          if (!aIsCreator && bIsCreator) return 1;
+        final baseMembers = List<Map<String, dynamic>>.from(state.currentMembers);
 
-          // If neither is creator, current user comes first
-          if (!aIsCreator && !bIsCreator) {
-            if (aIsCurrentUser && !bIsCurrentUser) return -1;
-            if (!aIsCurrentUser && bIsCurrentUser) return 1;
-          }
+        final hasMe = currentUserId != null &&
+            baseMembers.any((m) => m['id'] == currentUserId);
 
-          return 0;
-        });
+        if (isCreator && currentUserId != null && !hasMe) {
+          return FutureBuilder<Map<String, dynamic>?>(
+            future: _myProfileFuture ?? _fetchMyProfileFromDb(currentUserId),
+            builder: (context, snapshot) {
+              final injected = List<Map<String, dynamic>>.from(baseMembers);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Members (${sortedMembers.length})',
-              style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
-            ),
-            SizedBox(height: 12.h),
+              final meProfile = snapshot.data;
+              injected.add(<String, dynamic>{
+                'id': currentUserId,
+                'name': meProfile?['name'] ?? 'You',
+                'avatar': meProfile?['avatar'],
+              });
 
-            // Reverted: no extra “card” wrapper styling around the row.
-            // This restores your original member badge/row design behavior.
-            ...sortedMembers.map((member) {
-              final isCreator = member['id'] == widget.group.creatorId;
-              final isCurrentUser = member['id'] == currentUserId;
-
-              String? statusText;
-              if (isCreator && isCurrentUser) {
-                statusText = 'Creator • You';
-              } else if (isCreator) {
-                statusText = 'Creator';
-              } else if (isCurrentUser) {
-                statusText = 'You';
-              }
-
-              return CustomUserStatusRow(
-                profileImagePath: member['avatar']?.isNotEmpty == true
-                    ? member['avatar']
-                    : ImageConstant.imgEllipse826x26,
-                userName: member['name'] ?? 'Unknown',
-                statusText: statusText,
-                statusBackgroundColor: (isCreator || isCurrentUser)
-                    ? appTheme.deep_purple_A100.withAlpha(51)
-                    : null,
-                statusTextColor: (isCreator || isCurrentUser)
-                    ? appTheme.deep_purple_A100
-                    : null,
-                margin: EdgeInsets.only(bottom: 8.h),
+              return _buildMembersListUi(
+                context: context,
+                members: injected,
+                currentUserId: currentUserId,
+                showRemoveButtons: false,
               );
-            }).toList(),
-          ],
+            },
+          );
+        }
+
+        return _buildMembersListUi(
+          context: context,
+          members: baseMembers,
+          currentUserId: currentUserId,
+          showRemoveButtons: false,
         );
       },
     );
@@ -500,96 +510,147 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           );
         }
 
-        // Sort members: Creator first, then current user (if not creator), then others
-        final sortedMembers =
-        List<Map<String, dynamic>>.from(state.currentMembers);
-        sortedMembers.sort((a, b) {
-          final aIsCreator = a['id'] == widget.group.creatorId;
-          final bIsCreator = b['id'] == widget.group.creatorId;
-          final aIsCurrentUser = a['id'] == currentUserId;
-          final bIsCurrentUser = b['id'] == currentUserId;
+        final isCreator = currentUserId != null && currentUserId == widget.group.creatorId;
 
-          // Creator always first
-          if (aIsCreator && !bIsCreator) return -1;
-          if (!aIsCreator && bIsCreator) return 1;
+        final baseMembers = List<Map<String, dynamic>>.from(state.currentMembers);
 
-          // If neither is creator, current user comes first
-          if (!aIsCreator && !bIsCreator) {
-            if (aIsCurrentUser && !bIsCurrentUser) return -1;
-            if (!aIsCurrentUser && bIsCurrentUser) return 1;
-          }
+        final hasMe = currentUserId != null &&
+            baseMembers.any((m) => m['id'] == currentUserId);
 
-          return 0;
-        });
+        // ✅ If creator is missing from members list (empty group), inject them from DB
+        if (isCreator && currentUserId != null && !hasMe) {
+          return FutureBuilder<Map<String, dynamic>?>(
+            future: _myProfileFuture ?? _fetchMyProfileFromDb(currentUserId),
+            builder: (context, snapshot) {
+              final injected = List<Map<String, dynamic>>.from(baseMembers);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Members (${sortedMembers.length})',
-              style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
-            ),
-            SizedBox(height: 12.h),
-            ...sortedMembers.map((member) {
-              final isCreator = member['id'] == widget.group.creatorId;
-              final isCurrentUser = member['id'] == currentUserId;
+              final meProfile = snapshot.data;
+              injected.add(<String, dynamic>{
+                'id': currentUserId,
+                'name': meProfile?['name'] ?? 'You',
+                'avatar': meProfile?['avatar'],
+              });
 
-              // Build status text with multiple badges
-              String? statusText;
-              if (isCreator && isCurrentUser) {
-                statusText = 'Creator • You';
-              } else if (isCreator) {
-                statusText = 'Creator';
-              } else if (isCurrentUser) {
-                statusText = 'You';
-              }
-
-              return Container(
-                margin: EdgeInsets.only(bottom: 8.h),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CustomUserStatusRow(
-                        profileImagePath: member['avatar']?.isNotEmpty == true
-                            ? member['avatar']
-                            : ImageConstant.imgEllipse826x26,
-                        userName: member['name'] ?? 'Unknown',
-                        statusText: statusText,
-                        statusBackgroundColor: (isCreator || isCurrentUser)
-                            ? appTheme.deep_purple_A100.withAlpha(51)
-                            : null,
-                        statusTextColor: (isCreator || isCurrentUser)
-                            ? appTheme.deep_purple_A100
-                            : null,
-                      ),
-                    ),
-                    if (!isCreator && !isCurrentUser) ...[
-                      SizedBox(width: 8.h),
-                      GestureDetector(
-                        onTap: () => _showRemoveMemberDialog(
-                            context, member['id'], member['name']),
-                        child: Container(
-                          padding: EdgeInsets.all(6.h),
-                          decoration: BoxDecoration(
-                            color: appTheme.red_500.withAlpha(26),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.close,
-                            color: appTheme.red_500,
-                            size: 18.h,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              return _buildMembersListUi(
+                context: context,
+                members: injected,
+                currentUserId: currentUserId,
+                showRemoveButtons: true,
               );
-            }).toList(),
-          ],
+            },
+          );
+        }
+
+        return _buildMembersListUi(
+          context: context,
+          members: baseMembers,
+          currentUserId: currentUserId,
+          showRemoveButtons: true,
         );
       },
+    );
+  }
+
+  Widget _buildMembersListUi({
+    required BuildContext context,
+    required List<Map<String, dynamic>> members,
+    required String? currentUserId,
+    required bool showRemoveButtons,
+  }) {
+    // Sort members: Creator first, then current user (if not creator), then others
+    final sortedMembers = List<Map<String, dynamic>>.from(members);
+    sortedMembers.sort((a, b) {
+      final aIsCreator = a['id'] == widget.group.creatorId;
+      final bIsCreator = b['id'] == widget.group.creatorId;
+      final aIsCurrentUser = a['id'] == currentUserId;
+      final bIsCurrentUser = b['id'] == currentUserId;
+
+      if (aIsCreator && !bIsCreator) return -1;
+      if (!aIsCreator && bIsCreator) return 1;
+
+      if (!aIsCreator && !bIsCreator) {
+        if (aIsCurrentUser && !bIsCurrentUser) return -1;
+        if (!aIsCurrentUser && bIsCurrentUser) return 1;
+      }
+
+      return 0;
+    });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Members (${sortedMembers.length})',
+          style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
+        SizedBox(height: 12.h),
+        ...sortedMembers.map((member) {
+          final isCreator = member['id'] == widget.group.creatorId;
+          final isCurrentUser = member['id'] == currentUserId;
+
+          String? statusText;
+          if (isCreator && isCurrentUser) {
+            statusText = 'Creator • You';
+          } else if (isCreator) {
+            statusText = 'Creator';
+          } else if (isCurrentUser) {
+            statusText = 'You';
+          }
+
+          final row = CustomUserStatusRow(
+            profileImagePath: member['avatar']?.isNotEmpty == true
+                ? member['avatar']
+                : ImageConstant.imgEllipse826x26,
+            userName: member['name'] ?? 'Unknown',
+            statusText: statusText,
+            statusBackgroundColor: (isCreator || isCurrentUser)
+                ? appTheme.deep_purple_A100.withAlpha(51)
+                : null,
+            statusTextColor: (isCreator || isCurrentUser)
+                ? appTheme.deep_purple_A100
+                : null,
+          );
+
+          if (!showRemoveButtons) {
+            return Container(
+              margin: EdgeInsets.only(bottom: 8.h),
+              child: row,
+            );
+          }
+
+          return Container(
+            margin: EdgeInsets.only(bottom: 8.h),
+            child: Row(
+              children: [
+                Expanded(child: row),
+                if (!isCreator && !isCurrentUser) ...[
+                  SizedBox(width: 8.h),
+                  GestureDetector(
+                    onTap: () => _showRemoveMemberDialog(
+                      context,
+                      member['id'],
+                      member['name'],
+                    ),
+                    child: Container(
+                      padding: EdgeInsets.all(6.h),
+                      decoration: BoxDecoration(
+                        color: appTheme.red_500.withAlpha(26),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.close,
+                        color: appTheme.red_500,
+                        size: 18.h,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      ],
     );
   }
 

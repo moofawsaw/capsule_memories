@@ -3,6 +3,21 @@ import 'package:intl/intl.dart';
 import '../core/app_export.dart';
 import '../services/notification_service.dart';
 
+class _InviteCtx {
+  final String? inviteId;
+  final String? memoryId;
+  final String? notificationId;
+  final String inviterName;
+  final String memoryTitle;
+
+  const _InviteCtx({
+    required this.inviteId,
+    required this.memoryId,
+    required this.notificationId,
+    required this.inviterName,
+    required this.memoryTitle,
+  });
+}
 /// A notification card specifically for memory invites with Accept/Decline buttons
 class MemoryInviteNotificationCard extends StatefulWidget {
   const MemoryInviteNotificationCard({
@@ -56,189 +71,308 @@ class _MemoryInviteNotificationCardState
     return DateFormat('MMM d, yyyy').format(date);
   }
 
+  _InviteCtx _inviteCtx() {
+  final raw = widget.notification;
+
+  final data = (raw['data'] as Map?)?.cast<String, dynamic>() ?? {};
+  final enriched =
+  (raw['enriched_data'] as Map?)?.cast<String, dynamic>() ?? {};
+
+  // Be permissive: these payload keys tend to drift as you enrich/transform.
+  final inviteId = (data['invite_id'] ??
+  data['memory_invite_id'] ??
+  enriched['invite_id'] ??
+  enriched['memory_invite_id'])
+      ?.toString();
+
+  final memoryId = (data['memory_id'] ??
+  enriched['memory_id'] ??
+  enriched['memoryId'] ??
+  raw['memory_id'])
+      ?.toString();
+
+  final notificationId = raw['id']?.toString();
+
+  final inviterName = (data['inviter_name'] ??
+  enriched['inviter_name'] ??
+  enriched['inviterName'] ??
+  'Someone')
+      .toString();
+
+  final memoryTitle = (data['memory_title'] ??
+  enriched['memory_name'] ??
+  enriched['memory_title'] ??
+  enriched['memoryTitle'] ??
+  'a memory')
+      .toString();
+
+  return _InviteCtx(
+  inviteId: inviteId,
+  memoryId: memoryId,
+  notificationId: notificationId,
+  inviterName: inviterName,
+  memoryTitle: memoryTitle,
+  );
+  }
+
   Future<void> _handleAccept() async {
-    final data = widget.notification['data'] as Map<String, dynamic>?;
-    final inviteId = data?['invite_id'] as String?;
-    final memoryId = data?['memory_id'] as String?;
-    final notificationId = widget.notification['id'] as String?;
+  final ctx = _inviteCtx();
 
-    if (inviteId == null || notificationId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid invite - missing required information'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+  // Notification id is mandatory (we update the notification regardless).
+  if (ctx.notificationId == null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('Invalid invite - missing notification id'),
+  backgroundColor: Colors.red,
+  ),
+  );
+  return;
+  }
 
-    setState(() => _isLoading = true);
+  // For sealed memories, invite_id might be missing (or invite row may be gone),
+  // but memory_id should still allow joining. Require at least ONE.
+  if (ctx.inviteId == null && ctx.memoryId == null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('Invalid invite - missing invite and memory information'),
+  backgroundColor: Colors.red,
+  ),
+  );
+  return;
+  }
 
-    try {
-      // Check if invite is still pending
-      final isPending =
-          await NotificationService.instance.isInviteStillPending(inviteId);
-      if (!isPending) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('This invite has already been responded to'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        widget.onActionCompleted();
-        return;
-      }
+  setState(() => _isLoading = true);
 
-      // Accept the invite in database
-      await NotificationService.instance.acceptMemoryInvite(inviteId);
+  try {
+  // If the notification was already acted on (client-side), don’t do it twice.
+  final existingData =
+  (widget.notification['data'] as Map?)?.cast<String, dynamic>() ?? {};
+  final alreadyActioned = existingData['action_taken'] != null;
+  if (alreadyActioned) {
+  if (mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('This invite has already been responded to'),
+  backgroundColor: Colors.orange,
+  ),
+  );
+  }
+  widget.onActionCompleted();
+  return;
+  }
 
-      // Wait for database trigger to complete
-      await Future.delayed(const Duration(milliseconds: 800));
+  bool joined = false;
 
-      // Get memory title for updated message
-      final inviterName = data?['inviter_name'] as String? ??
-          widget.notification['enriched_data']?['inviter_name'] as String? ??
-          'Someone';
-      final memoryTitle = data?['memory_title'] as String? ??
-          widget.notification['enriched_data']?['memory_name'] as String? ??
-          'a memory';
+  // 1) Preferred path: accept by invite id (works for normal, unsealed flows)
+  if (ctx.inviteId != null) {
+  // IMPORTANT: we no longer hard-fail sealed/old invites here.
+  // We attempt pending-check, but if it fails due to sealed/expired logic,
+  // we fall back to joining by memory_id (keeps invites “always valid”).
+  try {
+  final isPending =
+  await NotificationService.instance.isInviteStillPending(ctx.inviteId!);
 
-      final actionDate = DateTime.now().toIso8601String();
-      final formattedDate = _formatActionDate(actionDate);
+  if (!isPending) {
+  // If it’s not pending, it may be already accepted OR it may be sealed logic.
+  // We still allow join-by-memory fallback if memoryId exists.
+  if (ctx.memoryId != null) {
+  await NotificationService.instance.joinMemoryById(ctx.memoryId!);
+  joined = true;
+  } else {
+  if (mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('This invite has already been responded to'),
+  backgroundColor: Colors.orange,
+  ),
+  );
+  }
+  widget.onActionCompleted();
+  return;
+  }
+  } else {
+  await NotificationService.instance.acceptMemoryInvite(ctx.inviteId!);
+  joined = true;
+  }
+  } catch (_) {
+  // Pending-check or accept failed (often due to sealed/expired invite logic).
+  if (ctx.memoryId != null) {
+  await NotificationService.instance.joinMemoryById(ctx.memoryId!);
+  joined = true;
+  } else {
+  rethrow;
+  }
+  }
+  } else {
+  // 2) Sealed-safe path: join directly by memory id
+  await NotificationService.instance.joinMemoryById(ctx.memoryId!);
+  joined = true;
+  }
 
-      // Update notification with accepted message
-      await NotificationService.instance.updateNotificationContent(
-        notificationId: notificationId,
-        newMessage: 'You joined "$memoryTitle" on $formattedDate',
-        additionalData: {
-          'action_taken': 'accepted',
-          'action_date': actionDate,
-        },
-      );
+  if (!joined) {
+  throw Exception('Unable to join memory');
+  }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('You joined the memory!'),
-            backgroundColor: Colors.green,
-            action: memoryId != null
-                ? SnackBarAction(
-                    label: 'View',
-                    textColor: Colors.white,
-                    onPressed: () => widget.onNavigateToMemory(memoryId),
-                  )
-                : null,
-          ),
-        );
-      }
+  // Optional small delay to let triggers settle (if any)
+  await Future.delayed(const Duration(milliseconds: 400));
 
-      // Add delay before navigation
-      await Future.delayed(const Duration(milliseconds: 200));
+  final actionDate = DateTime.now().toIso8601String();
+  final formattedDate = _formatActionDate(actionDate);
 
-      if (memoryId != null && mounted) {
-        widget.onNavigateToMemory(memoryId);
-      }
+  await NotificationService.instance.updateNotificationContent(
+  notificationId: ctx.notificationId!,
+  newMessage: 'You joined "${ctx.memoryTitle}" on $formattedDate',
+  additionalData: {
+  'action_taken': 'accepted',
+  'action_date': actionDate,
 
-      widget.onActionCompleted();
-    } catch (error) {
-      debugPrint('❌ Failed to accept invite: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to accept invite: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+  // Keep these so future UI always has what it needs
+  if (ctx.memoryId != null) 'memory_id': ctx.memoryId,
+  if (ctx.inviteId != null) 'invite_id': ctx.inviteId,
+  'inviter_name': ctx.inviterName,
+  'memory_title': ctx.memoryTitle,
+  },
+  );
+
+  if (mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+  content: const Text('You joined the memory!'),
+  backgroundColor: Colors.green,
+  action: ctx.memoryId != null
+  ? SnackBarAction(
+  label: 'View',
+  textColor: Colors.white,
+  onPressed: () => widget.onNavigateToMemory(ctx.memoryId!),
+  )
+      : null,
+  ),
+  );
+  }
+
+  await Future.delayed(const Duration(milliseconds: 200));
+
+  if (ctx.memoryId != null && mounted) {
+  widget.onNavigateToMemory(ctx.memoryId!);
+  }
+
+  widget.onActionCompleted();
+  } catch (error) {
+  debugPrint('❌ Failed to accept invite: $error');
+  if (mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+  content: Text('Failed to accept invite: $error'),
+  backgroundColor: Colors.red,
+  ),
+  );
+  }
+  } finally {
+  if (mounted) {
+  setState(() => _isLoading = false);
+  }
+  }
   }
 
   Future<void> _handleDecline() async {
-    final data = widget.notification['data'] as Map<String, dynamic>?;
-    final inviteId = data?['invite_id'] as String?;
-    final notificationId = widget.notification['id'] as String?;
+  final ctx = _inviteCtx();
 
-    if (inviteId == null || notificationId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Invalid invite - missing required information'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+  if (ctx.notificationId == null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('Invalid invite - missing notification id'),
+  backgroundColor: Colors.red,
+  ),
+  );
+  return;
+  }
 
-    setState(() => _isLoading = true);
+  // For decline, invite_id is optional (sealed invites may not have it).
+  // If we have neither invite_id nor memory_id, we still can’t do anything meaningful.
+  if (ctx.inviteId == null && ctx.memoryId == null) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('Invalid invite - missing invite and memory information'),
+  backgroundColor: Colors.red,
+  ),
+  );
+  return;
+  }
 
-    try {
-      // Check if invite is still pending
-      final isPending =
-          await NotificationService.instance.isInviteStillPending(inviteId);
-      if (!isPending) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('This invite has already been responded to'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        widget.onActionCompleted();
-        return;
-      }
+  setState(() => _isLoading = true);
 
-      // Decline the invite in the database
-      await NotificationService.instance.declineMemoryInvite(inviteId);
+  try {
+  final existingData =
+  (widget.notification['data'] as Map?)?.cast<String, dynamic>() ?? {};
+  final alreadyActioned = existingData['action_taken'] != null;
+  if (alreadyActioned) {
+  if (mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('This invite has already been responded to'),
+  backgroundColor: Colors.orange,
+  ),
+  );
+  }
+  widget.onActionCompleted();
+  return;
+  }
 
-      // Get memory title for updated message
-      final memoryTitle = data?['memory_title'] as String? ??
-          widget.notification['enriched_data']?['memory_name'] as String? ??
-          'a memory';
+  // If we have an invite id, attempt to decline it. If it fails (sealed logic),
+  // we still mark the notification declined (UX requirement).
+  if (ctx.inviteId != null) {
+  try {
+  final isPending =
+  await NotificationService.instance.isInviteStillPending(ctx.inviteId!);
+  if (isPending) {
+  await NotificationService.instance.declineMemoryInvite(ctx.inviteId!);
+  }
+  } catch (_) {
+  // ignore and still update notification
+  }
+  }
 
-      final actionDate = DateTime.now().toIso8601String();
-      final formattedDate = _formatActionDate(actionDate);
+  final actionDate = DateTime.now().toIso8601String();
+  final formattedDate = _formatActionDate(actionDate);
 
-      // Update notification with declined message instead of deleting
-      await NotificationService.instance.updateNotificationContent(
-        notificationId: notificationId,
-        newMessage: 'You declined "$memoryTitle" on $formattedDate',
-        additionalData: {
-          'action_taken': 'declined',
-          'action_date': actionDate,
-        },
-      );
+  await NotificationService.instance.updateNotificationContent(
+  notificationId: ctx.notificationId!,
+  newMessage: 'You declined "${ctx.memoryTitle}" on $formattedDate',
+  additionalData: {
+  'action_taken': 'declined',
+  'action_date': actionDate,
+  if (ctx.memoryId != null) 'memory_id': ctx.memoryId,
+  if (ctx.inviteId != null) 'invite_id': ctx.inviteId,
+  'inviter_name': ctx.inviterName,
+  'memory_title': ctx.memoryTitle,
+  },
+  );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invite declined'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+  if (mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('Invite declined'),
+  duration: Duration(seconds: 2),
+  ),
+  );
+  }
 
-      widget.onActionCompleted();
-    } catch (error) {
-      debugPrint('❌ Failed to decline invite: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to decline invite: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
+  widget.onActionCompleted();
+  } catch (error) {
+  debugPrint('❌ Failed to decline invite: $error');
+  if (mounted) {
+  ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+  content: Text('Failed to decline invite: $error'),
+  backgroundColor: Colors.red,
+  ),
+  );
+  }
+  } finally {
+  if (mounted) {
+  setState(() => _isLoading = false);
+  }
+  }
   }
 
   @override
@@ -270,12 +404,11 @@ class _MemoryInviteNotificationCardState
             }
           : null,
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 20.h),
+        width: double.infinity,
+        margin: EdgeInsets.zero,
         padding: EdgeInsets.all(16.h),
         decoration: BoxDecoration(
-          color: isRead
-              ? Colors.transparent
-              : appTheme.deep_purple_A100.withAlpha(20),
+          color: isRead ? Colors.transparent : appTheme.deep_purple_A100.withAlpha(20),
           borderRadius: BorderRadius.circular(12.h),
         ),
         child: Column(

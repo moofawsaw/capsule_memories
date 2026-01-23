@@ -55,12 +55,12 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBiJqT9kWHNt34lU74y8WCCIPGWVX0VISE',
-    appId: '1:945270049172:ios:REPLACE_WITH_IOS_APP_ID',
+    apiKey: 'AIzaSyCnJ8r5QBHSNOTECwx_tOnNh-sEHe7qtKI',
+    appId: '1:945270049172:ios:da685167deef03a8eea781',
     messagingSenderId: '945270049172',
     projectId: 'capsule-7a72b',
     storageBucket: 'capsule-7a72b.firebasestorage.app',
-    iosBundleId: 'com.capsule.app',
+    iosBundleId: 'com.capapp.capsule',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
