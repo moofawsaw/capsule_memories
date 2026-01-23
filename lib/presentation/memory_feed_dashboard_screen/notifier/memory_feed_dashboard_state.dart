@@ -10,6 +10,7 @@ class MemoryFeedDashboardState extends Equatable {
   final bool hasMoreTrending;
   final bool hasMoreLongestStreak;
   final bool hasMorePopularUsers;
+  final bool hasMorePopularNow;
   final bool hasMorePopularMemories;
   final bool hasMoreLatestStories;
   final List<Map<String, dynamic>> activeMemories;
@@ -26,6 +27,7 @@ class MemoryFeedDashboardState extends Equatable {
     this.hasMoreTrending = true,
     this.hasMoreLongestStreak = true,
     this.hasMorePopularUsers = true,
+    this.hasMorePopularNow = true,
     this.hasMorePopularMemories = true,
     this.hasMoreLatestStories = true,
     this.activeMemories = const [],
@@ -43,6 +45,7 @@ class MemoryFeedDashboardState extends Equatable {
     bool? hasMoreTrending,
     bool? hasMoreLongestStreak,
     bool? hasMorePopularUsers,
+    bool? hasMorePopularNow,
     bool? hasMorePopularMemories,
     bool? hasMoreLatestStories,
     List<Map<String, dynamic>>? activeMemories,
@@ -61,6 +64,7 @@ class MemoryFeedDashboardState extends Equatable {
       hasMoreTrending: hasMoreTrending ?? this.hasMoreTrending,
       hasMoreLongestStreak: hasMoreLongestStreak ?? this.hasMoreLongestStreak,
       hasMorePopularUsers: hasMorePopularUsers ?? this.hasMorePopularUsers,
+      hasMorePopularNow: hasMorePopularNow ?? this.hasMorePopularNow,
       hasMorePopularMemories:
           hasMorePopularMemories ?? this.hasMorePopularMemories,
       hasMoreLatestStories: hasMoreLatestStories ?? this.hasMoreLatestStories,
@@ -82,6 +86,7 @@ class MemoryFeedDashboardState extends Equatable {
         hasMoreTrending,
         hasMoreLongestStreak,
         hasMorePopularUsers,
+        hasMorePopularNow,
         hasMorePopularMemories,
         hasMoreLatestStories,
         activeMemories,

@@ -10,6 +10,7 @@ class MemoryFeedDashboardModel extends Equatable {
   final List<HappeningNowStoryData>? trendingStories;
   final List<HappeningNowStoryData>? longestStreakStories;
   final List<HappeningNowStoryData>? popularUserStories;
+  final List<HappeningNowStoryData>? popularNowStories;
 
   // ✅ NEW STORY FEEDS
   final List<HappeningNowStoryData>? fromFriendsStories;
@@ -29,6 +30,7 @@ class MemoryFeedDashboardModel extends Equatable {
     this.trendingStories = const [],
     this.longestStreakStories = const [],
     this.popularUserStories = const [],
+    this.popularNowStories = const [],
 
     // ✅ NEW STORY FEEDS
     this.fromFriendsStories = const [],
@@ -49,6 +51,7 @@ class MemoryFeedDashboardModel extends Equatable {
     List<HappeningNowStoryData>? trendingStories,
     List<HappeningNowStoryData>? longestStreakStories,
     List<HappeningNowStoryData>? popularUserStories,
+    List<HappeningNowStoryData>? popularNowStories,
 
     // ✅ NEW STORY FEEDS
     List<HappeningNowStoryData>? fromFriendsStories,
@@ -68,6 +71,7 @@ class MemoryFeedDashboardModel extends Equatable {
       trendingStories: trendingStories ?? this.trendingStories,
       longestStreakStories: longestStreakStories ?? this.longestStreakStories,
       popularUserStories: popularUserStories ?? this.popularUserStories,
+      popularNowStories: popularNowStories ?? this.popularNowStories,
 
       // ✅ NEW STORY FEEDS
       fromFriendsStories: fromFriendsStories ?? this.fromFriendsStories,
@@ -90,6 +94,7 @@ class MemoryFeedDashboardModel extends Equatable {
     trendingStories,
     longestStreakStories,
     popularUserStories,
+    popularNowStories,
 
     // ✅ NEW STORY FEEDS
     fromFriendsStories,

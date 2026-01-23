@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../services/feed_service.dart';
 
 class StoryActionsSheet {
   static Future<void> show({
@@ -49,29 +50,25 @@ class StoryActionsSheet {
                   onTap: () async {
                     Navigator.pop(ctx);
 
-                    final String text =
-                    (deepLink != null && deepLink.trim().isNotEmpty)
-                        ? deepLink
-                        : mediaUrl;
-
-                    if (text.trim().isEmpty) return;
-                    await Share.share(text);
-                  },
-                ),
-                _ActionTile(
-                  icon: Icons.flag_outlined,
-                  label: 'Report',
-                  onTap: () async {
-                    Navigator.pop(ctx);
-
-                    // If your DB requires memory_id NOT NULL, ensure memoryId is set.
-                    await client.from('story_reports').insert({
-                      'story_id': storyId,
-                      'memory_id': memoryId.isEmpty ? null : memoryId,
-                      'reporter_id': currentUserId,
-                    });
-
-                    _toast(context, 'Reported');
+                    try {
+                      // Fetch story details to get share_code
+                      final feedService = FeedService();
+                      final storyData = await feedService.fetchStoryDetails(storyId);
+                      
+                      final shareCode = storyData?['share_code'] as String?;
+                      final shareIdentifier = shareCode ?? storyId;
+                      
+                      if (shareIdentifier.isEmpty) {
+                        _toast(context, 'Unable to share story');
+                        return;
+                      }
+                      
+                      final shareUrl = 'https://share.capapp.co/$shareIdentifier';
+                      await Share.share(shareUrl);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      _toast(context, 'Failed to share story');
+                    }
                   },
                 ),
                 if (canDelete) ...[

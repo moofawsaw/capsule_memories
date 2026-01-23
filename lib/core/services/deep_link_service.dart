@@ -234,9 +234,12 @@ class DeepLinkService with WidgetsBindingObserver {
         return;
       }
 
+      // IMPORTANT:
+      // Keep at least one route in the stack so closing the public story view
+      // can safely pop back without hitting Navigator's `_history.isNotEmpty` assertion.
       nav.pushNamedAndRemoveUntil(
         '${AppRoutes.storyViewPublic}/${args.initialStoryId}',
-            (_) => false,
+        (route) => route.isFirst,
         arguments: args,
       );
     });

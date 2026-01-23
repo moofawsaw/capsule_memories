@@ -92,10 +92,11 @@ flutter:
 
 flutter_native_splash:
   color: "#6B4EFF"
-  image: assets/images/splash_icon.png
+  image: assets/images/splash_logo.png
+
   android_12:
-    image: assets/images/splash_icon.png
     color: "#6B4EFF"
+    image: assets/images/splash_logo.png
 
 # Note: app_links package is NOT compatible with current Dart SDK 3.6.0 - deep linking implemented using native method channels instead
 

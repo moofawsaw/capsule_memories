@@ -170,13 +170,14 @@ class CustomStoryCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          userName,
-          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-              .copyWith(color: appTheme.white_A700, height: 1.29),
-        ),
+        if (userName.isNotEmpty)
+          Text(
+            userName,
+            style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                .copyWith(color: appTheme.white_A700, height: 1.29),
+          ),
         if (categoryText != null) ...[
-          SizedBox(height: 18.h),
+          SizedBox(height: userName.isNotEmpty ? 18.h : 0),
           _buildCategoryBadge(context, category),
         ],
         if (timestamp != null) ...[

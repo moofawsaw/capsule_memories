@@ -92,13 +92,23 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
 
     _displayNameFocus.addListener(() {
       if (!_displayNameFocus.hasFocus && _editingDisplayName) {
-        _saveDisplayName();
+        // Use post-frame callback to ensure state is consistent
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_displayNameFocus.hasFocus && _editingDisplayName) {
+            _saveDisplayName();
+          }
+        });
       }
     });
 
     _usernameFocus.addListener(() {
       if (!_usernameFocus.hasFocus && _editingUsername) {
-        _saveUsername();
+        // Use post-frame callback to ensure state is consistent
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_usernameFocus.hasFocus && _editingUsername) {
+            _saveUsername();
+          }
+        });
       }
     });
   }
@@ -228,6 +238,8 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
   }
 
   void _saveDisplayName() {
+    if (!_editingDisplayName) return;
+    
     final next = _displayNameController.text.trim();
     final current = widget.displayName.trim();
 
@@ -245,6 +257,8 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
   }
 
   void _saveUsername() {
+    if (!_editingUsername) return;
+    
     final nextRaw = _stripAt(_usernameController.text).trim();
     final currentRaw = _stripAt(widget.username).trim();
 
@@ -294,6 +308,9 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
       return uri.replace(query: '').toString();
     }
 
+    // Non-null avatar path when shouldLetter is false
+    final avatarUrl = resolvedAvatarPath ?? '';
+
     return SizedBox(
       width: size,
       height: size + (_showAvatarEdit ? 6.h : 0),
@@ -334,8 +351,8 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
                   child: ClipOval(
                     child: Image(
                       image: CachedNetworkImageProvider(
-                        resolvedAvatarPath!,
-                        cacheKey: _stripQuery(resolvedAvatarPath),
+                        avatarUrl,
+                        cacheKey: _stripQuery(avatarUrl),
                       ),
                       fit: BoxFit.cover,
                       gaplessPlayback: true,
@@ -391,6 +408,14 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
                 border: UnderlineInputBorder(),
               ),
               onSubmitted: (_) => _saveDisplayName(),
+              onEditingComplete: _saveDisplayName,
+              onTapOutside: (_) {
+                // Save immediately when tapping outside (iOS compatibility)
+                if (_editingDisplayName) {
+                  _saveDisplayName();
+                }
+                _displayNameFocus.unfocus();
+              },
             ),
             Positioned(
               right: 0,
@@ -487,6 +512,14 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
                         .copyWith(color: appTheme.blue_gray_300, height: 1.31),
                   ),
                   onSubmitted: (_) => _saveUsername(),
+                  onEditingComplete: _saveUsername,
+                  onTapOutside: (_) {
+                    // Save immediately when tapping outside (iOS compatibility)
+                    if (_editingUsername) {
+                      _saveUsername();
+                    }
+                    _usernameFocus.unfocus();
+                  },
                 ),
                 Positioned(
                   right: 0,

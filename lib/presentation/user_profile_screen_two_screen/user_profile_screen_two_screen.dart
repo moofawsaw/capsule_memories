@@ -11,7 +11,6 @@ import 'notifier/user_profile_screen_two_notifier.dart';
 import '../../core/models/feed_story_context.dart';
 import '../../core/utils/story_actions_sheet.dart';
 import '../../services/supabase_service.dart';
-import '../../core/utils/story_actions_sheet.dart';
 
 // ✅ NEW: skeleton
 import './widgets/user_profile_skeleton.dart';
@@ -381,10 +380,11 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       itemCount: stories.length,
       itemBuilder: (context, index) {
         final story = stories[index];
+        final isCurrentUser = _userId == null;
 
         return CustomStoryCard(
           borderRadius: BorderRadius.circular(0.h),
-          userName: story.userName ?? 'User',
+          userName: isCurrentUser ? '' : (story.userName ?? 'User'),
           userAvatar: story.userAvatar ?? ImageConstant.imgEllipse896x96,
           backgroundImage: story.backgroundImage ?? ImageConstant.imgImg,
           categoryText: story.categoryText ?? 'Memory',

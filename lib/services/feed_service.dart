@@ -1265,6 +1265,119 @@ class FeedService {
   }
 
   // -----------------------------
+  // STORIES: Popular Now
+  // -----------------------------
+
+  /// Fetch popular now stories with pagination
+  /// Filters: public memories, posted within 7 days
+  /// Sorted by: popularity_score from user_profiles
+  Future<List<Map<String, dynamic>>> fetchPopularNowStories({
+    int offset = 0,
+    int limit = _pageSize,
+  }) async {
+    if (_client == null) return [];
+
+    try {
+      final currentUserId = _client!.auth.currentUser?.id;
+
+      final response = await _client!
+          .from('stories')
+          .select('''
+            id,
+            video_url,
+            thumbnail_url,
+            created_at,
+            contributor_id,
+            memory_id,
+            reaction_count,
+            memories!inner(
+              title,
+              state,
+              visibility,
+              category_id,
+              memory_categories:category_id!inner(
+                name,
+                icon_url
+              )
+            ),
+            user_profiles_public!stories_contributor_id_fkey(
+              id,
+              display_name,
+              avatar_url,
+              popularity_score
+            )
+          ''')
+          .eq('memories.visibility', 'public')
+          .gte(
+        'created_at',
+        DateTime.now().subtract(const Duration(days: 7)).toIso8601String(),
+      )
+          .order('user_profiles_public(popularity_score)', ascending: false)
+          .range(offset, offset + limit - 1);
+
+      final rows = (response as List);
+
+      // Batch view status
+      final storyIds =
+      rows.map((r) => r['id'] as String?).whereType<String>().toList();
+
+      final viewedIds = (currentUserId != null)
+          ? await _fetchViewedStoryIdsForUser(
+        userId: currentUserId,
+        storyIds: storyIds,
+      )
+          : <String>{};
+
+      final validatedStories = <Map<String, dynamic>>[];
+
+      for (final item in rows) {
+        final memory = item['memories'] as Map<String, dynamic>?;
+        final contributor =
+            item['user_profiles_public'] as Map<String, dynamic>? ?? {};
+        final category = memory?['memory_categories'] as Map<String, dynamic>?;
+
+        final memoryTitle = (memory?['title'] as String?)?.trim();
+        final contributorName =
+        (contributor['display_name'] as String?)?.trim();
+        final rawThumb = item['thumbnail_url'];
+
+        if (memoryTitle == null ||
+            memoryTitle.isEmpty ||
+            contributorName == null ||
+            contributorName.isEmpty ||
+            rawThumb == null ||
+            rawThumb.toString().trim().isEmpty) {
+          continue;
+        }
+
+        final isRead =
+            (currentUserId != null) && viewedIds.contains(item['id']);
+
+        validatedStories.add({
+          'id': item['id'] ?? '',
+          'thumbnail_url': _resolveThumbnailUrl(rawThumb),
+          'created_at': item['created_at'] ?? '',
+          'reaction_count': item['reaction_count'] ?? 0,
+          'contributor_name': contributorName,
+          'contributor_avatar': AvatarHelperService.getAvatarUrl(
+            contributor['avatar_url'],
+          ),
+          'popularity_score': contributor['popularity_score'] ?? 0,
+          'memory_title': memoryTitle,
+          'category_name': (category?['name'] as String?)?.trim() ?? 'Custom',
+          'category_icon': category?['icon_url'] ?? '',
+          'is_read': isRead,
+        });
+      }
+
+      return validatedStories;
+    } catch (e) {
+      print('❌ ERROR fetching popular now stories: $e');
+      return [];
+    }
+  }
+
+  // -----------------------------
   // MEMORIES: Popular Memories
   // -----------------------------
 

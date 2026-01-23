@@ -1002,7 +1002,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
         _currentVideoController!.pause();
         _currentVideoController!.setVolume(0.0);
-        _currentVideoController!.seekTo(Duration.zero);
+        // NOTE:
+        // Don't call seekTo() right before dispose(). seekTo is async and may
+        // continue after disposal, causing "VideoPlayerController used after being disposed".
         _currentVideoController!.dispose();
         _currentVideoController = null;
         _isCurrentVideoInitialized = false;
@@ -1011,7 +1013,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       if (_nextVideoController != null) {
         _nextVideoController!.pause();
         _nextVideoController!.setVolume(0.0);
-        _nextVideoController!.seekTo(Duration.zero);
+        // NOTE: same reasoning as above—avoid async work right before dispose.
         _nextVideoController!.dispose();
         _nextVideoController = null;
         _isNextVideoInitialized = false;

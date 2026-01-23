@@ -79,8 +79,11 @@ class _MemoryFeedDashboardScreenState
                   _buildActionButton(context),
                   SizedBox(height: 22.h),
                   _buildHappeningNowOrLatestSection(context),
+                  if (_isAuthenticated) _buildFromFriendsSection(context),
+                  if (_isAuthenticated) _buildForYouSection(context),
                   _buildPublicMemoriesSection(context),
                   _buildTrendingStoriesSection(context),
+                  _buildPopularNowSection(context),
                   if (_isAuthenticated) _buildCategoriesSection(context),
                   _buildLongestStreakSection(context),
                   _buildPopularMemoriesSection(context),
@@ -394,6 +397,11 @@ class _MemoryFeedDashboardScreenState
             happeningNowStories.isEmpty &&
             latestStories.isEmpty;
 
+        // Hide section if both feeds are empty and not loading
+        if (!isLoading && happeningNowStories.isEmpty && latestStories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
         // If happening now has stories, show it
         if (happeningNowStories.isNotEmpty) {
           return _buildHappeningNowSection(context);
@@ -625,6 +633,11 @@ class _MemoryFeedDashboardScreenState
         final bool globalLoading = state.isLoading ?? false;
         final bool isLoading = globalLoading && memories.isEmpty;
 
+        // Hide section if empty and not loading
+        if (!isLoading && memories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
         // Convert memory_feed_dashboard_model.CustomMemoryItem to custom_public_memories.CustomMemoryItem
         final convertedMemories = memories.map((memory) {
           return custom_widget.CustomMemoryItem(
@@ -688,6 +701,11 @@ class _MemoryFeedDashboardScreenState
         final bool globalLoading = state.isLoading ?? false;
         final bool isLoading = globalLoading && memories.isEmpty;
 
+        // Hide section if empty and not loading
+        if (!isLoading && memories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
         // Convert dashboard model items into the widget's item type
         final convertedMemories = memories.map((memory) {
           return custom_widget.CustomMemoryItem(
@@ -747,6 +765,11 @@ class _MemoryFeedDashboardScreenState
         // Prevent "hard reload" flashes: only show loading skeletons when empty.
         final bool globalLoading = state.isLoading ?? false;
         final bool isLoading = globalLoading && stories.isEmpty;
+
+        // Hide section if empty and not loading
+        if (!isLoading && stories.isEmpty) {
+          return const SizedBox.shrink();
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -834,6 +857,374 @@ class _MemoryFeedDashboardScreenState
                       NavigatorService.pushNamed(
                         AppRoutes.appStoryView,
                         arguments: story.storyId,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildPopularNowSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryFeedDashboardProvider);
+        final stories = state.memoryFeedDashboardModel?.popularNowStories ?? [];
+
+        // IMPORTANT:
+        // Prevent "hard reload" flashes: only show loading skeletons when empty.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && stories.isEmpty;
+
+        // Hide section if empty and not loading
+        if (!isLoading && stories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 30.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.h),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.local_fire_department,
+                    size: 22.h,
+                    color: appTheme.colorFFD81E,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    'Popular Now',
+                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+            SizedBox(
+              height: 240.h,
+              child: isLoading
+                  ? ListView.builder(
+                key:
+                const PageStorageKey<String>('popular_now_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 140.h,
+                    margin: EdgeInsets.only(right: 12.h),
+                    child: CustomStorySkeleton(),
+                  );
+                },
+              )
+                  : stories.isEmpty
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.local_fire_department,
+                        size: 48.h,
+                        color: appTheme.blue_gray_300,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'No popular stories yet',
+                        style: TextStyleHelper
+                            .instance.title16MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Check back later for popular content',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key: const PageStorageKey<String>(
+                    'popular_now_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () {
+                      // Navigate with FeedStoryContext for proper feed navigation
+                      final args = FeedStoryContext(
+                        feedType: 'popular_now',
+                        initialStoryId: story.storyId,
+                        storyIds:
+                        stories.map((s) => s.storyId).toList(),
+                      );
+
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: args,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFromFriendsSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryFeedDashboardProvider);
+        final stories = state.memoryFeedDashboardModel?.fromFriendsStories ?? [];
+
+        // IMPORTANT:
+        // Prevent "hard reload" flashes: only show loading skeletons when empty.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && stories.isEmpty;
+
+        // Hide section if empty and not loading
+        if (!isLoading && stories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 30.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.h),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.people,
+                    size: 22.h,
+                    color: appTheme.deep_purple_A100,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    'From Friends',
+                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+            SizedBox(
+              height: 240.h,
+              child: isLoading
+                  ? ListView.builder(
+                key: const PageStorageKey<String>('from_friends_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 140.h,
+                    margin: EdgeInsets.only(right: 12.h),
+                    child: CustomStorySkeleton(),
+                  );
+                },
+              )
+                  : stories.isEmpty
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.people,
+                        size: 48.h,
+                        color: appTheme.blue_gray_300,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'No stories from friends yet',
+                        style: TextStyleHelper
+                            .instance.title16MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Your friends haven\'t posted recently',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key: const PageStorageKey<String>(
+                    'from_friends_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () {
+                      // Navigate with FeedStoryContext for proper feed navigation
+                      final args = FeedStoryContext(
+                        feedType: 'from_friends',
+                        initialStoryId: story.storyId,
+                        storyIds:
+                        stories.map((s) => s.storyId).toList(),
+                      );
+
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: args,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildForYouSection(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(memoryFeedDashboardProvider);
+        final stories = state.memoryFeedDashboardModel?.forYouStories ?? [];
+
+        // IMPORTANT:
+        // Prevent "hard reload" flashes: only show loading skeletons when empty.
+        final bool globalLoading = state.isLoading ?? false;
+        final bool isLoading = globalLoading && stories.isEmpty;
+
+        // Hide section if empty and not loading
+        if (!isLoading && stories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 30.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.h),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.favorite,
+                    size: 22.h,
+                    color: appTheme.red_500,
+                  ),
+                  SizedBox(width: 8.h),
+                  Text(
+                    'For You',
+                    style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                        .copyWith(color: appTheme.gray_50),
+                  ),
+                  SizedBox(width: 8.h),
+                  Flexible(
+                    child: Text(
+                      'Friends & Following',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                          .copyWith(color: appTheme.blue_gray_300),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+            SizedBox(
+              height: 240.h,
+              child: isLoading
+                  ? ListView.builder(
+                key: const PageStorageKey<String>('for_you_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 140.h,
+                    margin: EdgeInsets.only(right: 12.h),
+                    child: CustomStorySkeleton(),
+                  );
+                },
+              )
+                  : stories.isEmpty
+                  ? Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24.h),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.favorite,
+                        size: 48.h,
+                        color: appTheme.blue_gray_300,
+                      ),
+                      SizedBox(height: 12.h),
+                      Text(
+                        'No stories for you yet',
+                        style: TextStyleHelper
+                            .instance.title16MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Follow people to see their stories',
+                        style: TextStyleHelper
+                            .instance.body12MediumPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+                  : ListView.builder(
+                key: const PageStorageKey<String>(
+                    'for_you_list'),
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.only(left: 24.h),
+                itemCount: stories.length,
+                itemBuilder: (context, index) {
+                  final story = stories[index];
+                  return HappeningNowStoryCard(
+                    story: story,
+                    onTap: () {
+                      // Navigate with FeedStoryContext for proper feed navigation
+                      final args = FeedStoryContext(
+                        feedType: 'for_you',
+                        initialStoryId: story.storyId,
+                        storyIds:
+                        stories.map((s) => s.storyId).toList(),
+                      );
+
+                      NavigatorService.pushNamed(
+                        AppRoutes.appStoryView,
+                        arguments: args,
                       );
                     },
                   );
@@ -949,6 +1340,11 @@ class _MemoryFeedDashboardScreenState
         final bool globalLoading = state.isLoading ?? false;
         final bool isLoading = globalLoading && stories.isEmpty;
 
+        // Hide section if empty and not loading
+        if (!isLoading && stories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1058,6 +1454,11 @@ class _MemoryFeedDashboardScreenState
         // Prevent "hard reload" flashes: only show loading skeletons when empty.
         final bool globalLoading = state.isLoading ?? false;
         final bool isLoading = globalLoading && stories.isEmpty;
+
+        // Hide section if empty and not loading
+        if (!isLoading && stories.isEmpty) {
+          return const SizedBox.shrink();
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

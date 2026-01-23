@@ -189,6 +189,8 @@ class MemoryFeedDashboardNotifier
       await _feedService.fetchLongestStreakStories(offset: 0, limit: _pageSize);
       final popularUserData =
       await _feedService.fetchPopularUserStories(offset: 0, limit: _pageSize);
+      final popularNowData =
+      await _feedService.fetchPopularNowStories(offset: 0, limit: _pageSize);
 
       // ✅ NEW (required by MemoryFeedDashboardModel fields used in UI)
       // NOTE: These FeedService methods must exist. If you haven't built them yet,
@@ -310,6 +312,22 @@ class MemoryFeedDashboardNotifier
         );
       }).toList();
 
+      // Transform popular now
+      final popularNowStories = popularNowData.map((item) {
+        final isRead = item['is_read'] as bool? ?? false;
+
+        return HappeningNowStoryData(
+          storyId: item['id'] as String,
+          backgroundImage: item['thumbnail_url'] as String,
+          profileImage: item['contributor_avatar'] as String,
+          userName: item['contributor_name'] as String,
+          categoryName: item['category_name'] as String,
+          categoryIcon: item['category_icon'] as String? ?? '',
+          timestamp: _getRelativeTime(DateTime.parse(item['created_at'] as String)),
+          isRead: isRead,
+        );
+      }).toList();
+
       // ✅ Transform from friends
       final fromFriendsStories = fromFriendsData.map((item) {
         final isRead = item['is_read'] as bool? ?? false;
@@ -407,6 +425,7 @@ class MemoryFeedDashboardNotifier
         trendingStories: trendingStories.cast<HappeningNowStoryData>(),
         longestStreakStories: longestStreakStories.cast<HappeningNowStoryData>(),
         popularUserStories: popularUserStories.cast<HappeningNowStoryData>(),
+        popularNowStories: popularNowStories.cast<HappeningNowStoryData>(),
 
         // ✅ NEW
         fromFriendsStories: fromFriendsStories.cast<HappeningNowStoryData>(),
@@ -426,6 +445,7 @@ class MemoryFeedDashboardNotifier
           hasMoreTrending: trendingData.length == _pageSize,
           hasMoreLongestStreak: longestStreakData.length == _pageSize,
           hasMorePopularUsers: popularUserData.length == _pageSize,
+          hasMorePopularNow: popularNowData.length == _pageSize,
 
           // ✅ now actually driven by initial fetchPopularMemories
           hasMorePopularMemories: popularMemoriesData.length == _pageSize,
