@@ -101,6 +101,11 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     }
   }
 
+  /// Public refresh hook (used after creating/managing groups).
+  Future<void> refreshAvailableGroups() async {
+    await _fetchAvailableGroups();
+  }
+
   Future<void> _fetchAvailableCategories() async {
     try {
       final supabase = SupabaseService.instance.client;

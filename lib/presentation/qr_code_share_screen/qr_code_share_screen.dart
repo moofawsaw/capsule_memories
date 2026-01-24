@@ -71,11 +71,12 @@ class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
             ),
             SizedBox(height: 20.h),
             CustomNotificationCard(
-              iconPath: ImageConstant.imgFrameDeepOrangeA700,
+              leadingIcon: Icons.qr_code_2_rounded,
               title: 'Family Xmas 2025',
               description: 'Scan to join memory',
               isRead: true,
               onToggleRead: () {},
+              iconColor: appTheme.orange_600,
               titleFontSize: 20.0,
               descriptionAlignment: TextAlign.center,
               margin: EdgeInsets.zero,
@@ -103,8 +104,7 @@ class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
         return Container(
           margin: EdgeInsets.symmetric(horizontal: 68.h),
           child: QrImageView(
-            data: state.qrCodeShareModel?.qrCodeData ??
-                ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08,
+            data: (state.qrCodeShareModel?.qrCodeData ?? '').trim(),
             version: QrVersions.auto,
             size: 254.h,
             backgroundColor: appTheme.whiteCustom,
@@ -151,9 +151,7 @@ class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
                     borderRadius: BorderRadius.circular(8.h),
                   ),
                   child: Text(
-                    state.qrCodeShareModel?.shareUrl ??
-                        ImageConstant
-                            .imgNetworkR812309r72309r572093t722323t23t23t08,
+                    (state.qrCodeShareModel?.shareUrl ?? '').trim(),
                     style: TextStyleHelper
                         .instance.title16RegularPlusJakartaSans
                         .copyWith(color: appTheme.gray_50),
@@ -162,10 +160,10 @@ class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
               ),
               GestureDetector(
                 onTap: () => onTapCopyUrl(context),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgIcon14,
-                  height: 24.h,
-                  width: 24.h,
+                child: Icon(
+                  Icons.content_copy,
+                  size: 24.h,
+                  color: appTheme.gray_50,
                 ),
               ),
             ],
@@ -209,7 +207,7 @@ class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
             Expanded(
               child: CustomButton(
                 text: 'Download QR',
-                leftIcon: ImageConstant.imgIcon15,
+                leftIcon: Icons.download,
                 onPressed: () => onTapDownloadQR(context),
                 buttonStyle: CustomButtonStyle.fillDark,
                 buttonTextStyle: CustomButtonTextStyle
@@ -223,7 +221,7 @@ class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
             Expanded(
               child: CustomButton(
                 text: 'Share Link',
-                leftIcon: ImageConstant.imgIcon16,
+                leftIcon: Icons.share,
                 onPressed: () => onTapShareLink(context),
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle

@@ -416,10 +416,10 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CustomImageView(
-                    imagePath: ImageConstant.imgIcon16,
-                    height: 18.h,
-                    width: 18.h,
+                  Icon(
+                    Icons.share,
+                    size: 18.h,
+                    color: appTheme.white_A700,
                   ),
                   SizedBox(width: 8.h),
                   Text(

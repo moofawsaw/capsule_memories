@@ -109,7 +109,7 @@ class MemoryDetailsViewNotifier extends StateNotifier<MemoryDetailsViewState> {
         eventDate: snapshot.date,
         eventLocation: snapshot.location,
         isPrivate: snapshot.isPrivate,
-        categoryIcon: snapshot.categoryIcon ?? ImageConstant.imgFrame13,
+        categoryIcon: snapshot.categoryIcon ?? '',
         participantImages: snapshot.participantAvatars ?? [],
         customStoryItems: const <CustomStoryItem>[],
         timelineDetail: TimelineDetailModel(

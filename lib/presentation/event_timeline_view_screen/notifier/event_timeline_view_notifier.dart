@@ -279,7 +279,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       final iconName = (iconNameRaw ?? '').trim();
       final iconUrl = (category?['icon_url'] as String?)?.trim();
 
-      String categoryIconUrl = ImageConstant.imgFrame13;
+      String categoryIconUrl = '';
 
       if (iconName.isNotEmpty) {
         final resolved = StorageUtils.resolveMemoryCategoryIconUrl(iconName);
@@ -415,7 +415,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       final iconName = (iconNameRaw ?? '').trim();
       final iconUrl = (categoryData?['icon_url'] as String?)?.trim();
 
-      String categoryIconFinal = ImageConstant.imgFrame13;
+      String categoryIconFinal = '';
 
       if (iconName.isNotEmpty) {
         final resolved = StorageUtils.resolveMemoryCategoryIconUrl(iconName);
@@ -774,7 +774,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         eventTitle: snapshot.title,
         eventDate: snapshot.date,
         isPrivate: snapshot.isPrivate,
-        categoryIcon: snapshot.categoryIcon ?? ImageConstant.imgFrame13,
+        categoryIcon: snapshot.categoryIcon ?? '',
         participantImages: snapshot.participantAvatars ?? [],
         customStoryItems: [],
         timelineDetail: TimelineDetailModel(

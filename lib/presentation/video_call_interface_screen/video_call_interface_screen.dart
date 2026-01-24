@@ -104,10 +104,10 @@ class VideoCallInterfaceScreenState
                 onTap: () => Navigator.pop(context),
                 child: Container(
                   padding: EdgeInsets.all(8.h),
-                  child: CustomImageView(
-                    imagePath: ImageConstant.imgClose,
-                    height: 24.h,
-                    width: 24.h,
+                  child: Icon(
+                    Icons.close,
+                    size: 24.h,
+                    color: appTheme.gray_50,
                   ),
                 ),
               ),
@@ -159,10 +159,11 @@ class VideoCallInterfaceScreenState
                   CustomImageView(
                     imagePath:
                         state.videoCallInterfaceModel?.userProfileImage ??
-                            ImageConstant.imgEllipse852x52,
+                            '',
                     height: 52.h,
                     width: 52.h,
                     radius: BorderRadius.circular(26.h),
+                    isCircular: true,
                   ),
                   Positioned(
                     bottom: 0,
@@ -177,9 +178,14 @@ class VideoCallInterfaceScreenState
                             Border.all(color: appTheme.gray_900_02, width: 2.h),
                       ),
                       child: CustomImageView(
-                        imagePath: ImageConstant.imgIcon20x20,
+                        imagePath: '',
                         height: 12.h,
                         width: 12.h,
+                        placeholderWidget: Icon(
+                          Icons.person,
+                          size: 12.h,
+                          color: appTheme.gray_50,
+                        ),
                       ),
                     ),
                   ),
@@ -214,10 +220,10 @@ class VideoCallInterfaceScreenState
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CustomImageView(
-                      imagePath: ImageConstant.imgEmojiMemorycategory,
-                      height: 16.h,
-                      width: 16.h,
+                    Icon(
+                      Icons.emoji_emotions_outlined,
+                      size: 16.h,
+                      color: appTheme.gray_50,
                     ),
                     SizedBox(width: 4.h),
                     Text(
@@ -253,10 +259,10 @@ class VideoCallInterfaceScreenState
                 child: GestureDetector(
                   onTap: () => onTapParticipant(participant.id ?? ''),
                   child: CustomImageView(
-                    imagePath:
-                        participant.profileImage ?? ImageConstant.imgFrame48x48,
+                    imagePath: participant.profileImage ?? '',
                     height: 40.h,
                     width: 40.h,
+                    isCircular: true,
                   ),
                 ),
               );
@@ -271,20 +277,23 @@ class VideoCallInterfaceScreenState
     return Column(
       children: [
         CustomIconButton(
-          iconPath: ImageConstant.imgButtonsVolume,
+          icon: Icons.volume_up,
           backgroundColor: appTheme.color3B8E1E,
+          iconColor: appTheme.gray_50,
           onTap: () => onTapVolumeButton(),
         ),
         SizedBox(height: 24.h),
         CustomIconButton(
-          iconPath: ImageConstant.imgShare,
+          icon: Icons.share,
           backgroundColor: appTheme.color3B8E1E,
+          iconColor: appTheme.gray_50,
           onTap: () => onTapShareButton(),
         ),
         SizedBox(height: 24.h),
         CustomIconButton(
-          iconPath: ImageConstant.imgIcon6,
+          icon: Icons.screen_share,
           backgroundColor: appTheme.color3B8E1E,
+          iconColor: appTheme.gray_50,
           onTap: () => onTapScreenButton(),
         ),
       ],
@@ -351,10 +360,19 @@ class VideoCallInterfaceScreenState
                         borderRadius: BorderRadius.circular(32.h),
                       ),
                     )
-                  : CustomImageView(
-                      imagePath: counter.iconPath ?? '',
+                  : Container(
                       height: 64.h,
                       width: 64.h,
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_900_01,
+                        borderRadius: BorderRadius.circular(32.h),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        _reactionIcon(counter.type),
+                        size: 34.h,
+                        color: appTheme.gray_50,
+                      ),
                     ),
               SizedBox(height: 10.h),
               Container(
@@ -409,5 +427,18 @@ class VideoCallInterfaceScreenState
 
   void onTapReactionCounter(String reactionType) {
     ref.read(videoCallInterfaceNotifier.notifier).addReaction(reactionType);
+  }
+
+  IconData _reactionIcon(String? type) {
+    switch ((type ?? '').toLowerCase()) {
+      case 'heart':
+        return Icons.favorite;
+      case 'laugh':
+        return Icons.sentiment_very_satisfied;
+      case 'thumbs_up':
+        return Icons.thumb_up;
+      default:
+        return Icons.emoji_emotions_outlined;
+    }
   }
 }

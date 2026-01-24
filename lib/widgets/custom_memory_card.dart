@@ -192,7 +192,13 @@ class CustomMemoryCard extends StatelessWidget {
 
   Widget _buildActionButton(BuildContext context) {
     return CustomIconButton(
-      iconPath: actionIconPath ?? ImageConstant.imgFrame19,
+      iconPath: (actionIconPath != null && actionIconPath!.trim().isNotEmpty)
+          ? actionIconPath
+          : null,
+      icon: (actionIconPath == null || actionIconPath!.trim().isEmpty)
+          ? Icons.more_horiz
+          : null,
+      iconColor: appTheme.blue_gray_300,
       onTap: onActionTap,
       height: 40.h,
       width: 40.h,

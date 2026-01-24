@@ -456,10 +456,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CustomImageView(
-                imagePath: ImageConstant.imgIconDeepPurpleA10032x32,
-                height: 26.h,
-                width: 26.h,
+              Icon(
+                Icons.notifications_outlined,
+                size: 26.h,
+                color: appTheme.deep_purple_A100,
               ),
               SizedBox(width: 6.h),
               Text(
@@ -486,18 +486,22 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
   }
 
-  String _getNotificationIconPath(String type) {
+  IconData _getNotificationIcon(String type) {
     switch (type) {
       case 'memory_invite':
       case 'new_story':
       case 'memory_expiring':
       case 'memory_sealed':
-        return ImageConstant.imgIconDeepPurpleA10032x32;
+        return Icons.photo_library_outlined;
+      case 'public_story_nearby':
+        return Icons.photo_library_outlined;
+      case 'friend_new_story':
+        return Icons.person_pin_outlined;
       case 'friend_request':
       case 'followed':
-        return ImageConstant.imgIcon5;
+        return Icons.person_add_alt_1_outlined;
       default:
-        return ImageConstant.imgIconDeepPurpleA10032x32;
+        return Icons.notifications_outlined;
     }
   }
 
@@ -684,7 +688,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               ),
             ),
             child: CustomNotificationCard(
-              iconPath: _getNotificationIconPath(
+              leadingIcon: _getNotificationIcon(
                   notification['type'] as String? ?? ''),
               title: notification['title'] as String? ?? 'Notification',
               description: notification['message'] as String? ?? '',

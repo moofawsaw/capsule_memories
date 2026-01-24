@@ -67,11 +67,23 @@ class CustomMusicList extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Leading image
-          CustomImageView(
-            imagePath: item.leadingImagePath ?? ImageConstant.imgDollar,
-            height: 26.h,
-            width: 44.h,
-          ),
+          (item.leadingImagePath != null && item.leadingImagePath!.trim().isNotEmpty)
+              ? CustomImageView(
+                  imagePath: item.leadingImagePath!,
+                  height: 26.h,
+                  width: 44.h,
+                )
+              : SizedBox(
+                  height: 26.h,
+                  width: 44.h,
+                  child: Center(
+                    child: Icon(
+                      Icons.music_note,
+                      size: 22.h,
+                      color: appTheme.blue_gray_300,
+                    ),
+                  ),
+                ),
 
           SizedBox(width: 22.h),
 
@@ -93,12 +105,18 @@ class CustomMusicList extends StatelessWidget {
                 // Subtitle with icon
                 Row(
                   children: [
-                    CustomImageView(
-                      imagePath: item.subtitleIconPath ??
-                          ImageConstant.imgIconsBlueGray300,
-                      height: 20.h,
-                      width: 20.h,
-                    ),
+                    (item.subtitleIconPath != null &&
+                            item.subtitleIconPath!.trim().isNotEmpty)
+                        ? CustomImageView(
+                            imagePath: item.subtitleIconPath!,
+                            height: 20.h,
+                            width: 20.h,
+                          )
+                        : Icon(
+                            Icons.auto_stories,
+                            size: 20.h,
+                            color: appTheme.blue_gray_300,
+                          ),
                     SizedBox(width: 4.h),
                     Text(
                       item.subtitle ?? '121 stories',
@@ -113,8 +131,7 @@ class CustomMusicList extends StatelessWidget {
 
           // Play button
           CustomIconButton(
-            iconPath:
-                item.playButtonIconPath ?? ImageConstant.imgPlayCircleGray50,
+            icon: Icons.play_arrow,
             height: 34.h,
             width: 34.h,
             padding: EdgeInsets.all(2.h),

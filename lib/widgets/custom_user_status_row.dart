@@ -95,12 +95,15 @@ class CustomUserStatusRow extends StatelessWidget {
           gaplessPlayback: true,
           filterQuality: FilterQuality.low,
         )
-            : Image.asset(
-          profileImagePath.isNotEmpty
-              ? profileImagePath
-              : ImageConstant.imgEllipse826x26,
-          fit: BoxFit.cover,
-        ),
+            : Container(
+                color: appTheme.gray_900_03,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.person_outline,
+                  size: 18.h,
+                  color: appTheme.blue_gray_300,
+                ),
+              ),
       ),
     );
   }

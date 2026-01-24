@@ -137,12 +137,10 @@ class CustomUserList extends StatelessWidget {
           borderRadius: BorderRadius.circular(4.h),
           child: Padding(
             padding: EdgeInsets.all(4.h),
-            child: CustomImageView(
-              imagePath:
-                  user.actionIconPath ?? ImageConstant.imgIconBlueGray300,
-              height: 34.h,
-              width: 34.h,
-              fit: BoxFit.contain,
+            child: Icon(
+              Icons.more_horiz,
+              size: 28.h,
+              color: appTheme.blue_gray_300,
             ),
           ),
         );

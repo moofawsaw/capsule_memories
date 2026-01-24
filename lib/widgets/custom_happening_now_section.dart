@@ -59,10 +59,10 @@ class CustomHappeningNowSection extends StatelessWidget {
   Widget _buildSectionHeader() {
     return Row(
       children: [
-        CustomImageView(
-          imagePath: sectionIcon ?? ImageConstant.imgIconDeepPurpleA10022x22,
-          height: 22.h,
-          width: 22.h,
+        Icon(
+          Icons.flash_on,
+          size: 22.h,
+          color: appTheme.deep_purple_A100,
         ),
         SizedBox(width: 8.h),
         Text(

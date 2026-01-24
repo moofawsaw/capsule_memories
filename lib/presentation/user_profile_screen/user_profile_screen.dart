@@ -121,10 +121,10 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           margin: EdgeInsets.symmetric(horizontal: 10.h),
           child: Row(
             children: [
-              CustomImageView(
-                imagePath: ImageConstant.imgIcon32x32,
-                height: 32.h,
-                width: 32.h,
+              Icon(
+                Icons.arrow_back,
+                size: 32.h,
+                color: appTheme.gray_50,
               ),
               Expanded(
                 child: Container(
@@ -177,10 +177,10 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   ),
                 ),
               ),
-              CustomImageView(
-                imagePath: ImageConstant.imgIcon6,
-                height: 32.h,
-                width: 32.h,
+              Icon(
+                Icons.more_horiz,
+                size: 32.h,
+                color: appTheme.gray_50,
               ),
             ],
           ),
@@ -251,10 +251,9 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                     ? appTheme.gray_900_02
                                     : appTheme.white_A700),
                       ),
-                      CustomImageView(
-                        imagePath: ImageConstant.imgIconWhiteA70018x18,
-                        height: 18.h,
-                        width: 18.h,
+                      Icon(
+                        isFollowing ? Icons.check : Icons.add,
+                        size: 18.h,
                         color: isFollowing
                             ? appTheme.gray_900_02
                             : appTheme.white_A700,
@@ -296,10 +295,10 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             .instance.body14BoldPlusJakartaSans
                             .copyWith(color: appTheme.white_A700),
                       ),
-                      CustomImageView(
-                        imagePath: ImageConstant.imgIconWhiteA70018x18,
-                        height: 18.h,
-                        width: 18.h,
+                      Icon(
+                        isFriend ? Icons.person_remove : Icons.person_add,
+                        size: 18.h,
+                        color: appTheme.white_A700,
                       ),
                     ],
                   ),
@@ -323,10 +322,10 @@ class UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       style: TextStyleHelper.instance.body14BoldPlusJakartaSans
                           .copyWith(color: appTheme.white_A700),
                     ),
-                    CustomImageView(
-                      imagePath: ImageConstant.imgIcon18x18,
-                      height: 18.h,
-                      width: 18.h,
+                    Icon(
+                      Icons.block,
+                      size: 18.h,
+                      color: appTheme.white_A700,
                     ),
                   ],
                 ),

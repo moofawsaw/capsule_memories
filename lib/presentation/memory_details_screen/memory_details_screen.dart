@@ -158,7 +158,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
             CustomEditText(
               controller: state.titleController,
               hintText: 'Memory Title',
-              suffixIcon: canEditTitle ? ImageConstant.imgIconGray5018x20 : null,
+              suffixIcon: canEditTitle ? Icons.edit : null,
               fillColor: appTheme.gray_900,
               borderRadius: 8.h,
               textStyle: TextStyleHelper.instance.title16RegularPlusJakartaSans
@@ -277,7 +277,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                   ? 'Enter location or use Get Current'
                   : 'No location set',
               suffixIcon:
-              canEditLocation ? ImageConstant.imgIconGray5018x20 : null,
+              canEditLocation ? Icons.edit : null,
               fillColor: appTheme.gray_900,
               borderRadius: 8.h,
               textStyle: TextStyleHelper.instance.title16RegularPlusJakartaSans
@@ -851,10 +851,10 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
               children: [
                 Row(
                   children: [
-                    CustomImageView(
-                      imagePath: ImageConstant.imgIconBlueGray30018x18,
-                      height: 18.h,
-                      width: 18.h,
+                    Icon(
+                      Icons.group_outlined,
+                      size: 18.h,
+                      color: appTheme.blue_gray_300,
                     ),
                     SizedBox(width: 6.h),
                     Text(

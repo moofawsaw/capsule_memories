@@ -21,7 +21,6 @@ class CustomAppBar extends ConsumerStatefulWidget implements PreferredSizeWidget
     this.logoImagePath,
     this.title,
     this.showIconButton = false,
-    this.iconButtonImagePath,
     this.iconButtonBackgroundColor,
     this.actionIcons,
     this.showProfileImage = false,
@@ -30,7 +29,7 @@ class CustomAppBar extends ConsumerStatefulWidget implements PreferredSizeWidget
     this.showBottomBorder = true,
     this.backgroundColor,
     this.titleTextStyle,
-    this.leadingIcon,
+    this.showLeading = false,
     this.onLeadingTap,
   }) : super(key: key);
 
@@ -43,14 +42,11 @@ class CustomAppBar extends ConsumerStatefulWidget implements PreferredSizeWidget
   /// Whether to show the icon button (plus button)
   final bool showIconButton;
 
-  /// Path to the icon button image
-  final String? iconButtonImagePath;
-
   /// Background color for the icon button
   final Color? iconButtonBackgroundColor;
 
-  /// List of action icon paths
-  final List<String>? actionIcons;
+  /// List of action buttons to render on the right.
+  final List<CustomAppBarActionType>? actionIcons;
 
   /// Whether to show profile image
   final bool showProfileImage;
@@ -70,8 +66,8 @@ class CustomAppBar extends ConsumerStatefulWidget implements PreferredSizeWidget
   /// Custom text style for title
   final TextStyle? titleTextStyle;
 
-  /// Leading icon path
-  final String? leadingIcon;
+  /// Whether to show a leading icon (icon chosen by layout).
+  final bool showLeading;
 
   /// Callback for leading icon tap
   final VoidCallback? onLeadingTap;
@@ -251,8 +247,8 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                 onTap: () => _handleLogoTap(context),
                 child: CustomImageView(
                   imagePath: widget.logoImagePath!,
-                  height: 26.h,
-                  width: 130.h,
+                  height: 33.h,
+                  width: 190.h,
                   fit: BoxFit.contain,
                   alignment: Alignment.centerLeft,
                 ),
@@ -263,7 +259,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
 
           if (isAuthenticated) ...[
             // ➕ PLUS BUTTON (spin stays)
-            if (widget.showIconButton && widget.iconButtonImagePath != null) ...[
+            if (widget.showIconButton) ...[
               Container(
                 width: 46.h,
                 height: 46.h,
@@ -298,10 +294,12 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
             if (widget.actionIcons != null) ...[
               ...widget.actionIcons!.asMap().entries.map((entry) {
                 final index = entry.key;
-                final iconPath = entry.value;
+                final actionType = entry.value;
 
-                final isNotificationIcon = _isNotificationIcon(iconPath);
-                final isPicturesIcon = _isPicturesIcon(iconPath);
+                final isNotificationIcon =
+                    actionType == CustomAppBarActionType.notifications;
+                final isPicturesIcon =
+                    actionType == CustomAppBarActionType.memories;
 
                 bool isActive = false;
                 if (isNotificationIcon && currentRoute == AppRoutes.appNotifications) {
@@ -331,7 +329,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                 return Padding(
                   padding: EdgeInsets.only(left: index > 0 ? 6.h : 0),
                   child: GestureDetector(
-                    onTap: () => _handleActionIconTap(context, iconPath),
+                    onTap: () => _handleActionIconTap(context, actionType),
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -572,7 +570,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
       padding: EdgeInsets.symmetric(horizontal: 36.h, vertical: 4.h),
       child: Row(
         children: [
-          if (widget.leadingIcon != null)
+          if (widget.showLeading)
             GestureDetector(
               onTap: widget.onLeadingTap,
               child: Icon(
@@ -603,7 +601,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          if (widget.leadingIcon != null)
+          if (widget.showLeading)
             GestureDetector(
               onTap: widget.onLeadingTap,
               child: Icon(
@@ -641,26 +639,13 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     });
   }
 
-  void _handleActionIconTap(BuildContext context, String iconPath) {
-    if (_isNotificationIcon(iconPath)) {
+  void _handleActionIconTap(
+      BuildContext context, CustomAppBarActionType actionType) {
+    if (actionType == CustomAppBarActionType.notifications) {
       NavigatorService.pushNamed(AppRoutes.appNotifications);
-    } else if (_isPicturesIcon(iconPath)) {
+    } else if (actionType == CustomAppBarActionType.memories) {
       NavigatorService.pushNamed(AppRoutes.appMemories);
     }
-  }
-
-  bool _isNotificationIcon(String iconPath) {
-    return iconPath.contains('icon_gray_50_32x32');
-  }
-
-  bool _isPicturesIcon(String iconPath) {
-    return iconPath.contains('icon_gray_50') &&
-        !iconPath.contains('icon_gray_50_32x32') &&
-        !iconPath.contains('icon_gray_50_18x') &&
-        !iconPath.contains('icon_gray_50_20x') &&
-        !iconPath.contains('icon_gray_50_24x') &&
-        !iconPath.contains('icon_gray_50_26x') &&
-        !iconPath.contains('icon_gray_50_42x');
   }
 
   void _handleProfileTap(BuildContext context) {
@@ -693,4 +678,9 @@ enum CustomAppBarLayoutType {
   logoWithActions,
   titleWithLeading,
   spaceBetween,
+}
+
+enum CustomAppBarActionType {
+  memories,
+  notifications,
 }

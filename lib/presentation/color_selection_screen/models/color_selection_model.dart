@@ -37,33 +37,33 @@ class ColorSelectionModel extends Equatable {
 // ignore_for_file: must_be_immutable
 class ColorOptionModel extends Equatable {
   ColorOptionModel({
-    this.imagePath,
+    this.color,
     this.isSelected,
     this.id,
   }) {
-    imagePath = imagePath ?? "";
+    color = color ?? Colors.white;
     isSelected = isSelected ?? false;
     id = id ?? "";
   }
 
-  String? imagePath;
+  Color? color;
   bool? isSelected;
   String? id;
 
   ColorOptionModel copyWith({
-    String? imagePath,
+    Color? color,
     bool? isSelected,
     String? id,
   }) {
     return ColorOptionModel(
-      imagePath: imagePath ?? this.imagePath,
+      color: color ?? this.color,
       isSelected: isSelected ?? this.isSelected,
       id: id ?? this.id,
     );
   }
 
   @override
-  List<Object?> get props => [imagePath, isSelected, id];
+  List<Object?> get props => [color, isSelected, id];
 }
 
 // ignore_for_file: must_be_immutable

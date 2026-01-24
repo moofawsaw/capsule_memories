@@ -186,6 +186,65 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
     return base.where((m) => m.state == 'open').length;
   }
 
+  // ============================================================
+  // ✅ Local (non-loading) updates for memory cards
+  // ============================================================
+
+  void removeMemoryLocally(String memoryId) {
+    final id = memoryId.trim();
+    if (id.isEmpty) return;
+
+    final model = state.memoriesDashboardModel ?? MemoriesDashboardModel();
+    final current = model.memoryItems ?? <MemoryItemModel>[];
+
+    final updatedMemories = current.where((m) => (m.id ?? '') != id).toList();
+    final liveMemories = updatedMemories.where((m) => m.state == 'open').toList();
+    final sealedMemories =
+        updatedMemories.where((m) => m.state == 'sealed').toList();
+
+    final updatedModel = model.copyWith(
+      memoryItems: updatedMemories,
+      liveMemoryItems: liveMemories,
+      sealedMemoryItems: sealedMemories,
+      allCount: updatedMemories.length,
+      liveCount: liveMemories.length,
+      sealedCount: sealedMemories.length,
+    );
+
+    _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
+  }
+
+  void updateMemoryVisibilityLocally(String memoryId, String visibility) {
+    final id = memoryId.trim();
+    if (id.isEmpty) return;
+
+    final nextVisibility = visibility.trim().toLowerCase();
+    if (nextVisibility.isEmpty) return;
+
+    final model = state.memoriesDashboardModel ?? MemoriesDashboardModel();
+    final current = model.memoryItems ?? <MemoryItemModel>[];
+
+    final updatedMemories = current.map((m) {
+      if ((m.id ?? '') != id) return m;
+      return m.copyWith(visibility: nextVisibility);
+    }).toList();
+
+    final liveMemories = updatedMemories.where((m) => m.state == 'open').toList();
+    final sealedMemories =
+        updatedMemories.where((m) => m.state == 'sealed').toList();
+
+    final updatedModel = model.copyWith(
+      memoryItems: updatedMemories,
+      liveMemoryItems: liveMemories,
+      sealedMemoryItems: sealedMemories,
+      allCount: updatedMemories.length,
+      liveCount: liveMemories.length,
+      sealedCount: sealedMemories.length,
+    );
+
+    _safeSetState(state.copyWith(memoriesDashboardModel: updatedModel));
+  }
+
   int getVisibleCount(String userId) {
     return getFilteredMemories(userId).length;
   }
@@ -605,11 +664,11 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       if (endTimeStr == null || endTimeStr.trim().isEmpty) return;
 
       DateTime startTime;
-      DateTime endTime;
 
       try {
         startTime = DateTime.parse(startTimeStr.trim());
-        endTime = DateTime.parse(endTimeStr.trim());
+        // Validate parse (we only store string fields below)
+        DateTime.parse(endTimeStr.trim());
       } catch (_) {
         return;
       }

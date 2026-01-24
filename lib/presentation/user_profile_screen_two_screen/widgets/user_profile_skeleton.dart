@@ -69,7 +69,7 @@ class UserProfileSkeleton extends StatelessWidget {
               ),
               SizedBox(height: 20.h),
               _skeletonLine(width: 110.h, height: 14.h, radius: 10.h),
-              SizedBox(height: 14.h),
+              SizedBox(height: 18.h),
               _skeletonLine(width: 140.h, height: 12.h, radius: 10.h),
             ],
           ),

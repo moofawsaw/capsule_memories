@@ -120,10 +120,11 @@ class CustomUserCard extends StatelessWidget {
   Widget _buildProfileImage() {
     return ClipOval(
       child: CustomImageView(
-        imagePath: profileImagePath ?? ImageConstant.imgEllipse81,
+        imagePath: profileImagePath ?? '',
         height: profileImageSize ?? 36.h,
         width: profileImageSize ?? 36.h,
         fit: BoxFit.cover,
+        isCircular: true,
       ),
     );
   }
@@ -144,10 +145,10 @@ class CustomUserCard extends StatelessWidget {
       onTap: onActionTap,
       child: Container(
         margin: EdgeInsets.only(right: 10.h),
-        child: CustomImageView(
-          imagePath: actionIconPath ?? ImageConstant.imgIconBlueGray300,
-          height: actionIconSize ?? 28.h,
-          width: actionIconSize ?? 28.h,
+        child: Icon(
+          Icons.more_horiz,
+          size: actionIconSize ?? 28.h,
+          color: appTheme.blue_gray_300,
         ),
       ),
     );

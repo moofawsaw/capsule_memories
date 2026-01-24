@@ -66,7 +66,7 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
   Widget _buildAppBar(BuildContext context) {
     return CustomAppBar(
       layoutType: CustomAppBarLayoutType.titleWithLeading,
-      leadingIcon: ImageConstant.imgIconGray5042x42,
+      showLeading: true,
       title: 'Post story',
       onLeadingTap: () => NavigatorService.goBack(),
       titleTextStyle: TextStyleHelper.instance.headline28ExtraBold,
@@ -146,8 +146,7 @@ class PostStoryScreenState extends ConsumerState<PostStoryScreen> {
                     borderRadius: BorderRadius.circular(24.h),
                   ),
                   child: CustomImageView(
-                    imagePath: state.selectedImagePath ??
-                        ImageConstant.imgImage8542x342,
+                    imagePath: state.selectedImagePath ?? '',
                     width: double.infinity,
                     height: 542.h,
                     fit: BoxFit.cover,

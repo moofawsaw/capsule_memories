@@ -20,17 +20,25 @@ import './custom_image_view.dart';
 class CustomFab extends StatelessWidget {
   const CustomFab({
     Key? key,
-    required this.iconPath,
+    this.iconPath,
+    this.icon,
     this.onTap,
     this.backgroundColor,
     this.size,
     this.alignment,
     this.margin,
     this.borderRadius,
-  }) : super(key: key);
+    this.iconColor,
+    this.iconSize,
+  })  : assert(iconPath != null || icon != null,
+            'Either iconPath or icon must be provided'),
+        super(key: key);
 
-  /// Path to the icon image
-  final String iconPath;
+  /// Optional path to an asset/network icon (legacy)
+  final String? iconPath;
+
+  /// ✅ Preferred: Material icon
+  final IconData? icon;
 
   /// Callback function when FAB is tapped
   final VoidCallback? onTap;
@@ -50,6 +58,9 @@ class CustomFab extends StatelessWidget {
   /// Border radius for the FAB
   final double? borderRadius;
 
+  final Color? iconColor;
+  final double? iconSize;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -66,34 +77,53 @@ class CustomFab extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius ?? 32.h),
             ),
-            child: CustomImageView(
-              imagePath: iconPath,
-              height: (size ?? 64.h) * 0.5,
-              width: (size ?? 64.h) * 0.5,
-              fit: BoxFit.contain,
-            ),
+            child: _buildInnerIcon(),
           ),
         ),
       ),
     );
   }
 
+  Widget _buildInnerIcon() {
+    final effectiveSize = size ?? 64.h;
+    final glyphSize = iconSize ?? (effectiveSize * 0.5);
+    final glyphColor = iconColor ?? appTheme.gray_50;
+
+    if (icon != null) {
+      return Icon(icon, size: glyphSize, color: glyphColor);
+    }
+
+    return CustomImageView(
+      imagePath: iconPath!,
+      height: glyphSize,
+      width: glyphSize,
+      fit: BoxFit.contain,
+      color: glyphColor,
+    );
+  }
+
   /// Factory constructor for bottom right positioned FAB
   factory CustomFab.bottomRight({
-    required String iconPath,
+    String? iconPath,
+    IconData? icon,
     VoidCallback? onTap,
     Color? backgroundColor,
     double? size,
     double? rightMargin,
     double? bottomMargin,
     double? borderRadius,
+    Color? iconColor,
+    double? iconSize,
   }) {
     return CustomFab(
       iconPath: iconPath,
+      icon: icon,
       onTap: onTap,
       backgroundColor: backgroundColor,
       size: size,
       borderRadius: borderRadius,
+      iconColor: iconColor,
+      iconSize: iconSize,
       alignment: Alignment.bottomRight,
       margin: EdgeInsets.only(
         right: rightMargin ?? 28.h,
@@ -104,20 +134,26 @@ class CustomFab extends StatelessWidget {
 
   /// Factory constructor for bottom left positioned FAB
   factory CustomFab.bottomLeft({
-    required String iconPath,
+    String? iconPath,
+    IconData? icon,
     VoidCallback? onTap,
     Color? backgroundColor,
     double? size,
     double? leftMargin,
     double? bottomMargin,
     double? borderRadius,
+    Color? iconColor,
+    double? iconSize,
   }) {
     return CustomFab(
       iconPath: iconPath,
+      icon: icon,
       onTap: onTap,
       backgroundColor: backgroundColor,
       size: size,
       borderRadius: borderRadius,
+      iconColor: iconColor,
+      iconSize: iconSize,
       alignment: Alignment.bottomLeft,
       margin: EdgeInsets.only(
         left: leftMargin ?? 28.h,

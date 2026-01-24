@@ -4,13 +4,15 @@ import '../../../core/app_export.dart';
 
 // ignore_for_file: must_be_immutable
 class AppDownloadModel extends Equatable {
+  static const String capsuleDownloadUrl = 'https://capapp.co/download';
+
   AppDownloadModel({
     this.qrData,
     this.shareText,
     this.isLoading,
     this.id,
   }) {
-    qrData = qrData ?? ImageConstant.imgNetworkDownload;
+    qrData = qrData ?? capsuleDownloadUrl;
     shareText = shareText ??
         "Download the Capsule App and start creating memories together! https://capapp.co/download";
     isLoading = isLoading ?? false;

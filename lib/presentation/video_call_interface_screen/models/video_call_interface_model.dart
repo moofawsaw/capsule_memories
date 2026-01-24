@@ -13,7 +13,7 @@ class VideoCallInterfaceModel extends Equatable {
     this.reactionCounters,
     this.id,
   }) {
-    userProfileImage = userProfileImage ?? ImageConstant.imgEllipse852x52;
+    userProfileImage = userProfileImage ?? '';
     userName = userName ?? "Sarah Smith";
     timestamp = timestamp ?? "2 mins ago";
     participants = participants ?? [];

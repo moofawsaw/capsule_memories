@@ -71,10 +71,10 @@ class CustomSearchView extends StatelessWidget {
               .copyWith(color: appTheme.blue_gray_300, height: 1.31),
           prefixIcon: Container(
             padding: EdgeInsets.all(14.h),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgSearch,
-              height: 18.h,
-              width: 20.h,
+            child: Icon(
+              Icons.search,
+              size: 20.h,
+              color: appTheme.blue_gray_300,
             ),
           ),
           filled: true,

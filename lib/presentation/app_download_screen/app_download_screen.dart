@@ -79,16 +79,23 @@ class AppDownloadScreenState extends ConsumerState<AppDownloadScreen> {
   /// Section Widget
 
   Widget _buildQRCodeSection(BuildContext context) {
-    return CustomQrCodeCard(
-      assetImagePath: ImageConstant.imgCapsuleDownloadQR,
-      qrSize: 200.h,
-      outerPadding: 16.h,
-      borderRadius: 16.h,
-      margin: EdgeInsets.only(
-        top: 14.h,
-        left: 62.h,
-        right: 62.h,
-      ),
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(appDownloadNotifier);
+        final qrData = state.appDownloadModel?.qrData;
+
+        return CustomQrCodeCard(
+          qrData: (qrData ?? '').trim(),
+          qrSize: 200.h,
+          outerPadding: 16.h,
+          borderRadius: 16.h,
+          margin: EdgeInsets.only(
+            top: 14.h,
+            left: 62.h,
+            right: 62.h,
+          ),
+        );
+      },
     );
   }
 

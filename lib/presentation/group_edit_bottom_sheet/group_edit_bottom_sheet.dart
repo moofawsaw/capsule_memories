@@ -462,10 +462,10 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           ),
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIcon14x14,
-              height: 24.h,
-              width: 24.h,
+            child: Icon(
+              Icons.close,
+              size: 24.h,
+              color: appTheme.gray_50,
             ),
           ),
         ],
@@ -601,7 +601,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           final row = CustomUserStatusRow(
             profileImagePath: member['avatar']?.isNotEmpty == true
                 ? member['avatar']
-                : ImageConstant.imgEllipse826x26,
+                : '',
             userName: member['name'] ?? 'Unknown',
             statusText: statusText,
             statusBackgroundColor: (isCreator || isCurrentUser)

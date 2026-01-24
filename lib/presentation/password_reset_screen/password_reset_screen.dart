@@ -114,7 +114,7 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
             CustomEditText(
               controller: state.emailController,
               hintText: 'Email',
-              prefixIcon: ImageConstant.imgMail,
+              prefixIcon: Icons.mail_outline,
               keyboardType: TextInputType.emailAddress,
               validator: (value) {
                 if (value?.isEmpty ?? true) {

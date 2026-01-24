@@ -40,11 +40,10 @@ class AppShell extends StatelessWidget {
     return CustomAppBar(
       logoImagePath: ImageConstant.imgLogo,
       showIconButton: true,
-      iconButtonImagePath: ImageConstant.imgFrame19,
       iconButtonBackgroundColor: appTheme.color3BD81E,
       actionIcons: [
-        ImageConstant.imgIconGray50,
-        ImageConstant.imgIconGray5032x32,
+        CustomAppBarActionType.memories,
+        CustomAppBarActionType.notifications,
       ],
       showProfileImage: true,
       showBottomBorder: true,

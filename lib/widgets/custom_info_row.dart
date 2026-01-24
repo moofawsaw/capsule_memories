@@ -17,17 +17,23 @@ import '../core/app_export.dart';
 class CustomInfoRow extends StatelessWidget {
   const CustomInfoRow({
     Key? key,
-    required this.iconPath,
+    this.iconPath,
+    this.icon,
     required this.text,
     this.onIconTap,
     this.textWidth,
     this.spacing,
     this.margin,
     this.useFlexText = false,
-  }) : super(key: key);
+  })  : assert(iconPath != null || icon != null,
+            'Either iconPath or icon must be provided'),
+        super(key: key);
 
   /// Path to the icon image (SVG or other formats)
-  final String iconPath;
+  final String? iconPath;
+
+  /// ✅ Preferred: Material icon
+  final IconData? icon;
 
   /// Descriptive text content to display next to the icon
   final String text;
@@ -57,6 +63,7 @@ class CustomInfoRow extends StatelessWidget {
         children: [
           CustomIconButton(
             iconPath: iconPath,
+            icon: icon,
             onTap: onIconTap,
             height: 48.h,
             width: 48.h,

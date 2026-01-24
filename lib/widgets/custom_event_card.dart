@@ -75,10 +75,10 @@ class CustomEventCard extends StatelessWidget {
       padding: EdgeInsets.only(top: 14.h),
       child: GestureDetector(
         onTap: isLoading ? null : onBackTap,
-        child: CustomImageView(
-          imagePath: ImageConstant.imgArrowLeft,
-          width: 24.h,
-          height: 24.h,
+        child: Icon(
+          Icons.arrow_back,
+          size: 24.h,
+          color: appTheme.gray_50,
         ),
       ),
     );
@@ -175,12 +175,10 @@ class CustomEventCard extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CustomImageView(
-            imagePath: isPrivate!
-                ? ImageConstant.imgIconDeepPurpleA10014x14
-                : ImageConstant.imgIcon14x14,
-            height: 14.h,
-            width: 14.h,
+          Icon(
+            isPrivate! ? Icons.lock : Icons.public,
+            size: 14.h,
+            color: appTheme.deep_purple_A100,
           ),
           SizedBox(width: 4.h),
           Text(

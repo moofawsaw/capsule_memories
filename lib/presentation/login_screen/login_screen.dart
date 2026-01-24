@@ -137,7 +137,7 @@ class LoginScreenState extends ConsumerState<LoginScreen>
             CustomEditText(
               controller: state.emailController,
               hintText: 'Email',
-              prefixIcon: ImageConstant.imgMail,
+              prefixIcon: Icons.mail_outline,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
               validator: (value) {
@@ -148,7 +148,7 @@ class LoginScreenState extends ConsumerState<LoginScreen>
             CustomEditText(
               controller: state.passwordController,
               hintText: 'Password',
-              prefixIcon: ImageConstant.imgIcon,
+              prefixIcon: Icons.lock_outline,
               isPassword: true,
               autofillHints: const [AutofillHints.password],
               validator: (value) {

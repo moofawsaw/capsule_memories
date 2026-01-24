@@ -12,7 +12,7 @@ class UserProfileModel extends Equatable {
     this.followingCount,
     this.storyItems,
   }) {
-    profileImage = profileImage ?? ImageConstant.imgEllipse864x64;
+    profileImage = profileImage ?? '';
     userName = userName ?? "Lucy Ball";
     followersCount = followersCount ?? "29";
     followingCount = followingCount ?? "6";

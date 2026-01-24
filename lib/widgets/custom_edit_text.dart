@@ -46,6 +46,8 @@ class CustomEditText extends StatefulWidget {
     this.onTap,
     this.focusNode,
     this.autofillHints,
+    this.iconColor,
+    this.iconSize,
   }) : super(key: key);
 
   final TextEditingController? controller;
@@ -53,8 +55,10 @@ class CustomEditText extends StatefulWidget {
   final FormFieldValidator<String>? validator;
   final TextStyle? textStyle;
   final TextStyle? hintStyle;
-  final String? prefixIcon;
-  final String? suffixIcon;
+  /// ✅ Can be String (asset/url) OR IconData (Material icon)
+  final Object? prefixIcon;
+  /// ✅ Can be String (asset/url) OR IconData (Material icon)
+  final Object? suffixIcon;
   final bool isPassword;
   final TextInputType? keyboardType;
   final int? maxLines;
@@ -67,6 +71,9 @@ class CustomEditText extends StatefulWidget {
   final FocusNode? focusNode;
   final Iterable<String>? autofillHints;
 
+  final Color? iconColor;
+  final double? iconSize;
+
   @override
   State<CustomEditText> createState() => _CustomEditTextState();
 }
@@ -76,6 +83,9 @@ class _CustomEditTextState extends State<CustomEditText> {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveIconColor = widget.iconColor ?? appTheme.blue_gray_300;
+    final effectiveIconSize = widget.iconSize ?? 18.h;
+
     return TextFormField(
       controller: widget.controller,
       validator: widget.validator,
@@ -94,8 +104,18 @@ class _CustomEditTextState extends State<CustomEditText> {
         filled: true,
         fillColor: widget.fillColor ?? appTheme.gray_900,
         contentPadding: widget.contentPadding ?? _getDefaultPadding(),
-        prefixIcon: widget.prefixIcon != null ? _buildPrefixIcon() : null,
-        suffixIcon: _buildSuffixIcon(),
+        prefixIcon: widget.prefixIcon != null
+            ? _buildAnyIcon(
+                widget.prefixIcon!,
+                padding: EdgeInsets.symmetric(horizontal: 12.h),
+                color: effectiveIconColor,
+                size: effectiveIconSize,
+              )
+            : null,
+        suffixIcon: _buildSuffixIcon(
+          color: effectiveIconColor,
+          size: effectiveIconSize,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(widget.borderRadius ?? 8.h),
           borderSide: BorderSide.none,
@@ -120,27 +140,13 @@ class _CustomEditTextState extends State<CustomEditText> {
     );
   }
 
-  Widget? _buildPrefixIcon() {
-    if (widget.prefixIcon == null) return null;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.h),
-      child: CustomImageView(
-        imagePath: widget.prefixIcon!,
-        height: 18.h,
-        width: 18.h,
-        fit: BoxFit.contain,
-      ),
-    );
-  }
-
-  Widget? _buildSuffixIcon() {
+  Widget? _buildSuffixIcon({required Color color, required double size}) {
     if (widget.isPassword) {
       return IconButton(
         icon: Icon(
           _isObscured ? Icons.visibility_off : Icons.visibility,
-          color: appTheme.blue_gray_300,
-          size: 18.h,
+          color: color,
+          size: size,
         ),
         onPressed: () {
           setState(() {
@@ -149,17 +155,40 @@ class _CustomEditTextState extends State<CustomEditText> {
         },
       );
     } else if (widget.suffixIcon != null) {
-      return Padding(
+      return _buildAnyIcon(
+        widget.suffixIcon!,
         padding: EdgeInsets.symmetric(horizontal: 12.h),
-        child: CustomImageView(
-          imagePath: widget.suffixIcon!,
-          height: 18.h,
-          width: 20.h,
-          fit: BoxFit.contain,
-        ),
+        color: color,
+        size: size,
       );
     }
     return null;
+  }
+
+  Widget _buildAnyIcon(
+    Object iconValue, {
+    required EdgeInsetsGeometry padding,
+    required Color color,
+    required double size,
+  }) {
+    if (iconValue is IconData) {
+      return Padding(
+        padding: padding,
+        child: Icon(iconValue, color: color, size: size),
+      );
+    }
+
+    final path = iconValue.toString();
+    return Padding(
+      padding: padding,
+      child: CustomImageView(
+        imagePath: path,
+        height: size,
+        width: size,
+        fit: BoxFit.contain,
+        color: color,
+      ),
+    );
   }
 
   TextInputType _getKeyboardType() {

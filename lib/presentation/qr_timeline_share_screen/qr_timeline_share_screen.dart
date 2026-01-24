@@ -401,7 +401,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         Expanded(
           child: CustomButton(
             text: 'Share Link',
-            leftIcon: ImageConstant.imgIcon16,
+            leftIcon: Icons.share,
             onPressed: () => _shareLink(url),
             buttonStyle: CustomButtonStyle.fillPrimary,
             buttonTextStyle: CustomButtonTextStyle.bodyMedium,

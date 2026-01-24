@@ -116,10 +116,10 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CustomImageView(
-            imagePath: ImageConstant.imgEmojiMemorycategory,
-            height: 24.h,
-            width: 24.h,
+          Icon(
+            Icons.emoji_emotions_outlined,
+            size: 24.h,
+            color: appTheme.gray_50,
           ),
           SizedBox(width: 4.h),
           Text(
@@ -161,10 +161,11 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
                           child: CustomImageView(
                             imagePath: participants.length > 0
                                 ? participants[0]
-                                : ImageConstant.imgEllipse81,
+                                : '',
                             height: 40.h,
                             width: 40.h,
                             radius: BorderRadius.circular(20.h),
+                            isCircular: true,
                           ),
                         ),
                       if (participants.length > 1)
@@ -173,10 +174,11 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
                           child: CustomImageView(
                             imagePath: participants.length > 1
                                 ? participants[1]
-                                : ImageConstant.imgFrame3,
+                                : '',
                             height: 40.h,
                             width: 40.h,
                             radius: BorderRadius.circular(20.h),
+                            isCircular: true,
                           ),
                         ),
                       if (participants.length > 2)
@@ -185,10 +187,11 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
                           child: CustomImageView(
                             imagePath: participants.length > 2
                                 ? participants[2]
-                                : ImageConstant.imgFrame2,
+                                : '',
                             height: 40.h,
                             width: 40.h,
                             radius: BorderRadius.circular(20.h),
+                            isCircular: true,
                           ),
                         ),
                     ],
@@ -224,10 +227,10 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
       onTap: () {
         onTapCloseButton(context);
       },
-      child: CustomImageView(
-        imagePath: ImageConstant.imgFrame19,
-        height: 40.h,
-        width: 40.h,
+      child: Icon(
+        Icons.close,
+        size: 40.h,
+        color: appTheme.gray_50,
       ),
     );
   }
@@ -254,7 +257,8 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
   /// Section Widget
   Widget _buildBottomRightControl(BuildContext context) {
     return CustomFab(
-      iconPath: ImageConstant.imgButtonsGray5064x64,
+      icon: Icons.more_horiz,
+      iconColor: appTheme.gray_50,
       alignment: Alignment.bottomRight,
       backgroundColor: appTheme.color418724,
       size: 64.h,
@@ -268,7 +272,8 @@ class HangoutCallScreenState extends ConsumerState<HangoutCallScreen> {
   /// Section Widget
   Widget _buildBottomLeftControl(BuildContext context) {
     return CustomFab(
-      iconPath: ImageConstant.imgButtonsVolume,
+      icon: Icons.volume_up,
+      iconColor: appTheme.gray_50,
       alignment: Alignment.bottomLeft,
       backgroundColor: appTheme.color418724,
       size: 64.h,

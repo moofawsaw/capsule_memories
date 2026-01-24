@@ -101,11 +101,12 @@ class CustomImageView extends StatefulWidget {
     /// ✅ NEW: if true, only render actual http(s) URLs as images.
     /// Otherwise fallback placeholder is shown (prevents “stretched” assets).
     this.networkOnly = false,
+
+    /// ✅ NEW: Optional widget placeholder when image is missing or fails to load.
+    this.placeholderWidget,
   }) : super(key: key) {
-    // Keep legacy behavior: if null/empty, use placeholder immediately.
-    if (_isEffectivelyEmpty(imagePath)) {
-      imagePath = ImageConstant.imgImageNotFound;
-    }
+    // Do not force an asset fallback here (assets may not exist).
+    // Rendering fallback is handled in build based on resolved path.
   }
 
   late String? imagePath;
@@ -126,6 +127,8 @@ class CustomImageView extends StatefulWidget {
 
   final bool networkOnly;
 
+  final Widget? placeholderWidget;
+
   @override
   State<CustomImageView> createState() => _CustomImageViewState();
 }
@@ -138,7 +141,7 @@ class _CustomImageViewState extends State<CustomImageView>
   bool _hasAnimationCompleted = false;
 
   String _resolvedPathOrFallback(String? raw) {
-    if (_isEffectivelyEmpty(raw)) return widget.placeHolder ?? ImageConstant.imgImageNotFound;
+    if (_isEffectivelyEmpty(raw)) return widget.placeHolder ?? '';
 
     final input = (raw ?? '').trim();
 
@@ -147,7 +150,7 @@ class _CustomImageViewState extends State<CustomImageView>
         : input;
 
     if (_isEffectivelyEmpty(resolved)) {
-      return widget.placeHolder ?? ImageConstant.imgImageNotFound;
+      return widget.placeHolder ?? '';
     }
     return resolved;
   }
@@ -258,8 +261,12 @@ class _CustomImageViewState extends State<CustomImageView>
     // ✅ If networkOnly is true and this isn't an http(s) URL, force placeholder.
     final effectivePath =
     (widget.networkOnly && !_isNetworkImage(resolved))
-        ? (widget.placeHolder ?? ImageConstant.imgImageNotFound)
+        ? (widget.placeHolder ?? '')
         : resolved;
+
+    if (_isEffectivelyEmpty(effectivePath)) {
+      return _buildPlaceholder();
+    }
 
     Widget imageContent = Padding(
       padding: widget.margin ?? EdgeInsets.zero,
@@ -277,6 +284,34 @@ class _CustomImageViewState extends State<CustomImageView>
     }
 
     return imageContent;
+  }
+
+  Widget _buildPlaceholder() {
+    if (widget.placeholderWidget != null) return widget.placeholderWidget!;
+
+    final sizeHint = (widget.height ?? widget.width ?? 24.0).toDouble();
+    final iconSize = (sizeHint * 0.55).clamp(14.0, 48.0);
+    final iconData = widget.isCircular ? Icons.person_outline : Icons.image_not_supported_outlined;
+
+    return Padding(
+      padding: widget.margin ?? EdgeInsets.zero,
+      child: Container(
+        height: _safeFiniteDouble(widget.height),
+        width: _safeFiniteDouble(widget.width),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: appTheme.gray_900_01.withAlpha(51),
+          borderRadius: widget.radius,
+          shape: widget.isCircular ? BoxShape.circle : BoxShape.rectangle,
+          border: widget.border,
+        ),
+        child: Icon(
+          iconData,
+          size: iconSize,
+          color: appTheme.blue_gray_300.withAlpha(179),
+        ),
+      ),
+    );
   }
 
   Widget _buildCircleImage(String resolvedPath) {
@@ -329,6 +364,7 @@ class _CustomImageViewState extends State<CustomImageView>
               BlendMode.srcIn,
             )
                 : null,
+            placeholderBuilder: (_) => _buildPlaceholder(),
           ),
         );
 
@@ -353,6 +389,7 @@ class _CustomImageViewState extends State<CustomImageView>
             BlendMode.srcIn,
           )
               : null,
+          placeholderBuilder: (_) => _buildPlaceholder(),
         );
 
       case ImageType.network:
@@ -380,12 +417,7 @@ class _CustomImageViewState extends State<CustomImageView>
           gaplessPlayback: true,
           filterQuality: FilterQuality.low,
           errorBuilder: (_, __, ___) {
-            return Image.asset(
-              widget.placeHolder ?? ImageConstant.imgImageNotFound,
-              height: safeH,
-              width: safeW,
-              fit: widget.fit ?? BoxFit.cover,
-            );
+            return _buildPlaceholder();
           },
         );
 
@@ -398,12 +430,7 @@ class _CustomImageViewState extends State<CustomImageView>
           fit: widget.fit ?? BoxFit.cover,
           color: widget.color,
           errorBuilder: (context, error, stackTrace) {
-            return Image.asset(
-              widget.placeHolder ?? ImageConstant.imgImageNotFound,
-              height: safeH,
-              width: safeW,
-              fit: widget.fit ?? BoxFit.cover,
-            );
+            return _buildPlaceholder();
           },
         );
     }

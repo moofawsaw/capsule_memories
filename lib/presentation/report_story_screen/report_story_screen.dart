@@ -120,7 +120,7 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
             // If CustomUserListItem is too large and has no sizing controls,
             // replace it with your own Row. For now, keep it.
             CustomUserListItem(
-              imagePath: widget.reportedUserAvatar ?? ImageConstant.imgEllipse842x42,
+              imagePath: widget.reportedUserAvatar ?? '',
               name: displayName,
               avatarSize: 28, // 👈 smaller avatar for modal
               margin: EdgeInsets.zero,

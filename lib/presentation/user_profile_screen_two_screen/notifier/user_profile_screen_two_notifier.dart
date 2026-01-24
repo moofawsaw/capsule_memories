@@ -100,7 +100,7 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
       if (profile == null) {
         state = state.copyWith(
           userProfileScreenTwoModel: UserProfileScreenTwoModel(
-            avatarImagePath: ImageConstant.imgEllipse896x96,
+            avatarImagePath: '',
             displayName: 'User Not Found',
             username: '',
             email: null,
@@ -166,7 +166,7 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
             story['thumbnail_url'] as String?,
           ),
           categoryText: categoryName,
-          categoryIcon: categoryIconUrl ?? ImageConstant.imgVector,
+          categoryIcon: categoryIconUrl ?? '',
           timestamp: _storyService.getTimeAgo(
             DateTime.parse(
               story['created_at'] ?? DateTime.now().toIso8601String(),

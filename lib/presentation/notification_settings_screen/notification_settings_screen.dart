@@ -148,10 +148,10 @@ class NotificationSettingsScreenState
       margin: EdgeInsets.symmetric(horizontal: 16.h),
       child: Row(
         children: [
-          CustomImageView(
-            imagePath: ImageConstant.imgIcon26x26,
-            height: 26.h,
-            width: 26.h,
+          Icon(
+            Icons.settings,
+            size: 26.h,
+            color: appTheme.gray_50,
           ),
           SizedBox(width: 6.h),
           Text(
@@ -169,7 +169,9 @@ class NotificationSettingsScreenState
       final state = ref.watch(userMenuNotifier);
 
       return CustomSettingsRow(
-        iconPath: ImageConstant.imgIcon5,
+        useIconData: true,
+        iconData: Icons.dark_mode_outlined,
+        iconColor: appTheme.gray_50,
         title: 'Dark mode',
         description: 'Toggle dark mode on or off',
         switchValue: state.userMenuModel?.isDarkModeEnabled ?? true,
@@ -188,7 +190,7 @@ class NotificationSettingsScreenState
         final pushEnabled = state.pushNotificationsEnabled ?? true;
 
         return CustomNotificationSettings(
-          headerIcon: ImageConstant.imgIcon1,
+          headerIcon: Icons.notifications_outlined,
           headerTitle: 'Notifications',
           pushNotificationsEnabled: pushEnabled,
           onPushNotificationsChanged: (value) {
@@ -306,7 +308,7 @@ class NotificationSettingsScreenState
         _getAccountTypeLabel(userProfile?.authProvider ?? 'email');
 
         return CustomAccountSettings(
-          headerIcon: ImageConstant.imgIcon2,
+          headerIcon: Icons.person_outline,
           headerTitle: 'Account',
           accountOptions: [
             CustomAccountOption(
@@ -364,7 +366,7 @@ class NotificationSettingsScreenState
     }).toList();
 
     return CustomBlockedUsersSettings(
-      headerIcon: ImageConstant.imgIcon3,
+      headerIcon: Icons.block,
       headerTitle: 'Blocked Users',
       blockedUsers: _isLoadingBlockedUsers ? null : blockedUserItems,
     );
@@ -373,7 +375,7 @@ class NotificationSettingsScreenState
   /// Section Widget - Support Settings
   Widget _buildSupportSettings(BuildContext context) {
     return CustomSupportSettings(
-      headerIcon: ImageConstant.imgIcon4,
+      headerIcon: Icons.support_agent,
       headerTitle: 'Support',
       supportOptions: [
         CustomSupportOption(
@@ -399,7 +401,7 @@ class NotificationSettingsScreenState
   /// Section Widget - About Settings
   Widget _buildAboutSettings(BuildContext context) {
     return CustomAboutSettings(
-      headerIcon: ImageConstant.imgIcon5,
+      headerIcon: Icons.info_outline,
       headerTitle: 'About',
       appVersion: 'V1.0.01',
       aboutOptions: [

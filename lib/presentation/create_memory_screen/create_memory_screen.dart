@@ -1,12 +1,9 @@
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_dropdown.dart';
 import '../../widgets/custom_edit_text.dart';
 import '../../widgets/custom_header_section.dart';
-import '../../widgets/custom_icon_button_row.dart';
 import '../../services/groups_service.dart';
 import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_info_row.dart';
 import '../../widgets/custom_settings_row.dart';
 import 'notifier/create_memory_notifier.dart';
 
@@ -682,9 +679,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                       // Group name
                       Expanded(
                         child: Text(
-                          groups.isEmpty
-                              ? 'Loading groups...'
-                              : (selectedGroupName ?? 'None'),
+                          selectedGroupName ?? 'None',
                           style: TextStyleHelper.instance.body16BoldPlusJakartaSans
                               .copyWith(
                             fontSize: 16.fSize,
@@ -841,11 +836,74 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
 
                 SizedBox(height: 16.h),
 
+                // ✅ If user has no groups, offer a quick CTA under "None"
+                if (groups.isEmpty) ...[
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(modalContext);
+                      NavigatorService.pushNamed(AppRoutes.appGroups).then((_) {
+                        notifier.refreshAvailableGroups();
+                      });
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 18.h,
+                        vertical: 18.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: appTheme.gray_900,
+                        borderRadius: BorderRadius.circular(14.h),
+                        border: Border.all(
+                          color: appTheme.deep_purple_A100.withAlpha(60),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            height: 32.h,
+                            width: 32.h,
+                            decoration: BoxDecoration(
+                              color: appTheme.deep_purple_A100.withAlpha(51),
+                              borderRadius: BorderRadius.circular(10.h),
+                            ),
+                            child: Icon(
+                              Icons.add_circle_outline,
+                              color: appTheme.deep_purple_A100,
+                              size: 21.h,
+                            ),
+                          ),
+                          SizedBox(width: 14.h),
+                          Expanded(
+                            child: Text(
+                              'Create a group',
+                              style: TextStyleHelper
+                                  .instance.body16BoldPlusJakartaSans
+                                  .copyWith(
+                                fontSize: 18.fSize,
+                                fontWeight: FontWeight.w700,
+                                color: appTheme.gray_50,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: appTheme.blue_gray_300,
+                            size: 26.h,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                ],
+
                 Expanded(
                   child: groups.isEmpty
                       ? Center(
                     child: Text(
-                      'No groups found',
+                      'No groups yet',
                       style: TextStyleHelper
                           .instance.body14RegularPlusJakartaSans
                           .copyWith(color: appTheme.blue_gray_300),
@@ -1315,10 +1373,9 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         return Container(
           margin: EdgeInsets.only(top: 20.h),
           child: CustomSettingsRow(
-            useIconData: !isPublic,
-            iconData: !isPublic ? Icons.lock : null,
-            iconPath: isPublic ? ImageConstant.imgIconGreen500 : null,
-            iconColor: !isPublic ? appTheme.deep_purple_A100 : null,
+            useIconData: true,
+            iconData: isPublic ? Icons.public : Icons.lock,
+            iconColor: isPublic ? appTheme.green_500 : appTheme.deep_purple_A100,
             title: isPublic ? 'Public' : 'Private',
             description: isPublic
                 ? 'Anyone can view this memory'

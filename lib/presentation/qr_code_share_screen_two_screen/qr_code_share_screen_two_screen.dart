@@ -371,7 +371,7 @@ class QRCodeShareScreenTwoScreenState
             Expanded(
               child: CustomButton(
                 text: 'Share Link',
-                leftIcon: ImageConstant.imgIcon16,
+                leftIcon: Icons.share,
                 onPressed: () => onTapShareLink(context),
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,

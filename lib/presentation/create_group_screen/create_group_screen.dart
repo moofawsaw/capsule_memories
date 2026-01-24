@@ -163,16 +163,41 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         );
       }
 
+      final allFriends = state.createGroupModel?.friendsList ?? [];
       final filteredFriends = state.createGroupModel?.filteredFriends ?? [];
+      final hasNoFriends = allFriends.isEmpty;
 
       if (filteredFriends.isEmpty) {
         return Padding(
           padding: EdgeInsets.symmetric(vertical: 20.h),
-          child: Text(
-            'No friends found. Add friends to create a group.',
-            style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
-            textAlign: TextAlign.center,
+          child: Column(
+            children: [
+              Text(
+                hasNoFriends
+                    ? 'No friends yet. Add friends to create a group.'
+                    : 'No friends found.',
+                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+                textAlign: TextAlign.center,
+              ),
+              if (hasNoFriends) ...[
+                SizedBox(height: 14.h),
+                CustomButton(
+                  text: 'Go to Friends',
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  height: 44.h,
+                  padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 10.h),
+                  onPressed: () {
+                    // Close sheet first, then navigate to Friends screen
+                    NavigatorService.goBack();
+                    Future.microtask(
+                      () => NavigatorService.pushNamed(AppRoutes.appFriends),
+                    );
+                  },
+                ),
+              ],
+            ],
           ),
         );
       }

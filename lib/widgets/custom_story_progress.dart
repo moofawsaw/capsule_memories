@@ -89,7 +89,7 @@ class CustomStoryProgress extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6.h),
               child: CustomImageView(
-                imagePath: mainImagePath ?? ImageConstant.imgImage9,
+                imagePath: mainImagePath ?? '',
                 width: double.infinity,
                 height: double.infinity,
                 fit: BoxFit.cover,
@@ -116,10 +116,10 @@ class CustomStoryProgress extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8.h),
                   ),
                   child: Center(
-                    child: CustomImageView(
-                      imagePath: overlayIconPath ?? ImageConstant.imgImagesmode,
-                      width: 12.h,
-                      height: 12.h,
+                    child: Icon(
+                      Icons.photo,
+                      size: 12.h,
+                      color: appTheme.gray_50,
                     ),
                   ),
                 ),
@@ -173,10 +173,11 @@ class CustomStoryProgress extends StatelessWidget {
 
               // Profile image at progress point
               CustomImageView(
-                imagePath: profileImagePath ?? ImageConstant.imgEllipse826x26,
+                imagePath: profileImagePath ?? '',
                 width: 28.h,
                 height: 28.h,
                 fit: BoxFit.cover,
+                isCircular: true,
               ),
 
               Expanded(
@@ -196,10 +197,10 @@ class CustomStoryProgress extends StatelessWidget {
       right: 0,
       child: InkWell(
         onTap: onActionTap,
-        child: CustomImageView(
-          imagePath: actionIconPath ?? ImageConstant.imgFrame19,
-          width: 42.h,
-          height: 42.h,
+        child: Icon(
+          Icons.chevron_right,
+          size: 42.h,
+          color: appTheme.gray_50,
         ),
       ),
     );

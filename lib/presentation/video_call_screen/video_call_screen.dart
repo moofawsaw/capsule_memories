@@ -114,10 +114,11 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                       child: CustomImageView(
                         imagePath: contributorAvatar.isNotEmpty
                             ? contributorAvatar
-                            : ImageConstant.imgEllipse852x52,
+                            : '',
                         height: 52.h,
                         width: 52.h,
                         radius: BorderRadius.circular(26.h),
+                        isCircular: true,
                       ),
                     ),
                     if (memoryCategoryIcon.isNotEmpty)
@@ -223,10 +224,11 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                 return CustomImageView(
                   imagePath: avatarUrl.isNotEmpty
                       ? avatarUrl
-                      : ImageConstant.imgEllipse826x26,
+                      : '',
                   height: 40.h,
                   width: 40.h,
                   radius: BorderRadius.circular(20.h),
+                  isCircular: true,
                 );
               }).toList(),
             ),
@@ -256,10 +258,10 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                   color: appTheme.color3B8E1E,
                   borderRadius: BorderRadius.circular(24.h),
                 ),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgButtonsVolume,
-                  height: 24.h,
-                  width: 24.h,
+                child: Icon(
+                  Icons.volume_up,
+                  size: 24.h,
+                  color: appTheme.gray_50,
                 ),
               ),
             ),
@@ -276,10 +278,10 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                   color: appTheme.color3B8E1E,
                   borderRadius: BorderRadius.circular(24.h),
                 ),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgShare,
-                  height: 24.h,
-                  width: 24.h,
+                child: Icon(
+                  Icons.share,
+                  size: 24.h,
+                  color: appTheme.gray_50,
                 ),
               ),
             ),
@@ -296,10 +298,10 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
                   color: appTheme.color3B8E1E,
                   borderRadius: BorderRadius.circular(24.h),
                 ),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgIcon6,
-                  height: 24.h,
-                  width: 24.h,
+                child: Icon(
+                  Icons.more_horiz,
+                  size: 24.h,
+                  color: appTheme.gray_50,
                 ),
               ),
             ),
@@ -421,32 +423,36 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
             children: [
               _buildEmojiItem(
                 context,
-                ImageConstant.imgHeart,
+                Icons.favorite,
                 '2',
                 () => ref.read(videoCallProvider.notifier).onEmojiTap('heart'),
+                iconColor: appTheme.red_500,
               ),
               _buildEmojiItem(
                 context,
-                null,
+                Icons.favorite,
                 '2',
                 () => ref
                     .read(videoCallProvider.notifier)
                     .onEmojiTap('heart_eyes'),
                 backgroundColor: appTheme.red_600,
+                iconColor: appTheme.gray_50,
               ),
               _buildEmojiItem(
                 context,
-                ImageConstant.imgLaughing,
+                Icons.sentiment_very_satisfied,
                 '2',
                 () =>
                     ref.read(videoCallProvider.notifier).onEmojiTap('laughing'),
+                iconColor: appTheme.amber_600,
               ),
               _buildEmojiItem(
                 context,
-                ImageConstant.imgThumbsup,
+                Icons.thumb_up,
                 '2',
                 () =>
                     ref.read(videoCallProvider.notifier).onEmojiTap('thumbsup'),
+                iconColor: appTheme.blue_A200,
               ),
             ],
           ),
@@ -457,31 +463,31 @@ class VideoCallScreenState extends ConsumerState<VideoCallScreen> {
 
   Widget _buildEmojiItem(
     BuildContext context,
-    String? imagePath,
+    IconData? icon,
     String count,
     VoidCallback onTap, {
     Color? backgroundColor,
+    Color? iconColor,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         spacing: 10.h,
         children: [
-          if (imagePath != null)
-            CustomImageView(
-              imagePath: imagePath,
-              height: 56.h,
-              width: 56.h,
-            )
-          else
-            Container(
-              height: 64.h,
-              width: 64.h,
-              decoration: BoxDecoration(
-                color: backgroundColor ?? appTheme.transparentCustom,
-                borderRadius: BorderRadius.circular(32.h),
-              ),
+          Container(
+            height: 64.h,
+            width: 64.h,
+            decoration: BoxDecoration(
+              color: backgroundColor ?? appTheme.transparentCustom,
+              borderRadius: BorderRadius.circular(32.h),
             ),
+            alignment: Alignment.center,
+            child: Icon(
+              icon ?? Icons.emoji_emotions_outlined,
+              size: 34.h,
+              color: iconColor ?? appTheme.gray_50,
+            ),
+          ),
           Container(
             width: 34.h,
             padding: EdgeInsets.symmetric(vertical: 4.h),

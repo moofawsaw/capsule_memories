@@ -32,10 +32,11 @@ class MemberItemWidget extends ConsumerWidget {
         children: [
           CustomImageView(
             imagePath:
-                member.profileImagePath ?? ImageConstant.imgEllipse826x26,
+                member.profileImagePath ?? '',
             height: 36.h,
             width: 36.h,
             radius: BorderRadius.circular(18.h),
+            isCircular: true,
           ),
           SizedBox(width: 8.h),
           Expanded(

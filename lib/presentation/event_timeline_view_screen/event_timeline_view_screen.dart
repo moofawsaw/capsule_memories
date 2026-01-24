@@ -770,7 +770,7 @@ class EventTimelineViewScreenState
             if (isCurrentUserMember)
               CustomButton(
                 text: 'Create Story',
-                leftIcon: ImageConstant.imgIcon20x20,
+                leftIcon: Icons.add,
                 onPressed: () => onTapCreateStory(context),
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,

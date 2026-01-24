@@ -92,10 +92,10 @@ class VibeSelectionScreenState extends ConsumerState<VibeSelectionScreen>
                 .copyWith(color: appTheme.gray_50),
           ),
           SizedBox(width: 14.h),
-          CustomImageView(
-            imagePath: ImageConstant.imgIconGray5026x26,
-            width: 26.h,
-            height: 26.h,
+          Icon(
+            Icons.emoji_emotions_outlined,
+            size: 26.h,
+            color: appTheme.gray_50,
           ),
           Spacer(),
           GestureDetector(
@@ -124,7 +124,7 @@ class VibeSelectionScreenState extends ConsumerState<VibeSelectionScreen>
             children: [
               _buildVibeTab(
                 context: context,
-                imagePath: ImageConstant.imgGroup,
+                icon: Icons.sentiment_satisfied_alt_outlined,
                 label: 'Fun',
                 backgroundColor: appTheme.deep_purple_A100,
                 isSelected: state.selectedVibeIndex == 0,
@@ -132,7 +132,7 @@ class VibeSelectionScreenState extends ConsumerState<VibeSelectionScreen>
               ),
               _buildVibeTab(
                 context: context,
-                imagePath: ImageConstant.imgGroupOrange600,
+                icon: Icons.auto_awesome,
                 label: 'Crazy',
                 backgroundColor: appTheme.color41C124,
                 isSelected: state.selectedVibeIndex == 1,
@@ -140,7 +140,7 @@ class VibeSelectionScreenState extends ConsumerState<VibeSelectionScreen>
               ),
               _buildVibeTab(
                 context: context,
-                imagePath: ImageConstant.imgGroupOrange60034x36,
+                icon: Icons.favorite_border,
                 label: 'Sexy',
                 backgroundColor: appTheme.color41C124,
                 isSelected: state.selectedVibeIndex == 2,
@@ -148,7 +148,7 @@ class VibeSelectionScreenState extends ConsumerState<VibeSelectionScreen>
               ),
               _buildVibeTab(
                 context: context,
-                imagePath: ImageConstant.imgGroup34x36,
+                icon: Icons.pets_outlined,
                 label: 'Cute',
                 backgroundColor: appTheme.color41C124,
                 isSelected: state.selectedVibeIndex == 3,
@@ -164,7 +164,7 @@ class VibeSelectionScreenState extends ConsumerState<VibeSelectionScreen>
   /// Individual vibe tab
   Widget _buildVibeTab({
     required BuildContext context,
-    required String imagePath,
+    required IconData icon,
     required String label,
     required Color backgroundColor,
     required bool isSelected,
@@ -184,10 +184,10 @@ class VibeSelectionScreenState extends ConsumerState<VibeSelectionScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CustomImageView(
-              imagePath: imagePath,
-              width: 36.h,
-              height: 36.h,
+            Icon(
+              icon,
+              size: 36.h,
+              color: isSelected ? appTheme.white_A700 : appTheme.gray_50,
             ),
             SizedBox(height: 8.h),
             Text(

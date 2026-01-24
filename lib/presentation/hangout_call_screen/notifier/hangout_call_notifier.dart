@@ -20,12 +20,8 @@ class HangoutCallNotifier extends StateNotifier<HangoutCallState> {
   void initialize() {
     state = state.copyWith(
       hangoutCallModel: HangoutCallModel(
-        participants: [
-          ImageConstant.imgEllipse81,
-          ImageConstant.imgFrame3,
-          ImageConstant.imgFrame2,
-        ],
-        additionalParticipants: 3,
+        participants: const <String>[],
+        additionalParticipants: 0,
         isSpeakerOn: true,
         isCallActive: true,
       ),

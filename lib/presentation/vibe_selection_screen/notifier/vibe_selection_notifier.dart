@@ -23,30 +23,18 @@ class VibeSelectionNotifier extends StateNotifier<VibeSelectionState> {
       MusicListItem(
         title: 'Swag Song',
         subtitle: '121 stories',
-        leadingImagePath: ImageConstant.imgDollar,
-        subtitleIconPath: ImageConstant.imgIconsBlueGray300,
-        playButtonIconPath: ImageConstant.imgPlayCircleGray50,
       ),
       MusicListItem(
         title: 'Swag Song',
         subtitle: '121 stories',
-        leadingImagePath: ImageConstant.imgDollar,
-        subtitleIconPath: ImageConstant.imgIconsBlueGray300,
-        playButtonIconPath: ImageConstant.imgPlayCircleGray50,
       ),
       MusicListItem(
         title: 'Swag Song',
         subtitle: '121 stories',
-        leadingImagePath: ImageConstant.imgDollar,
-        subtitleIconPath: ImageConstant.imgIconsBlueGray300,
-        playButtonIconPath: ImageConstant.imgPlayCircleGray50,
       ),
       MusicListItem(
         title: 'Swag Song',
         subtitle: '121 stories',
-        leadingImagePath: ImageConstant.imgDollar,
-        subtitleIconPath: ImageConstant.imgIconsBlueGray300,
-        playButtonIconPath: ImageConstant.imgPlayCircleGray50,
       ),
     ];
 

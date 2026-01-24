@@ -227,10 +227,11 @@ class _QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
                     CustomIconButton(
                       height: 44.h,
                       width: 44.h,
-                      iconPath: ImageConstant.imgArrowLeft,
+                      icon: Icons.arrow_back,
                       backgroundColor: appTheme.gray_900_01.withAlpha(179),
                       borderRadius: 22.h,
                       iconSize: 24.h,
+                      iconColor: appTheme.gray_50,
                       onTap: () => Navigator.pop(context),
                     ),
                     GestureDetector(

@@ -34,12 +34,12 @@ class ContactItemWidget extends StatelessWidget {
               child: CustomImageView(
                 imagePath: (contact.profileImage == null ||
                         contact.profileImage!.isEmpty)
-                    ? ImageConstant.imgEllipse864x64
+                    ? ''
                     : contact.profileImage!,
                 height: 60.h,
                 width: 60.h,
                 fit: BoxFit.cover,
-                placeHolder: ImageConstant.imgImageNotFound,
+                isCircular: true,
               ),
             ),
           ),

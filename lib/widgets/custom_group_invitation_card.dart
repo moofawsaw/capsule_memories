@@ -169,11 +169,10 @@ class CustomGroupInvitationCard extends StatelessWidget {
         SizedBox(width: 18.h),
         GestureDetector(
           onTap: onActionTap,
-          child: CustomImageView(
-            imagePath: actionIconPath ?? ImageConstant.imgIconRed50026x26,
-            width: 26.h,
-            height: 26.h,
-            fit: BoxFit.contain,
+          child: Icon(
+            Icons.close,
+            size: 26.h,
+            color: appTheme.red_500,
           ),
         ),
       ],

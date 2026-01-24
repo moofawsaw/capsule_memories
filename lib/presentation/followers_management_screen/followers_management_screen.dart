@@ -51,10 +51,10 @@ class FollowersManagementScreenState
           children: [
             Container(
               margin: EdgeInsets.only(top: 2.h),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgIconDeepPurpleA10026x26,
-                height: 26.h,
-                width: 26.h,
+              child: Icon(
+                Icons.people_alt_rounded,
+                size: 26.h,
+                color: appTheme.deep_purple_A100,
               ),
             ),
             Container(
@@ -105,10 +105,10 @@ class FollowersManagementScreenState
             ref.listen(
               followersManagementNotifier,
               (previous, current) {
-                if (current.isBlocked ?? false) {
+                if (current.didFollowBack ?? false) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('User blocked successfully'),
+                      content: Text('Followed back'),
                       backgroundColor: appTheme.deep_purple_A100,
                     ),
                   );
@@ -161,6 +161,8 @@ class FollowersManagementScreenState
       BuildContext context, FollowerItemModel? follower, int index) {
     if (follower == null) return SizedBox.shrink();
 
+    final isFollowingBack = follower.isFollowingBack ?? false;
+
     return GestureDetector(
       onTap: () => onTapFollower(context, follower),
       child: Row(
@@ -195,17 +197,20 @@ class FollowersManagementScreenState
             ),
           ),
           CustomButton(
-            text: 'block',
+            text: isFollowingBack ? 'Following' : 'Follow back',
             width: null,
-            buttonStyle: CustomButtonStyle
-                .fillPrimary, // Modified: Fixed CustomButtonStyle type
-            buttonTextStyle: CustomButtonTextStyle
-                .bodySmall, // Modified: Fixed CustomButtonTextStyle type
+            buttonStyle: isFollowingBack
+                ? CustomButtonStyle.outlinePrimary
+                : CustomButtonStyle.fillPrimary,
+            buttonTextStyle: isFollowingBack
+                ? CustomButtonTextStyle.bodySmallPrimary
+                : CustomButtonTextStyle.bodySmall,
+            isDisabled: isFollowingBack,
             padding: EdgeInsets.symmetric(
               horizontal: 16.h,
               vertical: 6.h,
             ),
-            onPressed: () => onTapBlock(context, follower, index),
+            onPressed: isFollowingBack ? null : () => onTapFollowBack(follower),
           ),
         ],
       ),
@@ -242,8 +247,9 @@ class FollowersManagementScreenState
     );
   }
 
-  /// Blocks the selected follower
-  void onTapBlock(BuildContext context, FollowerItemModel follower, int index) {
-    ref.read(followersManagementNotifier.notifier).blockFollower(index);
+  void onTapFollowBack(FollowerItemModel follower) {
+    final id = (follower.id ?? '').trim();
+    if (id.isEmpty) return;
+    ref.read(followersManagementNotifier.notifier).followBack(id);
   }
 }

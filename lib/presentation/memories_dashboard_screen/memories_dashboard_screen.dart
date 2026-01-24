@@ -2,11 +2,10 @@
 
 
 import '../../core/app_export.dart';
+import '../../core/utils/memory_actions_sheet.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_image_view.dart';
-import '../../widgets/custom_memory_skeleton.dart';
 import '../../widgets/custom_public_memories.dart' as unified_widget;
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/custom_story_skeleton.dart';
@@ -112,10 +111,10 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
         children: [
           Row(
             children: [
-              CustomImageView(
-                imagePath: ImageConstant.imgIcon10,
-                height: 24.h,
-                width: 24.h,
+              Icon(
+                Icons.photo_library_rounded,
+                size: 24.h,
+                color: appTheme.deep_purple_A100,
               ),
               SizedBox(width: 6.h),
               Text(
@@ -139,7 +138,7 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
               SizedBox(width: 8.h),
               CustomButton(
                 text: 'New',
-                leftIcon: ImageConstant.imgIcon20x20,
+                leftIcon: Icons.add,
                 onPressed: () => _onCreateMemoryTap(context),
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
@@ -208,7 +207,7 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
                   timestamp: e.timestamp ?? '',
                   navigateTo: e.navigateTo,
                   storyId: e.id,
-                  isRead: e.isRead ?? false,
+                  isRead: e.isRead,
                 ),
               )
                   .toList(),
@@ -488,10 +487,38 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
             memoryItem: found,
           );
         },
+        onMemoryLongPress: (memoryItem) {
+          final memoryId = (memoryItem.id ?? '').trim();
+          if (memoryId.isEmpty) return;
+
+          MemoryActionsSheet.show(
+            context: context,
+            memoryId: memoryId,
+            ownerUserId: (memoryItem.userId ?? '').trim(),
+            title: (memoryItem.title ?? 'Memory').trim(),
+            visibility: (memoryItem.visibility ?? '').trim(),
+            onDeleted: () async {
+              // ✅ Update ONLY the memory card row immediately (no global loading).
+              ref
+                  .read(memoriesDashboardNotifier.notifier)
+                  .removeMemoryLocally(memoryId);
+            },
+            onVisibilityChanged: (isPublic) async {
+              // ✅ Update ONLY this card’s visibility (no global loading).
+              ref
+                  .read(memoriesDashboardNotifier.notifier)
+                  .updateMemoryVisibilityLocally(
+                    memoryId,
+                    isPublic ? 'public' : 'private',
+                  );
+            },
+          );
+        },
       );
     });
   }
 
+  // ignore: unused_element
   Widget _buildLoadedMemoriesList(
       BuildContext context,
       MemoriesDashboardState state,

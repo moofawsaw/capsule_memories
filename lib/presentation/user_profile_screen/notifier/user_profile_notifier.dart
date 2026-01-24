@@ -209,7 +209,7 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
 
       state = state.copyWith(
         userProfileModel: UserProfileModel(
-          profileImage: ImageConstant.imgEllipse864x64,
+          profileImage: '',
           userName: 'Lucy Ball',
           followersCount: '29',
           followingCount: '6',
@@ -224,7 +224,7 @@ class UserProfileNotifier extends StateNotifier<UserProfileState> {
       // Set empty list on error
       state = state.copyWith(
         userProfileModel: UserProfileModel(
-          profileImage: ImageConstant.imgEllipse864x64,
+          profileImage: '',
           userName: 'Lucy Ball',
           followersCount: '29',
           followingCount: '6',

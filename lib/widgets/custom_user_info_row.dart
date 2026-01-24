@@ -96,11 +96,12 @@ class CustomUserInfoRow extends StatelessWidget {
           // Profile Image
           CustomImageView(
             // Modified: Fixed import reference
-            imagePath: profileImagePath ?? ImageConstant.imgEllipse81,
+            imagePath: profileImagePath ?? '',
             height: profileImageSize ?? 28.h,
             width: profileImageSize ?? 28.h,
             radius: BorderRadius.circular((profileImageSize ?? 28.h) / 2),
             fit: BoxFit.cover,
+            isCircular: true,
           ),
 
           // User Name

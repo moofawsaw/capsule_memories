@@ -22,17 +22,17 @@ class VideoCallInterfaceNotifier
     final participants = [
       ParticipantModel(
         id: 'p1',
-        profileImage: ImageConstant.imgFrame48x48,
+        profileImage: '',
         name: 'Alex Johnson',
       ),
       ParticipantModel(
         id: 'p2',
-        profileImage: ImageConstant.imgEllipse826x26,
+        profileImage: '',
         name: 'Maria Garcia',
       ),
       ParticipantModel(
         id: 'p3',
-        profileImage: ImageConstant.imgFrame1,
+        profileImage: '',
         name: 'David Chen',
       ),
     ];
@@ -47,7 +47,7 @@ class VideoCallInterfaceNotifier
     final reactionCounters = [
       ReactionCounterModel(
         type: 'heart',
-        iconPath: ImageConstant.imgHeart,
+        iconPath: '',
         count: 2,
         isCustomView: false,
       ),
@@ -59,13 +59,13 @@ class VideoCallInterfaceNotifier
       ),
       ReactionCounterModel(
         type: 'laugh',
-        iconPath: ImageConstant.imgLaughing,
+        iconPath: '',
         count: 2,
         isCustomView: false,
       ),
       ReactionCounterModel(
         type: 'thumbs_up',
-        iconPath: ImageConstant.imgThumbsup,
+        iconPath: '',
         count: 2,
         isCustomView: false,
       ),
@@ -73,7 +73,7 @@ class VideoCallInterfaceNotifier
 
     state = state.copyWith(
       videoCallInterfaceModel: VideoCallInterfaceModel(
-        userProfileImage: ImageConstant.imgEllipse852x52,
+        userProfileImage: '',
         userName: 'Sarah Smith',
         timestamp: '2 mins ago',
         participants: participants,

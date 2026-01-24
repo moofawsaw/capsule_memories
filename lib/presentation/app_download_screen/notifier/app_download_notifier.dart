@@ -22,7 +22,7 @@ class AppDownloadNotifier extends StateNotifier<AppDownloadState> {
   void initialize() {
     state = state.copyWith(
       appDownloadModel: AppDownloadModel(
-        qrData: ImageConstant.imgCapsuleDownloadQR,
+        qrData: AppDownloadModel.capsuleDownloadUrl,
         shareText:
             'Download the Capsule App and start creating memories together! https://capapp.co/download',
         isLoading: false,

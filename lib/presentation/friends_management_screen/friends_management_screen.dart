@@ -98,9 +98,10 @@ class FriendsManagementScreenState
             width: 26.h,
             height: 26.h,
             margin: EdgeInsets.only(top: 2.h),
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIconDeepPurpleA100,
-              fit: BoxFit.contain,
+            child: Icon(
+              Icons.people_rounded,
+              size: 26.h,
+              color: appTheme.deep_purple_A100,
             ),
           ),
           SizedBox(width: 6.h),
@@ -113,7 +114,7 @@ class FriendsManagementScreenState
           ),
           Spacer(),
           CustomIconButtonRow(
-            firstIconPath: ImageConstant.imgButtons,
+            firstIcon: Icons.qr_code_scanner,
             firstIconColor: appTheme.white_A700,
             secondIcon: Icons.camera_alt,
             onFirstIconTap: () => _openQRShareBottomSheet(context),

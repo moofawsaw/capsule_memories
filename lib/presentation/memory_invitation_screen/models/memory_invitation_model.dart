@@ -16,7 +16,7 @@ class MemoryInvitationModel extends Equatable {
   }) {
     memoryTitle = memoryTitle ?? "Fmaily Xmas 2025";
     creatorName = creatorName ?? "Jane Doe";
-    creatorImage = creatorImage ?? ImageConstant.imgEllipse81;
+    creatorImage = creatorImage ?? '';
     membersCount = membersCount ?? 2;
     storiesCount = storiesCount ?? 0;
     status = status ?? "Open";

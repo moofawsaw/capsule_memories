@@ -21,7 +21,7 @@ class UserProfileScreenTwoModel extends Equatable {
     this.storyItems,
     this.id,
   }) {
-    avatarImagePath ??= ImageConstant.imgEllipse896x96;
+    avatarImagePath ??= '';
 
     // Defaults
     displayName ??= 'User';

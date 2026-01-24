@@ -68,10 +68,10 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
           children: [
             Container(
               margin: EdgeInsets.only(top: 2.h),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgIcon11,
-                height: 26.h,
-                width: 26.h,
+              child: Icon(
+                Icons.person_add_alt_1_rounded,
+                size: 26.h,
+                color: appTheme.deep_purple_A100,
               ),
             ),
             Container(
@@ -287,7 +287,7 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
         isCircular: true,
         networkOnly: true,
         enableCategoryIconResolution: false,
-        placeHolder: ImageConstant.imgImageNotFound,
+        // CustomImageView now renders a safe built-in placeholder when empty/fails.
       ),
     );
   }

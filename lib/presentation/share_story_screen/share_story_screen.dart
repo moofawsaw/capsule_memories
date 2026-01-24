@@ -199,10 +199,10 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CustomImageView(
-                      imagePath: ImageConstant.imgShareIcon,
-                      height: 20.h,
-                      width: 20.h,
+                    Icon(
+                      Icons.share,
+                      size: 20.h,
+                      color: appTheme.gray_50,
                     ),
                     SizedBox(width: 8.h),
                     Text(
@@ -226,10 +226,10 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
                 borderRadius: BorderRadius.circular(28.h),
               ),
               child: Center(
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgCopyIcon,
-                  height: 20.h,
-                  width: 20.h,
+                child: Icon(
+                  Icons.content_copy,
+                  size: 20.h,
+                  color: appTheme.gray_50,
                 ),
               ),
             ),
@@ -245,10 +245,10 @@ class ShareStoryScreenState extends ConsumerState<ShareStoryScreen> {
                 borderRadius: BorderRadius.circular(28.h),
               ),
               child: Center(
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgDownloadIcon,
-                  height: 20.h,
-                  width: 20.h,
+                child: Icon(
+                  Icons.download,
+                  size: 20.h,
+                  color: appTheme.gray_50,
                 ),
               ),
             ),

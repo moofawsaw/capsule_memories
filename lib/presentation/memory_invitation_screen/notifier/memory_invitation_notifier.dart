@@ -61,7 +61,7 @@ class MemoryInvitationNotifier extends StateNotifier<MemoryInvitationState> {
             'qr_data': inviteUrl,
             'qr_code_url': qrCodeUrl,
             'description': 'Scan to join the memory',
-            'icon': ImageConstant.imgIcon,
+            'icon': Icons.qr_code_2_rounded,
           },
         );
       } else if (mounted) {

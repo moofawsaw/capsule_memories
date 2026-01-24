@@ -264,7 +264,7 @@ class MemoryMembersScreenState extends ConsumerState<MemoryMembersScreen> {
 
             return CustomUserStatusRow(
               profileImagePath:
-                  member.avatarUrl ?? ImageConstant.imgEllipse826x26,
+                  member.avatarUrl ?? '',
               userName: member.displayName ?? member.username ?? 'Unknown',
               statusText: statusText,
               statusBackgroundColor: (isCreator || isCurrentUser)

@@ -27,8 +27,8 @@ class CustomNotificationSettings extends StatelessWidget {
     this.margin,
   }) : super(key: key);
 
-  /// Icon path for the header section
-  final String? headerIcon;
+  /// ✅ Header icon (Material icon)
+  final IconData? headerIcon;
 
   /// Title text for the header section
   final String? headerTitle;
@@ -80,10 +80,10 @@ class CustomNotificationSettings extends StatelessWidget {
     return Row(
       children: [
         if (headerIcon != null)
-          CustomImageView(
-            imagePath: headerIcon!,
-            height: 26.h,
-            width: 26.h,
+          Icon(
+            headerIcon,
+            size: 26.h,
+            color: appTheme.gray_50,
           ),
         SizedBox(width: 8.h),
         Text(

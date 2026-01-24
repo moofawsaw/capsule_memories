@@ -1711,8 +1711,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                 ),
                 child: ClipOval(
                   child: CustomImageView(
-                    imagePath: userAvatar ?? ImageConstant.imgEllipse842x42,
+                    imagePath: userAvatar ?? '',
                     fit: BoxFit.cover,
+                    isCircular: true,
                   ),
                 ),
               ),

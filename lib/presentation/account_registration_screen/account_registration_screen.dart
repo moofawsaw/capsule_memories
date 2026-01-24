@@ -127,7 +127,7 @@ class AccountRegistrationScreenState
               CustomEditText(
                 controller: state.nameController,
                 hintText: 'Name',
-                prefixIcon: ImageConstant.imgIcon,
+                prefixIcon: Icons.person_outline,
                 keyboardType: TextInputType.name,
                 autofillHints: const [AutofillHints.name],
                 validator: (value) => ref
@@ -145,7 +145,7 @@ class AccountRegistrationScreenState
               CustomEditText(
                 controller: state.emailController,
                 hintText: 'Email',
-                prefixIcon: ImageConstant.imgMail,
+                prefixIcon: Icons.mail_outline,
                 keyboardType: TextInputType.emailAddress,
                 autofillHints: const [AutofillHints.email],
                 validator: (value) => ref
@@ -163,7 +163,7 @@ class AccountRegistrationScreenState
               CustomEditText(
                 controller: state.passwordController,
                 hintText: 'Password',
-                prefixIcon: ImageConstant.imgIcon,
+                prefixIcon: Icons.lock_outline,
                 isPassword: true,
                 autofillHints: const [AutofillHints.newPassword],
                 validator: (value) => ref
@@ -187,7 +187,7 @@ class AccountRegistrationScreenState
               CustomEditText(
                 controller: state.confirmPasswordController,
                 hintText: 'Password',
-                prefixIcon: ImageConstant.imgIcon,
+                prefixIcon: Icons.lock_outline,
                 isPassword: true,
                 autofillHints: const [AutofillHints.newPassword],
                 validator: (value) => ref

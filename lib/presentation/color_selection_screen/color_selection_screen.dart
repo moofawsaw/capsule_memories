@@ -1,6 +1,5 @@
 import '../../core/app_export.dart';
 import '../../widgets/custom_app_bar.dart';
-import '../../widgets/custom_image_view.dart';
 import 'notifier/color_selection_notifier.dart';
 
 class ColorSelectionScreen extends ConsumerStatefulWidget {
@@ -40,7 +39,7 @@ class ColorSelectionScreenState extends ConsumerState<ColorSelectionScreen> {
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return CustomAppBar(
       layoutType: CustomAppBarLayoutType.spaceBetween,
-      leadingIcon: ImageConstant.imgFrame19,
+      showLeading: true,
       title: 'Done',
       onLeadingTap: () {
         onTapBack(context);
@@ -87,11 +86,11 @@ class ColorSelectionScreenState extends ConsumerState<ColorSelectionScreen> {
                                   color: appTheme.blue_A700, width: 2.h)
                               : null,
                         ),
-                        child: CustomImageView(
-                          imagePath: colorModel.imagePath,
-                          height: 42.h,
-                          width: 42.h,
-                          fit: BoxFit.cover,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: colorModel.color ?? appTheme.white_A700,
+                          ),
                         ),
                       ),
                     );

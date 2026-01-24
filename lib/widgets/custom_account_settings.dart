@@ -16,7 +16,7 @@ class CustomAccountSettings extends StatelessWidget {
     this.margin,
   }) : super(key: key);
 
-  final String? headerIcon;
+  final IconData? headerIcon;
   final String? headerTitle;
   final List<CustomAccountOption>? accountOptions;
   final Color? backgroundColor;
@@ -48,10 +48,10 @@ class CustomAccountSettings extends StatelessWidget {
     return Row(
       children: [
         if (headerIcon != null)
-          CustomImageView(
-            imagePath: headerIcon!,
-            height: 26.h,
-            width: 26.h,
+          Icon(
+            headerIcon,
+            size: 26.h,
+            color: appTheme.gray_50,
           ),
         SizedBox(width: 8.h),
         Text(

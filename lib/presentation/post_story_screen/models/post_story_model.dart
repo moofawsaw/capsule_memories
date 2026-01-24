@@ -11,10 +11,10 @@ class PostStoryModel extends Equatable {
     this.profileImagePath,
     this.id,
   }) {
-    selectedImagePath = selectedImagePath ?? ImageConstant.imgImage8542x342;
+    selectedImagePath = selectedImagePath ?? '';
     selectedTool = selectedTool ?? '';
     storyDestination = storyDestination ?? 'Vacation';
-    profileImagePath = profileImagePath ?? ImageConstant.imgEllipse826x26;
+    profileImagePath = profileImagePath ?? '';
     id = id ?? '';
   }
 

@@ -207,7 +207,7 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
           child: CustomProfileHeader(
             avatarImagePath: (isCurrentUser ? avatarState.avatarUrl : null) ??
                 model?.avatarImagePath ??
-                ImageConstant.imgEllipse896x96,
+                '',
             displayName: displayName.isNotEmpty ? displayName : 'User',
             username: usernameRaw,
             email: isCurrentUser ? (model?.email ?? '') : '',
@@ -385,10 +385,10 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
         return CustomStoryCard(
           borderRadius: BorderRadius.circular(0.h),
           userName: isCurrentUser ? '' : (story.userName ?? 'User'),
-          userAvatar: story.userAvatar ?? ImageConstant.imgEllipse896x96,
-          backgroundImage: story.backgroundImage ?? ImageConstant.imgImg,
+          userAvatar: story.userAvatar ?? '',
+          backgroundImage: story.backgroundImage ?? '',
           categoryText: story.categoryText ?? 'Memory',
-          categoryIcon: story.categoryIcon ?? ImageConstant.imgVector,
+          categoryIcon: story.categoryIcon ?? '',
           timestamp: story.timestamp ?? 'Just now',
           onTap: () => _onTapStoryCard(context, index),
 

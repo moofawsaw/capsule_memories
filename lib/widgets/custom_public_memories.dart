@@ -1,4 +1,5 @@
 // lib/widgets/custom_public_memories.dart
+// ignore_for_file: unused_field
 import 'dart:async';
 
 import '../core/app_export.dart';
@@ -29,15 +30,18 @@ class CustomPublicMemories extends StatelessWidget {
     this.sectionIcon,
     this.memories,
     this.onMemoryTap,
+    this.onMemoryLongPress,
     this.margin,
     this.isLoading = false,
     this.variant = MemoryCardVariant.dashboard,
   }) : super(key: key);
 
   final String? sectionTitle;
-  final String? sectionIcon;
+  /// ✅ Can be String (asset/url) OR IconData (Material icon)
+  final Object? sectionIcon;
   final List<CustomMemoryItem>? memories;
   final Function(CustomMemoryItem)? onMemoryTap;
+  final Function(CustomMemoryItem)? onMemoryLongPress;
   final EdgeInsetsGeometry? margin;
   final bool isLoading;
 
@@ -98,12 +102,7 @@ class CustomPublicMemories extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: 24.h),
       child: Row(
         children: [
-          CustomImageView(
-            imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
-            height: 22.h,
-            width: 22.h,
-            color: appTheme.deep_purple_A100,
-          ),
+          _buildSectionIcon(),
           SizedBox(width: 8.h),
           Text(
             sectionTitle ?? 'Public Memories',
@@ -113,6 +112,26 @@ class CustomPublicMemories extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildSectionIcon() {
+    final v = sectionIcon;
+    const fallback = Icons.public;
+
+    if (v is IconData) {
+      return Icon(v, size: 22.h, color: appTheme.deep_purple_A100);
+    }
+
+    if (v is String && v.trim().isNotEmpty) {
+      return CustomImageView(
+        imagePath: v,
+        height: 22.h,
+        width: 22.h,
+        color: appTheme.deep_purple_A100,
+      );
+    }
+
+    return Icon(fallback, size: 22.h, color: appTheme.deep_purple_A100);
   }
 
   Widget _buildMemoriesScroll(BuildContext context) {
@@ -197,6 +216,7 @@ class CustomPublicMemories extends StatelessWidget {
             child: _PublicMemoryCard(
               memory: memory,
               onTap: () => onMemoryTap?.call(memory),
+              onLongPress: () => onMemoryLongPress?.call(memory),
               variant: variant,
             ),
           );
@@ -214,12 +234,31 @@ class CustomPublicMemories extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CustomImageView(
-                imagePath: sectionIcon ?? ImageConstant.imgIcon22x22,
-                height: 48.h,
-                width: 48.h,
-                color: appTheme.blue_gray_300,
-              ),
+                Builder(
+                  builder: (context) {
+                    final v = sectionIcon;
+                    if (v is IconData) {
+                      return Icon(
+                        v,
+                        size: 48.h,
+                        color: appTheme.blue_gray_300,
+                      );
+                    }
+                    if (v is String && v.trim().isNotEmpty) {
+                      return CustomImageView(
+                        imagePath: v,
+                        height: 48.h,
+                        width: 48.h,
+                        color: appTheme.blue_gray_300,
+                      );
+                    }
+                    return Icon(
+                      Icons.public,
+                      size: 48.h,
+                      color: appTheme.blue_gray_300,
+                    );
+                  },
+                ),
               SizedBox(height: 12.h),
               Text(
                 'No memories yet',
@@ -341,12 +380,14 @@ class CustomMediaItem {
 class _PublicMemoryCard extends StatefulWidget {
   final CustomMemoryItem memory;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final MemoryCardVariant variant;
 
   const _PublicMemoryCard({
     Key? key,
     required this.memory,
     this.onTap,
+    this.onLongPress,
     this.variant = MemoryCardVariant.dashboard,
   }) : super(key: key);
 
@@ -937,17 +978,17 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           style: TextStyleHelper.instance.title16BoldPlusJakartaSans
               .copyWith(color: appTheme.gray_50),
         ),
-        SizedBox(height: 6.h),
-        Text(
-          'Create your first story',
-          style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-              .copyWith(color: appTheme.blue_gray_300),
-          textAlign: TextAlign.center,
-        ),
+        // SizedBox(height: 6.h),
+        // Text(
+        //   'Create your first story',
+        //   style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+        //       .copyWith(color: appTheme.blue_gray_300),
+        //   textAlign: TextAlign.center,
+        // ),
         SizedBox(height: 12.h),
         CustomButton(
           text: 'Create Story',
-          leftIcon: ImageConstant.imgPlayCircle,
+          leftIcon: Icons.add,
           onPressed: _onCreateStoryTap,
           buttonStyle: CustomButtonStyle.fillPrimary,
           buttonTextStyle: CustomButtonTextStyle.bodySmall,
@@ -981,7 +1022,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
           SizedBox(height: 12.h),
           CustomButton(
             text: 'Create Story',
-            leftIcon: ImageConstant.imgPlayCircle,
+            leftIcon: Icons.add,
             onPressed: _onCreateStoryTap,
             buttonStyle: CustomButtonStyle.fillPrimary,
             buttonTextStyle: CustomButtonTextStyle.bodySmall,
@@ -1088,6 +1129,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
     return GestureDetector(
       onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
       child: SizedBox(
         width: 300.h,
         height: cardHeight,
@@ -1216,12 +1258,19 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
                   ),
                   width: 42.h,
                   height: 42.h,
-                  child: CustomImageView(
-                    imagePath: memory.iconPath ?? ImageConstant.imgFrame13Red600,
-                    height: 29.h,
-                    width: 29.h,
-                    fit: BoxFit.contain,
-                  ),
+                  child: (memory.iconPath != null &&
+                          memory.iconPath!.trim().isNotEmpty)
+                      ? CustomImageView(
+                          imagePath: memory.iconPath!,
+                          height: 29.h,
+                          width: 29.h,
+                          fit: BoxFit.contain,
+                        )
+                      : Icon(
+                          Icons.photo_library_outlined,
+                          size: 26.h,
+                          color: appTheme.gray_50.withAlpha(230),
+                        ),
                 ),
                 SizedBox(width: 12.h),
                 Expanded(

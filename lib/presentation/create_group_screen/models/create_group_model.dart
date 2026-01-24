@@ -54,7 +54,7 @@ class FriendModel extends Equatable {
   }) {
     id = id ?? '';
     name = name ?? '';
-    profileImage = profileImage ?? ImageConstant.imgEllipse81;
+    profileImage = profileImage ?? '';
     isSelected = isSelected ?? false;
   }
 

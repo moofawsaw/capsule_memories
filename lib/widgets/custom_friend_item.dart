@@ -87,9 +87,14 @@ class CustomFriendItem extends StatelessWidget {
                           ),
                         ),
                       ),
-                      errorWidget: (context, url, error) => Image.asset(
-                        ImageConstant.imgEllipse842x42,
-                        fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => Container(
+                        color: appTheme.gray_900_03,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.person_outline,
+                          size: 20.h,
+                          color: appTheme.blue_gray_300,
+                        ),
                       ),
                     ),
                   ),
@@ -125,7 +130,8 @@ class CustomFriendItem extends StatelessWidget {
             Container(
               margin: EdgeInsets.only(left: 16.h, right: 14.h),
               child: CustomIconButton(
-                iconPath: ImageConstant.imgIconBlueGray30028x28,
+                icon: Icons.more_horiz,
+                iconColor: appTheme.blue_gray_300,
                 height: 28.h,
                 width: 28.h,
                 padding: EdgeInsets.all(2.h),

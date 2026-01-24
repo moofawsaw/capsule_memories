@@ -189,22 +189,22 @@ class CameraScannerScreenState extends ConsumerState<CameraScannerScreen> {
                     CustomIconButton(
                       height: 44.h,
                       width: 44.h,
-                      iconPath: ImageConstant.imgArrowLeft,
+                      icon: Icons.arrow_back,
                       backgroundColor: appTheme.gray_900_01.withAlpha(179),
                       borderRadius: 22.h,
                       iconSize: 24.h,
+                      iconColor: appTheme.gray_50,
                       onTap: () => Navigator.pop(context),
                     ),
                     if (!kIsWeb)
                       CustomIconButton(
                         height: 44.h,
                         width: 44.h,
-                        iconPath: isFlashOn
-                            ? ImageConstant.imgButtonsVolume
-                            : ImageConstant.imgButtonsGray50,
+                        icon: isFlashOn ? Icons.flash_on : Icons.flash_off,
                         backgroundColor: appTheme.gray_900_01.withAlpha(179),
                         borderRadius: 22.h,
                         iconSize: 24.h,
+                        iconColor: appTheme.gray_50,
                         onTap: _toggleFlash,
                       ),
                   ],

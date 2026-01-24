@@ -49,10 +49,10 @@ class FollowingUserItemWidget extends StatelessWidget {
           ),
           GestureDetector(
             onTap: onActionTap,
-            child: CustomImageView(
-              imagePath: ImageConstant.imgIconBlueGray300,
-              height: 34.h,
-              width: 34.h,
+            child: Icon(
+              Icons.person_remove_outlined,
+              size: 28.h,
+              color: appTheme.blue_gray_300,
             ),
           ),
         ],

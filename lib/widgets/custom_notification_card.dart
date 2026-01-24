@@ -16,12 +16,13 @@ import 'package:intl/intl.dart';
 class CustomNotificationCard extends StatelessWidget {
   const CustomNotificationCard({
     Key? key,
-    required this.iconPath,
+    required this.leadingIcon,
     required this.title,
     required this.description,
     required this.isRead,
     required this.onToggleRead,
     this.timestamp,
+    this.iconColor,
     this.titleFontSize,
     this.descriptionAlignment,
     this.margin,
@@ -31,7 +32,8 @@ class CustomNotificationCard extends StatelessWidget {
     this.descriptionColor,
   }) : super(key: key);
 
-  final String iconPath;
+  final IconData leadingIcon;
+  final Color? iconColor;
   final String title;
   final String description;
   final bool isRead;
@@ -87,11 +89,17 @@ class CustomNotificationCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(12.0),
           ),
           child: Container(
-            margin: margin ?? EdgeInsets.symmetric(horizontal: 20.h),
-            padding: EdgeInsets.all(16.h),
+            margin: margin ?? EdgeInsets.zero, // ✅ no outer inset
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h), // ✅ inner padding only
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Icon(
+                  leadingIcon,
+                  size: 28.h,
+                  color: iconColor ?? appTheme.deep_purple_A100,
+                ),
+                SizedBox(width: 12.h),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

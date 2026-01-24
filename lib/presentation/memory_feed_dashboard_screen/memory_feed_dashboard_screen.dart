@@ -104,10 +104,9 @@ class _MemoryFeedDashboardScreenState
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CustomImageView(
-            imagePath: ImageConstant.imgPlayCircle,
-            height: 24.h,
-            width: 24.h,
+          Icon(
+            Icons.play_circle_filled,
+            size: 24.h,
             color: appTheme.deep_purple_A100,
           ),
           SizedBox(width: 8.h),
@@ -130,7 +129,6 @@ class _MemoryFeedDashboardScreenState
         child: CustomButton(
           text: 'Log in to Create Memory',
           width: double.infinity,
-          // leftIcon: ImageConstant.imgIcon20x20,
           onPressed: () {
             NavigatorService.pushNamed(AppRoutes.authLogin);
           },
@@ -162,7 +160,7 @@ class _MemoryFeedDashboardScreenState
             child: CustomButton(
               text: 'Create Memory',
               width: double.infinity,
-              leftIcon: ImageConstant.imgIcon20x20,
+              leftIcon: Icons.add,
               onPressed: () {
                 showModalBottomSheet(
                   context: context,
@@ -182,7 +180,7 @@ class _MemoryFeedDashboardScreenState
             child: CustomButton(
               text: 'Create Story',
               width: double.infinity,
-              leftIcon: ImageConstant.imgIcon20x20,
+              leftIcon: Icons.add,
               onPressed: () => _onCreateStoryTap(context, activeMemories),
               buttonStyle: CustomButtonStyle.fillPrimary,
               buttonTextStyle: CustomButtonTextStyle.bodyMedium,
@@ -359,10 +357,9 @@ class _MemoryFeedDashboardScreenState
                               ],
                             ),
                           ),
-                          CustomImageView(
-                            imagePath: ImageConstant.imgArrowLeft,
-                            width: 20.h,
-                            height: 20.h,
+                          Icon(
+                            Icons.chevron_right,
+                            size: 20.h,
                             color: appTheme.gray_50,
                           ),
                         ],
@@ -415,10 +412,10 @@ class _MemoryFeedDashboardScreenState
               padding: EdgeInsets.symmetric(horizontal: 24.h),
               child: Row(
                 children: [
-                  CustomImageView(
-                    imagePath: ImageConstant.imgIconDeepPurpleA10022x22,
-                    height: 22.h,
-                    width: 22.h,
+                  Icon(
+                    Icons.schedule,
+                    size: 22.h,
+                    color: appTheme.deep_purple_A100,
                   ),
                   SizedBox(width: 8.h),
                   Text(
@@ -453,11 +450,9 @@ class _MemoryFeedDashboardScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CustomImageView(
-                        imagePath:
-                        ImageConstant.imgIconDeepPurpleA10022x22,
-                        height: 48.h,
-                        width: 48.h,
+                      Icon(
+                        Icons.schedule,
+                        size: 48.h,
                         color: appTheme.blue_gray_300,
                       ),
                       SizedBox(height: 12.h),
@@ -524,10 +519,10 @@ class _MemoryFeedDashboardScreenState
               padding: EdgeInsets.symmetric(horizontal: 24.h),
               child: Row(
                 children: [
-                  CustomImageView(
-                    imagePath: ImageConstant.imgIconDeepPurpleA10022x22,
-                    height: 22.h,
-                    width: 22.h,
+                  Icon(
+                    Icons.flash_on,
+                    size: 22.h,
+                    color: appTheme.deep_purple_A100,
                   ),
                   SizedBox(width: 8.h),
                   Text(
@@ -562,11 +557,9 @@ class _MemoryFeedDashboardScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CustomImageView(
-                        imagePath:
-                        ImageConstant.imgIconDeepPurpleA10022x22,
-                        height: 48.h,
-                        width: 48.h,
+                      Icon(
+                        Icons.flash_on,
+                        size: 48.h,
                         color: appTheme.blue_gray_300,
                       ),
                       SizedBox(height: 12.h),
@@ -665,7 +658,7 @@ class _MemoryFeedDashboardScreenState
         return custom_widget.CustomPublicMemories(
           key: const PageStorageKey<String>('public_memories_section'),
           sectionTitle: 'Public Memories',
-          sectionIcon: ImageConstant.imgIcon22x22,
+          sectionIcon: Icons.public,
           variant: custom_widget.MemoryCardVariant.feed,
           memories: convertedMemories,
           isLoading: isLoading,
@@ -733,7 +726,7 @@ class _MemoryFeedDashboardScreenState
         return custom_widget.CustomPublicMemories(
           key: const PageStorageKey<String>('popular_memories_section'),
           sectionTitle: 'Popular Memories',
-          sectionIcon: ImageConstant.imgIconRed500,
+          sectionIcon: Icons.favorite,
           memories: convertedMemories,
           isLoading: isLoading,
           onMemoryTap: (memory) {
@@ -779,10 +772,10 @@ class _MemoryFeedDashboardScreenState
               padding: EdgeInsets.symmetric(horizontal: 24.h),
               child: Row(
                 children: [
-                  CustomImageView(
-                    imagePath: ImageConstant.imgIconBlueA700,
-                    height: 22.h,
-                    width: 22.h,
+                  Icon(
+                    Icons.trending_up,
+                    size: 22.h,
+                    color: appTheme.blue_A700,
                   ),
                   SizedBox(width: 8.h),
                   Text(
@@ -818,10 +811,9 @@ class _MemoryFeedDashboardScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CustomImageView(
-                        imagePath: ImageConstant.imgIconBlueA700,
-                        height: 48.h,
-                        width: 48.h,
+                      Icon(
+                        Icons.trending_up,
+                        size: 48.h,
                         color: appTheme.blue_gray_300,
                       ),
                       SizedBox(height: 12.h),
@@ -1258,10 +1250,9 @@ class _MemoryFeedDashboardScreenState
               padding: EdgeInsets.symmetric(horizontal: 24.h),
               child: Row(
                 children: [
-                  CustomImageView(
-                    imagePath: ImageConstant.imgPlayCircle,
-                    height: 22.h,
-                    width: 22.h,
+                  Icon(
+                    Icons.play_circle_filled,
+                    size: 22.h,
                     color: appTheme.deep_purple_A100,
                   ),
                   SizedBox(width: 8.h),
@@ -1391,11 +1382,9 @@ class _MemoryFeedDashboardScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CustomImageView(
-                        imagePath:
-                        ImageConstant.imgIconDeepPurpleA10022x22,
-                        height: 48.h,
-                        width: 48.h,
+                      Icon(
+                        Icons.emoji_events_outlined,
+                        size: 48.h,
                         color: appTheme.blue_gray_300,
                       ),
                       SizedBox(height: 12.h),
@@ -1468,10 +1457,10 @@ class _MemoryFeedDashboardScreenState
               padding: EdgeInsets.symmetric(horizontal: 24.h),
               child: Row(
                 children: [
-                  CustomImageView(
-                    imagePath: ImageConstant.imgIconGreen500,
-                    height: 22.h,
-                    width: 22.h,
+                  Icon(
+                    Icons.people_alt_outlined,
+                    size: 22.h,
+                    color: appTheme.green_500,
                   ),
                   SizedBox(width: 8.h),
                   Text(
@@ -1506,10 +1495,9 @@ class _MemoryFeedDashboardScreenState
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CustomImageView(
-                        imagePath: ImageConstant.imgIconGreen500,
-                        height: 48.h,
-                        width: 48.h,
+                      Icon(
+                        Icons.people_alt_outlined,
+                        size: 48.h,
                         color: appTheme.blue_gray_300,
                       ),
                       SizedBox(height: 12.h),

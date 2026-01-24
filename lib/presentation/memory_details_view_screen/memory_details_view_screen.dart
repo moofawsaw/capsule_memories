@@ -310,7 +310,7 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
       isPrivate: effectiveLoading ? null : state.memoryDetailsViewModel?.isPrivate,
       iconButtonImagePath: effectiveLoading
           ? null
-          : (state.memoryDetailsViewModel?.categoryIcon ?? ImageConstant.imgFrame13),
+          : (state.memoryDetailsViewModel?.categoryIcon ?? ''),
       participantImages: effectiveLoading ? null : state.memoryDetailsViewModel?.participantImages,
       onBackTap: NavigatorService.goBack,
       onIconButtonTap: () {},

@@ -46,6 +46,32 @@ class FollowersManagementNotifier
           .select('follower_id, user_profiles!follows_follower_id_fkey(*)')
           .eq('following_id', currentUser.id);
 
+      // Determine which of these followers the current user already follows back.
+      final followerIds = (followersData as List)
+          .map((item) => item['follower_id'] as String?)
+          .whereType<String>()
+          .where((id) => id.trim().isNotEmpty)
+          .toList();
+
+      Set<String> followingBackIds = {};
+      if (followerIds.isNotEmpty) {
+        try {
+          final followBackRows = await client
+              .from('follows')
+              .select('following_id')
+              .eq('follower_id', currentUser.id)
+              .inFilter('following_id', followerIds);
+
+          followingBackIds = (followBackRows as List)
+              .map((r) => r['following_id'] as String?)
+              .whereType<String>()
+              .toSet();
+        } catch (e) {
+          // ignore: avoid_print
+          print('Error checking follow-back status: $e');
+        }
+      }
+
       final followersList = followersData
           .map((item) {
             final userProfile = item['user_profiles'] as Map<String, dynamic>?;
@@ -54,13 +80,15 @@ class FollowersManagementNotifier
             final avatarUrl =
                 AvatarHelperService.getAvatarUrl(userProfile['avatar_url']);
             final followerCount = userProfile['follower_count'] ?? 0;
+            final id = userProfile['id'] as String;
 
             return FollowerItemModel(
-              id: userProfile['id'] as String,
+              id: id,
               name: userProfile['display_name'] as String? ??
                   userProfile['username'] as String,
               followersCount: '$followerCount followers',
               profileImage: avatarUrl,
+              isFollowingBack: followingBackIds.contains(id),
             );
           })
           .whereType<FollowerItemModel>()
@@ -80,30 +108,6 @@ class FollowersManagementNotifier
           followersList: [],
         ),
       );
-    }
-  }
-
-  Future<void> blockFollower(int index) async {
-    try {
-      final followers = state.followersManagementModel?.followersList ?? [];
-      if (index < 0 || index >= followers.length) return;
-
-      // Remove follower from list (blocking functionality can be extended)
-      final updatedFollowers = List<FollowerItemModel>.from(followers);
-      updatedFollowers.removeAt(index);
-
-      state = state.copyWith(
-        followersManagementModel: state.followersManagementModel?.copyWith(
-          followersList: updatedFollowers,
-        ),
-        isBlocked: true,
-      );
-
-      // Reset blocked state after a short delay
-      await Future.delayed(Duration(milliseconds: 500));
-      state = state.copyWith(isBlocked: false);
-    } catch (e) {
-      print('Error blocking follower: $e');
     }
   }
 
@@ -134,7 +138,12 @@ class FollowersManagementNotifier
           await _followsService.followUser(currentUser.id, followerId);
 
       if (success) {
+        state = state.copyWith(didFollowBack: true);
         await initialize();
+
+        // Reset success pulse
+        await Future.delayed(const Duration(milliseconds: 600));
+        state = state.copyWith(didFollowBack: false);
       }
     } catch (e) {
       print('Error following back: $e');

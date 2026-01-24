@@ -405,10 +405,10 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CustomImageView(
-                          imagePath: ImageConstant.imgIconWhiteA700,
-                          height: 20.h,
-                          width: 20.h,
+                        Icon(
+                          Icons.insert_drive_file_outlined,
+                          size: 20.h,
+                          color: appTheme.gray_50,
                         ),
                         SizedBox(width: 8.h),
                         Flexible(
@@ -510,12 +510,13 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
 
   Widget _buildUploadIcon() {
     return CustomIconButton(
-      iconPath: ImageConstant.imgFrameDeepPurpleA100,
+      icon: Icons.upload_file,
       backgroundColor: appTheme.color41C124,
       height: 62.h,
       width: 62.h,
       borderRadius: 30.h,
       padding: EdgeInsets.all(12.h),
+      iconColor: appTheme.deep_purple_A100,
     );
   }
 
@@ -545,7 +546,7 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
               Expanded(
                 child: CustomButton(
                   text: (state.isUploading ?? false) ? 'Uploading...' : 'Add to Memory',
-                  leftIcon: (state.isUploading ?? false) ? null : ImageConstant.imgIconWhiteA700,
+                  leftIcon: (state.isUploading ?? false) ? null : Icons.add,
                   onPressed: canUpload ? () => _onTapAddToMemory(context) : null,
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,

@@ -178,13 +178,18 @@ class _MemoryCardWidgetState extends State<MemoryCardWidget> {
                 iconPath: widget.memoryItem.categoryIconUrl != null &&
                         widget.memoryItem.categoryIconUrl!.isNotEmpty
                     ? widget.memoryItem.categoryIconUrl!
-                    : ImageConstant.imgFrame13Red600,
+                    : null,
+                icon: (widget.memoryItem.categoryIconUrl == null ||
+                        widget.memoryItem.categoryIconUrl!.isEmpty)
+                    ? Icons.local_offer_outlined
+                    : null,
                 backgroundColor: appTheme.color41C124,
                 borderRadius: 18.h,
                 height: 36.h,
                 width: 36.h,
                 padding: EdgeInsets.all(6.h),
                 iconSize: 24.h,
+                iconColor: appTheme.gray_50,
               ),
               SizedBox(width: 12.h),
               Expanded(

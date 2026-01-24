@@ -140,12 +140,20 @@ class CustomStoryViewer extends StatelessWidget {
                 top: 4.h,
                 left: 4.h,
                 child: CustomIconButton(
-                  iconPath: item.playIconPath ?? ImageConstant.imgPlayCircle,
+                  iconPath: (item.playIconPath != null &&
+                          item.playIconPath!.trim().isNotEmpty)
+                      ? item.playIconPath
+                      : null,
+                  icon: (item.playIconPath == null ||
+                          item.playIconPath!.trim().isEmpty)
+                      ? Icons.play_circle_fill
+                      : null,
                   height: 24.h,
                   width: 24.h,
                   backgroundColor: appTheme.color3BD81E,
                   borderRadius: 6.h,
                   padding: EdgeInsets.all(4.h),
+                  iconColor: appTheme.gray_50,
                   onTap: () => onPlayButtonTap?.call(index),
                 ),
               ),

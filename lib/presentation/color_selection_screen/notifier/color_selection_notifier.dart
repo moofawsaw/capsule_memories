@@ -19,12 +19,12 @@ class ColorSelectionNotifier extends StateNotifier<ColorSelectionState> {
 
   void initialize() {
     final colors = [
-      ColorOptionModel(imagePath: ImageConstant.imgEllipse11),
-      ColorOptionModel(imagePath: ImageConstant.imgEllipse11Black900),
-      ColorOptionModel(imagePath: ImageConstant.imgEllipse11Amber600),
-      ColorOptionModel(imagePath: ImageConstant.imgEllipse11Red500),
-      ColorOptionModel(imagePath: ImageConstant.imgEllipse11BlueA200),
-      ColorOptionModel(imagePath: ImageConstant.imgEllipse11Teal400),
+      ColorOptionModel(color: appTheme.white_A700),
+      ColorOptionModel(color: appTheme.black_900),
+      ColorOptionModel(color: appTheme.amber_600),
+      ColorOptionModel(color: appTheme.red_500),
+      ColorOptionModel(color: appTheme.blue_A200),
+      ColorOptionModel(color: appTheme.teal_400),
     ];
 
     final themes = [

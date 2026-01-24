@@ -105,10 +105,11 @@ class CustomFriendRequestCard extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24.h),
           child: CustomImageView(
-            imagePath: profileImagePath ?? ImageConstant.imgFrame2,
+            imagePath: profileImagePath ?? '',
             height: 48.h,
             width: 48.h,
             fit: BoxFit.cover,
+            isCircular: true,
           ),
         ),
       ),

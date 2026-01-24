@@ -34,36 +34,36 @@ class ShareStoryModel extends Equatable {
   List<Object?> get props => [contacts, filteredContacts, searchQuery];
 
   List<ContactModel> _getInitialContacts() {
-    // Use existing ellipse images as placeholders since contact images don't exist
+    // Placeholder contacts (no local avatar assets)
     return [
       ContactModel(
         name: "Sarah Smith",
-        profileImage: ImageConstant.imgEllipse864x64,
+        profileImage: '',
         isSelected: false,
       ),
       ContactModel(
         name: "John Doe",
-        profileImage: ImageConstant.imgEllipse864x64,
+        profileImage: '',
         isSelected: false,
       ),
       ContactModel(
         name: "Emily Johnson",
-        profileImage: ImageConstant.imgEllipse864x64,
+        profileImage: '',
         isSelected: false,
       ),
       ContactModel(
         name: "Michael Brown",
-        profileImage: ImageConstant.imgEllipse864x64,
+        profileImage: '',
         isSelected: false,
       ),
       ContactModel(
         name: "Jessica Davis",
-        profileImage: ImageConstant.imgEllipse864x64,
+        profileImage: '',
         isSelected: false,
       ),
       ContactModel(
         name: "William Garcia",
-        profileImage: ImageConstant.imgEllipse864x64,
+        profileImage: '',
         isSelected: false,
       ),
     ];

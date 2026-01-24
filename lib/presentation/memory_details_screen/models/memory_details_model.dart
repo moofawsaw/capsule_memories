@@ -11,8 +11,7 @@ class MemoryDetailsModel extends Equatable {
     this.members,
   }) {
     title = title ?? "Family Xmas 2025";
-    inviteLink = inviteLink ??
-        ImageConstant.imgNetworkR812309r72309r572093t722323t23t23t08;
+    inviteLink = inviteLink ?? 'https://capapp.co';
     isPublic = isPublic ?? true;
     members = members ?? [];
   }

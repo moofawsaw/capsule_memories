@@ -33,6 +33,8 @@ class CustomDropdown<T> extends StatelessWidget {
     this.textStyle,
     this.padding,
     this.margin,
+    this.iconColor,
+    this.iconSize,
   }) : super(key: key);
 
   /// List of dropdown items
@@ -47,11 +49,11 @@ class CustomDropdown<T> extends StatelessWidget {
   /// Placeholder text when no selection
   final String? placeholder;
 
-  /// Left icon path
-  final String? leftIcon;
+  /// ✅ Can be String (asset/url) OR IconData (Material icon)
+  final Object? leftIcon;
 
-  /// Right icon path
-  final String? rightIcon;
+  /// ✅ Can be String (asset/url) OR IconData (Material icon)
+  final Object? rightIcon;
 
   /// Form validation function
   final String? Function(T?)? validator;
@@ -71,8 +73,14 @@ class CustomDropdown<T> extends StatelessWidget {
   /// External margin
   final EdgeInsetsGeometry? margin;
 
+  final Color? iconColor;
+  final double? iconSize;
+
   @override
   Widget build(BuildContext context) {
+    final effectiveIconColor = iconColor ?? appTheme.blue_gray_300;
+    final effectiveIconSize = iconSize ?? 20.h;
+
     return Container(
       margin: margin ?? EdgeInsets.only(top: 20.h),
       child: DropdownButtonFormField<T>(
@@ -90,20 +98,20 @@ class CustomDropdown<T> extends StatelessWidget {
           prefixIcon: leftIcon != null
               ? Padding(
                   padding: EdgeInsets.all(12.h),
-                  child: CustomImageView(
-                    imagePath: leftIcon!,
-                    height: 22.h,
-                    width: 26.h,
+                  child: _buildAnyIcon(
+                    leftIcon!,
+                    color: effectiveIconColor,
+                    size: effectiveIconSize,
                   ),
                 )
               : null,
           suffixIcon: rightIcon != null
               ? Padding(
                   padding: EdgeInsets.all(12.h),
-                  child: CustomImageView(
-                    imagePath: rightIcon!,
-                    height: 22.h,
-                    width: 18.h,
+                  child: _buildAnyIcon(
+                    rightIcon!,
+                    color: effectiveIconColor,
+                    size: effectiveIconSize,
                   ),
                 )
               : null,
@@ -142,6 +150,22 @@ class CustomDropdown<T> extends StatelessWidget {
         icon: SizedBox.shrink(),
         isExpanded: true,
       ),
+    );
+  }
+
+  Widget _buildAnyIcon(Object iconValue,
+      {required Color color, required double size}) {
+    if (iconValue is IconData) {
+      return Icon(iconValue, color: color, size: size);
+    }
+
+    final path = iconValue.toString();
+    return CustomImageView(
+      imagePath: path,
+      height: size,
+      width: size,
+      fit: BoxFit.contain,
+      color: color,
     );
   }
 }

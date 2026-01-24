@@ -65,7 +65,7 @@ class GroupQRInviteNotifier extends StateNotifier<GroupQRInviteState> {
           qrCodeData: inviteUrl,
           qrCodeUrl: resolvedQrUrl,
           groupDescription: 'Scan to join the group',
-          iconPath: ImageConstant.imgButtons,
+          iconPath: '',
         ),
       );
     } catch (e) {

@@ -38,7 +38,7 @@ class NotificationItemModel extends Equatable {
     title = title ?? "Jane sent you a friend request!";
     subtitle = subtitle ?? "Click here to view";
     timestamp = timestamp ?? "2 hrs ago";
-    iconPath = iconPath ?? ImageConstant.imgButton;
+    iconPath = iconPath ?? '';
     isRead = isRead ?? false;
   }
 

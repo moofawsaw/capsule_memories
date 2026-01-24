@@ -11,13 +11,8 @@ class HangoutCallModel extends Equatable {
     this.isCallActive,
     this.id,
   }) {
-    participants = participants ??
-        [
-          ImageConstant.imgEllipse81,
-          ImageConstant.imgFrame3,
-          ImageConstant.imgFrame2,
-        ];
-    additionalParticipants = additionalParticipants ?? 3;
+    participants = participants ?? <String>[];
+    additionalParticipants = additionalParticipants ?? 0;
     isSpeakerOn = isSpeakerOn ?? true;
     isCallActive = isCallActive ?? true;
     id = id ?? "";

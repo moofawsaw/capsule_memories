@@ -156,9 +156,9 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
               width: 26.h,
               height: 26.h,
               margin: EdgeInsets.only(top: 2.h),
-              child: CustomImageView(
-                imagePath: ImageConstant.imgIcon7,
-                fit: BoxFit.contain,
+              child: Icon(
+                Icons.groups_outlined,
+                size: 26.h,
                 color: appTheme.deep_purple_A100,
               ),
             ),
@@ -177,7 +177,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
               children: [
                 CustomButton(
                   text: 'New',
-                  leftIcon: ImageConstant.imgIcon20x20,
+                  leftIcon: Icons.add,
                   onPressed: () => onTapNewGroup(context),
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
@@ -247,7 +247,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                   groupName: invitation.groupName ?? 'Unknown',
                   memberCount: invitation.memberCount ?? 0,
                   memberAvatarImagePath:
-                  invitation.avatarImage ?? ImageConstant.imgFrame403,
+                  invitation.avatarImage ?? '',
                   onAcceptTap: () => onTapAcceptInvitation(context),
                   onActionTap: () => onTapDeclineInvitation(context),
                 ),
@@ -341,7 +341,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                         '$effectiveCount member${effectiveCount == 1 ? '' : 's'}',
                         memberImages: avatar != null
                             ? [avatar]
-                            : [ImageConstant.imgEllipse81],
+                            : [''],
                         isCreator: isCreator,
                       ),
                       onActionTap: () => onTapGroupQR(context, group),
@@ -369,7 +369,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                   '$effectiveCount member${effectiveCount == 1 ? '' : 's'}',
                   memberImages: memberImages.isNotEmpty
                       ? memberImages
-                      : [ImageConstant.imgEllipse81],
+                      : [''],
                   isCreator: isCreator,
                 ),
                 onActionTap: () => onTapGroupQR(context, group),

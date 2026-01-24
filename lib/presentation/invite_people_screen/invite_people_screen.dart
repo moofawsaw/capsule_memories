@@ -98,8 +98,10 @@ class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
             ),
           ),
           CustomIconButtonRow(
-            firstIconPath: ImageConstant.imgButtons,
-            secondIconPath: ImageConstant.imgButtonsGray50,
+            firstIcon: Icons.qr_code_scanner,
+            secondIcon: Icons.photo_camera,
+            firstIconColor: appTheme.gray_50,
+            secondIconColor: appTheme.gray_50,
             onFirstIconTap: () {
               onTapQRCode(context);
             },
@@ -130,8 +132,8 @@ class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
               },
               value: state.invitePeopleModel?.selectedGroup,
               placeholder: 'Select from group...',
-              leftIcon: ImageConstant.imgIconBlueGray30022x26,
-              rightIcon: ImageConstant.imgIconBlueGray30022x18,
+              leftIcon: Icons.group_outlined,
+              rightIcon: Icons.expand_more,
               margin: EdgeInsets.zero,
             ),
             if (state.invitePeopleModel?.selectedGroup != null &&
@@ -199,10 +201,11 @@ class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
         children: [
           ClipOval(
             child: CustomImageView(
-              imagePath: member['avatar'] ?? ImageConstant.imgEllipse8,
+              imagePath: member['avatar'] ?? '',
               height: 32.h,
               width: 32.h,
               fit: BoxFit.cover,
+              isCircular: true,
             ),
           ),
           SizedBox(width: 10.h),
@@ -267,10 +270,10 @@ class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
               ),
               prefixIcon: Padding(
                 padding: EdgeInsets.all(12.h),
-                child: CustomImageView(
-                  imagePath: ImageConstant.imgSearch,
-                  height: 20.h,
-                  width: 20.h,
+                child: Icon(
+                  Icons.search,
+                  size: 20.h,
+                  color: appTheme.blue_gray_300,
                 ),
               ),
               border: InputBorder.none,
@@ -345,10 +348,11 @@ class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
           // User avatar
           ClipOval(
             child: CustomImageView(
-              imagePath: user['avatar'] ?? ImageConstant.imgEllipse8,
+              imagePath: user['avatar'] ?? '',
               height: 40.h,
               width: 40.h,
               fit: BoxFit.cover,
+              isCircular: true,
             ),
           ),
           SizedBox(width: 12.h),
@@ -429,7 +433,7 @@ class InvitePeopleScreenState extends ConsumerState<InvitePeopleScreen> {
   /// Section Widget
   Widget _buildInfoSection(BuildContext context) {
     return CustomInfoRow(
-      iconPath: ImageConstant.imgFrameBlueGray300,
+      icon: Icons.info_outline,
       text: 'You can also share a link after creating the memory',
       textWidth: 0.82,
       margin: EdgeInsets.only(top: 20.h, right: 26.h, left: 12.h),

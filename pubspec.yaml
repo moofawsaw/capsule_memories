@@ -91,12 +91,17 @@ flutter:
   # - ONLY USE EXISTING LOCAL FONTS FROM assets/fonts/
 
 flutter_native_splash:
-  color: "#6B4EFF"
-  image: assets/images/splash_logo.png
+  ios: true
+  android: true
 
+  # iOS – frozen
+  color: "#12151D"
+  image: assets/images/ios_splash.png
+
+  # Android – free to change
   android_12:
-    color: "#6B4EFF"
-    image: assets/images/splash_logo.png
+    color: "#12151D"
+    image: assets/images/android_splash.png
 
 # Note: app_links package is NOT compatible with current Dart SDK 3.6.0 - deep linking implemented using native method channels instead
 

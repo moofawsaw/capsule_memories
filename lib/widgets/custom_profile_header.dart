@@ -298,8 +298,7 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
     final resolvedAvatarPath = _resolveAvatarPath(widget.avatarImagePath);
 
     final shouldLetter = resolvedAvatarPath == null ||
-        resolvedAvatarPath.isEmpty ||
-        widget.avatarImagePath == ImageConstant.imgDefaultAvatar;
+        resolvedAvatarPath.isEmpty;
 
     // Strip query so cacheKey is stable (same as your header logic)
     String _stripQuery(String url) {
@@ -368,13 +367,14 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
               bottom: 0,
               right: 0,
               child: CustomIconButton(
-                iconPath: ImageConstant.imgEdit,
+                icon: Icons.edit,
                 onTap: widget.onEditTap,
                 backgroundColor: const Color(0xFFD81E29).withAlpha(59),
                 borderRadius: 18.h,
                 height: 38.h,
                 width: 38.h,
                 padding: EdgeInsets.all(8.h),
+                iconColor: appTheme.gray_50,
               ),
             ),
         ],
