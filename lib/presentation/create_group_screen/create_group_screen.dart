@@ -131,10 +131,11 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             padding: EdgeInsets.only(top: 8.h),
             child: Text(
               'Group Name',
-              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+              style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                   .copyWith(color: appTheme.blue_gray_300),
             ),
           ),
+          SizedBox(height: 10.h),
           CustomEditText(
             controller: state.groupNameController,
             hintText: 'e.g., Family, Work Friends, Team',
@@ -154,73 +155,86 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     return Consumer(builder: (context, ref, _) {
       final state = ref.watch(createGroupNotifier);
 
-      if (state.isLoading ?? false) {
-        return Center(
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 20.h),
-            child: CircularProgressIndicator(color: appTheme.colorFF52D1),
-          ),
-        );
-      }
-
       final allFriends = state.createGroupModel?.friendsList ?? [];
       final filteredFriends = state.createGroupModel?.filteredFriends ?? [];
       final hasNoFriends = allFriends.isEmpty;
 
-      if (filteredFriends.isEmpty) {
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: 20.h),
-          child: Column(
-            children: [
-              Text(
-                hasNoFriends
-                    ? 'No friends yet. Add friends to create a group.'
-                    : 'No friends found.',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-                textAlign: TextAlign.center,
-              ),
-              if (hasNoFriends) ...[
-                SizedBox(height: 14.h),
-                CustomButton(
-                  text: 'Go to Friends',
-                  buttonStyle: CustomButtonStyle.fillPrimary,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  height: 44.h,
-                  padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 10.h),
-                  onPressed: () {
-                    // Close sheet first, then navigate to Friends screen
-                    NavigatorService.goBack();
-                    Future.microtask(
-                      () => NavigatorService.pushNamed(AppRoutes.appFriends),
-                    );
-                  },
-                ),
-              ],
-            ],
-          ),
-        );
-      }
-
       return Column(
-        children: filteredFriends.map((friend) {
-          final isSelected = state.createGroupModel?.selectedMembers
-              ?.any((member) => member.id == friend.id) ??
-              false;
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select Friends',
+            // Match the "Group Name" label style on the Edit Group bottom sheet.
+            style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                .copyWith(color: appTheme.blue_gray_300),
+          ),
+          SizedBox(height: 10.h),
+          if (state.isLoading ?? false)
+            Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 20.h),
+                child: CircularProgressIndicator(color: appTheme.colorFF52D1),
+              ),
+            )
+          else if (filteredFriends.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 20.h),
+              child: Column(
+                children: [
+                  Text(
+                    hasNoFriends
+                        ? 'No friends yet. Add friends to create a group.'
+                        : 'No friends found.',
+                    style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                        .copyWith(color: appTheme.blue_gray_300),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (hasNoFriends) ...[
+                    SizedBox(height: 14.h),
+                    CustomButton(
+                      text: 'Go to Friends',
+                      buttonStyle: CustomButtonStyle.fillPrimary,
+                      buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                      height: 44.h,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16.h,
+                        vertical: 10.h,
+                      ),
+                      onPressed: () {
+                        // Close sheet first, then navigate to Friends screen
+                        NavigatorService.goBack();
+                        Future.microtask(
+                          () => NavigatorService.pushNamed(AppRoutes.appFriends),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            )
+          else
+            Column(
+              children: filteredFriends.map((friend) {
+                final isSelected = state.createGroupModel?.selectedMembers
+                        ?.any((member) => member.id == friend.id) ??
+                    false;
 
-          return FriendListItem(
-            friend: friend,
-            isSelected: isSelected,
-            margin: EdgeInsets.only(top: 8.h), // closer to Edit Group spacing
-            onTap: () {
-              if (isSelected) {
-                ref.read(createGroupNotifier.notifier).removeMember(friend);
-              } else {
-                ref.read(createGroupNotifier.notifier).addMember(friend);
-              }
-            },
-          );
-        }).toList(),
+                return FriendListItem(
+                  friend: friend,
+                  isSelected: isSelected,
+                  margin:
+                      EdgeInsets.only(top: 8.h), // closer to Edit Group spacing
+                  onTap: () {
+                    if (isSelected) {
+                      ref.read(createGroupNotifier.notifier).removeMember(friend);
+                    } else {
+                      ref.read(createGroupNotifier.notifier).addMember(friend);
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+        ],
       );
     });
   }
@@ -243,7 +257,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             Expanded(
               child: CustomButton(
                 text: 'Cancel',
-                buttonStyle: CustomButtonStyle.fillDark,
+                buttonStyle: CustomButtonStyle.outlineDark,
                 buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
                 onPressed: () => onTapCancel(context),
               ),

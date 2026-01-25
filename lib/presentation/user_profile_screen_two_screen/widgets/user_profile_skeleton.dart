@@ -97,7 +97,7 @@ class UserProfileSkeleton extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 19.h, vertical: 12.h), // ✅ wider
       decoration: BoxDecoration(
-        color: const Color(0xFF151319),
+        color: appTheme.gray_900,
         borderRadius: BorderRadius.circular(8.h),
       ),
       child: Row(

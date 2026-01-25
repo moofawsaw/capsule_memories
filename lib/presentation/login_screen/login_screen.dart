@@ -85,6 +85,10 @@ class LoginScreenState extends ConsumerState<LoginScreen>
 
   /// Logo Section
   Widget _buildLogoSection() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final logoPath =
+        isLight ? ImageConstant.imgLogoLight : ImageConstant.imgLogo;
+
     return GestureDetector(
       onTap: () {
         NavigatorService.pushNamed(AppRoutes.appFeed);
@@ -92,7 +96,7 @@ class LoginScreenState extends ConsumerState<LoginScreen>
       child: SizedBox(
         width: MediaQuery.of(context).size.width * 0.38,
         child: CustomImageView(
-          imagePath: ImageConstant.imgLogo,
+          imagePath: logoPath,
           height: 26.h,
           width: 130.h,
         ),
@@ -348,10 +352,9 @@ class _SocialAuthButton extends StatelessWidget {
 }
 
 class _NormalizedProviderIcon extends StatelessWidget {
-  final IconData? iconData;
-  final String? assetPath;
+  final IconData iconData;
 
-  const _NormalizedProviderIcon({this.iconData, this.assetPath});
+  const _NormalizedProviderIcon({required this.iconData});
 
   @override
   Widget build(BuildContext context) {
@@ -359,17 +362,10 @@ class _NormalizedProviderIcon extends StatelessWidget {
       width: 24.h,
       height: 24.h,
       child: Center(
-        child: iconData != null
-            ? Icon(
+        child: Icon(
           iconData,
           size: 18.h,
           color: appTheme.blue_gray_300,
-        )
-            : Image.asset(
-          assetPath!,
-          width: 18.h,
-          height: 18.h,
-          fit: BoxFit.contain,
         ),
       ),
     );

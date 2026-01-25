@@ -1,5 +1,4 @@
 import '../core/app_export.dart';
-import './custom_image_view.dart';
 
 /**
  * CustomSearchView - A reusable search input component with customizable styling
@@ -55,6 +54,7 @@ class CustomSearchView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hintColor = Theme.of(context).colorScheme.onSurface.withAlpha(50);
     return Container(
       margin: margin ?? EdgeInsets.zero,
       child: TextFormField(
@@ -68,7 +68,7 @@ class CustomSearchView extends StatelessWidget {
         decoration: InputDecoration(
           hintText: placeholder ?? "Search...",
           hintStyle: TextStyleHelper.instance.title16RegularPlusJakartaSans
-              .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+              .copyWith(color: hintColor, height: 1.31),
           prefixIcon: Container(
             padding: EdgeInsets.all(14.h),
             child: Icon(

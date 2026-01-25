@@ -380,11 +380,16 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       itemCount: stories.length,
       itemBuilder: (context, index) {
         final story = stories[index];
-        final isCurrentUser = _userId == null;
+        final me = _currentUserId;
+        final isMyStory =
+            me != null && me.isNotEmpty && (story.contributorId ?? '') == me;
+        final rawName = (story.userName ?? '').trim();
 
         return CustomStoryCard(
           borderRadius: BorderRadius.circular(0.h),
-          userName: isCurrentUser ? '' : (story.userName ?? 'User'),
+          // Hide name for the current user's own stories (even if this screen is
+          // reached via a route arg that temporarily sets _userId).
+          userName: isMyStory ? '' : (rawName.isNotEmpty ? rawName : 'User'),
           userAvatar: story.userAvatar ?? '',
           backgroundImage: story.backgroundImage ?? '',
           categoryText: story.categoryText ?? 'Memory',

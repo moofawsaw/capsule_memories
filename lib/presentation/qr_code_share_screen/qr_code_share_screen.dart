@@ -204,20 +204,20 @@ class QRCodeShareScreenState extends ConsumerState<QRCodeShareScreen> {
         return Row(
           spacing: 12.h,
           children: [
-            Expanded(
-              child: CustomButton(
-                text: 'Download QR',
-                leftIcon: Icons.download,
-                onPressed: () => onTapDownloadQR(context),
-                buttonStyle: CustomButtonStyle.fillDark,
-                buttonTextStyle: CustomButtonTextStyle
-                    .bodyMedium, // Modified: Replaced unavailable bodyMediumWhite with bodyMedium
-                padding: EdgeInsets.symmetric(
-                  horizontal: 22.h,
-                  vertical: 12.h,
-                ),
-              ),
-            ),
+            // Expanded(
+            //   child: CustomButton(
+            //     text: 'Download QR',
+            //     leftIcon: Icons.download,
+            //     onPressed: () => onTapDownloadQR(context),
+            //     buttonStyle: CustomButtonStyle.fillDark,
+            //     buttonTextStyle: CustomButtonTextStyle
+            //         .bodyMedium, // Modified: Replaced unavailable bodyMediumWhite with bodyMedium
+            //     padding: EdgeInsets.symmetric(
+            //       horizontal: 22.h,
+            //       vertical: 12.h,
+            //     ),
+            //   ),
+            // ),
             Expanded(
               child: CustomButton(
                 text: 'Share Link',

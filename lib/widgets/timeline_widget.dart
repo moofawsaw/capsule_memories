@@ -31,10 +31,10 @@ class TimelineWidget extends StatelessWidget {
   // ===== Layout constants =====
   static const double _cardHeight = 62.0;
   static const double _cardWidth = 44.0;
-  static const double _connectorAboveBar = 12.0;
+  static const double _connectorAboveBar = 6.0;
   static const double _barHeight = 4.0;
   static const double _connectorBelowBar = 12.0;
-  static const double _avatarSize = 40.0;
+  static const double _avatarSize = 42.0;
   static const double _markerAreaHeight = 46.0;
   static const double _horizontalPadding = 20.0;
 
@@ -788,7 +788,7 @@ class _TimelineStoryWidget extends StatelessWidget {
         padding: const EdgeInsets.all(1),
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
-          color: Color(0xFF222D3E),
+          // color: Color(0xFF222D3E),
         ),
         child: ClipOval(
           child: _isValidNetworkUrl(url)

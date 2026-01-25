@@ -403,7 +403,7 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
               autofocus: true,
               textAlign: TextAlign.center,
               style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-                  .copyWith(color: appTheme.white_A700, height: 1.29),
+                  .copyWith(color: appTheme.gray_50, height: 1.29),
               decoration: const InputDecoration(
                 border: UnderlineInputBorder(),
               ),
@@ -446,7 +446,7 @@ class _CustomProfileHeaderState extends State<CustomProfileHeader> {
             child: Text(
               current.isNotEmpty ? current : 'User',
               style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-                  .copyWith(color: appTheme.white_A700, height: 1.29),
+                  .copyWith(color: appTheme.gray_50, height: 1.29),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

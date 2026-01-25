@@ -92,12 +92,12 @@ class _MemoryShareOptionsScreenState
                           child: Column(
                             children: [
                               Icon(Icons.check_circle,
-                                  color: Colors.white, size: 48.fSize),
+                                  color: appTheme.whiteCustom, size: 48.fSize),
                               SizedBox(height: 2.h.fSize),
                               Text(
                                 'Memory Created!',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: appTheme.whiteCustom,
                                   fontSize: 18.fSize,
                                   fontWeight: FontWeight.bold,
                                 ),

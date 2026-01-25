@@ -508,7 +508,6 @@ class MemoryTimelinePlaybackScreenState
       decoration: BoxDecoration(
         color: Colors.black.withAlpha(90),
         borderRadius: BorderRadius.circular(999.h),
-        border: Border.all(color: Colors.white.withAlpha(25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -747,7 +746,11 @@ class MemoryTimelinePlaybackScreenState
 
   Widget _buildBottomOverlay(
       BuildContext context, MemoryTimelinePlaybackState state) {
-    final progress = (state.currentStoryIndex ?? 0) / (state.totalStories ?? 1);
+    // Avoid Infinity/NaN on first frame (totalStories can be 0 before data loads).
+    final int idx = state.currentStoryIndex ?? 0;
+    final int total = state.totalStories ?? 0;
+    final double progress =
+        (total > 0) ? (idx / total).clamp(0.0, 1.0) : 0.0;
 
     return FadeTransition(
       opacity: _fadeAnimation,

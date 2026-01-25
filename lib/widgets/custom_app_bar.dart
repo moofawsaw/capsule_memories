@@ -4,10 +4,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+// ignore_for_file: unused_field
 import '../core/app_export.dart';
 import '../presentation/create_memory_screen/create_memory_screen.dart';
 import '../presentation/notifications_screen/notifier/notifications_notifier.dart';
 import '../services/avatar_state_service.dart';
+import '../services/create_memory_preload_service.dart';
 import '../services/supabase_service.dart';
 import './custom_image_view.dart';
 
@@ -142,6 +144,12 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
         _primeAvatarProvider(next);
       },
     );
+
+    // ✅ Preload Create Memory dependencies AFTER first paint (keeps splash fast).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Fire-and-forget warm cache; CreateMemoryNotifier will consume it.
+      CreateMemoryPreloadService.instance.warm();
+    });
   }
 
   @override
@@ -221,8 +229,6 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
         return _buildTitleWithLeadingLayout();
       case CustomAppBarLayoutType.spaceBetween:
         return _buildSpaceBetweenLayout();
-      default:
-        return _buildLogoWithActionsLayout(context, unreadCount);
     }
   }
 
@@ -248,7 +254,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
                 child: CustomImageView(
                   imagePath: widget.logoImagePath!,
                   height: 33.h,
-                  width: 190.h,
+                  width: 130.h,
                   fit: BoxFit.contain,
                   alignment: Alignment.centerLeft,
                 ),
@@ -520,7 +526,7 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     final avatarLetter = email.isNotEmpty ? email[0].toUpperCase() : 'U';
 
     if (hasUrl) {
-      _primeAvatarProvider(avatarUrl!);
+      _primeAvatarProvider(avatarUrl);
     } else {
       _cachedAvatarUrl = null;
       _cachedAvatarProvider = null;
@@ -528,19 +534,32 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
 
     final providerToUse = _globalAvatarProvider ?? _cachedAvatarProvider;
 
+    // ===== RING CONFIG =====
+    final double avatarSize = 54.h;
+    final double ringPadding = 3.h; // thickness of ring
+    final Color ringColor = appTheme.blue_gray_900_02;
+
+    // ===== FALLBACK (LETTER AVATAR) =====
     if (!hasUrl || providerToUse == null) {
       return SizedBox(
-        width: 50.h,
-        height: 50.h,
-        child: ClipOval(
-          child: Container(
-            color: appTheme.deep_purple_A100,
-            child: Center(
-              child: Text(
-                avatarLetter,
-                style: TextStyleHelper.instance.title18BoldPlusJakartaSans.copyWith(
-                  color: appTheme.gray_50,
-                  fontSize: 20.h,
+        width: avatarSize,
+        height: avatarSize,
+        child: Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: ringColor,
+          ),
+          padding: EdgeInsets.all(ringPadding),
+          child: ClipOval(
+            child: Container(
+              color: appTheme.deep_purple_A100,
+              child: Center(
+                child: Text(
+                  avatarLetter,
+                  style: TextStyleHelper.instance.title18BoldPlusJakartaSans.copyWith(
+                    color: appTheme.gray_50,
+                    fontSize: 20.h,
+                  ),
                 ),
               ),
             ),
@@ -549,16 +568,24 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
       );
     }
 
+    // ===== IMAGE AVATAR =====
     return SizedBox(
-      width: 50.h,
-      height: 50.h,
-      child: ClipOval(
-        child: RepaintBoundary(
-          child: Image(
-            image: providerToUse,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            filterQuality: FilterQuality.low,
+      width: avatarSize,
+      height: avatarSize,
+      child: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: ringColor,
+        ),
+        padding: EdgeInsets.all(ringPadding),
+        child: ClipOval(
+          child: RepaintBoundary(
+            child: Image(
+              image: providerToUse,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              filterQuality: FilterQuality.low,
+            ),
           ),
         ),
       ),

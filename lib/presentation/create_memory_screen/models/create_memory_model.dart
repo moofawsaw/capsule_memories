@@ -2,6 +2,8 @@
 
 // ignore_for_file: must_be_immutable
 class CreateMemoryModel {
+  static const Object _unset = Object();
+
   String? memoryName;
   bool isPublic;
   String? selectedGroup;
@@ -35,7 +37,7 @@ class CreateMemoryModel {
   CreateMemoryModel copyWith({
     String? memoryName,
     bool? isPublic,
-    String? selectedGroup,
+    Object? selectedGroup = _unset,
     String? selectedCategory,
     String? selectedDuration,
     String? searchQuery,
@@ -48,7 +50,9 @@ class CreateMemoryModel {
     return CreateMemoryModel(
       memoryName: memoryName ?? this.memoryName,
       isPublic: isPublic ?? this.isPublic,
-      selectedGroup: selectedGroup ?? this.selectedGroup,
+      // Allow explicitly clearing the selected group by passing `selectedGroup: null`.
+      selectedGroup:
+          selectedGroup == _unset ? this.selectedGroup : selectedGroup as String?,
       selectedCategory: selectedCategory ?? this.selectedCategory,
       selectedDuration: selectedDuration ?? this.selectedDuration,
       searchQuery: searchQuery ?? this.searchQuery,

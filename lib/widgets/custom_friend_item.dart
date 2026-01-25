@@ -130,7 +130,7 @@ class CustomFriendItem extends StatelessWidget {
             Container(
               margin: EdgeInsets.only(left: 16.h, right: 14.h),
               child: CustomIconButton(
-                icon: Icons.more_horiz,
+                icon: Icons.person_remove_outlined,
                 iconColor: appTheme.blue_gray_300,
                 height: 28.h,
                 width: 28.h,

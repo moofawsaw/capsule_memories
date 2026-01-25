@@ -18,27 +18,37 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Force rebuild of /app subtree when themeMode changes.
+    // Many screens use the global `appTheme` (not Theme.of(context)),
+    // so without this they won't repaint until navigation.
+    final brightness = Theme.of(context).brightness;
+    final keyedChild = KeyedSubtree(
+      key: ValueKey(brightness),
+      child: child,
+    );
+
     return Scaffold(
       backgroundColor: appTheme.gray_900_02,
 
       // ✅ Hide the app bar for fullscreen routes
-      appBar: hideHeader ? null : _buildPersistentHeader(),
+      appBar: hideHeader ? null : _buildPersistentHeader(context),
 
       // ✅ Only apply SafeArea when there is NO AppBar (fullscreen)
       body: hideHeader
           ? SafeArea(
         top: false,   // allow under status bar
         bottom: false,
-        child: child,
+        child: keyedChild,
       )
-          : child,          // ✅ no SafeArea; AppBar already handled it
+          : keyedChild,          // ✅ no SafeArea; AppBar already handled it
     );
   }
 
   /// Persistent header that renders once and stays visible across all /app routes
-  PreferredSizeWidget _buildPersistentHeader() {
+  PreferredSizeWidget _buildPersistentHeader(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
     return CustomAppBar(
-      logoImagePath: ImageConstant.imgLogo,
+      logoImagePath: isLight ? ImageConstant.imgLogoLight : ImageConstant.imgLogo,
       showIconButton: true,
       iconButtonBackgroundColor: appTheme.color3BD81E,
       actionIcons: [

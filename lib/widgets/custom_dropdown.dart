@@ -80,6 +80,7 @@ class CustomDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final effectiveIconColor = iconColor ?? appTheme.blue_gray_300;
     final effectiveIconSize = iconSize ?? 20.h;
+    final hintColor = Theme.of(context).colorScheme.onSurface.withAlpha(153);
 
     return Container(
       margin: margin ?? EdgeInsets.only(top: 20.h),
@@ -90,9 +91,9 @@ class CustomDropdown<T> extends StatelessWidget {
         validator: validator,
         decoration: InputDecoration(
           hintText: placeholder ?? "Select from group...",
-          hintStyle: textStyle ??
-              TextStyleHelper.instance.title16RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
+          hintStyle: (textStyle ??
+                  TextStyleHelper.instance.title16RegularPlusJakartaSans)
+              .copyWith(color: hintColor),
           filled: true,
           fillColor: fillColor ?? Color(0xFF1B181E),
           prefixIcon: leftIcon != null

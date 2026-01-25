@@ -55,7 +55,8 @@ class CustomButton extends StatelessWidget {
 
   Widget _buildButton(BuildContext context) {
     final style = buttonStyle ?? CustomButtonStyle.fillPrimary;
-    final textStyle = buttonTextStyle ?? CustomButtonTextStyle.bodyMedium;
+    final baseTextStyle = buttonTextStyle ?? CustomButtonTextStyle.bodyMedium;
+    final textStyle = _resolveEffectiveTextStyle(context, style, baseTextStyle);
 
     final disabled = (isDisabled ?? false) || (isLoading ?? false);
 
@@ -67,6 +68,40 @@ class CustomButton extends StatelessWidget {
       case CustomButtonVariant.text:
         return _buildTextButton(style, textStyle, disabled);
     }
+  }
+
+  CustomButtonTextStyle _resolveEffectiveTextStyle(
+    BuildContext context,
+    CustomButtonStyle style,
+    CustomButtonTextStyle textStyle,
+  ) {
+    final brightness = Theme.of(context).brightness;
+    final bool isOutlineVariant = style.variant == CustomButtonVariant.outline;
+
+    // ✅ Fix: outlineDark + outlinePrimary should have dark text in light mode.
+    // This matches typical UX expectations for outline buttons on light surfaces.
+    final bool isOutlineDark = isOutlineVariant &&
+        style.borderSide != null &&
+        style.borderSide!.width >= 2 &&
+        style.borderSide!.color == appTheme.blue_gray_900;
+
+    final bool isOutlinePrimary = isOutlineVariant &&
+        style.borderSide != null &&
+        style.borderSide!.color == appTheme.deep_purple_A100;
+
+    if (!isOutlineDark && !isOutlinePrimary) return textStyle;
+
+    // Match outlineDark behavior for both styles.
+    final Color desiredColor = (brightness == Brightness.light)
+        ? Theme.of(context).colorScheme.onSurface
+        : appTheme.gray_50;
+
+    return CustomButtonTextStyle(
+      color: desiredColor,
+      fontSize: textStyle.fontSize,
+      fontWeight: textStyle.fontWeight,
+      iconSize: textStyle.iconSize,
+    );
   }
 
   Widget _buildElevatedButton(

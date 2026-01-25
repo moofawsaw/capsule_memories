@@ -98,7 +98,7 @@ class CustomGroupCard extends StatelessWidget {
                 child: Text(
                   'Creator',
                   style: TextStyleHelper.instance.bodyTextRegularPlusJakartaSans.copyWith(
-                    color: appTheme.gray_50,
+                    color: appTheme.whiteCustom,
                     fontSize: 10.fSize,
                     fontWeight: FontWeight.w600,
                   ),

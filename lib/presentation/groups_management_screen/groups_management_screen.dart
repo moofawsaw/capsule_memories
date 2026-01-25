@@ -157,7 +157,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
               height: 26.h,
               margin: EdgeInsets.only(top: 2.h),
               child: Icon(
-                Icons.groups_outlined,
+                Icons.groups_rounded,
                 size: 26.h,
                 color: appTheme.deep_purple_A100,
               ),

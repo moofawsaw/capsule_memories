@@ -26,6 +26,7 @@ import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/story_reactions.dart';
+import '../qr_timeline_share_screen/qr_timeline_share_screen.dart';
 import '../report_story_screen/report_story_screen.dart';
 
 /// Enum for different haptic feedback types
@@ -115,6 +116,14 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   String? _memoryCategoryName;
   String? _memoryCategoryIcon;
   String? _memoryId;
+  String? _memoryState; // 'open' | 'sealed' (best-effort)
+
+  bool get _isSealedMemory => (_memoryState ?? '').trim().toLowerCase() == 'sealed';
+
+  // Memory membership (for action bar)
+  String? _membershipMemoryId;
+  bool _isCurrentUserMember = false;
+  bool _isCurrentUserCreator = false;
 
   // Prefetching state
   bool _isPrefetching = false;
@@ -589,14 +598,32 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
       final memoryId = storyData['memory_id'] as String?;
       if (memoryId != null && memoryId.isNotEmpty) {
+        // Avoid flashing stale membership actions when switching between memories.
+        if (_membershipMemoryId != memoryId) {
+          _safeSetState(() {
+            _membershipMemoryId = null;
+            _isCurrentUserMember = false;
+            _isCurrentUserCreator = false;
+          });
+        }
+
         _memoryId = memoryId;
         await _fetchMemoryCategory(memoryId);
+        // Determine membership for action bar (joined memories should still show actions).
+        await _refreshMemoryMembership(memoryId, token: token);
         if (_isDisposed ||
             !mounted ||
             !_isActiveInTree ||
             token != _loadToken) {
           return;
         }
+      } else {
+        // No memory -> no membership actions
+        _safeSetState(() {
+          _membershipMemoryId = null;
+          _isCurrentUserMember = false;
+          _isCurrentUserCreator = false;
+        });
       }
 
       if (_currentStoryData == null) {
@@ -752,6 +779,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
             created_at,
             location,
             visibility,
+            state,
             category_id, 
             memory_categories(name, icon_name)
           ''').eq('id', memoryId).single();
@@ -765,6 +793,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _memoryCategoryIcon = iconName != null
             ? StorageUtils.resolveMemoryCategoryIconUrl(iconName)
             : null;
+        _memoryState = (response['state'] as String?)?.trim();
       });
 
       if (_currentStoryData != null) {
@@ -773,6 +802,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _currentStoryData!['memory_location'] = response['location'] as String?;
         _currentStoryData!['memory_visibility'] =
         response['visibility'] as String?;
+        _currentStoryData!['memory_state'] = response['state'] as String?;
       }
     } catch (_) {}
   }
@@ -911,8 +941,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
   Future<void> _triggerHapticFeedback(HapticFeedbackType type) async {
     try {
-      final hasVibrator = await Vibration.hasVibrator() ?? false;
-      if (!hasVibrator) return;
+      final hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator != true) return;
 
       switch (type) {
         case HapticFeedbackType.light:
@@ -1038,7 +1068,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
     await Navigator.pushNamed(
       context,
-      AppRoutes.appTimeline,
+      _isSealedMemory ? AppRoutes.appTimelineSealed : AppRoutes.appTimeline,
       arguments: navArgs,
     );
 
@@ -1261,6 +1291,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                     if (_shouldShowPlayOverlay) _buildPlayOverlay(),
                     if (_isFastForwarding) _buildFastForwardOverlay(),
                     SafeArea(
+                      top: true,
+                      bottom: false, // ✅ this removes the extra padding under reactions/caption
                       child: Column(
                         children: [
                           _useSingleTimerBar
@@ -1788,6 +1820,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                         ],
                       ),
                     ),
+                  // ✅ Timeline actions for sealed memories where the current user is a member
+                  // but NOT the creator: Leave + Share.
+                  _buildTimelineSection(),
                   Text(
                     _formatTimeAgo(_currentStoryData?['created_at'] as String? ?? ''),
                     style: TextStyleHelper.instance.body14RegularPlusJakartaSans
@@ -1814,6 +1849,34 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       child: Row(
         children: [
           const Spacer(),
+          // Keep the top-right action bar for members EXCEPT the sealed non-creator case,
+          // which shows Leave + Share under the memory title (timeline section).
+          if (_isCurrentUserMember &&
+              !(_isSealedMemory && !_isCurrentUserCreator)) ...[
+            if (!_isCurrentUserCreator) ...[
+              _buildMemberActionCircle(
+                icon: Icons.logout,
+                iconColor: appTheme.red_500,
+                onTap: () async {
+                  final memoryId =
+                      _memoryId ?? (_currentStoryData?['memory_id'] as String?);
+                  if (memoryId == null || memoryId.isEmpty) return;
+                  await _confirmAndLeaveMemory(memoryId);
+                },
+              ),
+              SizedBox(width: 8.h),
+            ],
+            _buildMemberActionCircle(
+              icon: Icons.qr_code,
+              onTap: () async {
+                final memoryId =
+                    _memoryId ?? (_currentStoryData?['memory_id'] as String?);
+                if (memoryId == null || memoryId.isEmpty) return;
+                await _openMemoryShareSheet(memoryId);
+              },
+            ),
+            SizedBox(width: 10.h),
+          ],
           if (location != null && location.isNotEmpty)
             Container(
               padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
@@ -1911,6 +1974,209 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         ],
       ),
     );
+  }
+
+  /// Timeline section actions shown under the memory title.
+  /// For SEALED memories where the current user is a member but not the creator,
+  /// we show Leave + Share here (instead of top-right bar).
+  Widget _buildTimelineSection() {
+    final bool shouldShow =
+        _isCurrentUserMember && !_isCurrentUserCreator && _isSealedMemory;
+
+    if (!shouldShow) return const SizedBox.shrink();
+
+    final memoryId = _memoryId ?? (_currentStoryData?['memory_id'] as String?);
+    if (memoryId == null || memoryId.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(top: 8.h),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildMemberActionCircle(
+            icon: Icons.logout,
+            iconColor: appTheme.red_500,
+            onTap: () async {
+              await _confirmAndLeaveMemory(memoryId);
+            },
+          ),
+          SizedBox(width: 8.h),
+          _buildMemberActionCircle(
+            icon: Icons.qr_code,
+            onTap: () async {
+              await _openMemoryShareSheet(memoryId);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _refreshMemoryMembership(
+    String memoryId, {
+    required int token,
+  }) async {
+    try {
+      final client = SupabaseService.instance.client;
+      final currentUserId = client?.auth.currentUser?.id;
+      final safeMemoryId = memoryId.trim();
+
+      if (client == null ||
+          currentUserId == null ||
+          safeMemoryId.isEmpty ||
+          _isDisposed ||
+          token != _loadToken) {
+        return;
+      }
+
+      // If we're already up-to-date for this memory, skip extra reads.
+      if (_membershipMemoryId == safeMemoryId) return;
+
+      bool isCreator = false;
+      bool isMember = false;
+
+      // 1) Creator check (+ state best-effort)
+      final memoryRow = await client
+          .from('memories')
+          .select('creator_id, state')
+          .eq('id', safeMemoryId)
+          .maybeSingle();
+
+      isCreator = (memoryRow?['creator_id'] as String?) == currentUserId;
+      final stateRaw = (memoryRow?['state'] as String?)?.trim();
+      if (stateRaw != null && stateRaw.isNotEmpty) {
+        _memoryState = stateRaw;
+      }
+      if (isCreator) {
+        isMember = true;
+      } else {
+        // 2) Contributor check
+        final contributorRow = await client
+            .from('memory_contributors')
+            .select('id')
+            .eq('memory_id', safeMemoryId)
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+        isMember = contributorRow != null;
+      }
+
+      if (_isDisposed || !mounted || !_isActiveInTree || token != _loadToken) {
+        return;
+      }
+
+      _safeSetState(() {
+        _membershipMemoryId = safeMemoryId;
+        _isCurrentUserCreator = isCreator;
+        _isCurrentUserMember = isMember;
+      });
+    } catch (_) {
+      // Best-effort; don't crash the viewer
+    }
+  }
+
+  Widget _buildMemberActionCircle({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () async {
+        if (_isAnyModalOpen) return;
+        if (_isTransitioning) return;
+        if (_tapLocked) return;
+        _lockTapBriefly();
+        onTap();
+      },
+      child: Container(
+        width: 38.h,
+        height: 38.h,
+        decoration: BoxDecoration(
+          color: appTheme.blackCustom.withAlpha(128),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: appTheme.whiteCustom.withAlpha(40),
+            width: 1,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: iconColor ?? appTheme.whiteCustom,
+          size: 18.h,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openMemoryShareSheet(String memoryId) async {
+    final wasPausedBefore = _isPaused;
+    _pausePlaybackForModal();
+    _safeSetState(() => _isAnyModalOpen = true);
+
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => QRTimelineShareScreen(memoryId: memoryId),
+      );
+    } finally {
+      if (_isDisposed || !mounted) return;
+      _safeSetState(() => _isAnyModalOpen = false);
+      _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
+    }
+  }
+
+  Future<void> _confirmAndLeaveMemory(String memoryId) async {
+    final client = SupabaseService.instance.client;
+    final currentUserId = client?.auth.currentUser?.id;
+    final safeId = memoryId.trim();
+    if (client == null || currentUserId == null || safeId.isEmpty) return;
+
+    // Creator can't "leave" their own memory
+    if (_isCurrentUserCreator) return;
+
+    final wasPausedBefore = _isPaused;
+    _pausePlaybackForModal();
+    _safeSetState(() => _isAnyModalOpen = true);
+
+    try {
+      final bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Leave memory?'),
+          content: const Text('You will lose access to this memory.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Leave'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
+      await client
+          .from('memory_contributors')
+          .delete()
+          .eq('memory_id', safeId)
+          .eq('user_id', currentUserId);
+
+      if (!mounted) return;
+      _performHardMediaReset();
+      NavigatorService.popAndPushNamed(AppRoutes.appMemories);
+    } finally {
+      if (_isDisposed || !mounted) return;
+      _safeSetState(() => _isAnyModalOpen = false);
+      _resumePlaybackAfterModal(wasPausedBefore: wasPausedBefore);
+    }
   }
 
   Widget _buildBottomInfo() {
@@ -2181,6 +2447,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           ),
           child: SafeArea(
             top: false,
+            bottom: false,
             child: Padding(
               padding: EdgeInsets.all(20.h), // ✅ old
               child: Column(
@@ -2192,12 +2459,12 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                     minLeadingWidth: 28.h, // ✅ prevents iOS leading collapse
                     leading: Icon(
                       Icons.share_outlined,
-                      color: appTheme.whiteCustom,
+                      color: appTheme.gray_50,
                     ),
                     title: Text(
                       'Share Story',
                       style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                          .copyWith(color: appTheme.whiteCustom),
+                          .copyWith(color: appTheme.gray_50),
                     ),
                     onTap: () async {
                       actionSelected = true;
@@ -2220,12 +2487,12 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                     minLeadingWidth: 28.h,
                     leading: Icon(
                       Icons.report_outlined,
-                      color: appTheme.whiteCustom,
+                      color: appTheme.gray_50,
                     ),
                     title: Text(
                       'Report Story',
                       style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                          .copyWith(color: appTheme.whiteCustom),
+                          .copyWith(color: appTheme.gray_50),
                     ),
                     onTap: () async {
                       actionSelected = true;

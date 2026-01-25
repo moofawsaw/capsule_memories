@@ -27,6 +27,22 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
   late final Animation<double> _livePulseScale;
   late final Animation<double> _livePulseOpacity;
 
+  static const int _initialMemoriesToRender = 3;
+  static const int _memoriesPageSize = 3;
+  static const int _initialStoriesToRender = 7;
+  static const int _storiesPageSize = 7;
+
+  final ScrollController _memoriesScrollController = ScrollController();
+  final ScrollController _storiesScrollController = ScrollController();
+
+  ProviderSubscription<MemoriesDashboardState>? _filtersSub;
+
+  int _visibleMemoriesCount = _initialMemoriesToRender;
+  int _visibleStoriesCount = _initialStoriesToRender;
+
+  int _currentMemoriesTotal = 0;
+  int _currentStoriesTotal = 0;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +66,30 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
       ),
     );
 
+    _memoriesScrollController.addListener(_onMemoriesScroll);
+    _storiesScrollController.addListener(_onStoriesScroll);
+
+    // Reset windowing when memory filters change
+    // ✅ Riverpod: listenManual is required in initState
+    _filtersSub = ref.listenManual<MemoriesDashboardState>(
+      memoriesDashboardNotifier,
+      (previous, next) {
+        if (previous == null) return;
+        final filtersChanged =
+            previous.selectedOwnership != next.selectedOwnership ||
+                previous.showOnlyOpen != next.showOnlyOpen;
+        if (!filtersChanged) return;
+
+        if (!mounted) return;
+        setState(() {
+          _visibleMemoriesCount = _initialMemoriesToRender;
+        });
+        if (_memoriesScrollController.hasClients) {
+          _memoriesScrollController.jumpTo(0);
+        }
+      },
+    );
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(memoriesDashboardNotifier.notifier).initialize();
     });
@@ -57,8 +97,45 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
 
   @override
   void dispose() {
+    _filtersSub?.close();
+    _memoriesScrollController.removeListener(_onMemoriesScroll);
+    _storiesScrollController.removeListener(_onStoriesScroll);
+    _memoriesScrollController.dispose();
+    _storiesScrollController.dispose();
     _livePulseController.dispose();
     super.dispose();
+  }
+
+  void _onMemoriesScroll() {
+    if (!_memoriesScrollController.hasClients) return;
+    if (_currentMemoriesTotal <= 0) return;
+    if (_visibleMemoriesCount >= _currentMemoriesTotal) return;
+
+    final pos = _memoriesScrollController.position;
+    if (pos.pixels >= (pos.maxScrollExtent - 220)) {
+      if (!mounted) return;
+      setState(() {
+        final next = _visibleMemoriesCount + _memoriesPageSize;
+        _visibleMemoriesCount =
+            next > _currentMemoriesTotal ? _currentMemoriesTotal : next;
+      });
+    }
+  }
+
+  void _onStoriesScroll() {
+    if (!_storiesScrollController.hasClients) return;
+    if (_currentStoriesTotal <= 0) return;
+    if (_visibleStoriesCount >= _currentStoriesTotal) return;
+
+    final pos = _storiesScrollController.position;
+    if (pos.pixels >= (pos.maxScrollExtent - 220)) {
+      if (!mounted) return;
+      setState(() {
+        final next = _visibleStoriesCount + _storiesPageSize;
+        _visibleStoriesCount =
+            next > _currentStoriesTotal ? _currentStoriesTotal : next;
+      });
+    }
   }
 
   Future<void> _onRefresh() async {
@@ -160,6 +237,11 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
       final items = state.memoriesDashboardModel?.storyItems ?? [];
       final isLoading = state.isLoading ?? false;
 
+      _currentStoriesTotal = items.length;
+      final visibleStoriesCount =
+          _visibleStoriesCount > items.length ? items.length : _visibleStoriesCount;
+      final visibleItems = items.take(visibleStoriesCount).toList();
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -199,7 +281,8 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
               ),
             )
                 : CustomStoryList(
-              storyItems: items
+              scrollController: _storiesScrollController,
+              storyItems: visibleItems
                   .map(
                     (e) => CustomStoryItem(
                   backgroundImage: e.backgroundImage ?? '',
@@ -442,6 +525,10 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
       if (user == null) return const SizedBox.shrink();
 
       final memories = notifier.getFilteredMemories(user.id);
+      _currentMemoriesTotal = memories.length;
+      final visibleMemoriesCount =
+          _visibleMemoriesCount > memories.length ? memories.length : _visibleMemoriesCount;
+      final visibleMemories = memories.take(visibleMemoriesCount).toList();
 
       if (memories.isEmpty) {
         return Center(
@@ -461,7 +548,8 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
       return unified_widget.CustomPublicMemories(
         variant: unified_widget.MemoryCardVariant.dashboard,
         margin: EdgeInsets.only(top: 16.h),
-        memories: memories.map((mm) {
+        scrollController: _memoriesScrollController,
+        memories: visibleMemories.map((mm) {
           return unified_widget.CustomMemoryItem(
             id: mm.id,
             userId: mm.creatorId,

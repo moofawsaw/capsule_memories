@@ -519,7 +519,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             children: [
               Text(
                 'Name your memory',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
               SizedBox(height: 10.h),
@@ -557,7 +557,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             children: [
               Text(
                 'Memory duration',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
               SizedBox(height: 10.h),
@@ -638,7 +638,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             children: [
               Text(
                 'Invite group',
-                style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
               SizedBox(height: 10.h),
@@ -772,7 +772,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   children: [
                     Text(
                       'Select Group',
-                      style: TextStyleHelper.instance.title20BoldPlusJakartaSans
+                      style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                           .copyWith(color: appTheme.gray_50),
                     ),
                     GestureDetector(
@@ -1032,7 +1032,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
             label,
             style:
                 TextStyleHelper.instance.body14MediumPlusJakartaSans.copyWith(
-              color: isSelected ? appTheme.gray_50 : appTheme.blue_gray_300,
+              color: isSelected ? appTheme.whiteCustom : appTheme.blue_gray_300,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
             ),
           ),
@@ -1080,7 +1080,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   Text(
                     'Category',
                     style: TextStyleHelper
-                        .instance.title16RegularPlusJakartaSans
+                        .instance.body16MediumPlusJakartaSans
                         .copyWith(color: appTheme.blue_gray_300),
                   ),
                   SizedBox(width: 4.h),
@@ -1493,7 +1493,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                       NavigatorService.goBack();
                     }
                   },
-                  buttonStyle: CustomButtonStyle.fillDark,
+                  buttonStyle: CustomButtonStyle.outlineDark,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                   padding:
                       EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),

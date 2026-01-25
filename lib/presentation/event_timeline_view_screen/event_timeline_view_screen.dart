@@ -657,6 +657,10 @@ class EventTimelineViewScreenState
       stories: timelineStories,
       memoryStartTime: memoryStartTime,
       memoryEndTime: memoryEndTime,
+      // Ensure sealed memories show the "SEALED" countdown badge (even for non-members).
+      variant: (state.isSealed ?? false)
+          ? TimelineVariant.sealed
+          : TimelineVariant.active,
       onStoryTap: (storyId) {
         final notifier = ref.read(eventTimelineViewNotifier.notifier);
 

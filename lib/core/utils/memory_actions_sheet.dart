@@ -31,105 +31,104 @@ class MemoryActionsSheet {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return SafeArea(
-          child: StatefulBuilder(
-            builder: (ctx, setState) {
-              return Container(
-                margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                decoration: BoxDecoration(
-                  color: appTheme.gray_900_01,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: appTheme.gray_900_02),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _ActionTile(
-                      icon: Icons.ios_share,
-                      label: 'Share',
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        try {
-                          final invite = await _fetchInviteCode(
-                            client: client,
-                            memoryId: memoryId,
-                          );
-                          if (invite == null || invite.isEmpty) {
-                            _toast(context, 'Unable to share memory');
-                            return;
-                          }
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              decoration: BoxDecoration(
+                color: appTheme.gray_900_01,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: appTheme.gray_900_02),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ActionTile(
+                    icon: Icons.ios_share,
+                    label: 'Share',
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      try {
+                        final invite = await _fetchInviteCode(
+                          client: client,
+                          memoryId: memoryId,
+                        );
+                        if (invite == null || invite.isEmpty) {
+                          _toast(context, 'Unable to share memory');
+                          return;
+                        }
 
-                          final shareUrl =
-                              'https://capapp.co/join/memory/$invite';
-                          await Share.share(
-                            'Join my Capsule memory: $title\n\n$shareUrl',
-                            subject: 'Join $title on Capsule',
-                          );
+                        final shareUrl =
+                            'https://capapp.co/join/memory/$invite';
+                        await Share.share(
+                          'Join my Capsule memory: $title\n\n$shareUrl',
+                          subject: 'Join $title on Capsule',
+                        );
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        _toast(context, 'Failed to share memory');
+                      }
+                    },
+                  ),
+                  if (canEdit) ...[
+                    const SizedBox(height: 6),
+                    _ToggleTile(
+                      icon: isPublic
+                          ? Icons.public
+                          : Icons.lock_outline,
+                      label: isPublic ? 'Public' : 'Private',
+                      value: isPublic,
+                      onChanged: (next) async {
+                        setState(() => isPublic = next);
+                        try {
+                          await client.from('memories').update({
+                            'visibility': next ? 'public' : 'private',
+                          }).eq('id', memoryId);
+
+                          await onVisibilityChanged?.call(next);
                         } catch (_) {
-                          if (!context.mounted) return;
-                          _toast(context, 'Failed to share memory');
+                          setState(() => isPublic = !next);
+                          _toast(context, 'Failed to update visibility');
                         }
                       },
                     ),
-                    if (canEdit) ...[
-                      const SizedBox(height: 6),
-                      _ToggleTile(
-                        icon: isPublic
-                            ? Icons.public
-                            : Icons.lock_outline,
-                        label: isPublic ? 'Public' : 'Private',
-                        value: isPublic,
-                        onChanged: (next) async {
-                          setState(() => isPublic = next);
-                          try {
-                            await client.from('memories').update({
-                              'visibility': next ? 'public' : 'private',
-                            }).eq('id', memoryId);
-
-                            await onVisibilityChanged?.call(next);
-                          } catch (_) {
-                            // revert UI if update failed
-                            setState(() => isPublic = !next);
-                            _toast(context, 'Failed to update visibility');
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 6),
-                      _ActionTile(
-                        icon: Icons.delete_outline,
-                        label: 'Delete',
-                        isDestructive: true,
-                        onTap: () async {
-                          Navigator.pop(ctx);
-
-                          final bool? confirm = await _confirmDelete(context);
-                          if (confirm != true) return;
-
-                          try {
-                            await _deleteMemory(
-                              client: client,
-                              memoryId: memoryId,
-                            );
-                            _toast(context, 'Deleted');
-                            await onDeleted?.call();
-                          } catch (_) {
-                            _toast(context, 'Delete failed');
-                          }
-                        },
-                      ),
-                    ],
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     _ActionTile(
-                      icon: Icons.close,
-                      label: 'Cancel',
-                      onTap: () => Navigator.pop(ctx),
+                      icon: Icons.delete_outline,
+                      label: 'Delete',
+                      isDestructive: true,
+                      onTap: () async {
+                        Navigator.pop(ctx);
+
+                        final bool? confirm =
+                        await _confirmDelete(context);
+                        if (confirm != true) return;
+
+                        try {
+                          await _deleteMemory(
+                            client: client,
+                            memoryId: memoryId,
+                          );
+                          _toast(context, 'Deleted');
+                          await onDeleted?.call();
+                        } catch (_) {
+                          _toast(context, 'Delete failed');
+                        }
+                      },
                     ),
                   ],
-                ),
-              );
-            },
-          ),
+                  const SizedBox(height: 10),
+                  _ActionTile(
+                    icon: Icons.close,
+                    label: 'Cancel',
+                    color: appTheme.blue_gray_300,
+                    onTap: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -222,22 +221,28 @@ class _ActionTile extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.isDestructive = false,
+    this.color,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final bool isDestructive;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final Color color =
-        isDestructive ? Colors.redAccent : appTheme.white_A700;
+    final Color resolvedColor = color ??
+        (isDestructive ? appTheme.red_500 : appTheme.gray_50);
 
     return ListTile(
       dense: true,
-      leading: Icon(icon, color: color),
-      title: Text(label, style: TextStyle(color: color)),
+      leading: Icon(icon, color: resolvedColor),
+      title: Text(
+        label,
+        style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+            .copyWith(color: resolvedColor),
+      ),
       onTap: onTap,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
@@ -268,8 +273,12 @@ class _ToggleTile extends StatelessWidget {
       ),
       child: ListTile(
         dense: true,
-        leading: Icon(icon, color: appTheme.white_A700),
-        title: Text(label, style: TextStyle(color: appTheme.white_A700)),
+        leading: Icon(icon, color: appTheme.gray_50),
+        title: Text(
+          label,
+          style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+              .copyWith(color: appTheme.gray_50),
+        ),
         trailing: Switch.adaptive(
           value: value,
           activeColor: appTheme.deep_purple_A100,

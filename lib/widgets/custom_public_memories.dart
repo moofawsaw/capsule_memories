@@ -31,6 +31,7 @@ class CustomPublicMemories extends StatelessWidget {
     this.memories,
     this.onMemoryTap,
     this.onMemoryLongPress,
+    this.scrollController,
     this.margin,
     this.isLoading = false,
     this.variant = MemoryCardVariant.dashboard,
@@ -42,6 +43,7 @@ class CustomPublicMemories extends StatelessWidget {
   final List<CustomMemoryItem>? memories;
   final Function(CustomMemoryItem)? onMemoryTap;
   final Function(CustomMemoryItem)? onMemoryLongPress;
+  final ScrollController? scrollController;
   final EdgeInsetsGeometry? margin;
   final bool isLoading;
 
@@ -137,6 +139,7 @@ class CustomPublicMemories extends StatelessWidget {
   Widget _buildMemoriesScroll(BuildContext context) {
     if (isLoading) {
       return SingleChildScrollView(
+        controller: scrollController,
         scrollDirection: Axis.horizontal,
         physics: const NeverScrollableScrollPhysics(),
         child: Row(
@@ -169,6 +172,7 @@ class CustomPublicMemories extends StatelessWidget {
           // While filtering, show skeletons (same layout).
           if (snapshot.connectionState == ConnectionState.waiting) {
             return SingleChildScrollView(
+              controller: scrollController,
               scrollDirection: Axis.horizontal,
               physics: const NeverScrollableScrollPhysics(),
               child: Row(
@@ -204,6 +208,7 @@ class CustomPublicMemories extends StatelessWidget {
 
   Widget _buildMemoryRow(BuildContext context, List<CustomMemoryItem> list) {
     return SingleChildScrollView(
+      controller: scrollController,
       scrollDirection: Axis.horizontal,
       child: Row(
         children: List.generate(list.length, (index) {
@@ -1041,9 +1046,9 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         padding: EdgeInsets.symmetric(horizontal: _timelineSidePadding.h),
         child: Container(
           decoration: BoxDecoration(
-            color: _timelineStories.isEmpty
-                ? appTheme.gray_900_02.withAlpha(128)
-                : Colors.transparent,
+            // color: _timelineStories.isEmpty
+            //     ? appTheme.gray_900_02.withAlpha(128)
+            //     : Colors.transparent,
             borderRadius: BorderRadius.circular(16.h),
           ),
           child: _buildMemoryTimelineInner(),
@@ -1135,6 +1140,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         height: cardHeight,
         child: Container(
           decoration: BoxDecoration(
+            color: appTheme.gray_900_01, // pick your token
             borderRadius: BorderRadius.circular(20.h),
           ),
           child: Column(
@@ -1253,7 +1259,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
                 Container(
                   padding: EdgeInsets.all(6.h),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF222D3E),
+                    color: appTheme.blue_gray_900_01,
                     borderRadius: BorderRadius.circular(18.h),
                   ),
                   width: 42.h,

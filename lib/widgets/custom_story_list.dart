@@ -10,12 +10,14 @@ class CustomStoryList extends StatelessWidget {
     this.onStoryTap,
     this.itemGap,
     this.margin,
+    this.scrollController,
   }) : super(key: key);
 
   final List<CustomStoryItem> storyItems;
   final Function(int index)? onStoryTap;
   final double? itemGap;
   final EdgeInsetsGeometry? margin;
+  final ScrollController? scrollController;
 
   bool _isNetworkUrl(String? s) {
     if (s == null) return false;
@@ -30,6 +32,7 @@ class CustomStoryList extends StatelessWidget {
     return Container(
       margin: margin,
       child: SingleChildScrollView(
+        controller: scrollController,
         scrollDirection: Axis.horizontal,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

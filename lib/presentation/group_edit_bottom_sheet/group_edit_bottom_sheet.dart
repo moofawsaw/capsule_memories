@@ -240,7 +240,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
       children: [
         Text(
           'Group Name',
-          style: TextStyleHelper.instance.body14MediumPlusJakartaSans
+          style: TextStyleHelper.instance.title16MediumPlusJakartaSans
               .copyWith(color: appTheme.gray_50.withAlpha(153)),
         ),
         SizedBox(height: 8.h),
@@ -480,7 +480,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
         Text(
           'Group Name',
           style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-              .copyWith(color: appTheme.gray_50),
+              .copyWith(color: appTheme.blue_gray_300),
         ),
         SizedBox(height: 8.h),
         CustomEditText(
@@ -582,7 +582,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
         Text(
           'Members (${sortedMembers.length})',
           style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-              .copyWith(color: appTheme.gray_50),
+              .copyWith(color: appTheme.blue_gray_300),
         ),
         SizedBox(height: 12.h),
         ...sortedMembers.map((member) {
@@ -665,7 +665,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
             Text(
               'Add Members',
               style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
+                  .copyWith(color: appTheme.blue_gray_300),
             ),
             SizedBox(height: 12.h),
             CustomSearchView(
@@ -792,13 +792,11 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           child: Row(
             children: [
               Expanded(
-                child: TextButton(
+                child: CustomButton(
+                  text: 'Cancel',
                   onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Cancel',
-                    style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
-                  ),
+                  buttonStyle: CustomButtonStyle.outlineDark,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 ),
               ),
               SizedBox(width: 12.h),
@@ -811,6 +809,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 ),
               ),
+
             ],
           ),
         );

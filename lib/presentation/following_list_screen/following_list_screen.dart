@@ -2,8 +2,11 @@ import '../../core/app_export.dart';
 import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
+import '../../widgets/custom_story_list.dart';
+import '../../widgets/custom_story_skeleton.dart';
 import './widgets/following_user_item_widget.dart';
 import 'models/following_list_model.dart';
+import 'models/following_story_item_model.dart';
 import 'notifier/following_list_notifier.dart';
 
 class FollowingListScreen extends ConsumerStatefulWidget {
@@ -26,30 +29,74 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: appTheme.gray_900_02,
-      body: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          children: [
-            SizedBox(height: 24.h),
-            Expanded(
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(child: SizedBox(height: 24.h)),
+
+          // ✅ Stationary header (Following title + Followers pill)
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _FixedSliverHeaderDelegate(
+              height: 52.h,
               child: Container(
-                margin: EdgeInsets.symmetric(horizontal: 16.h),
-                child: Column(
-                  children: [
-                    _buildTabSection(context),
-                    SizedBox(height: 14.h),
-
-                    // ✅ Search lives on Following screen
-                    _buildSearchSection(context),
-
-                    SizedBox(height: 14.h),
-                    Expanded(child: _buildFollowingList(context)),
-                  ],
-                ),
+                color: appTheme.gray_900_02,
+                padding: EdgeInsets.symmetric(horizontal: 16.h),
+                alignment: Alignment.center,
+                child: _buildTabSection(context),
               ),
             ),
-          ],
-        ),
+          ),
+
+          SliverToBoxAdapter(child: SizedBox(height: 14.h)),
+
+          // Latest Stories should run edge-to-edge (no horizontal padding).
+          SliverToBoxAdapter(child: _buildLatestStoriesSection(context)),
+
+          SliverToBoxAdapter(child: SizedBox(height: 14.h)),
+
+          // ✅ Pinned search (list scrolls BELOW it, not under it)
+          Consumer(builder: (context, ref, _) {
+            final state = ref.watch(followingListNotifier);
+            final query = (state.searchQuery ?? '').trim();
+            final resultsLen = state.searchResults?.length ?? 0;
+            final isSearching = state.isSearching ?? false;
+
+            final showPanel = query.isNotEmpty;
+
+            // Best-effort height to prevent overlap. This doesn't need to be exact—
+            // it just needs to be >= the rendered content height.
+            final double base = 56.h; // search bar
+            final double panel = showPanel
+                ? (isSearching || resultsLen == 0
+                    ? 56.h
+                    : (resultsLen.clamp(0, 8) * 52.h) + 16.h)
+                : 0;
+            final double height = base + (showPanel ? (10.h + panel) : 0);
+
+            return SliverPersistentHeader(
+              pinned: true,
+              delegate: _FixedSliverHeaderDelegate(
+                height: height,
+                child: Container(
+                  color: appTheme.gray_900_02,
+                  padding: EdgeInsets.symmetric(horizontal: 16.h),
+                  child: _buildSearchSection(context),
+                ),
+              ),
+            );
+          }),
+
+          SliverToBoxAdapter(child: SizedBox(height: 14.h)),
+
+          SliverPadding(
+            // Match Followers list effective padding (16 + 8).
+            padding: EdgeInsets.symmetric(horizontal: 24.h),
+            sliver: _buildFollowingSliver(context),
+          ),
+
+          SliverToBoxAdapter(child: SizedBox(height: 24.h)),
+        ],
       ),
     );
   }
@@ -136,10 +183,6 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
               decoration: BoxDecoration(
                 color: appTheme.gray_900_01,
                 borderRadius: BorderRadius.circular(14.h),
-                border: Border.all(
-                  color: appTheme.gray_50.withAlpha(25),
-                  width: 1,
-                ),
               ),
               child: isSearching
                   ? Padding(
@@ -274,6 +317,85 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     });
   }
 
+  Widget _buildLatestStoriesSection(BuildContext context) {
+    return Consumer(builder: (context, ref, _) {
+      final state = ref.watch(followingListNotifier);
+
+      final List<FollowingStoryItemModel> items =
+          state.latestStories ?? const <FollowingStoryItemModel>[];
+      final bool isLoading = state.isLoadingStories ?? false;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.h),
+            child: Text(
+              'Latest Stories',
+              style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50),
+            ),
+          ),
+          SizedBox(height: 12.h),
+          SizedBox(
+            height: 121.h,
+            child: isLoading
+                ? ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.zero,
+                    itemCount: 5,
+                    itemBuilder: (_, __) => Container(
+                      width: 90.h,
+                      margin: EdgeInsets.only(right: 8.h),
+                      child: CustomStorySkeleton(isCompact: true),
+                    ),
+                  )
+                : items.isEmpty
+                    ? Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.h),
+                        child: Text(
+                          'No stories yet',
+                          style: TextStyleHelper
+                              .instance.body14RegularPlusJakartaSans
+                              .copyWith(
+                            color: appTheme.gray_50.withAlpha(128),
+                          ),
+                        ),
+                      )
+                    : CustomStoryList(
+                        storyItems: items
+                            .map(
+                              (e) => CustomStoryItem(
+                                backgroundImage: e.backgroundImage ?? '',
+                                profileImage: e.profileImage ?? '',
+                                timestamp: e.timestamp ?? '',
+                                storyId: e.id,
+                                isRead: e.isRead,
+                              ),
+                            )
+                            .toList(),
+                        onStoryTap: (index) => _onStoryTap(context, index),
+                      ),
+          ),
+        ],
+      );
+    });
+  }
+
+  void _onStoryTap(BuildContext context, int index) {
+    final items = ref.read(followingListNotifier).latestStories ??
+        const <FollowingStoryItemModel>[];
+    if (index < 0 || index >= items.length) return;
+
+    final id = (items[index].id ?? '').trim();
+    if (id.isEmpty) return;
+
+    NavigatorService.pushNamed(
+      AppRoutes.appStoryView,
+      arguments: id,
+    );
+  }
+
 // ONLY THE AVATAR PART MATTERS — everything else stays the same
 
   Widget _buildAvatar(String imagePath) {
@@ -332,10 +454,6 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
           decoration: BoxDecoration(
             color: appTheme.gray_900_02,
             borderRadius: BorderRadius.circular(14.h),
-            border: Border.all(
-              color: appTheme.gray_50.withAlpha(40),
-              width: 1,
-            ),
           ),
           child: Text(
             'Following',
@@ -375,16 +493,18 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     );
   }
 
-  /// Following list
-  Widget _buildFollowingList(BuildContext context) {
+  Widget _buildFollowingSliver(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(followingListNotifier);
 
         if (state.isLoading ?? false) {
-          return Center(
-            child: CircularProgressIndicator(
-              color: appTheme.deep_purple_A100,
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: appTheme.deep_purple_A100,
+              ),
             ),
           );
         }
@@ -392,35 +512,39 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
         final followingUsers = state.followingListModel?.followingUsers ?? [];
 
         if (followingUsers.isEmpty) {
-          return Center(
-            child: Text(
-              'No following yet',
-              style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                  .copyWith(color: appTheme.blue_gray_300),
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Text(
+                'No following yet',
+                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
             ),
           );
         }
 
-        return Container(
-          margin: EdgeInsets.symmetric(horizontal: 8.h),
-          child: ListView.separated(
-            padding: EdgeInsets.zero,
-            physics: BouncingScrollPhysics(),
-            shrinkWrap: true,
-            separatorBuilder: (context, index) => SizedBox(height: 20.h),
-            itemCount: followingUsers.length,
-            itemBuilder: (context, index) {
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
               final user = followingUsers[index];
-              return FollowingUserItemWidget(
-                user: user,
-                onUserTap: () {
-                  onTapFollowingUser(context, user);
-                },
-                onActionTap: () {
-                  onTapUserAction(context, user);
-                },
+              return Column(
+                children: [
+                  FollowingUserItemWidget(
+                    user: user,
+                    onUserTap: () {
+                      onTapFollowingUser(context, user);
+                    },
+                    onActionTap: () {
+                      onTapUserAction(context, user);
+                    },
+                  ),
+                  if (index != followingUsers.length - 1)
+                    SizedBox(height: 20.h),
+                ],
               );
             },
+            childCount: followingUsers.length,
           ),
         );
       },
@@ -457,5 +581,35 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     if (confirmed == true) {
       await ref.read(followingListNotifier.notifier).unfollowUser(user.id ?? '');
     }
+  }
+}
+
+class _FixedSliverHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _FixedSliverHeaderDelegate({
+    required this.height,
+    required this.child,
+  });
+
+  final double height;
+  final Widget child;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(covariant _FixedSliverHeaderDelegate oldDelegate) {
+    return oldDelegate.height != height || oldDelegate.child != child;
   }
 }

@@ -208,8 +208,11 @@ class _CustomEditTextState extends State<CustomEditText> {
   }
 
   TextStyle _getDefaultHintStyle() {
+    // NOTE: old behavior used `appTheme.blue_gray_300`, which could be too heavy
+    // (especially in light mode). Use a standard Material-like hint opacity.
+    final hintColor = Theme.of(context).colorScheme.onSurface.withAlpha(50);
     return TextStyleHelper.instance.title16RegularPlusJakartaSans
-        .copyWith(color: appTheme.blue_gray_300, height: 1.3);
+        .copyWith(color: hintColor, height: 1.3);
   }
 
   EdgeInsetsGeometry _getDefaultPadding() {

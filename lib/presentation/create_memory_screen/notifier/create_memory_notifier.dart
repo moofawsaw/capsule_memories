@@ -1,8 +1,8 @@
 import '../../../core/app_export.dart';
 import '../../../services/groups_service.dart';
+import '../../../services/create_memory_preload_service.dart';
 import '../../../services/memory_cache_service.dart';
 import '../../../services/memory_service.dart';
-import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../friends_management_screen/widgets/qr_scanner_overlay.dart';
 import '../models/create_memory_model.dart';
@@ -19,7 +19,6 @@ StateNotifierProvider.autoDispose<CreateMemoryNotifier, CreateMemoryState>(
 );
 
 class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
-  final _storyService = StoryService();
   final _cacheService = MemoryCacheService();
   final _memoryService = MemoryService();
 
@@ -28,6 +27,10 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   }
 
   void initialize() {
+    final preload = CreateMemoryPreloadService.instance;
+    final cachedGroups = preload.cachedGroups;
+    final cachedCategories = preload.cachedCategories;
+
     state = state.copyWith(
       memoryNameController: TextEditingController(),
       searchController: TextEditingController(),
@@ -47,13 +50,14 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         searchResults: [],
         invitedUserIds: {},
         groupMembers: [],
-        availableGroups: [],
-        availableCategories: [],
+        availableGroups: cachedGroups,
+        availableCategories: cachedCategories,
       ),
     );
 
-    _fetchAvailableGroups();
-    _fetchAvailableCategories();
+    // Only fetch on-demand if we haven't preloaded yet.
+    if (cachedGroups.isEmpty) _fetchAvailableGroups();
+    if (cachedCategories.isEmpty) _fetchAvailableCategories();
   }
 
   Future<void> initializeWithCategory(String categoryId) async {

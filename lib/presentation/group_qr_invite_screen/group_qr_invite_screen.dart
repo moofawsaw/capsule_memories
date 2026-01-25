@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../widgets/custom_qr_code_card.dart';
+import '../../widgets/custom_button.dart';
 import '../../core/app_export.dart';
 import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_qr_info_card.dart';
@@ -375,60 +376,21 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
   /// Action buttons
   Widget _buildActionButtons(GroupQRInviteModel model) {
     return Row(
+      spacing: 12.h,
       children: [
         Expanded(
-          child: GestureDetector(
-            onTap: () => _downloadQR(model.groupName ?? 'group'),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 22.h, vertical: 12.h),
-              decoration: BoxDecoration(
-                color: appTheme.color41C124,
-                borderRadius: BorderRadius.circular(6.h),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.download_rounded, color: appTheme.white_A700, size: 18.h),
-                  SizedBox(width: 8.h),
-                  Text(
-                    "Download",
-                    style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                        .copyWith(color: appTheme.white_A700),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: 12.h),
-        Expanded(
-          child: GestureDetector(
-            onTap: () => _shareLink(
+          child: CustomButton(
+            text: 'Share Link',
+            leftIcon: Icons.share,
+            onPressed: () => _shareLink(
               model.groupName ?? 'group',
               model.invitationUrl ?? '',
             ),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 30.h, vertical: 12.h),
-              decoration: BoxDecoration(
-                color: appTheme.deep_purple_A100,
-                borderRadius: BorderRadius.circular(6.h),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.share,
-                    size: 18.h,
-                    color: appTheme.white_A700,
-                  ),
-                  SizedBox(width: 8.h),
-                  Text(
-                    "Share Link",
-                    style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                        .copyWith(color: appTheme.white_A700),
-                  ),
-                ],
-              ),
+            buttonStyle: CustomButtonStyle.fillPrimary,
+            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+            padding: EdgeInsets.symmetric(
+              horizontal: 30.h,
+              vertical: 12.h,
             ),
           ),
         ),

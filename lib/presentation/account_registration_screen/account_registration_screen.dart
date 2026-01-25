@@ -57,6 +57,10 @@ class AccountRegistrationScreenState
 
   /// Section Widget - Logo
   Widget _buildLogo(BuildContext context) {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final logoPath =
+        isLight ? ImageConstant.imgLogoLight : ImageConstant.imgLogo;
+
     return GestureDetector(
       onTap: () {
         NavigatorService.pushNamed(AppRoutes.appFeed);
@@ -65,7 +69,7 @@ class AccountRegistrationScreenState
         margin: EdgeInsets.only(top: 16.h),
         width: SizeUtils.width * 0.38,
         child: CustomImageView(
-          imagePath: ImageConstant.imgLogo,
+          imagePath: logoPath,
           height: 26.h,
           width: 130.h,
         ),

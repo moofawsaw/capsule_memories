@@ -126,7 +126,7 @@ class HappeningNowStoryCard extends StatelessWidget {
                       story.userName ?? '',
                       style: TextStyleHelper.instance.body14BoldPlusJakartaSans
                           .copyWith(
-                        color: appTheme.gray_50,
+                        color: appTheme.whiteCustom,
                         fontWeight: FontWeight.w700,
                       ),
                       maxLines: 1,
@@ -187,7 +187,7 @@ class HappeningNowStoryCard extends StatelessWidget {
                       style: TextStyleHelper
                           .instance.body12MediumPlusJakartaSans
                           .copyWith(
-                        color: appTheme.gray_50.withAlpha(230),
+                        color: appTheme.whiteCustom.withAlpha(230),
                         fontWeight: FontWeight.w500,
                       ),
                     ),

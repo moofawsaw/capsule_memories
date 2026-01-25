@@ -1,11 +1,14 @@
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/app_export.dart';
+import '../../core/utils/theme_provider.dart';
 import '../../services/avatar_state_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_menu_item.dart';
 import '../../widgets/custom_navigation_drawer.dart';
+import '../../widgets/custom_switch.dart';
 import '../app_download_screen/app_download_screen.dart';
 import 'notifier/user_menu_notifier.dart';
 
@@ -19,6 +22,11 @@ class UserMenuScreen extends ConsumerStatefulWidget {
 class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   @override
   Widget build(BuildContext context) {
+    // Ensure the drawer repaints immediately when themeMode changes.
+    // Many widgets in this tree read the global `appTheme` (ThemeHelper),
+    // so we must rebuild on provider updates.
+    ref.watch(themeModeProvider);
+
     return Stack(
       children: [
         // ✅ FIX: Make the overlay explicitly fill the screen so taps always register.
@@ -66,6 +74,8 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
                             _buildNavigationMenu(context),
                             SizedBox(height: 26.h),
                             _buildDivider(context),
+                            SizedBox(height: 19.h),
+                            _buildDarkModeToggle(context),
                             Spacer(),
                             _buildActionButtons(context),
                             SizedBox(height: 16.h),
@@ -138,7 +148,7 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
                             child: Text(
                               avatarLetter,
                               style: TextStyle(
-                                color: appTheme.white_A700,
+                                color: appTheme.gray_50,
                                 fontSize: 24.h,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -162,7 +172,7 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                    appTheme.white_A700,
+                                    appTheme.gray_50,
                                   ),
                                 ),
                               ),
@@ -179,9 +189,9 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
                           Text(
                             userModel?.userName ?? 'User',
                             style: TextStyle(
-                              color: appTheme.white_A700,
+                              color: appTheme.gray_50,
                               fontSize: 16.h,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -339,6 +349,59 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
       menuItems: navigationItems,
       margin: EdgeInsets.only(left: 12.h),
     );
+  }
+
+  /// Dark mode toggle (shown below the main nav options, not part of the list)
+  Widget _buildDarkModeToggle(BuildContext context) {
+    return Consumer(builder: (context, ref, _) {
+      final themeMode = ref.watch(themeModeProvider);
+      final bool isDark = themeMode == ThemeMode.dark;
+
+      return Container(
+        margin: EdgeInsets.only(left: 12.h, right: 12.h, top: 8.h),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            final next = isDark ? ThemeMode.light : ThemeMode.dark;
+            ref.read(themeModeProvider.notifier).setThemeMode(next);
+            // Keep user menu model in sync (best-effort)
+            ref.read(userMenuNotifier.notifier).syncDarkModeFromTheme();
+          },
+          child: Row(
+            children: [
+              Icon(
+                Icons.dark_mode_outlined,
+                size: 24.h,
+                color: appTheme.gray_50,
+              ),
+              SizedBox(width: 8.h),
+              Expanded(
+                child: Text(
+                  'Dark mode',
+                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                      .copyWith(color: appTheme.gray_50),
+                ),
+              ),
+              CustomSwitch(
+                value: isDark,
+                activeColor: appTheme.deep_purple_A100,
+                inactiveTrackColor: appTheme.gray_900_02,
+                inactiveThumbColor: appTheme.gray_50,
+                onChanged: (value) {
+                  HapticFeedback.selectionClick();
+                  ref.read(themeModeProvider.notifier).setThemeMode(
+                        value ? ThemeMode.dark : ThemeMode.light,
+                      );
+                  // Keep user menu model in sync (best-effort)
+                  ref.read(userMenuNotifier.notifier).syncDarkModeFromTheme();
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    });
   }
 
   /// Divider line

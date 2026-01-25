@@ -1,14 +1,13 @@
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_export.dart';
+import '../../core/utils/theme_provider.dart';
 import '../../presentation/user_menu_screen/notifier/user_menu_notifier.dart';
 import '../../services/blocked_users_service.dart';
 import '../../widgets/custom_about_settings.dart';
 import '../../widgets/custom_account_settings.dart';
 import '../../widgets/custom_blocked_users_settings.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_notification_settings.dart';
-import '../../widgets/custom_privacy_settings.dart';
 import '../../widgets/custom_settings_row.dart';
 import '../../widgets/custom_support_settings.dart';
 import '../../widgets/custom_warning_modal.dart';
@@ -166,7 +165,8 @@ class NotificationSettingsScreenState
   /// Dark mode toggle section - moved from user menu
   Widget _buildDarkModeSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
-      final state = ref.watch(userMenuNotifier);
+      final themeMode = ref.watch(themeModeProvider);
+      final isDark = themeMode == ThemeMode.dark;
 
       return CustomSettingsRow(
         useIconData: true,
@@ -174,9 +174,14 @@ class NotificationSettingsScreenState
         iconColor: appTheme.gray_50,
         title: 'Dark mode',
         description: 'Toggle dark mode on or off',
-        switchValue: state.userMenuModel?.isDarkModeEnabled ?? true,
-        onSwitchChanged: (value) =>
-            ref.read(userMenuNotifier.notifier).toggleDarkMode(),
+        switchValue: isDark,
+        onSwitchChanged: (value) {
+          ref.read(themeModeProvider.notifier).setThemeMode(
+                value ? ThemeMode.dark : ThemeMode.light,
+              );
+          // Keep user menu model in sync (best-effort; avoids stale toggle elsewhere)
+          ref.read(userMenuNotifier.notifier).syncDarkModeFromTheme();
+        },
         margin: EdgeInsets.only(left: 16.h, right: 24.h),
       );
     });

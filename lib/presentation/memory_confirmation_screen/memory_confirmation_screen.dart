@@ -281,20 +281,28 @@ class _MemoryConfirmationScreenState
     }
   }
 
+  /// Normalize friend user id across possible shapes.
+  /// FriendsService.getUserFriends() returns `id`, but keep fallbacks for safety.
+  String _friendUserId(Map<String, dynamic> friend) {
+    final raw = friend['id'] ?? friend['user_id'] ?? friend['friend_id'];
+    return (raw ?? '').toString().trim();
+  }
+
   void _filterFriends(String query) {
     final memberIds = _existingMemberUserIds;
 
     setState(() {
       if (query.isEmpty) {
+        // Show ALL friends (including those already added via group).
         _filteredFriends = _allFriends.where((f) {
-          final fid = (f['id'] ?? '').toString().trim();
-          return fid.isNotEmpty && !memberIds.contains(fid);
+          final fid = _friendUserId(f);
+          return fid.isNotEmpty;
         }).toList();
       } else {
         final q = query.toLowerCase();
         _filteredFriends = _allFriends.where((friend) {
-          final fid = (friend['id'] ?? '').toString().trim();
-          if (fid.isEmpty || memberIds.contains(fid)) return false;
+          final fid = _friendUserId(friend);
+          if (fid.isEmpty) return false;
 
           final name = (friend['display_name'] as String? ?? '').toLowerCase();
           final username = (friend['username'] as String? ?? '').toLowerCase();
@@ -444,13 +452,13 @@ class _MemoryConfirmationScreenState
                           child: Column(
                             children: [
                               Icon(Icons.check_circle,
-                                  color: appTheme.gray_50, size: 48.h),
+                                  color: appTheme.whiteCustom, size: 48.h),
                               SizedBox(height: 16.h),
                               Text(
                                 'Memory Created!',
                                 style: TextStyleHelper
                                     .instance.title18BoldPlusJakartaSans
-                                    .copyWith(color: appTheme.gray_50),
+                                    .copyWith(color: appTheme.whiteCustom),
                               ),
                             ],
                           ),
@@ -809,13 +817,50 @@ class _MemoryConfirmationScreenState
                                       ),
                                     ),
                                   )
+                                      : _allFriends.isEmpty
+                                      ? Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(20.h),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'No friends yet',
+                                            style: TextStyleHelper
+                                                .instance
+                                                .body14RegularPlusJakartaSans
+                                                .copyWith(
+                                              color: appTheme.blue_gray_300,
+                                            ),
+                                          ),
+                                          SizedBox(height: 12.h),
+                                          CustomButton(
+                                            text: 'Add friends',
+                                            buttonStyle:
+                                                CustomButtonStyle.outlinePrimary,
+                                            buttonTextStyle:
+                                                CustomButtonTextStyle.bodyMedium,
+                                            onPressed: () {
+                                              NavigatorService.pushNamed(
+                                                AppRoutes.appFriends,
+                                              );
+                                            },
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 18.h,
+                                              vertical: 10.h,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
                                       : _filteredFriends.isEmpty
                                       ? Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(20.h),
                                       child: Text(
                                         _searchController.text.isEmpty
-                                            ? 'No friends to invite'
+                                            ? 'No friends found'
                                             : 'No friends found',
                                         style: TextStyleHelper
                                             .instance
@@ -838,16 +883,17 @@ class _MemoryConfirmationScreenState
                                     itemBuilder: (context, index) {
                                       final friend =
                                       _filteredFriends[index];
-                                      final friendId = (friend['id'] ??
-                                          '')
-                                          .toString()
-                                          .trim();
+                                      final friendId = _friendUserId(friend);
 
+                                      final isAdded =
+                                          _existingMemberUserIds.contains(friendId);
                                       final isSelected =
                                       _selectedFriendIds
                                           .contains(friendId);
 
-                                      return ListTile(
+                                      return Opacity(
+                                        opacity: isAdded ? 0.6 : 1.0,
+                                        child: ListTile(
                                         contentPadding:
                                         EdgeInsets.symmetric(
                                           horizontal: 12.h,
@@ -884,33 +930,67 @@ class _MemoryConfirmationScreenState
                                               color: appTheme
                                                   .blue_gray_300),
                                         ),
-                                        trailing: InkWell(
-                                          onTap: () =>
-                                              _toggleFriendSelection(
-                                                  friendId),
-                                          borderRadius:
-                                          BorderRadius.circular(
-                                              24.h),
-                                          child: Padding(
-                                            padding:
-                                            EdgeInsets.all(8.h),
-                                            child: Icon(
-                                              isSelected
-                                                  ? Icons.check_box
-                                                  : Icons
-                                                  .check_box_outline_blank,
-                                              size: 24.h,
-                                              color: isSelected
-                                                  ? appTheme
-                                                  .deep_purple_A100
-                                                  : appTheme
-                                                  .blue_gray_300,
-                                            ),
-                                          ),
-                                        ),
-                                        onTap: () =>
-                                            _toggleFriendSelection(
-                                                friendId),
+                                        trailing: isAdded
+                                            ? Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 10.h,
+                                                  vertical: 6.h,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: appTheme.gray_900_02,
+                                                  borderRadius:
+                                                      BorderRadius.circular(999),
+                                                  border: Border.all(
+                                                    color: appTheme.blue_gray_900,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.check_circle,
+                                                      size: 16.h,
+                                                      color:
+                                                          appTheme.deep_purple_A100,
+                                                    ),
+                                                    SizedBox(width: 6.h),
+                                                    Text(
+                                                      'Already in memory',
+                                                      style: TextStyleHelper
+                                                          .instance
+                                                          .body12MediumPlusJakartaSans
+                                                          .copyWith(
+                                                            color:
+                                                                appTheme.blue_gray_300,
+                                                          ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              )
+                                            : InkWell(
+                                                onTap: () =>
+                                                    _toggleFriendSelection(friendId),
+                                                borderRadius:
+                                                    BorderRadius.circular(24.h),
+                                                child: Padding(
+                                                  padding: EdgeInsets.all(8.h),
+                                                  child: Icon(
+                                                    isSelected
+                                                        ? Icons.check_box
+                                                        : Icons
+                                                            .check_box_outline_blank,
+                                                    size: 24.h,
+                                                    color: isSelected
+                                                        ? appTheme.deep_purple_A100
+                                                        : appTheme.blue_gray_300,
+                                                  ),
+                                                ),
+                                              ),
+                                        onTap: isAdded
+                                            ? null
+                                            : () => _toggleFriendSelection(friendId),
+                                      ),
                                       );
                                     },
                                   ),
@@ -1099,7 +1179,8 @@ class _MemoryConfirmationScreenState
           data: 'https://capapp.co/join/memory/$inviteCode',
           decoration: PrettyQrDecoration(
             shape: PrettyQrSmoothSymbol(
-              color: appTheme.gray_900_02,
+              // Must stay dark even in light mode (QR sits on white background).
+              color: appTheme.blackCustom,
             ),
           ),
         ),

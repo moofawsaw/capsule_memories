@@ -53,11 +53,15 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
 
   /// Logo Section
   Widget _buildLogoSection() {
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final logoPath =
+        isLight ? ImageConstant.imgLogoLight : ImageConstant.imgLogo;
+
     return Center(
       child: Container(
         width: MediaQuery.of(context).size.width * 0.38,
         child: CustomImageView(
-          imagePath: ImageConstant.imgLogo,
+          imagePath: logoPath,
           height: 26.h,
           width: 130.h,
         ),

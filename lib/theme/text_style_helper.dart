@@ -108,7 +108,7 @@ class TextStyleHelper {
 
   TextStyle get title16MediumPlusJakartaSans => TextStyle(
         fontSize: 16.fSize,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         fontFamily: 'Plus Jakarta Sans',
         color: appTheme.gray_50,
       );

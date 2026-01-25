@@ -8,7 +8,6 @@ import '../../../core/utils/theme_provider.dart';
 import '../../../services/avatar_state_service.dart';
 import '../../../services/memory_cache_service.dart';
 import '../../../services/push_notification_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 // If you want fallback access to cached token:
 // import '../../../services/push_notification_service.dart';
@@ -69,6 +68,8 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
           .maybeSingle();
 
       if (response != null) {
+        final isDark = ref.read(themeModeProvider) == ThemeMode.dark;
+
         // Pass empty string for avatar_url if null/empty to trigger letter avatar
         final avatarUrl = response['avatar_url'] as String?;
         final cleanAvatarUrl =
@@ -79,7 +80,7 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
             userName: response['display_name'] ?? response['username'] ?? '',
             userEmail: response['email'] ?? '',
             avatarImagePath: cleanAvatarUrl,
-            isDarkModeEnabled: state.userMenuModel?.isDarkModeEnabled ?? true,
+            isDarkModeEnabled: isDark,
             authProvider: response['auth_provider'] as String?,
             createdAt: response['created_at'] != null
                 ? DateTime.parse(response['created_at'] as String)
@@ -92,12 +93,23 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
     }
   }
 
+  /// Ensure the local toggle matches the global theme mode.
+  void syncDarkModeFromTheme() {
+    final model = state.userMenuModel;
+    if (model == null) return;
+    final isDark = ref.read(themeModeProvider) == ThemeMode.dark;
+    if ((model.isDarkModeEnabled ?? true) == isDark) return;
+    state = state.copyWith(
+      userMenuModel: model.copyWith(isDarkModeEnabled: isDark),
+    );
+  }
+
   void toggleDarkMode() async {
-    final currentModel = state.userMenuModel;
-    final newDarkModeValue = !(currentModel?.isDarkModeEnabled ?? true);
+    final currentIsDark = ref.read(themeModeProvider) == ThemeMode.dark;
+    final newDarkModeValue = !currentIsDark;
 
     // Update local state
-    final updatedModel = currentModel?.copyWith(
+    final updatedModel = state.userMenuModel?.copyWith(
       isDarkModeEnabled: newDarkModeValue,
     );
 
@@ -165,6 +177,7 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
 
   /// Best-effort unregister via Edge Function:
   /// await supabase.functions.invoke('unregister-fcm-token', body: { device_id, token })
+  // ignore: unused_element
   Future<void> _unregisterFcmTokenBestEffort(dynamic client) async {
     try {
       // deviceId is generated/persisted in PushNotificationService under this key
@@ -201,6 +214,7 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
     }
   }
 
+  // ignore: unused_element
   void _clearUserCaches() {
     // 🔥 CRITICAL: Clear all cached user data on sign out
     // This prevents previous user data from displaying for new login

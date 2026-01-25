@@ -206,11 +206,19 @@ class MyApp extends ConsumerWidget {
       builder: (context, child) {
         ThemeHelper().setThemeMode(themeMode);
 
+        // Global "tap away to dismiss keyboard" behavior.
+        // Use Listener so we don't compete with child gestures.
+        final wrapped = Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+          child: child!,
+        );
+
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.linear(1.0),
           ),
-          child: child!,
+          child: wrapped,
         );
       },
       navigatorKey: NavigatorService.navigatorKey,

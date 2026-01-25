@@ -8,6 +8,10 @@ class FollowingListState extends Equatable {
     this.selectedUser,
     this.isLoading,
 
+    // Latest stories row
+    this.isLoadingStories = false,
+    this.latestStories = const [],
+
     // Search state
     this.searchQuery,
     this.searchResults,
@@ -18,6 +22,9 @@ class FollowingListState extends Equatable {
   FollowingUserModel? selectedUser;
   bool? isLoading;
 
+  bool? isLoadingStories;
+  List<FollowingStoryItemModel>? latestStories;
+
   String? searchQuery;
   List<FollowingSearchUserModel>? searchResults;
   bool? isSearching;
@@ -27,6 +34,8 @@ class FollowingListState extends Equatable {
     followingListModel,
     selectedUser,
     isLoading,
+    isLoadingStories,
+    latestStories,
     searchQuery,
     searchResults,
     isSearching,
@@ -36,6 +45,8 @@ class FollowingListState extends Equatable {
     FollowingListModel? followingListModel,
     FollowingUserModel? selectedUser,
     bool? isLoading,
+    bool? isLoadingStories,
+    List<FollowingStoryItemModel>? latestStories,
     String? searchQuery,
     List<FollowingSearchUserModel>? searchResults,
     bool? isSearching,
@@ -44,6 +55,8 @@ class FollowingListState extends Equatable {
       followingListModel: followingListModel ?? this.followingListModel,
       selectedUser: selectedUser ?? this.selectedUser,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingStories: isLoadingStories ?? this.isLoadingStories,
+      latestStories: latestStories ?? this.latestStories,
       searchQuery: searchQuery ?? this.searchQuery,
       searchResults: searchResults ?? this.searchResults,
       isSearching: isSearching ?? this.isSearching,

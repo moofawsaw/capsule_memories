@@ -174,7 +174,7 @@ class CustomStoryCard extends StatelessWidget {
           Text(
             userName,
             style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                .copyWith(color: appTheme.white_A700, height: 1.29),
+                .copyWith(color: appTheme.whiteCustom, height: 1.29),
           ),
         if (categoryText != null) ...[
           SizedBox(height: userName.isNotEmpty ? 18.h : 0),
@@ -185,7 +185,7 @@ class CustomStoryCard extends StatelessWidget {
           Text(
             timestamp!,
             style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                .copyWith(color: appTheme.white_A700, height: 1.33),
+                .copyWith(color: appTheme.whiteCustom, height: 1.33),
           ),
         ],
       ],

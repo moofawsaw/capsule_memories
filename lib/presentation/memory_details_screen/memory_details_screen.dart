@@ -306,6 +306,23 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
 
         final canEditCategory = state.isCreator; // allowed even if sealed
 
+        // Resolve selected category icon (best-effort from loaded categories list)
+        final selectedCategoryId = state.selectedCategoryId;
+        Map<String, dynamic>? selectedCategory;
+        if (selectedCategoryId != null && selectedCategoryId.trim().isNotEmpty) {
+          try {
+            selectedCategory = state.categories.firstWhere(
+              (c) => (c['id'] as String?) == selectedCategoryId,
+            );
+          } catch (_) {
+            selectedCategory = null;
+          }
+        }
+
+        final selectedIconUrl =
+            (selectedCategory?['icon_url'] as String?)?.trim() ?? '';
+        final hasSelectedIconUrl = selectedIconUrl.isNotEmpty;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -340,8 +357,31 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                     borderRadius: BorderRadius.circular(8.h),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // Selected category icon
+                      Container(
+                        height: 26.h,
+                        width: 26.h,
+                        decoration: BoxDecoration(
+                          color: appTheme.deep_purple_A100.withAlpha(51),
+                          borderRadius: BorderRadius.circular(8.h),
+                        ),
+                        child: hasSelectedIconUrl
+                            ? Padding(
+                                padding: EdgeInsets.all(4.h),
+                                child: CustomImageView(
+                                  imagePath: selectedIconUrl,
+                                  fit: BoxFit.contain,
+                                  enableCategoryIconResolution: false,
+                                ),
+                              )
+                            : Icon(
+                                Icons.category,
+                                color: appTheme.deep_purple_A100,
+                                size: 16.h,
+                              ),
+                      ),
+                      SizedBox(width: 10.h),
                       Expanded(
                         child: Text(
                           state.selectedCategoryName ?? 'Select Category',
@@ -374,10 +414,42 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                   color: appTheme.gray_900,
                   borderRadius: BorderRadius.circular(8.h),
                 ),
-                child: Text(
-                  state.selectedCategoryName ?? 'No category set',
-                  style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
+                child: Row(
+                  children: [
+                    // Selected category icon
+                    Container(
+                      height: 26.h,
+                      width: 26.h,
+                      decoration: BoxDecoration(
+                        color: appTheme.deep_purple_A100.withAlpha(51),
+                        borderRadius: BorderRadius.circular(8.h),
+                      ),
+                      child: hasSelectedIconUrl
+                          ? Padding(
+                              padding: EdgeInsets.all(4.h),
+                              child: CustomImageView(
+                                imagePath: selectedIconUrl,
+                                fit: BoxFit.contain,
+                                enableCategoryIconResolution: false,
+                              ),
+                            )
+                          : Icon(
+                              Icons.category,
+                              color: appTheme.deep_purple_A100,
+                              size: 16.h,
+                            ),
+                    ),
+                    SizedBox(width: 10.h),
+                    Expanded(
+                      child: Text(
+                        state.selectedCategoryName ?? 'No category set',
+                        style: TextStyleHelper.instance
+                            .title16RegularPlusJakartaSans
+                            .copyWith(color: appTheme.gray_50),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             if (!state.isCreator) ...[
@@ -1100,7 +1172,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                 onPressed: () {
                   Navigator.pop(context);
                 },
-                buttonStyle: CustomButtonStyle.fillDark,
+                buttonStyle: CustomButtonStyle.outlineDark,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
               ),
             ),

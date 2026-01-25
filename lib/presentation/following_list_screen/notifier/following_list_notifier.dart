@@ -1,10 +1,14 @@
 import 'dart:async';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../core/app_export.dart';
 import '../../../services/avatar_helper_service.dart';
 import '../../../services/follows_service.dart';
+import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/following_list_model.dart';
+import '../models/following_story_item_model.dart';
 
 part 'following_list_state.dart';
 
@@ -23,6 +27,7 @@ StateNotifierProvider.autoDispose<FollowingListNotifier, FollowingListState>(
 
 class FollowingListNotifier extends StateNotifier<FollowingListState> {
   final FollowsService _followsService = FollowsService();
+  final StoryService _storyService = StoryService();
 
   final TextEditingController searchController = TextEditingController();
   Timer? _debounce;
@@ -51,6 +56,9 @@ class FollowingListNotifier extends StateNotifier<FollowingListState> {
         state = state.copyWith(isLoading: false);
         return;
       }
+
+      // Start stories loading immediately (we will fill once we know following IDs)
+      state = state.copyWith(isLoadingStories: true, latestStories: const []);
 
       final followingData = await client
           .from('follows')
@@ -84,6 +92,17 @@ class FollowingListNotifier extends StateNotifier<FollowingListState> {
         isLoading: false,
       );
 
+      // Fetch "Latest Stories" from followed users (compact row)
+      final followingIds = followingUsers
+          .map((u) => (u.id ?? '').trim())
+          .where((id) => id.isNotEmpty)
+          .toList();
+      await _loadLatestStoriesForFollowing(
+        client: client,
+        currentUserId: currentUser.id,
+        followingIds: followingIds,
+      );
+
       // Keep search flags accurate if user already typed
       final q = (state.searchQuery ?? '').trim();
       if (q.isNotEmpty) {
@@ -96,7 +115,103 @@ class FollowingListNotifier extends StateNotifier<FollowingListState> {
         followingListModel: state.followingListModel?.copyWith(
           followingUsers: [],
         ),
+        isLoadingStories: false,
+        latestStories: const [],
       );
+    }
+  }
+
+  Future<void> _loadLatestStoriesForFollowing({
+    required SupabaseClient client,
+    required String currentUserId,
+    required List<String> followingIds,
+  }) async {
+    try {
+      if (followingIds.isEmpty) {
+        state = state.copyWith(isLoadingStories: false, latestStories: const []);
+        return;
+      }
+
+      final response = await client
+          .from('stories')
+          .select('''
+            id,
+            memory_id,
+            contributor_id,
+            image_url,
+            video_url,
+            thumbnail_url,
+            media_type,
+            created_at,
+            user_profiles_public!stories_contributor_id_fkey (
+              id,
+              avatar_url
+            ),
+            memories!inner (
+              visibility,
+              state
+            )
+          ''')
+          .eq('memories.visibility', 'public')
+          .inFilter('contributor_id', followingIds)
+          .order('created_at', ascending: false)
+          .limit(30);
+
+      final rows = (response as List?) ?? [];
+      if (rows.isEmpty) {
+        state = state.copyWith(isLoadingStories: false, latestStories: const []);
+        return;
+      }
+
+      final storyIds =
+          rows.map((r) => r['id'] as String?).whereType<String>().toList();
+
+      // Batch read/unread status for current user
+      Set<String> viewedStoryIds = {};
+      if (storyIds.isNotEmpty) {
+        final viewsResponse = await client
+            .from('story_views')
+            .select('story_id')
+            .eq('user_id', currentUserId)
+            .inFilter('story_id', storyIds);
+
+        viewedStoryIds = (viewsResponse as List)
+            .map((v) => v['story_id'] as String?)
+            .whereType<String>()
+            .toSet();
+      }
+
+      final items = rows.map((storyData) {
+        final createdAtRaw = storyData['created_at'] as String?;
+        DateTime createdAt;
+        try {
+          createdAt = createdAtRaw != null ? DateTime.parse(createdAtRaw) : DateTime.now();
+        } catch (_) {
+          createdAt = DateTime.now();
+        }
+
+        final storyMap = Map<String, dynamic>.from(storyData);
+        final storyId = (storyData['id'] as String?) ?? '';
+        final bg = _storyService.getStoryMediaUrl(
+          storyMap,
+        );
+        final avatar = _storyService.getContributorAvatar(
+          storyMap,
+        );
+
+        return FollowingStoryItemModel(
+          id: storyId,
+          backgroundImage: bg,
+          profileImage: avatar,
+          timestamp: _storyService.getTimeAgo(createdAt),
+          isRead: viewedStoryIds.contains(storyId),
+        );
+      }).where((s) => (s.id ?? '').isNotEmpty).toList();
+
+      state = state.copyWith(isLoadingStories: false, latestStories: items);
+    } catch (e) {
+      print('Error loading latest following stories: $e');
+      state = state.copyWith(isLoadingStories: false, latestStories: const []);
     }
   }
 
@@ -146,24 +261,30 @@ class FollowingListNotifier extends StateNotifier<FollowingListState> {
 
     try {
       final client = SupabaseService.instance.client;
-      if (client == null) {
+      final currentUser = client?.auth.currentUser;
+      if (client == null || currentUser == null) {
         state = state.copyWith(isSearching: false, searchResults: const []);
         return;
       }
 
-      final res = await client.rpc(
-        'search_users_smart',
-        params: {
-          'q': query,
-          'limit_count': 12,
-        },
-      );
+      // ✅ Match the NEW SQL signature (same as Friends search)
+      final res = await client.rpc('search_users_smart', params: {
+        'p_query': query.trim(),
+        'p_limit': 12,
+        'p_user_id': currentUser.id,
+      });
 
       // stale guard (user typed again)
       final stillSame = (state.searchQuery ?? '').trim() == query.trim();
       if (!stillSame) return;
 
-      final rows = (res as List?) ?? [];
+      if (res is! List) {
+        print('search_users_smart unexpected return type: ${res.runtimeType}');
+        state = state.copyWith(isSearching: false, searchResults: const []);
+        return;
+      }
+
+      final rows = res;
 
       final results = rows.map((r) {
         final map = r as Map<String, dynamic>;
