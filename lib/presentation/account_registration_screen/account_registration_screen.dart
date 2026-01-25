@@ -41,9 +41,11 @@ class AccountRegistrationScreenState
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    SizedBox(height: 68.h),
                     _buildLogo(context),
                     _buildCreateAccountText(context),
                     _buildRegistrationForm(context),
+                    SizedBox(height: 14.h),
                     _buildSignInLink(context),
                   ],
                 ),
@@ -66,12 +68,12 @@ class AccountRegistrationScreenState
         NavigatorService.pushNamed(AppRoutes.appFeed);
       },
       child: Container(
-        margin: EdgeInsets.only(top: 16.h),
+        // margin: EdgeInsets.only(top: 16.h),
         width: SizeUtils.width * 0.38,
         child: CustomImageView(
           imagePath: logoPath,
-          height: 26.h,
-          width: 130.h,
+          height: 32.h,
+          width: 160.h,
         ),
       ),
     );
@@ -109,7 +111,13 @@ class AccountRegistrationScreenState
               ref.read(accountRegistrationNotifier.notifier).clearForm();
               NavigatorService.pushNamed(AppRoutes.appFeed);
             }
-            if (current.hasError ?? false) {
+            final prevErr = (previous?.errorMessage ?? '').trim();
+            final currErr = (current.errorMessage ?? '').trim();
+            final bool didError = (current.hasError ?? false) &&
+                currErr.isNotEmpty &&
+                currErr != prevErr;
+
+            if (didError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content:
@@ -190,7 +198,7 @@ class AccountRegistrationScreenState
               // Confirm Password Field
               CustomEditText(
                 controller: state.confirmPasswordController,
-                hintText: 'Password',
+                hintText: 'Re-type Password',
                 prefixIcon: Icons.lock_outline,
                 isPassword: true,
                 autofillHints: const [AutofillHints.newPassword],

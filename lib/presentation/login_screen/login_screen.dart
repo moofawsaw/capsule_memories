@@ -63,11 +63,11 @@ class LoginScreenState extends ConsumerState<LoginScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(height: 36.h),
-                    _buildLogoSection(),
-                    SizedBox(height: 24.h),
-                    _buildLoginTitle(),
                     SizedBox(height: 68.h),
+                    _buildLogoSection(),
+                    SizedBox(height: 16.h),
+                    _buildLoginTitle(),
+                    SizedBox(height: 48.h),
                     _buildLoginForm(),
                     SizedBox(height: 50.h),
                     _buildForgotPasswordLink(),
@@ -97,8 +97,8 @@ class LoginScreenState extends ConsumerState<LoginScreen>
         width: MediaQuery.of(context).size.width * 0.38,
         child: CustomImageView(
           imagePath: logoPath,
-          height: 26.h,
-          width: 130.h,
+          height: 32.h,
+          width: 160.h,
         ),
       ),
     );
@@ -128,10 +128,12 @@ class LoginScreenState extends ConsumerState<LoginScreen>
               _clearForm();
               NavigatorService.pushNamedAndRemoveUntil(AppRoutes.appFeed);
             }
-            if (current.errorMessage != null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(current.errorMessage!)),
-              );
+            final prevErr = (previous?.errorMessage ?? '').trim();
+            final currErr = (current.errorMessage ?? '').trim();
+            if (currErr.isNotEmpty && currErr != prevErr) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(content: Text(currErr)));
             }
           },
         );
@@ -173,7 +175,7 @@ class LoginScreenState extends ConsumerState<LoginScreen>
 
             // ✅ Material Icons
             _SocialAuthButton(
-              text: 'Log in with Google',
+              text: 'Continue with Google',
               iconData: _googleIcon,
               onPressed:
               state.isLoading ?? false ? null : () => _onGoogleLoginTap(),
@@ -181,7 +183,7 @@ class LoginScreenState extends ConsumerState<LoginScreen>
             ),
             SizedBox(height: 20.h),
             _SocialAuthButton(
-              text: 'Log in with Facebook',
+              text: 'Continue with Facebook',
               iconData: _facebookIcon,
               onPressed:
               state.isLoading ?? false ? null : () => _onFacebookLoginTap(),

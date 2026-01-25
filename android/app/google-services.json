@@ -1,29 +1,54 @@
 {
-    "project_info": {
-        "project_number": "945270049172",
-        "project_id": "capsule-7a72b",
-        "storage_bucket": "capsule-7a72b.firebasestorage.app"
-    },
-    "client": [
-        {
-            "client_info": {
-                "mobilesdk_app_id": "1:945270049172:android:5bd9085d86a44f27eea781",
-                "android_client_info": {
-                    "package_name": "com.capsule.app"
-                }
-            },
-            "oauth_client": [],
-            "api_key": [
-                {
-                    "current_key": "AIzaSyBiJqT9kWHNt34lU74y8WCCIPGWVX0VISE"
-                }
-            ],
-            "services": {
-                "appinvite_service": {
-                    "other_platform_oauth_client": []
-                }
-            }
+  "project_info": {
+    "project_number": "945270049172",
+    "project_id": "capsule-7a72b",
+    "storage_bucket": "capsule-7a72b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:945270049172:android:5bd9085d86a44f27eea781",
+        "android_client_info": {
+          "package_name": "com.capsule.app"
         }
-    ],
-    "configuration_version": "1"
+      },
+      "oauth_client": [
+        {
+          "client_id": "945270049172-nksj4octo6d31ue6t92ov6up5lkqfm17.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.capsule.app",
+            "certificate_hash": "eba7b3cc0b60a3a1e89bcc82bd6ce180da67e029"
+          }
+        },
+        {
+          "client_id": "945270049172-5qdhogb4qa156ub2fb5a7qe4g92ij22q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBiJqT9kWHNt34lU74y8WCCIPGWVX0VISE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "945270049172-5qdhogb4qa156ub2fb5a7qe4g92ij22q.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "945270049172-cujbpvou6clc975ubsultdfmbb4ignv9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.capapp.capsule"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
 }

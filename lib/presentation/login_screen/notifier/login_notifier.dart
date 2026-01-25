@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
+import '../../../core/services/native_google_sign_in_service.dart';
 import '../../../core/services/deep_link_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/login_model.dart';
@@ -178,19 +179,40 @@ class LoginNotifier extends StateNotifier<LoginState> {
             'Supabase is not initialized. Please check your configuration.');
       }
 
-      // Sign in with Google OAuth with forced account picker
-      // Supabase Flutter SDK v2.12.0+ handles deep link callbacks automatically
-      // The auth state change listener in main.dart will handle success
+      // Native Google sign-in (mobile-first) → exchange ID token with Supabase.
+      // This avoids the browser OAuth redirect flow entirely.
+      try {
+        await NativeGoogleSignInService.signIn(supabaseClient);
+        // NOTE: We intentionally do not set isSuccess/isLoading here.
+        // The auth state listener will update UI when Supabase session is established.
+        return;
+      } on AuthException catch (e) {
+        // If native Google Sign-In isn't configured on this build/device,
+        // fall back to Supabase's browser OAuth (still using Custom Tabs).
+        final code = (e.code ?? '').trim();
+        const configErrorCodes = {
+          'clientConfigurationError',
+          'providerConfigurationError',
+          'uiUnavailable',
+          // Android: native sign-in couldn't mint an ID token (often missing SHA/OAuth client).
+          'failedToRetrieveAuthToken',
+          // Some builds report this when Google Play Console / OAuth isn't wired up.
+          'developerConsoleNotSetUpCorrectly',
+        };
+        if (!configErrorCodes.contains(code)) rethrow;
+
+        debugPrint(
+          'ℹ️ Native Google sign-in unavailable ($code). Falling back to OAuth.',
+        );
+      }
+
       final authResponse = await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
-        authScreenLaunchMode: LaunchMode.externalApplication,
-        queryParams: {
-          'prompt': 'select_account', // Forces account picker
-        },
+        // Use an in-app browser (Custom Tabs on Android) for a smoother OAuth UX.
+        authScreenLaunchMode: LaunchMode.inAppBrowserView,
       );
 
-      // Verify OAuth URL was generated successfully
       if (!authResponse) {
         throw AuthException(
           'Failed to generate Google OAuth URL. Please check your Supabase OAuth configuration.',
@@ -205,7 +227,7 @@ class LoginNotifier extends StateNotifier<LoginState> {
         }
       });
 
-      // Note: Don't set loading to false here as OAuth flow redirects
+      // NOTE: Don't set loading to false here as OAuth flow redirects
       // The auth state listener will update UI when user returns
       // Keep loading state true while waiting for OAuth callback
     } on AuthException catch (e) {
@@ -217,6 +239,10 @@ class LoginNotifier extends StateNotifier<LoginState> {
         errorMessage = 'Sign-in popup was closed. Please try again.';
       } else if (e.message.contains('network')) {
         errorMessage = 'Network error. Please check your internet connection.';
+      } else if (e.message.contains('Unacceptable audience in id_token')) {
+        errorMessage =
+            'Google sign-in is misconfigured (ID token audience mismatch). '
+            'Make sure `GOOGLE_WEB_CLIENT_ID` matches the Web client ID in Supabase → Auth → Providers → Google.';
       } else if (e.message.contains('OAuth configuration')) {
         errorMessage =
             'Google Sign-In is not properly configured in Supabase. Please check the setup guide.';
@@ -258,10 +284,8 @@ class LoginNotifier extends StateNotifier<LoginState> {
       await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.facebook,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
-        authScreenLaunchMode: LaunchMode.externalApplication,
-        queryParams: {
-          'auth_type': 'reauthenticate', // Forces Facebook to re-authenticate
-        },
+        // Use an in-app browser (Custom Tabs on Android) for a smoother OAuth UX.
+        authScreenLaunchMode: LaunchMode.inAppBrowserView,
       );
 
       // Set a fallback timeout to reset loading state if OAuth doesn't complete

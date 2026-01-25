@@ -710,7 +710,7 @@ class _NativeCameraRecordingScreenState
           Text(
             _errorMessage ?? 'Unknown error',
             style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
+                .copyWith(color: appTheme.whiteCustom),
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 24.h),
@@ -765,7 +765,7 @@ class _NativeCameraRecordingScreenState
                 ),
                 child: Icon(
                   Icons.close,
-                  color: appTheme.gray_50,
+                  color: appTheme.whiteCustom,
                   size: 24.h,
                 ),
               ),
@@ -791,7 +791,7 @@ class _NativeCameraRecordingScreenState
                 Text(
                   widget.memoryTitle,
                   style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
+                      .copyWith(color: appTheme.whiteCustom),
                 ),
               ],
             ),
@@ -857,7 +857,7 @@ class _NativeCameraRecordingScreenState
                               border: Border.all(
                                 color: _state == CameraState.preparingVideo
                                     ? appTheme.red_500.withAlpha(179)
-                                    : appTheme.gray_50,
+                                    : appTheme.whiteCustom,
                                 width: _state == CameraState.preparingVideo
                                     ? 5
                                     : 4,
@@ -940,7 +940,7 @@ class _NativeCameraRecordingScreenState
                 scale: _lockScaleAnimation!,
                 child: Icon(
                   Icons.lock,
-                  color: appTheme.gray_50,
+                  color: appTheme.whiteCustom,
                   size: 24.h,
                 ),
               ),
@@ -959,7 +959,7 @@ class _NativeCameraRecordingScreenState
             ),
             child: Icon(
               Icons.flip_camera_ios,
-              color: appTheme.gray_50,
+              color: appTheme.whiteCustom,
               size: 24.h,
             ),
           ),
@@ -985,7 +985,7 @@ class _NativeCameraRecordingScreenState
                 width: 8.h,
                 height: 8.h,
                 decoration: BoxDecoration(
-                  color: appTheme.gray_50,
+                  color: appTheme.whiteCustom,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -993,7 +993,7 @@ class _NativeCameraRecordingScreenState
               Text(
                 'Recording ${_formatTime(_elapsedSeconds)}/${_formatTime(_maxRecordingDurationSeconds)}',
                 style: TextStyleHelper.instance.body14Bold
-                    .copyWith(color: appTheme.gray_50),
+                    .copyWith(color: appTheme.whiteCustom),
               ),
             ],
           ),
@@ -1014,7 +1014,7 @@ class _NativeCameraRecordingScreenState
                 scale: _lockScaleAnimation!,
                 child: Icon(
                   Icons.lock,
-                  color: appTheme.gray_50,
+                  color: appTheme.whiteCustom,
                   size: 16.h,
                 ),
               ),
@@ -1022,7 +1022,7 @@ class _NativeCameraRecordingScreenState
               Text(
                 'Locked • Tap to stop ${_formatTime(_elapsedSeconds)}/${_formatTime(_maxRecordingDurationSeconds)}',
                 style: TextStyleHelper.instance.body14Bold
-                    .copyWith(color: appTheme.gray_50),
+                    .copyWith(color: appTheme.whiteCustom),
               ),
             ],
           ),
@@ -1044,14 +1044,14 @@ class _NativeCameraRecordingScreenState
                 height: 12.h,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: appTheme.gray_50,
+                  color: appTheme.whiteCustom,
                 ),
               ),
               SizedBox(width: 8.h),
               Text(
                 'Preparing...',
                 style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                    .copyWith(color: appTheme.gray_50),
+                    .copyWith(color: appTheme.whiteCustom),
               ),
             ],
           ),
@@ -1071,7 +1071,7 @@ class _NativeCameraRecordingScreenState
           child: Text(
             idleLabel,
             style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                .copyWith(color: appTheme.gray_50),
+                .copyWith(color: appTheme.whiteCustom),
           ),
         );
     }
