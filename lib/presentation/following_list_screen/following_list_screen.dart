@@ -4,6 +4,7 @@ import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/custom_story_skeleton.dart';
+import '../../widgets/standard_title_bar.dart';
 import './widgets/following_user_item_widget.dart';
 import 'models/following_list_model.dart';
 import 'models/following_story_item_model.dart';
@@ -25,133 +26,156 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     });
   }
 
+  Future<void> _onRefresh() async {
+    await ref.read(followingListNotifier.notifier).initialize();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: appTheme.gray_900_02,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(child: SizedBox(height: 24.h)),
+      body: RefreshIndicator(
+        color: appTheme.deep_purple_A100,
+        backgroundColor: appTheme.gray_900_01,
+        displacement: 30,
+        onRefresh: _onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
+            SliverToBoxAdapter(child: SizedBox(height: 24.h)),
 
-          // ✅ Stationary header (Following title + Followers pill)
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: _FixedSliverHeaderDelegate(
-              height: 52.h,
-              child: Container(
-                color: appTheme.gray_900_02,
-                padding: EdgeInsets.symmetric(horizontal: 16.h),
-                alignment: Alignment.center,
-                child: _buildTabSection(context),
+            // ✅ Stationary header (Following title + Followers pill)
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _AdaptiveFixedSliverHeaderDelegate(
+                height: 52.h,
+                builder: (context, overlapsContent) {
+                  // When the header becomes pinned (overlapsContent=true),
+                  // add a little extra vertical breathing room so it doesn't feel
+                  // cramped against the system top area and the pinned search bar.
+                  final double vPad = overlapsContent ? 4.h : 0;
+                  final double innerHeight = 52.h - (vPad * 2);
+
+                  return Container(
+                    color: appTheme.gray_900_02,
+                    padding: EdgeInsets.fromLTRB(16.h, vPad, 16.h, vPad),
+                    alignment: Alignment.center,
+                    child: _buildTabSection(context, height: innerHeight),
+                  );
+                },
               ),
             ),
-          ),
 
-          SliverToBoxAdapter(child: SizedBox(height: 14.h)),
+            SliverToBoxAdapter(child: SizedBox(height: 14.h)),
 
-          // Latest Stories should run edge-to-edge (no horizontal padding).
-          SliverToBoxAdapter(child: _buildLatestStoriesSection(context)),
+            // Latest Stories should run edge-to-edge (no horizontal padding).
+            // Hide the entire section when there are no stories.
+            Consumer(builder: (context, ref, _) {
+              final state = ref.watch(followingListNotifier);
+              final items =
+                  state.latestStories ?? const <FollowingStoryItemModel>[];
+              final isLoading = state.isLoadingStories ?? false;
 
-          SliverToBoxAdapter(child: SizedBox(height: 14.h)),
+              final shouldShow = isLoading || items.isNotEmpty;
+              if (!shouldShow) {
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              }
 
-          // ✅ Pinned search (list scrolls BELOW it, not under it)
-          Consumer(builder: (context, ref, _) {
-            final state = ref.watch(followingListNotifier);
-            final query = (state.searchQuery ?? '').trim();
-            final resultsLen = state.searchResults?.length ?? 0;
-            final isSearching = state.isSearching ?? false;
-
-            final showPanel = query.isNotEmpty;
-
-            // Best-effort height to prevent overlap. This doesn't need to be exact—
-            // it just needs to be >= the rendered content height.
-            final double base = 56.h; // search bar
-            final double panel = showPanel
-                ? (isSearching || resultsLen == 0
-                    ? 56.h
-                    : (resultsLen.clamp(0, 8) * 52.h) + 16.h)
-                : 0;
-            final double height = base + (showPanel ? (10.h + panel) : 0);
-
-            return SliverPersistentHeader(
-              pinned: true,
-              delegate: _FixedSliverHeaderDelegate(
-                height: height,
-                child: Container(
-                  color: appTheme.gray_900_02,
-                  padding: EdgeInsets.symmetric(horizontal: 16.h),
-                  child: _buildSearchSection(context),
+              return SliverToBoxAdapter(
+                child: Column(
+                  children: [
+                    SizedBox(height: 14.h),
+                    _buildLatestStoriesSection(
+                      context,
+                      items: items,
+                      isLoading: isLoading,
+                    ),
+                    SizedBox(height: 14.h),
+                  ],
                 ),
-              ),
-            );
-          }),
+              );
+            }),
 
-          SliverToBoxAdapter(child: SizedBox(height: 14.h)),
+            // ✅ Pinned search (list scrolls BELOW it, not under it)
+            Consumer(builder: (context, ref, _) {
+              final state = ref.watch(followingListNotifier);
+              final query = (state.searchQuery ?? '').trim();
+              final resultsLen = state.searchResults?.length ?? 0;
+              final isSearching = state.isSearching ?? false;
 
-          SliverPadding(
-            // Match Followers list effective padding (16 + 8).
-            padding: EdgeInsets.symmetric(horizontal: 24.h),
-            sliver: _buildFollowingSliver(context),
-          ),
+              final showPanel = query.isNotEmpty;
 
-          SliverToBoxAdapter(child: SizedBox(height: 24.h)),
-        ],
+              // Best-effort height to prevent overlap. This doesn't need to be exact—
+              // it just needs to be >= the rendered content height.
+              final double base = 56.h; // search bar
+              final double panel = showPanel
+                  ? (isSearching || resultsLen == 0
+                      ? 56.h
+                      : (resultsLen.clamp(0, 8) * 52.h) + 16.h)
+                  : 0;
+              final double height = base + (showPanel ? (10.h + panel) : 0);
+
+              return SliverPersistentHeader(
+                pinned: true,
+                delegate: _FixedSliverHeaderDelegate(
+                  height: height,
+                  child: Container(
+                    color: appTheme.gray_900_02,
+                    padding: EdgeInsets.symmetric(horizontal: 16.h),
+                    child: _buildSearchSection(context),
+                  ),
+                ),
+              );
+            }),
+
+            SliverToBoxAdapter(child: SizedBox(height: 14.h)),
+
+            SliverPadding(
+              // Match Followers list effective padding (16 + 8).
+              padding: EdgeInsets.symmetric(horizontal: 24.h),
+              sliver: _buildFollowingSliver(context),
+            ),
+
+            SliverToBoxAdapter(child: SizedBox(height: 24.h)),
+          ],
+        ),
       ),
     );
   }
 
   /// Tab header
-  Widget _buildTabSection(BuildContext context) {
+  Widget _buildTabSection(BuildContext context, {double? height}) {
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(followingListNotifier);
         final followingCount =
             state.followingListModel?.followingUsers?.length ?? 0;
 
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              margin: EdgeInsets.only(top: 2.h),
-              child: Icon(
-                Icons.person_add_alt_1_rounded,
-                size: 26.h,
-                color: appTheme.deep_purple_A100,
+        return StandardTitleBar(
+          leadingIcon: Icons.person_add_alt_1_rounded,
+          title: 'Following ($followingCount)',
+          height: height,
+          trailing: GestureDetector(
+            onTap: () => onTapFollowersTab(context),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+              decoration: BoxDecoration(
+                color: appTheme.color41C124,
+                border: Border.all(
+                  color: appTheme.blue_gray_900,
+                  width: 1.h,
+                ),
+                borderRadius: BorderRadius.circular(22.h),
               ),
-            ),
-            Container(
-              margin: EdgeInsets.fromLTRB(6.h, 4.h, 0, 0),
               child: Text(
-                'Following ($followingCount)',
-                style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans
-                    .copyWith(height: 1.3),
+                'Followers',
+                style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                    .copyWith(color: appTheme.gray_50, height: 1.31),
               ),
             ),
-            Spacer(),
-            GestureDetector(
-              onTap: () {
-                onTapFollowersTab(context);
-              },
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
-                decoration: BoxDecoration(
-                  color: appTheme.color41C124,
-                  border: Border.all(
-                    color: appTheme.blue_gray_900,
-                    width: 1.h,
-                  ),
-                  borderRadius: BorderRadius.circular(22.h),
-                ),
-                child: Text(
-                  'Followers',
-                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50, height: 1.31),
-                ),
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -317,69 +341,53 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
     });
   }
 
-  Widget _buildLatestStoriesSection(BuildContext context) {
-    return Consumer(builder: (context, ref, _) {
-      final state = ref.watch(followingListNotifier);
-
-      final List<FollowingStoryItemModel> items =
-          state.latestStories ?? const <FollowingStoryItemModel>[];
-      final bool isLoading = state.isLoadingStories ?? false;
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.h),
-            child: Text(
-              'Latest Stories',
-              style: TextStyleHelper.instance.body14BoldPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
-            ),
+  Widget _buildLatestStoriesSection(
+    BuildContext context, {
+    required List<FollowingStoryItemModel> items,
+    required bool isLoading,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.h),
+          child: Text(
+            'Latest Stories',
+            style: TextStyleHelper.instance.body14BoldPlusJakartaSans
+                .copyWith(color: appTheme.gray_50),
           ),
-          SizedBox(height: 12.h),
-          SizedBox(
-            height: 121.h,
-            child: isLoading
-                ? ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.zero,
-                    itemCount: 5,
-                    itemBuilder: (_, __) => Container(
-                      width: 90.h,
-                      margin: EdgeInsets.only(right: 8.h),
-                      child: CustomStorySkeleton(isCompact: true),
-                    ),
-                  )
-                : items.isEmpty
-                    ? Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.h),
-                        child: Text(
-                          'No stories yet',
-                          style: TextStyleHelper
-                              .instance.body14RegularPlusJakartaSans
-                              .copyWith(
-                            color: appTheme.gray_50.withAlpha(128),
-                          ),
+        ),
+        SizedBox(height: 12.h),
+        SizedBox(
+          height: 121.h,
+          child: isLoading
+              ? ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: 16.h), // match loaded
+                  itemCount: 5,
+                  itemBuilder: (_, __) => Container(
+                    width: 90.h,
+                    margin: EdgeInsets.only(right: 8.h),
+                    child: CustomStorySkeleton(isCompact: true),
+                  ),
+                )
+              : CustomStoryList(
+                  storyItems: items
+                      .map(
+                        (e) => CustomStoryItem(
+                          backgroundImage: e.backgroundImage ?? '',
+                          profileImage: e.profileImage ?? '',
+                          timestamp: e.timestamp ?? '',
+                          storyId: e.id,
+                          isRead: e.isRead,
                         ),
                       )
-                    : CustomStoryList(
-                        storyItems: items
-                            .map(
-                              (e) => CustomStoryItem(
-                                backgroundImage: e.backgroundImage ?? '',
-                                profileImage: e.profileImage ?? '',
-                                timestamp: e.timestamp ?? '',
-                                storyId: e.id,
-                                isRead: e.isRead,
-                              ),
-                            )
-                            .toList(),
-                        onStoryTap: (index) => _onStoryTap(context, index),
-                      ),
-          ),
-        ],
-      );
-    });
+                      .toList(),
+                  onStoryTap: (index) => _onStoryTap(context, index),
+                ),
+        ),
+      ],
+    );
   }
 
   void _onStoryTap(BuildContext context, int index) {
@@ -512,11 +520,12 @@ class FollowingListScreenState extends ConsumerState<FollowingListScreen> {
         final followingUsers = state.followingListModel?.followingUsers ?? [];
 
         if (followingUsers.isEmpty) {
-          return SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(24.h, 8.h, 24.h, 12.h), // top padding controls how close to search bar
               child: Text(
-                'No following yet',
+                "You're not following anyone.\nTry searching for users.",
+                textAlign: TextAlign.center,
                 style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                     .copyWith(color: appTheme.blue_gray_300),
               ),
@@ -611,5 +620,35 @@ class _FixedSliverHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _FixedSliverHeaderDelegate oldDelegate) {
     return oldDelegate.height != height || oldDelegate.child != child;
+  }
+}
+
+class _AdaptiveFixedSliverHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _AdaptiveFixedSliverHeaderDelegate({
+    required this.height,
+    required this.builder,
+  });
+
+  final double height;
+  final Widget Function(BuildContext context, bool overlapsContent) builder;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox.expand(child: builder(context, overlapsContent));
+  }
+
+  @override
+  bool shouldRebuild(covariant _AdaptiveFixedSliverHeaderDelegate oldDelegate) {
+    return oldDelegate.height != height || oldDelegate.builder != builder;
   }
 }

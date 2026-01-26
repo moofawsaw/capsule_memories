@@ -6,6 +6,7 @@ import '../../../core/app_export.dart';
 import '../../../core/utils/memory_nav_args.dart';
 import '../../../services/avatar_helper_service.dart';
 import '../../../services/memory_cache_service.dart';
+import '../../../services/notification_service.dart';
 import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/storage_utils.dart';
@@ -46,6 +47,29 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   }
 
   bool _isSealedState(String state) => state == 'sealed';
+
+  Future<String?> _fetchPendingInviteId(String memoryId) async {
+    try {
+      final client = SupabaseService.instance.client;
+      if (client == null) return null;
+
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) return null;
+
+      final resp = await client
+          .from('memory_invites')
+          .select('id,status')
+          .eq('memory_id', memoryId)
+          .eq('user_id', userId)
+          .eq('status', 'pending')
+          .maybeSingle();
+
+      final inviteId = (resp?['id'] as String?)?.trim();
+      return (inviteId != null && inviteId.isNotEmpty) ? inviteId : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Parse any Supabase timestamp into a UTC DateTime consistently.
   DateTime _parseUtc(dynamic value) {
@@ -374,6 +398,13 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
             : EventTimelineViewModel(memoryId: navArgs.memoryId),
       );
 
+      // ✅ If caller provided a snapshot (e.g. from story viewer header click),
+      // render it immediately so category icon + member avatars appear even when
+      // DB joins are restricted or slow. The DB load below will refine fields.
+      if (navArgs.snapshot != null) {
+        _displaySnapshot(navArgs.snapshot!);
+      }
+
       final client = SupabaseService.instance.client;
       if (client == null) {
         print('❌ ERROR: Supabase client is null');
@@ -383,10 +414,15 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
       final isCreator = await _checkCurrentUserIsCreator(navArgs.memoryId);
       final isMember = await _checkCurrentUserMembership(navArgs.memoryId);
+      final pendingInviteId =
+          !isMember ? await _fetchPendingInviteId(navArgs.memoryId) : null;
+      final hasPendingInvite =
+          pendingInviteId != null && pendingInviteId.trim().isNotEmpty;
 
       print('🔍 TIMELINE NOTIFIER: User permissions');
       print('   - Is Creator: $isCreator');
       print('   - Is Member: $isMember');
+      print('   - Has Pending Invite: $hasPendingInvite');
 
       final memoryResponse = await client.from('memories').select('''
   id,
@@ -433,21 +469,28 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           'icon_url="$iconUrl" '
           'final="$categoryIconFinal"');
 
-      final contributorsResponse = await client
-          .from('memory_contributors')
-          .select('user_id, user_profiles(avatar_url)')
-          .eq('memory_id', navArgs.memoryId);
+      // Best-effort contributors list (can be blocked by RLS for non-members).
+      List<String> contributorAvatars = [];
+      try {
+        final contributorsResponse = await client
+            .from('memory_contributors')
+            .select('user_id, user_profiles(avatar_url)')
+            .eq('memory_id', navArgs.memoryId);
 
-      final contributorAvatars = (contributorsResponse as List?)
-          ?.map((c) {
-        final profile = c['user_profiles'] as Map<String, dynamic>?;
-        return AvatarHelperService.getAvatarUrl(
-          profile?['avatar_url'] as String?,
-        );
-      })
-          .whereType<String>()
-          .toList() ??
-          [];
+        contributorAvatars = (contributorsResponse as List?)
+                ?.map((c) {
+                  final profile = c['user_profiles'] as Map<String, dynamic>?;
+                  return AvatarHelperService.getAvatarUrl(
+                    profile?['avatar_url'] as String?,
+                  );
+                })
+                .whereType<String>()
+                .where((u) => u.trim().isNotEmpty)
+                .toList() ??
+            <String>[];
+      } catch (_) {
+        contributorAvatars = <String>[];
+      }
 
       final DateTime? startUtc =
       memoryResponse['start_time'] != null ? _parseUtc(memoryResponse['start_time']) : null;
@@ -455,6 +498,13 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       memoryResponse['end_time'] != null ? _parseUtc(memoryResponse['end_time']) : null;
 
       final existingTimelineDetail = state.eventTimelineViewModel?.timelineDetail;
+      final existingTitle = (state.eventTimelineViewModel?.eventTitle ?? '').trim();
+      final existingLocation =
+          (state.eventTimelineViewModel?.timelineDetail?.centerLocation ?? '').trim();
+      final existingCategoryIcon =
+          (state.eventTimelineViewModel?.categoryIcon ?? '').trim();
+      final existingParticipants =
+          state.eventTimelineViewModel?.participantImages ?? const <String>[];
 
       state = state.copyWith(
         memoryId: navArgs.memoryId,
@@ -463,19 +513,27 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         eventTimelineViewModel:
         (state.eventTimelineViewModel ?? EventTimelineViewModel(memoryId: navArgs.memoryId)).copyWith(
           memoryId: navArgs.memoryId,
-          eventTitle: memoryResponse['title'] ?? 'Memory',
+          eventTitle: ((memoryResponse['title'] as String?)?.trim().isNotEmpty ?? false)
+              ? (memoryResponse['title'] as String?)!
+              : (existingTitle.isNotEmpty ? existingTitle : 'Memory'),
           eventDate: _formatTimestamp(memoryResponse['created_at'] ?? ''),
           isPrivate: memoryResponse['visibility'] == 'private',
-          categoryIcon: categoryIconFinal,
-          participantImages: contributorAvatars,
+          categoryIcon: categoryIconFinal.trim().isNotEmpty
+              ? categoryIconFinal
+              : (existingCategoryIcon.isNotEmpty ? existingCategoryIcon : ''),
+          participantImages: contributorAvatars.isNotEmpty
+              ? contributorAvatars
+              : (existingParticipants.isNotEmpty ? existingParticipants : []),
 
           // NEW
           memoryState: normalizedState,
           isSealed: sealed,
 
           timelineDetail: TimelineDetailModel(
-            centerLocation: (memoryResponse['location_name'] as String?) ??
-                (existingTimelineDetail?.centerLocation ?? 'Unknown Location'),
+            centerLocation: ((memoryResponse['location_name'] as String?)?.trim().isNotEmpty ?? false)
+                ? (memoryResponse['location_name'] as String?)!
+                : (existingTimelineDetail?.centerLocation ??
+                    (existingLocation.isNotEmpty ? existingLocation : 'Unknown Location')),
             centerDistance: existingTimelineDetail?.centerDistance ?? '0km',
             memoryStartTime: startUtc,
             memoryEndTime: endUtc,
@@ -485,6 +543,8 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         ),
         isCurrentUserMember: isMember,
         isCurrentUserCreator: isCreator,
+        hasPendingInvite: hasPendingInvite,
+        pendingInviteId: pendingInviteId,
         isLoading: true,
         errorMessage: null,
       );
@@ -499,6 +559,75 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('❌ ERROR in initializeFromMemory: $e');
       print('Stack trace: $stackTrace');
       state = state.copyWith(isLoading: false);
+    }
+  }
+
+  /// Accepts a pending invite (if present) and joins the memory.
+  /// Sealed-safe: if invite accept/pending check fails, falls back to joining by memory id.
+  Future<void> acceptPendingInviteAndJoin() async {
+    final memoryId =
+        (state.eventTimelineViewModel?.memoryId ?? state.memoryId)?.trim();
+    if (memoryId == null || memoryId.isEmpty) {
+      throw Exception('Missing memory id');
+    }
+
+    final inviteId = (state.pendingInviteId ?? '').trim();
+
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: null,
+    );
+
+    try {
+      bool joined = false;
+
+      if (inviteId.isNotEmpty) {
+        try {
+          final isPending =
+              await NotificationService.instance.isInviteStillPending(inviteId);
+          if (isPending) {
+            await NotificationService.instance.acceptMemoryInvite(inviteId);
+            joined = true;
+          } else {
+            await NotificationService.instance.joinMemoryById(memoryId);
+            joined = true;
+          }
+        } catch (_) {
+          await NotificationService.instance.joinMemoryById(memoryId);
+          joined = true;
+        }
+      } else {
+        await NotificationService.instance.joinMemoryById(memoryId);
+        joined = true;
+      }
+
+      if (!joined) {
+        throw Exception('Unable to join memory');
+      }
+
+      final isCreator = await _checkCurrentUserIsCreator(memoryId);
+
+      // Flip UI to member mode immediately.
+      state = state.copyWith(
+        isCurrentUserMember: true,
+        isCurrentUserCreator: isCreator,
+        hasPendingInvite: false,
+        pendingInviteId: null,
+      );
+
+      // Keep cache consistent for other screens that rely on it.
+      final client = SupabaseService.instance.client;
+      final userId = client?.auth.currentUser?.id;
+      if (userId != null) {
+        await _cacheService.refreshMemoryCache(userId);
+      }
+
+      // Refresh timeline data now that the user is a member.
+      await loadMemoryStories(memoryId);
+      await validateMemoryData(memoryId);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      rethrow;
     }
   }
 
@@ -764,6 +893,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   }
 
   /// Display snapshot data immediately
+  // ignore: unused_element
   void _displaySnapshot(MemorySnapshot snapshot) {
     // Keep using the state's memoryId (it is set before snapshot display),
     // because MemorySnapshot in this project does not expose memoryId.

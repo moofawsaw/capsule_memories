@@ -413,13 +413,32 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
       final currentUserId = client.auth.currentUser?.id;
       if (currentUserId == null) return;
 
-      final memoryResponse = await client
-          .from('memories')
-          .select('creator_id')
-          .eq('id', memoryId)
-          .single();
+      Map<String, dynamic> memoryResponse;
+      try {
+        final raw = await client
+            .from('memories')
+            .select('creator_id, is_daily_capsule')
+            .eq('id', memoryId)
+            .single();
+        memoryResponse = (raw as Map).cast<String, dynamic>();
+      } on PostgrestException catch (e) {
+        final msg = e.message.toLowerCase();
+        final code = (e.code ?? '').toString();
+        final isMissing =
+            code == '42703' || (msg.contains('is_daily_capsule') && msg.contains('does not exist'));
+        if (!isMissing) rethrow;
+        final raw = await client
+            .from('memories')
+            .select('creator_id')
+            .eq('id', memoryId)
+            .single();
+        memoryResponse = (raw as Map).cast<String, dynamic>();
+      }
 
       if (_isDisposed) return;
+
+      final isDailyCapsule = memoryResponse['is_daily_capsule'] == true;
+      if (isDailyCapsule) return;
 
       final isUserMemory = memoryResponse['creator_id'] == currentUserId;
 
@@ -528,7 +547,36 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       if (contributorUserId != currentUserId) return;
 
-      final response = await client.from('memories').select('''
+      Map<String, dynamic> response;
+      try {
+        final raw = await client.from('memories').select('''
+            id,
+            title,
+            is_daily_capsule,
+            start_time,
+            end_time,
+            location_name,
+            state,
+            creator_id,
+            memory_categories(
+              id,
+              name,
+              icon_url
+            ),
+            memory_contributors(
+              user_profiles(
+                avatar_url
+              )
+            )
+          ''').eq('id', memoryId).single();
+        response = (raw as Map).cast<String, dynamic>();
+      } on PostgrestException catch (e) {
+        final msg = e.message.toLowerCase();
+        final code = (e.code ?? '').toString();
+        final isMissing =
+            code == '42703' || (msg.contains('is_daily_capsule') && msg.contains('does not exist'));
+        if (!isMissing) rethrow;
+        final raw = await client.from('memories').select('''
             id,
             title,
             start_time,
@@ -547,8 +595,12 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
               )
             )
           ''').eq('id', memoryId).single();
+        response = (raw as Map).cast<String, dynamic>();
+      }
 
       if (_isDisposed) return;
+
+      if (response['is_daily_capsule'] == true) return;
 
       final contributors = response['memory_contributors'] as List? ?? [];
       final category = response['memory_categories'] as Map<String, dynamic>?;
@@ -630,7 +682,38 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
 
       if (creatorId != currentUserId) return;
 
-      final response = await client.from('memories').select('''
+      Map<String, dynamic> response;
+      try {
+        final raw = await client.from('memories').select('''
+            id,
+            title,
+            is_daily_capsule,
+            start_time,
+            end_time,
+            location_name,
+            location_lat,
+            location_lng,
+            state,
+            creator_id,
+            memory_categories(
+              id,
+              name,
+              icon_url
+            ),
+            memory_contributors(
+              user_profiles(
+                avatar_url
+              )
+            )
+          ''').eq('id', memoryId).single();
+        response = (raw as Map).cast<String, dynamic>();
+      } on PostgrestException catch (e) {
+        final msg = e.message.toLowerCase();
+        final code = (e.code ?? '').toString();
+        final isMissing =
+            code == '42703' || (msg.contains('is_daily_capsule') && msg.contains('does not exist'));
+        if (!isMissing) rethrow;
+        final raw = await client.from('memories').select('''
             id,
             title,
             start_time,
@@ -651,8 +734,12 @@ class MemoriesDashboardNotifier extends StateNotifier<MemoriesDashboardState> {
               )
             )
           ''').eq('id', memoryId).single();
+        response = (raw as Map).cast<String, dynamic>();
+      }
 
       if (_isDisposed) return;
+
+      if (response['is_daily_capsule'] == true) return;
 
       final contributors = response['memory_contributors'] as List? ?? [];
       final category = response['memory_categories'] as Map<String, dynamic>?;

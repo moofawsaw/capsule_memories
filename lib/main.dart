@@ -25,6 +25,11 @@ late ProviderContainer _globalContainer;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 🎨 Load theme mode BEFORE first paint (prevents dark->light flash).
+  // If user hasn't set a preference yet, this returns ThemeMode.system.
+  final ThemeMode initialThemeMode = await ThemeModeNotifier.loadInitialThemeMode();
+  ThemeHelper().setThemeMode(initialThemeMode);
+
   // ✅ Initialize Firebase exactly once (avoid [core/duplicate-app])
   try {
     await Firebase.initializeApp(
@@ -71,6 +76,14 @@ Future<void> main() async {
   runApp(
     AppScaffoldMessenger(
       child: ProviderScope(
+        overrides: [
+          themeModeProvider.overrideWith(
+            (ref) => ThemeModeNotifier(
+              initialMode: initialThemeMode,
+              hydrateFromPrefs: false,
+            ),
+          ),
+        ],
         parent: _globalContainer,
         child: Sizer(
           builder: (context, orientation, deviceType) {
@@ -108,6 +121,7 @@ Future<bool> _initSupabaseSafely() async {
 /// Handles notification taps when app is in foreground, background, or terminated
 /// NOTE: This function is now deprecated as PushNotificationService handles all notification logic internally
 @Deprecated('Use PushNotificationService.instance.initialize() instead')
+// ignore: unused_element
 Future<void> _setupNotificationHandlers() async {
   debugPrint('⚠️ _setupNotificationHandlers is deprecated and does nothing');
 }

@@ -10,7 +10,6 @@ import '../../services/supabase_service.dart';
 import '../../theme/text_style_helper.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
-import './notifier/feature_request_notifier.dart';
 import 'notifier/feature_request_notifier.dart';
 
 // lib/presentation/feature_request_screen/feature_request_screen.dart
@@ -167,25 +166,29 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
   }
 
   Widget _buildSubtitleSection(BuildContext context) {
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: 'Got an idea to improve ',
-            style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300, height: 1.31),
-          ),
-          TextSpan(
-            text: 'Capsule',
-            style: TextStyleHelper.instance.title16SemiBoldPlusJakartaSans
-                .copyWith(color: appTheme.gray_50, height: 1.31),
-          ),
-          TextSpan(
-            text: '?',
-            style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300, height: 1.31),
-          ),
-        ],
+    return SizedBox(
+      width: double.infinity,
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: 'Got an idea to improve ',
+              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+            ),
+            TextSpan(
+              text: 'Capsule',
+              style: TextStyleHelper.instance.title16SemiBoldPlusJakartaSans
+                  .copyWith(color: appTheme.gray_50, height: 1.31),
+            ),
+            TextSpan(
+              text: '?',
+              style: TextStyleHelper.instance.title16RegularPlusJakartaSans
+                  .copyWith(color: appTheme.blue_gray_300, height: 1.31),
+            ),
+          ],
+        ),
+        textAlign: TextAlign.center,
       ),
     );
   }
@@ -197,10 +200,8 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Category',
-          style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-              .copyWith(color: appTheme.gray_50.withAlpha(220)),
+        SizedBox(
+          width: double.infinity,
         ),
         SizedBox(height: 10.h),
         Wrap(
@@ -214,7 +215,7 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
                 : appTheme.gray_900;
 
             final textColor =
-                selected ? appTheme.gray_50 : appTheme.blue_gray_300;
+            selected ? appTheme.gray_50 : appTheme.blue_gray_300;
 
             return _ChipPill(
               label: label,
@@ -266,28 +267,49 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
 
   Widget _buildInputSection(BuildContext context, {Key? key}) {
     final state = ref.watch(featureRequestNotifier);
+    final hasMedia = state.selectedMediaFiles.isNotEmpty;
 
-    return Column(
+    // ✅ IMPORTANT:
+    // This section sits inside an Expanded. When users add media previews,
+    // the content can exceed the available height and overflow behind the
+    // fixed submit button. Make it scrollable so the button never overlaps.
+    return LayoutBuilder(
       key: key,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        CustomEditText(
-          controller: state.featureDescriptionController,
-          hintText:
-              'Describe what you want changed and why. If you can, include where it happens in the app.',
-          maxLines: 12,
-          fillColor: appTheme.gray_900,
-          borderRadius: 12.h,
-          contentPadding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 14.h),
-          validator: (value) => ref
-              .read(featureRequestNotifier.notifier)
-              .validateFeatureDescription(value),
-        ),
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.only(
+            // Keep content reachable when keyboard is open.
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CustomEditText(
+                  controller: state.featureDescriptionController,
+                  hintText:
+                      'Describe what you want changed and why. If you can, include where it happens in the app.',
+                  // Shrink a bit when media is attached so the preview doesn't fight for space.
+                  maxLines: hasMedia ? 8 : 12,
+                  fillColor: appTheme.gray_900,
+                  borderRadius: 12.h,
+                  contentPadding: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 14.h),
+                  validator: (value) => ref
+                      .read(featureRequestNotifier.notifier)
+                      .validateFeatureDescription(value),
+                ),
 
-        // ✅ Media upload section
-        SizedBox(height: 12.h),
-        _buildMediaUploadSection(context, state),
-      ],
+                // ✅ Media upload section
+                SizedBox(height: 12.h),
+                _buildMediaUploadSection(context, state),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

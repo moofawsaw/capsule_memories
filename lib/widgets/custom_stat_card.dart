@@ -47,7 +47,7 @@ class CustomStatCard extends StatelessWidget {
     return Container(
       padding: padding ?? EdgeInsets.all(8.h),
       decoration: BoxDecoration(
-        color: backgroundColor ?? appTheme.color3BD81E,
+        // color: backgroundColor ?? appTheme.color3BD81E,
         borderRadius: BorderRadius.circular(borderRadius ?? 8.h),
       ),
       child: Row(

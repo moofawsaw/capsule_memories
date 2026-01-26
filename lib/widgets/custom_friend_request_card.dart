@@ -1,4 +1,5 @@
 import '../core/app_export.dart';
+import './custom_button.dart';
 import './custom_image_view.dart';
 
 /** 
@@ -134,26 +135,16 @@ class CustomFriendRequestCard extends StatelessWidget {
 
   /// Builds the secondary button (Decline)
   Widget _buildSecondaryButton() {
-    return Container(
-      child: GestureDetector(
-        onTap: onSecondaryButtonTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 16.h,
-            vertical: 4.h,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6.h),
-            color: secondaryButtonBackgroundColor ?? Color(0xFFE53935),
-          ),
-          child: Text(
-            'Decline',
-            style: secondaryButtonTextStyle ??
-                TextStyleHelper.instance.body12BoldPlusJakartaSans
-                    .copyWith(color: appTheme.white_A700, height: 1.33),
-          ),
-        ),
+    return CustomButton(
+      text: 'Decline',
+      size: CustomButtonSize.compact,
+      onPressed: onSecondaryButtonTap,
+      buttonStyle: CustomButtonStyle(
+        backgroundColor: secondaryButtonBackgroundColor ?? const Color(0xFFE53935),
+        borderRadius: 6.h,
+        variant: CustomButtonVariant.fill,
       ),
+      buttonTextStyle: CustomButtonTextStyle.bodySmall,
     );
   }
 
@@ -161,24 +152,16 @@ class CustomFriendRequestCard extends StatelessWidget {
   Widget _buildActionButton() {
     return Container(
       margin: EdgeInsets.only(right: 14.h),
-      child: GestureDetector(
-        onTap: onButtonPressed,
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: 16.h,
-            vertical: 4.h,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(6.h),
-            color: buttonBackgroundColor ?? Color(0xFF34B456),
-          ),
-          child: Text(
-            buttonText ?? 'Accept',
-            style: buttonTextStyle ??
-                TextStyleHelper.instance.body12BoldPlusJakartaSans
-                    .copyWith(color: appTheme.white_A700, height: 1.33),
-          ),
+      child: CustomButton(
+        text: buttonText ?? 'Accept',
+        size: CustomButtonSize.compact,
+        onPressed: onButtonPressed,
+        buttonStyle: CustomButtonStyle(
+          backgroundColor: buttonBackgroundColor ?? const Color(0xFF34B456),
+          borderRadius: 6.h,
+          variant: CustomButtonVariant.fill,
         ),
+        buttonTextStyle: CustomButtonTextStyle.bodySmall,
       ),
     );
   }

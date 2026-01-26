@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 
@@ -20,6 +21,26 @@ class UserMenuScreen extends ConsumerStatefulWidget {
 }
 
 class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
+  bool _avatarLoadRequested = false;
+
+  bool _isNetworkUrl(String? s) {
+    final v = (s ?? '').trim();
+    return v.startsWith('http://') || v.startsWith('https://');
+  }
+
+  void _ensureAvatarLoadedIfNeeded(AvatarState avatarState) {
+    if (_avatarLoadRequested) return;
+    if (avatarState.isLoading) return;
+
+    final url = (avatarState.avatarUrl ?? '').trim();
+    if (url.isNotEmpty) return;
+
+    _avatarLoadRequested = true;
+    Future.microtask(
+      () => ref.read(avatarStateProvider.notifier).loadCurrentUserAvatar(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Ensure the drawer repaints immediately when themeMode changes.
@@ -101,12 +122,15 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
       final avatarState = ref.watch(avatarStateProvider);
       final userModel = state.userMenuModel;
 
-      // Use global avatar state if available, otherwise fallback to local state
-      final avatarUrl = (avatarState.avatarUrl?.isNotEmpty ?? false)
-          ? avatarState.avatarUrl
-          : (userModel?.avatarImagePath?.isNotEmpty ?? false)
-          ? userModel?.avatarImagePath
-          : null;
+      _ensureAvatarLoadedIfNeeded(avatarState);
+
+      // Prefer global avatar URL, and only accept real http(s) URLs here.
+      // (userMenuModel.avatarImagePath is typically a storage key, not a URL)
+      final String? avatarUrl = _isNetworkUrl(avatarState.avatarUrl)
+          ? avatarState.avatarUrl!.trim()
+          : (_isNetworkUrl(userModel?.avatarImagePath)
+              ? userModel?.avatarImagePath!.trim()
+              : null);
 
       // Generate avatar letter from email if no avatar URL
       final email = userModel?.userEmail ?? '';
@@ -128,33 +152,57 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
                     // Avatar - show letter or image with loading indicator
                     Stack(
                       children: [
-                        Container(
+                        SizedBox(
                           width: 52.h,
                           height: 52.h,
-                          decoration: BoxDecoration(
-                            color: showLetterAvatar
-                                ? appTheme.deep_purple_A100
-                                : null,
-                            shape: BoxShape.circle,
-                            image: !showLetterAvatar
-                                ? DecorationImage(
-                              image: NetworkImage(avatarUrl),
-                              fit: BoxFit.cover,
-                            )
-                                : null,
-                          ),
                           child: showLetterAvatar
-                              ? Center(
-                            child: Text(
-                              avatarLetter,
-                              style: TextStyle(
-                                color: appTheme.gray_50,
-                                fontSize: 24.h,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          )
-                              : null,
+                              ? Container(
+                                  decoration: BoxDecoration(
+                                    color: appTheme.deep_purple_A100,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      avatarLetter,
+                                      style: TextStyle(
+                                        color: appTheme.gray_50,
+                                        fontSize: 24.h,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : ClipOval(
+                                  child: Image(
+                                    image: CachedNetworkImageProvider(
+                                      avatarUrl,
+                                      // Stable cache key even for signed URLs
+                                      cacheKey: Uri.parse(avatarUrl)
+                                          .replace(query: '')
+                                          .toString(),
+                                    ),
+                                    fit: BoxFit.cover,
+                                    gaplessPlayback: true,
+                                    errorBuilder: (_, __, ___) {
+                                      return Container(
+                                        decoration: BoxDecoration(
+                                          color: appTheme.deep_purple_A100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            avatarLetter,
+                                            style: TextStyle(
+                                              color: appTheme.gray_50,
+                                              fontSize: 24.h,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
                         ),
                         // Loading overlay
                         if (avatarState.isLoading)
@@ -324,6 +372,11 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
         onTap: () => onTapMemories(context),
       ),
       CustomNavigationDrawerItem(
+        icon: Icons.auto_awesome_rounded,
+        label: 'Daily Capsule',
+        onTap: () => onTapDailyCapsule(context),
+      ),
+      CustomNavigationDrawerItem(
         icon: Icons.group_outlined,
         label: 'Groups',
         onTap: () => onTapGroups(context),
@@ -462,6 +515,11 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   /// Navigates to memories dashboard
   void onTapMemories(BuildContext context) {
     NavigatorService.pushNamed(AppRoutes.appMemories);
+  }
+
+  /// Navigates to Daily Capsule (personal daily journal)
+  void onTapDailyCapsule(BuildContext context) {
+    NavigatorService.pushNamed(AppRoutes.appDailyCapsule);
   }
 
   /// Navigates to groups management

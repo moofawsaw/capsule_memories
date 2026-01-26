@@ -12,7 +12,7 @@ class ThemeHelper {
   ThemeHelper._internal();
 
   // Current app theme mode
-  var _themeMode = ThemeMode.dark;
+  var _themeMode = ThemeMode.system;
 
   // Map of custom color themes
   Map<String, ThemeColors> _supportedCustomColor = {
@@ -44,15 +44,29 @@ class ThemeHelper {
     _themeMode = mode;
   }
 
+  bool _isDarkEffective() {
+    if (_themeMode == ThemeMode.dark) return true;
+    if (_themeMode == ThemeMode.light) return false;
+
+    // ThemeMode.system -> follow device
+    try {
+      return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+          Brightness.dark;
+    } catch (_) {
+      // If binding isn't ready for some reason, default to dark (safer for current palette).
+      return true;
+    }
+  }
+
   /// Returns the colors for the current theme.
   ThemeColors _getThemeColors() {
-    final isDark = _themeMode == ThemeMode.dark;
+    final isDark = _isDarkEffective();
     return _supportedCustomColor[isDark ? 'dark' : 'light'] ?? DarkModeColors();
   }
 
   /// Returns the current theme data.
   ThemeData _getThemeData() {
-    final isDark = _themeMode == ThemeMode.dark;
+    final isDark = _isDarkEffective();
     final colors = _getThemeColors();
     var colorScheme = supportedColorScheme[isDark ? 'dark' : 'light'] ??
         supportedColorScheme['dark']!;

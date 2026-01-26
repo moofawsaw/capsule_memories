@@ -9,6 +9,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_public_memories.dart' as unified_widget;
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/custom_story_skeleton.dart';
+import '../../widgets/standard_title_bar.dart';
 import '../create_memory_screen/create_memory_screen.dart';
 import '../friends_management_screen/widgets/qr_scanner_overlay.dart';
 import './notifier/memories_dashboard_notifier.dart';
@@ -166,6 +167,7 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
             parent: BouncingScrollPhysics(),
           ),
           slivers: [
+            SliverToBoxAdapter(child: SizedBox(height: 24.h)),
             SliverToBoxAdapter(child: _buildMemoriesHeader(context)),
             SliverToBoxAdapter(child: _buildLatestStoriesSection(context)),
             SliverToBoxAdapter(child: _buildTabsAndLiveFilterRow(context)),
@@ -182,49 +184,35 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
 
   Widget _buildMemoriesHeader(BuildContext context) {
     return Container(
-      margin: EdgeInsets.fromLTRB(16.h, 16.h, 16.h, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.photo_library_rounded,
-                size: 24.h,
-                color: appTheme.deep_purple_A100,
-              ),
-              SizedBox(width: 6.h),
-              Text(
-                'Memories',
-                style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans,
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              CustomIconButton(
-                height: 40.h,
-                width: 40.h,
-                icon: Icons.camera_alt,
-                backgroundColor: appTheme.gray_900_01.withAlpha(179),
-                borderRadius: 20.h,
-                iconSize: 22.h,
-                iconColor: Theme.of(context).colorScheme.onSurface,
-                onTap: () => _onCameraButtonTap(context),
-              ),
-              SizedBox(width: 8.h),
-              CustomButton(
-                text: 'New',
-                leftIcon: Icons.add,
-                onPressed: () => _onCreateMemoryTap(context),
-                buttonStyle: CustomButtonStyle.fillPrimary,
-                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                height: 38.h,
-                padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
-              ),
-            ],
-          ),
-        ],
+      margin: EdgeInsets.symmetric(horizontal: 16.h),
+      child: StandardTitleBar(
+        leadingIcon: Icons.photo_library_rounded,
+        title: 'Memories',
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CustomIconButton(
+              height: 44.h,
+              width: 44.h,
+              icon: Icons.camera_alt,
+              backgroundColor: appTheme.gray_900_01.withAlpha(179),
+              borderRadius: 22.h,
+              iconSize: 24.h,
+              iconColor: appTheme.gray_50,
+              onTap: () => _onCameraButtonTap(context),
+            ),
+            SizedBox(width: 8.h),
+            CustomButton(
+              text: 'New',
+              leftIcon: Icons.add,
+              onPressed: () => _onCreateMemoryTap(context),
+              buttonStyle: CustomButtonStyle.fillPrimary,
+              buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+              height: 38.h,
+              padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -272,7 +260,7 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20.h),
                 child: Text(
-                  'No stories yet',
+                  'No stories yet. Create a memory and start posting!',
                   style: TextStyleHelper
                       .instance.body14RegularPlusJakartaSans
                       .copyWith(
@@ -535,7 +523,7 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 40.h),
             child: Text(
-              state.showOnlyOpen ? 'No open memories right now' : 'No memories yet',
+              state.showOnlyOpen ? 'No open memories right now' : 'No memories yet. Create your first memory and start posting!',
               style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                   .copyWith(color: appTheme.gray_50.withAlpha(128)),
             ),
@@ -622,7 +610,7 @@ class _MemoriesDashboardScreenState extends ConsumerState<MemoriesDashboardScree
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 40.h),
           child: Text(
-            state.showOnlyOpen ? 'No open memories right now' : 'No memories yet',
+            state.showOnlyOpen ? 'No open memories right now' : 'No memories yet. Create your first memory and start posting!',
             style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                 .copyWith(color: appTheme.gray_50.withAlpha(128)),
           ),

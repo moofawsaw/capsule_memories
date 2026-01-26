@@ -56,8 +56,8 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     );
 
     // Only fetch on-demand if we haven't preloaded yet.
-    if (cachedGroups.isEmpty) _fetchAvailableGroups();
-    if (cachedCategories.isEmpty) _fetchAvailableCategories();
+    if (!preload.groupsLoaded) _fetchAvailableGroups();
+    if (!preload.categoriesLoaded) _fetchAvailableCategories();
   }
 
   Future<void> initializeWithCategory(String categoryId) async {

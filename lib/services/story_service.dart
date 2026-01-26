@@ -14,6 +14,22 @@ class StoryService {
   static const int _maxRetries = 3;
   static const Duration _initialRetryDelay = Duration(milliseconds: 500);
 
+  bool _isMissingColumn(PostgrestException e, String columnName) {
+    final msg = (e.message).toLowerCase();
+    final details = (e.details ?? '').toString().toLowerCase();
+    final hint = (e.hint ?? '').toString().toLowerCase();
+    final code = (e.code ?? '').toString();
+    final col = columnName.toLowerCase();
+
+    if (code == '42703') return true;
+    if (msg.contains('column') && msg.contains(col) && msg.contains('does not exist')) return true;
+    if (details.contains('column') && details.contains(col) && details.contains('does not exist')) {
+      return true;
+    }
+    if (hint.contains('column') && hint.contains(col) && hint.contains('does not exist')) return true;
+    return false;
+  }
+
   static String? resolveStoryMediaUrl(String? path) {
     if (path == null || path.isEmpty) return null;
 
@@ -70,7 +86,53 @@ class StoryService {
 
       if (memoryIds.isEmpty) return [];
 
-      var query = supabase.from('stories').select('''
+      PostgrestFilterBuilder<List<dynamic>> query =
+          supabase.from('stories').select('''
+            id,
+            memory_id,
+            contributor_id,
+            image_url,
+            video_url,
+            thumbnail_url,
+            media_type,
+            created_at,
+            capture_timestamp,
+            duration_seconds,
+            location_name,
+            user_profiles!stories_contributor_id_fkey (
+              id,
+              display_name,
+              avatar_url,
+              username
+            ),
+            memories!inner (
+              id,
+              title,
+              visibility,
+              creator_id,
+              state
+            )
+          ''')
+          .inFilter('memory_id', memoryIds)
+          // Hide private Daily Capsule stories from general story surfaces
+          .eq('memories.is_daily_capsule', false);
+
+      if (onlyLast24Hours) {
+        query = query.gte(
+          'created_at',
+          DateTime.now()
+              .subtract(const Duration(hours: 24))
+              .toIso8601String(),
+        );
+      }
+
+      try {
+        final response = await query.order('created_at', ascending: false);
+        return List<Map<String, dynamic>>.from(response as List? ?? []);
+      } on PostgrestException catch (e) {
+        // Backward-compat: if migration not applied yet, retry without daily capsule filter.
+        if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+        var fallback = supabase.from('stories').select('''
             id,
             memory_id,
             contributor_id,
@@ -97,17 +159,17 @@ class StoryService {
             )
           ''').inFilter('memory_id', memoryIds);
 
-      if (onlyLast24Hours) {
-        query = query.gte(
-          'created_at',
-          DateTime.now()
-              .subtract(const Duration(hours: 24))
-              .toIso8601String(),
-        );
+        if (onlyLast24Hours) {
+          fallback = fallback.gte(
+            'created_at',
+            DateTime.now()
+                .subtract(const Duration(hours: 24))
+                .toIso8601String(),
+          );
+        }
+        final response = await fallback.order('created_at', ascending: false);
+        return List<Map<String, dynamic>>.from(response as List? ?? []);
       }
-
-      final response = await query.order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response as List? ?? []);
     } catch (e) {
       print('❌ STORY SERVICE: Error fetching user stories: $e');
       rethrow;
@@ -125,7 +187,8 @@ class StoryService {
       String userId,
       ) async {
     try {
-      final response = await _supabase
+      try {
+        final response = await _supabase
           ?.from('stories')
           .select('''
           id,
@@ -161,9 +224,52 @@ class StoryService {
         ''')
           .eq('contributor_id', userId)
           .eq('memories.visibility', 'public')
+          .eq('memories.is_daily_capsule', false)
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(response as List? ?? []);
+        return List<Map<String, dynamic>>.from(response as List? ?? []);
+      } on PostgrestException catch (e) {
+        if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+        final response = await _supabase
+            ?.from('stories')
+            .select('''
+          id,
+          memory_id,
+          contributor_id,
+          image_url,
+          video_url,
+          thumbnail_url,
+          media_type,
+          created_at,
+          capture_timestamp,
+          duration_seconds,
+          location_name,
+          user_profiles_public!stories_contributor_id_fkey (
+            id,
+            display_name,
+            avatar_url,
+            username
+          ),
+          memories!inner (
+            id,
+            title,
+            visibility,
+            state,
+            creator_id,
+            category_id,
+            memory_categories (
+              name,
+              icon_name,
+              icon_url
+            )
+          )
+        ''')
+            .eq('contributor_id', userId)
+            .eq('memories.visibility', 'public')
+            .order('created_at', ascending: false);
+
+        return List<Map<String, dynamic>>.from(response as List? ?? []);
+      }
     } catch (e) {
       rethrow;
     }
@@ -190,7 +296,51 @@ class StoryService {
           .toList() ??
           [];
 
-      final response = await _supabase?.from('memories').select('''
+      try {
+        final response = await _supabase?.from('memories').select('''
+            id,
+            title,
+            visibility,
+            state,
+            created_at,
+            expires_at,
+            sealed_at,
+            start_time,
+            end_time,
+            location_name,
+            location_lat,
+            location_lng,
+            contributor_count,
+            creator_id,
+            duration,
+            memory_categories (
+              name,
+              icon_name,
+              icon_url
+            ),
+            user_profiles!memories_creator_id_fkey (
+              id,
+              display_name,
+              avatar_url,
+              username
+            ),
+            stories (
+              id,
+              thumbnail_url,
+              image_url,
+              video_url,
+              media_type
+            )
+          ''')
+          .eq('is_daily_capsule', false)
+          .or(
+        'creator_id.eq.$userId${contributorIds.isNotEmpty ? ',id.in.(${contributorIds.join(",")})' : ''}',
+      );
+
+        return List<Map<String, dynamic>>.from(response as List? ?? []);
+      } on PostgrestException catch (e) {
+        if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+        final response = await _supabase?.from('memories').select('''
             id,
             title,
             visibility,
@@ -225,10 +375,11 @@ class StoryService {
               media_type
             )
           ''').or(
-        'creator_id.eq.$userId${contributorIds.isNotEmpty ? ',id.in.(${contributorIds.join(",")})' : ''}',
-      );
+          'creator_id.eq.$userId${contributorIds.isNotEmpty ? ',id.in.(${contributorIds.join(",")})' : ''}',
+        );
 
-      return List<Map<String, dynamic>>.from(response as List? ?? []);
+        return List<Map<String, dynamic>>.from(response as List? ?? []);
+      }
     } catch (e) {
       rethrow;
     }
@@ -352,7 +503,7 @@ class StoryService {
         'text_overlays': caption != null ? [{'text': caption}] : [],
       };
 
-      final inserted = await _supabase!.from('stories').insert(storyData).select('''
+      final inserted = await _supabase.from('stories').insert(storyData).select('''
         id,
         contributor_id,
         memory_id,
@@ -633,6 +784,7 @@ class StoryService {
     }
   }
 
+  // ignore: unused_element
   DateTime _calculateExpirationTime(String duration) {
     final now = DateTime.now();
     switch (duration) {

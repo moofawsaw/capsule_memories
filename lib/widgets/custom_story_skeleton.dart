@@ -58,6 +58,31 @@ class _CustomStorySkeletonState extends State<CustomStorySkeleton>
         final double cardRadius =
         forceSquare ? 0.h : 12.h;
 
+        // Instagram-style profile grid: media-only tiles (no avatar/meta skeleton).
+        if (forceSquare) {
+          return AnimatedBuilder(
+            animation: _shimmerController,
+            builder: (context, _) {
+              return Container(
+                width: w,
+                height: h,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.zero,
+                  gradient: LinearGradient(
+                    begin: Alignment(-1.0 - _shimmerController.value * 2, 0.0),
+                    end: Alignment(1.0 - _shimmerController.value * 2, 0.0),
+                    colors: [
+                      appTheme.gray_900_01,
+                      appTheme.gray_900_01.withAlpha(179),
+                      appTheme.gray_900_01,
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        }
+
         // Internal layout scales to any size
         final double pad = (h * 0.06).clamp(6.h, 10.h);
         final double avatar = (h * 0.13).clamp(16.h, 22.h);

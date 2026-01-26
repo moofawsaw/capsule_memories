@@ -12,16 +12,80 @@ final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>(
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   static const String _themeKey = 'theme_mode';
 
-  ThemeModeNotifier() : super(ThemeMode.dark) {
-    _loadThemeMode();
+  /// If [initialMode] is provided (e.g. during app bootstrap), we can skip
+  /// async hydration to avoid a first-frame theme flash.
+  ThemeModeNotifier({
+    ThemeMode? initialMode,
+    bool hydrateFromPrefs = true,
+  }) : super(initialMode ?? ThemeMode.system) {
+    if (hydrateFromPrefs && initialMode == null) {
+      _loadThemeMode();
+    } else {
+      _updateThemeHelper();
+    }
+  }
+
+  /// Load the initial theme mode for first paint.
+  /// - If user has not chosen yet -> ThemeMode.system (device theme)
+  /// - Backwards compatible with legacy bool storage (true=dark, false=light)
+  static Future<ThemeMode> loadInitialThemeMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final stored = prefs.getString(_themeKey);
+      if (stored != null && stored.trim().isNotEmpty) {
+        return _parseStoredThemeMode(stored);
+      }
+
+      // Legacy (older builds stored a bool at the same key)
+      final legacy = prefs.getBool(_themeKey);
+      if (legacy != null) {
+        final mode = legacy ? ThemeMode.dark : ThemeMode.light;
+        // Migrate to string format so future reads are consistent.
+        await prefs.setString(_themeKey, mode.name);
+        return mode;
+      }
+
+      // Not set yet -> follow device
+      return ThemeMode.system;
+    } catch (e) {
+      debugPrint('Error loading initial theme mode: $e');
+      return ThemeMode.system;
+    }
+  }
+
+  static ThemeMode _parseStoredThemeMode(String raw) {
+    final v = raw.trim().toLowerCase();
+    switch (v) {
+      case 'dark':
+        return ThemeMode.dark;
+      case 'light':
+        return ThemeMode.light;
+      case 'system':
+        return ThemeMode.system;
+      default:
+        return ThemeMode.system;
+    }
   }
 
   /// Load saved theme mode from SharedPreferences
   Future<void> _loadThemeMode() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final isDarkMode = prefs.getBool(_themeKey) ?? true;
-      state = isDarkMode ? ThemeMode.dark : ThemeMode.light;
+      final stored = prefs.getString(_themeKey);
+      if (stored != null && stored.trim().isNotEmpty) {
+        state = _parseStoredThemeMode(stored);
+      } else {
+        // Legacy (older builds stored a bool at the same key)
+        final legacy = prefs.getBool(_themeKey);
+        if (legacy != null) {
+          state = legacy ? ThemeMode.dark : ThemeMode.light;
+          // Migrate to string format so future reads are consistent.
+          await prefs.setString(_themeKey, state.name);
+        } else {
+          state = ThemeMode.system;
+        }
+      }
       _updateThemeHelper();
     } catch (e) {
       debugPrint('Error loading theme mode: $e');
@@ -31,14 +95,14 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   /// Toggle between light and dark mode
   Future<void> toggleTheme() async {
     try {
-      final newMode =
-          state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+      // If currently following system, default toggle goes to explicit dark.
+      final newMode = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
       state = newMode;
       _updateThemeHelper();
 
       // Save to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_themeKey, newMode == ThemeMode.dark);
+      await prefs.setString(_themeKey, newMode.name);
     } catch (e) {
       debugPrint('Error toggling theme: $e');
     }
@@ -52,7 +116,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 
       // Save to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_themeKey, mode == ThemeMode.dark);
+      await prefs.setString(_themeKey, mode.name);
     } catch (e) {
       debugPrint('Error setting theme mode: $e');
     }

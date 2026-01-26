@@ -5,6 +5,7 @@ class CustomGroupCard extends StatelessWidget {
   CustomGroupCard({
     Key? key,
     required this.groupData,
+    this.onTap,
     this.onActionTap,
     this.onDeleteTap,
     this.onLeaveTap,
@@ -18,6 +19,9 @@ class CustomGroupCard extends StatelessWidget {
 
   /// Group data containing title, member count, and profile images
   final CustomGroupData groupData;
+
+  /// Callback for tapping the group row (opens group details, etc.)
+  final VoidCallback? onTap;
 
   /// Callback for the primary action button
   final VoidCallback? onActionTap;
@@ -53,21 +57,25 @@ class CustomGroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: margin,
-      padding: padding ?? EdgeInsets.all(16.h),
-      decoration: BoxDecoration(
-        color: backgroundColor ?? appTheme.gray_900_01,
-        borderRadius: BorderRadius.circular(borderRadius ?? 12.h),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildGroupInfo(context),
-          ),
-          SizedBox(width: 18.h),
-          _buildActionButtons(context),
-        ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        margin: margin,
+        padding: padding ?? EdgeInsets.all(16.h),
+        decoration: BoxDecoration(
+          color: backgroundColor ?? appTheme.gray_900_01,
+          borderRadius: BorderRadius.circular(borderRadius ?? 12.h),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildGroupInfo(context),
+            ),
+            SizedBox(width: 18.h),
+            _buildActionButtons(context),
+          ],
+        ),
       ),
     );
   }

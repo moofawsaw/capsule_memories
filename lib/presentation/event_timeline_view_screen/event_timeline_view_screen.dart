@@ -6,6 +6,7 @@ import '../../widgets/custom_button_skeleton.dart';
 import '../../widgets/custom_event_card.dart';
 import '../../widgets/custom_story_list.dart';
 import '../../widgets/timeline_widget.dart';
+import '../add_memory_upload_screen/add_memory_upload_screen.dart';
 import '../memory_details_screen/memory_details_screen.dart';
 import '../memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import '../memory_members_screen/memory_members_screen.dart';
@@ -284,6 +285,25 @@ class EventTimelineViewScreenState
   static const int _maxRetryAttempts =
   10; // NEW: Max retries (2 seconds total with 200ms delays)
 
+  String? _resolveExpectedMemoryId(BuildContext context) {
+    // Priority 1: constructor memoryId (deep link / notification)
+    final direct = (widget.memoryId ?? '').trim();
+    if (direct.isNotEmpty) return direct;
+
+    // Priority 2: route arguments
+    final rawArgs = ModalRoute.of(context)?.settings.arguments;
+    if (rawArgs is MemoryNavArgs) {
+      return (rawArgs.memoryId).trim();
+    }
+    if (rawArgs is Map<String, dynamic>) {
+      return (MemoryNavArgs.fromMap(rawArgs).memoryId).trim();
+    }
+    if (rawArgs is Map) {
+      return (MemoryNavArgs.fromMap(rawArgs.cast<String, dynamic>()).memoryId).trim();
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -462,6 +482,23 @@ class EventTimelineViewScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(eventTimelineViewNotifier);
 
+    // If we were routed here with a specific memory (push/deep link),
+    // NEVER show any other memory snapshot first. Block UI with skeleton until
+    // the expected memoryId is the one currently loaded in state.
+    final expectedMemoryId = _resolveExpectedMemoryId(context);
+    final currentMemoryId =
+        (state.eventTimelineViewModel?.memoryId ?? state.memoryId)?.trim();
+    final waitingForExpectedMemory = (expectedMemoryId != null &&
+        expectedMemoryId.trim().isNotEmpty &&
+        currentMemoryId != expectedMemoryId.trim());
+
+    if (waitingForExpectedMemory) {
+      return Scaffold(
+        backgroundColor: appTheme.gray_900_02,
+        body: const _OpenTimelineViewSkeleton(),
+      );
+    }
+
     final isLoading = state.isLoading ?? false;
     final hasSnapshot = state.eventTimelineViewModel != null;
 
@@ -563,6 +600,7 @@ class EventTimelineViewScreenState
 
         final isCurrentUserMember = state.isCurrentUserMember ?? false;
         final isCurrentUserCreator = state.isCurrentUserCreator ?? false;
+        final hasPendingInvite = state.hasPendingInvite ?? false;
 
         return Container(
           margin: EdgeInsets.only(top: 6.h),
@@ -588,7 +626,7 @@ class EventTimelineViewScreenState
                   ],
                 ),
               ),
-              if (isCurrentUserMember) ...[
+              if (isCurrentUserMember || hasPendingInvite) ...[
                 Align(
                   alignment: Alignment.topRight,
                   child: Container(
@@ -596,7 +634,19 @@ class EventTimelineViewScreenState
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (!isCurrentUserCreator) ...[
+                        if (hasPendingInvite && !isCurrentUserMember) ...[
+                          CustomButton(
+                            text: 'Join',
+                            height: 36.h,
+                            width: 92.h,
+                            leftIcon: Icons.check_rounded,
+                            buttonStyle: CustomButtonStyle.fillPrimary,
+                            buttonTextStyle: CustomButtonTextStyle.bodySmall,
+                            onPressed: () => onTapAcceptInvite(context),
+                          ),
+                          SizedBox(width: 8.h),
+                        ],
+                        if (isCurrentUserMember && !isCurrentUserCreator) ...[
                           _CircleIconButton(
                             icon: Icons.logout,
                             isDestructive: true,
@@ -604,7 +654,7 @@ class EventTimelineViewScreenState
                           ),
                           SizedBox(width: 8.h),
                         ],
-                        if (isCurrentUserCreator) ...[
+                        if (isCurrentUserMember && isCurrentUserCreator) ...[
                           _CircleIconButton(
                             icon: Icons.delete_outline,
                             isDestructive: true,
@@ -617,10 +667,11 @@ class EventTimelineViewScreenState
                           ),
                           SizedBox(width: 8.h),
                         ],
-                        _CircleIconButton(
-                          icon: Icons.qr_code,
-                          onTap: () => onTapTimelineOptions(context),
-                        ),
+                        if (isCurrentUserMember)
+                          _CircleIconButton(
+                            icon: Icons.qr_code,
+                            onTap: () => onTapTimelineOptions(context),
+                          ),
                       ],
                     ),
                   ),
@@ -739,6 +790,8 @@ class EventTimelineViewScreenState
   Widget _buildTimelineEmptyState(BuildContext context) {
     final state = ref.watch(eventTimelineViewNotifier);
     final isCurrentUserMember = state.isCurrentUserMember ?? false;
+    final bool isSealed =
+        state.eventTimelineViewModel?.isSealed ?? state.isSealed ?? false;
 
     return Center(
       child: Container(
@@ -773,9 +826,11 @@ class EventTimelineViewScreenState
 
             if (isCurrentUserMember)
               CustomButton(
-                text: 'Create Story',
-                leftIcon: Icons.add,
-                onPressed: () => onTapCreateStory(context),
+                text: isSealed ? 'Add Media' : 'Create Story',
+                leftIcon:
+                    isSealed ? Icons.add_photo_alternate_outlined : Icons.add,
+                onPressed:
+                    isSealed ? () => onTapAddMedia(context) : () => onTapCreateStory(context),
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 height: 40.h,
@@ -892,10 +947,29 @@ class EventTimelineViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
         final isCurrentUserMember = state.isCurrentUserMember ?? false;
+        final bool sealedKnown =
+            state.isSealed != null || state.eventTimelineViewModel?.isSealed != null;
+        final bool isSealed =
+            state.eventTimelineViewModel?.isSealed ?? state.isSealed ?? false;
 
         final storyCount =
             state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
         final hasStories = storyCount > 0;
+
+        // If we somehow reached here without a resolved sealed state, avoid flashing
+        // the wrong actions (common when entering via push and state is still settling).
+        if (!sealedKnown) {
+          return Container(
+            margin: EdgeInsets.symmetric(horizontal: 24.h),
+            child: Column(
+              children: const [
+                CustomButtonSkeleton(),
+                SizedBox(height: 12),
+                CustomButtonSkeleton(),
+              ],
+            ),
+          );
+        }
 
         return Container(
           margin: EdgeInsets.symmetric(horizontal: 24.h),
@@ -934,12 +1008,15 @@ class EventTimelineViewScreenState
 
               if (isCurrentUserMember)
                 CustomButton(
-                  text: 'Create Story',
+                  text: isSealed ? 'Add Media' : 'Create Story',
                   width: double.infinity,
                   buttonStyle: CustomButtonStyle.fillPrimary,
                   buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  leftIcon: Icons.videocam_outlined, // ✅ Material icon
-                  onPressed: () => onTapCreateStory(context),
+                  leftIcon: isSealed
+                      ? Icons.add_photo_alternate_outlined
+                      : Icons.videocam_outlined, // ✅ Material icon
+                  onPressed:
+                      isSealed ? () => onTapAddMedia(context) : () => onTapCreateStory(context),
                 ),
             ],
           ),
@@ -966,6 +1043,7 @@ class EventTimelineViewScreenState
     });
   }
 
+  // ignore: unused_element
   void _onJoinMemory(BuildContext context, String memoryId) async {
     try {
       final notifier = ref.read(eventTimelineViewNotifier.notifier);
@@ -1057,6 +1135,48 @@ class EventTimelineViewScreenState
 
   void onTapEventOptions(BuildContext context) {}
 
+  Future<void> onTapAcceptInvite(BuildContext context) async {
+    final state = ref.read(eventTimelineViewNotifier);
+    if ((state.isLoading ?? false) == true) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Center(
+        child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
+      ),
+    );
+
+    try {
+      await ref.read(eventTimelineViewNotifier.notifier).acceptPendingInviteAndJoin();
+
+      if (context.mounted) Navigator.pop(context);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You joined the memory!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to join memory: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
   void onTapTimelineOptions(BuildContext context) {
     final memoryId =
         ref.read(eventTimelineViewNotifier).eventTimelineViewModel?.memoryId;
@@ -1121,6 +1241,35 @@ class EventTimelineViewScreenState
           memoryId: memoryId,
           memoryTitle: memoryTitle,
           categoryIcon: categoryIcon,
+        ),
+      ),
+    );
+  }
+
+  void onTapAddMedia(BuildContext context) {
+    final state = ref.read(eventTimelineViewNotifier);
+    final memoryId = state.eventTimelineViewModel?.memoryId;
+    final timeline = state.eventTimelineViewModel?.timelineDetail;
+
+    if (memoryId == null || memoryId.trim().isEmpty) return;
+
+    final start = timeline?.memoryStartTime?.toLocal() ?? DateTime.now();
+    final end = timeline?.memoryEndTime?.toLocal() ?? DateTime.now();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddMemoryUploadScreen(
+          memoryId: memoryId,
+          memoryStartDate: start,
+          memoryEndDate: end,
+        ),
+        settings: RouteSettings(
+          arguments: {
+            'memory_id': memoryId,
+            'memory_title': state.eventTimelineViewModel?.eventTitle,
+            'category_icon': state.eventTimelineViewModel?.categoryIcon,
+          },
         ),
       ),
     );

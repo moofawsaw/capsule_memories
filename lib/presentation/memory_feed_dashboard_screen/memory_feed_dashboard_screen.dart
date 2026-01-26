@@ -2,6 +2,7 @@ import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../core/utils/memory_navigation_wrapper.dart';
+import '../../services/network_connectivity_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_category_badge.dart';
@@ -50,8 +51,11 @@ class _MemoryFeedDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(memoryFeedDashboardProvider);
     final notifier = ref.read(memoryFeedDashboardProvider.notifier);
+    final bool offline = ref.watch(isOfflineProvider).valueOrNull ?? false;
+    final hasDbConnectionError = ref.watch(
+      memoryFeedDashboardProvider.select((s) => s.hasDbConnectionError),
+    );
 
     return Scaffold(
       backgroundColor: appTheme.gray_900_02,
@@ -65,7 +69,24 @@ class _MemoryFeedDashboardScreenState
         },
         child: SizedBox(
           width: double.maxFinite,
-          child: SingleChildScrollView(
+          child: (offline || hasDbConnectionError)
+              ? LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: Align(
+                    alignment: const Alignment(0, -0.1), // slight upward pull
+                    child: _buildNoConnectionEmptyState(),
+                  ),
+                ),
+              );
+            },
+          )
+              : SingleChildScrollView(
             key: const PageStorageKey<String>('memory_feed_scroll'),
             physics: const AlwaysScrollableScrollPhysics(),
             child: Container(
@@ -98,6 +119,39 @@ class _MemoryFeedDashboardScreenState
     );
   }
 
+  Widget _buildNoConnectionEmptyState() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24.h),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.wifi_off,
+            size: 64.h,
+            color: appTheme.blue_gray_300,
+          ),
+          SizedBox(height: 10.h),
+          Text(
+            'No connection',
+            textAlign: TextAlign.center,
+            style: TextStyleHelper.instance.title16BoldPlusJakartaSans.copyWith(
+              color: appTheme.blue_gray_300,
+            ),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            'Connect to the internet and pull to refresh.',
+            textAlign: TextAlign.center,
+            style: TextStyleHelper.instance.body12MediumPlusJakartaSans.copyWith(
+              color: appTheme.blue_gray_300,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
   Widget _buildTitleBar(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 24.h),
@@ -256,6 +310,7 @@ class _MemoryFeedDashboardScreenState
     }
   }
 
+  // ignore: unused_element
   void _showMemorySelectionBottomSheet(
       BuildContext context, List<Map<String, dynamic>> activeMemories) {
     showModalBottomSheet(
@@ -1233,12 +1288,6 @@ class _MemoryFeedDashboardScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
-        final notifier = ref.read(memoryFeedDashboardProvider.notifier);
-
-        // Trigger loading categories if not already loaded
-        if (!state.isLoadingCategories && (state.categories?.isEmpty ?? true)) {
-          Future.microtask(() => notifier.loadCategories());
-        }
 
         final categories = state.categories ?? [];
 
@@ -1546,6 +1595,7 @@ class _MemoryFeedDashboardScreenState
   }
 
   /// CRITICAL FIX: Use MemoryNavArgs for memory card navigation
+  // ignore: unused_element
   void _onMemoryCardTap(BuildContext context, dynamic memoryData) {
     print('🔍 FEED NAVIGATION: Memory card tapped');
 

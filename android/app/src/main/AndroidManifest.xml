@@ -14,7 +14,7 @@
         <!-- Firebase Cloud Messaging notification icon and color -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_stat_capsule" />
+            android:resource="@drawable/ic_stat_notification" />
         
         <!-- Facebook App ID Configuration -->
         <meta-data

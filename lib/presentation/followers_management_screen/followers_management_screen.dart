@@ -1,6 +1,7 @@
 import '../../core/app_export.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
+import '../../widgets/standard_title_bar.dart';
 import './models/followers_management_model.dart';
 import 'notifier/followers_management_notifier.dart';
 
@@ -14,6 +15,41 @@ class FollowersManagementScreen extends ConsumerStatefulWidget {
 
 class FollowersManagementScreenState
     extends ConsumerState<FollowersManagementScreen> {
+  late final ProviderSubscription<FollowersManagementState>
+      _followBackToastSub;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _followBackToastSub = ref.listenManual<FollowersManagementState>(
+      followersManagementNotifier,
+      (previous, current) {
+        final prev = previous?.didFollowBack ?? false;
+        final next = current.didFollowBack ?? false;
+        if (!prev && next) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Followed back'),
+              backgroundColor: appTheme.deep_purple_A100,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _followBackToastSub.close();
+    super.dispose();
+  }
+
+  Future<void> _onRefresh() async {
+    await ref.read(followersManagementNotifier.notifier).initialize();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,49 +81,28 @@ class FollowersManagementScreenState
         final followersCount =
             state.followersManagementModel?.followersList?.length ?? 0;
 
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              margin: EdgeInsets.only(top: 2.h),
-              child: Icon(
-                Icons.people_alt_rounded,
-                size: 26.h,
-                color: appTheme.deep_purple_A100,
+        return StandardTitleBar(
+          leadingIcon: Icons.people_alt_rounded,
+          title: 'Followers ($followersCount)',
+          trailing: GestureDetector(
+            onTap: () => onTapFollowing(context),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
+              decoration: BoxDecoration(
+                color: appTheme.color41C124,
+                border: Border.all(
+                  color: appTheme.blue_gray_900,
+                  width: 1.h,
+                ),
+                borderRadius: BorderRadius.circular(22.h),
               ),
-            ),
-            Container(
-              margin: EdgeInsets.fromLTRB(6.h, 4.h, 0, 0),
               child: Text(
-                'Followers ($followersCount)',
-                style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans
-                    .copyWith(height: 1.3),
+                'Following',
+                style: TextStyleHelper.instance.title16BoldPlusJakartaSans
+                    .copyWith(color: appTheme.gray_50, height: 1.31),
               ),
             ),
-            Spacer(),
-            GestureDetector(
-              onTap: () {
-                onTapFollowing(context);
-              },
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
-                decoration: BoxDecoration(
-                  color: appTheme.color41C124,
-                  border: Border.all(
-                    color: appTheme.blue_gray_900,
-                    width: 1.h,
-                  ),
-                  borderRadius: BorderRadius.circular(22.h),
-                ),
-                child: Text(
-                  'Following',
-                  style: TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50, height: 1.31),
-                ),
-              ),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -102,53 +117,61 @@ class FollowersManagementScreenState
           builder: (context, ref, _) {
             final state = ref.watch(followersManagementNotifier);
 
-            ref.listen(
-              followersManagementNotifier,
-              (previous, current) {
-                if (current.didFollowBack ?? false) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Followed back'),
-                      backgroundColor: appTheme.deep_purple_A100,
-                    ),
-                  );
-                }
-              },
-            );
-
-            if (state.isLoading ?? false) {
-              return Center(
-                child: CircularProgressIndicator(
-                  color: appTheme.deep_purple_A100,
-                ),
-              );
-            }
-
             final followersList =
                 state.followersManagementModel?.followersList ?? [];
 
-            if (followersList.isEmpty) {
-              return Center(
-                child: Text(
-                  'No followers yet',
-                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300),
-                ),
-              );
-            }
-
-            return ListView.separated(
-              padding: EdgeInsets.zero,
-              physics: BouncingScrollPhysics(),
-              shrinkWrap: true,
-              separatorBuilder: (context, index) {
-                return SizedBox(height: 20.h);
-              },
-              itemCount: followersList.length,
-              itemBuilder: (context, index) {
-                final follower = followersList[index];
-                return _buildFollowerItem(context, follower, index);
-              },
+            return RefreshIndicator(
+              color: appTheme.deep_purple_A100,
+              backgroundColor: appTheme.gray_900_01,
+              displacement: 30,
+              onRefresh: _onRefresh,
+              child: (state.isLoading ?? false)
+                  ? ListView(
+                      padding: EdgeInsets.zero,
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      children: [
+                        SizedBox(height: 60.h),
+                        Center(
+                          child: CircularProgressIndicator(
+                            color: appTheme.deep_purple_A100,
+                          ),
+                        ),
+                      ],
+                    )
+                  : followersList.isEmpty
+                      ? ListView(
+                          padding: EdgeInsets.zero,
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          children: [
+                            SizedBox(height: 60.h),
+                            Center(
+                              child: Text(
+                                'No followers yet',
+                                style: TextStyleHelper
+                                    .instance.body14RegularPlusJakartaSans
+                                    .copyWith(color: appTheme.blue_gray_300),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.zero,
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          separatorBuilder: (context, index) {
+                            return SizedBox(height: 20.h);
+                          },
+                          itemCount: followersList.length,
+                          itemBuilder: (context, index) {
+                            final follower = followersList[index];
+                            return _buildFollowerItem(context, follower, index);
+                          },
+                        ),
             );
           },
         ),
@@ -199,17 +222,14 @@ class FollowersManagementScreenState
           CustomButton(
             text: isFollowingBack ? 'Following' : 'Follow back',
             width: null,
+            size: CustomButtonSize.compact,
             buttonStyle: isFollowingBack
-                ? CustomButtonStyle.outlinePrimary
-                : CustomButtonStyle.fillPrimary,
+                ? CustomButtonStyle.fillPrimary
+                : CustomButtonStyle.outlinePrimary,
             buttonTextStyle: isFollowingBack
                 ? CustomButtonTextStyle.bodySmallPrimary
                 : CustomButtonTextStyle.bodySmall,
             isDisabled: isFollowingBack,
-            padding: EdgeInsets.symmetric(
-              horizontal: 16.h,
-              vertical: 6.h,
-            ),
             onPressed: isFollowingBack ? null : () => onTapFollowBack(follower),
           ),
         ],

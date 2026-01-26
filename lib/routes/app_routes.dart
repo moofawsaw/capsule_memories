@@ -11,6 +11,7 @@ import '../presentation/color_selection_screen/color_selection_screen.dart';
 import '../presentation/create_group_screen/create_group_screen.dart';
 import '../presentation/create_memory_screen/create_memory_screen.dart';
 import '../presentation/deep_link_handler_screen/deep_link_handler_screen.dart';
+import '../presentation/daily_capsule_screen/daily_capsule_screen.dart';
 import '../presentation/event_stories_view_screen/event_stories_view_screen.dart';
 import '../presentation/event_timeline_view_screen/event_timeline_view_screen.dart';
 import '../presentation/feature_request_screen/feature_request_screen.dart';
@@ -81,6 +82,7 @@ class AppRoutes {
   static const String appHome = '/app/home';
   static const String appJoin = '/app/join';
   static const String appMemories = '/app/memories';
+  static const String appDailyCapsule = '/app/daily-capsule';
   static const String appMenu = '/app/menu';
   static const String appNavigation = '/app/navigation';
   static const String appNotifications = '/app/notifications';
@@ -172,12 +174,23 @@ class AppRoutes {
         final String? categoryIcon =
             (args['category_icon'] as String?) ?? (args['categoryIcon'] as String?);
 
+        final String? afterShareRouteName =
+            (args['after_share_route'] as String?) ?? (args['afterShareRoute'] as String?);
+        final Object? afterShareArgs = args['after_share_args'] ?? args['afterShareArgs'];
+
+        final String? dailyCapsuleCompletionType =
+            (args['daily_capsule_completion_type'] as String?) ??
+                (args['dailyCapsuleCompletionType'] as String?);
+
         return StoryEditScreen(
           mediaPath: mediaPath,
           isVideo: isVideo,
           memoryId: memoryId,
           memoryTitle: memoryTitle,
           categoryIcon: categoryIcon,
+          afterShareRouteName: afterShareRouteName,
+          afterShareRouteArgs: afterShareArgs,
+          dailyCapsuleCompletionType: dailyCapsuleCompletionType,
         );
       }
 
@@ -204,6 +217,8 @@ class AppRoutes {
         return const MemoryFeedDashboardScreen();
       case appMemories:
         return const MemoriesDashboardScreen();
+      case appDailyCapsule:
+        return const DailyCapsuleScreen();
       case appProfileUser: {
         final userId = _argNullableString(settings, 'userId');
         return UserProfileScreenTwo(userId: userId);
@@ -502,6 +517,9 @@ class AppRoutes {
         memoryId: args['memory_id'] as String,
         memoryTitle: args['memory_title'] as String,
         categoryIcon: args['category_icon'] as String?,
+        afterShareRouteName: args['after_share_route'] as String?,
+        afterShareRouteArgs: args['after_share_args'],
+        dailyCapsuleCompletionType: args['daily_capsule_completion_type'] as String?,
       );
     },
 

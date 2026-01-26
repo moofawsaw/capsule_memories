@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import '../../core/app_export.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/custom_confirmation_dialog.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_memory_invite_notification_card.dart';
 import '../../widgets/custom_notification_card.dart';
 import 'notifier/notifications_notifier.dart';
@@ -23,6 +24,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   // Suppress "new notification" snackbar for notifications restored via UNDO
   final Set<String> _suppressNewSnackbarsForNotificationIds = {};
 
+  // Undo snackbar countdown plumbing
+  ValueNotifier<int>? _undoCountdown;
+  Timer? _undoCountdownTimer;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>?
+      _undoSnackBarController;
+
   @override
   void initState() {
     super.initState();
@@ -34,8 +41,22 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   @override
   void dispose() {
+    _cancelUndoCountdown(closeSnackBar: false);
     _notificationService.unsubscribeFromNotifications();
     super.dispose();
+  }
+
+  void _cancelUndoCountdown({required bool closeSnackBar}) {
+    _undoCountdownTimer?.cancel();
+    _undoCountdownTimer = null;
+
+    _undoCountdown?.dispose();
+    _undoCountdown = null;
+
+    if (closeSnackBar) {
+      _undoSnackBarController?.close();
+    }
+    _undoSnackBarController = null;
   }
 
   Future<void> _setupRealtimeSubscription() async {
@@ -141,6 +162,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _deleteNotification(String notificationId) async {
     final confirmed = await CustomConfirmationDialog.show(
       context: context,
@@ -170,6 +192,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _deleteAllNotifications() async {
     final confirmed = await CustomConfirmationDialog.show(
       context: context,
@@ -321,60 +344,84 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   /// Show undo snackbar with countdown
-  void _showUndoSnackbar(Map<String, dynamic> deletedNotification, String notificationId) {
-    int remainingSeconds = 5;
+  void _showUndoSnackbar(
+      Map<String, dynamic> deletedNotification, String notificationId) {
+    // Ensure we only ever have ONE countdown + ONE snackbar active.
+    _cancelUndoCountdown(closeSnackBar: true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: appTheme.gray_900_01,
-        content: StatefulBuilder(
-          builder: (context, setState) {
-            Future.delayed(Duration.zero, () async {
-              for (int i = remainingSeconds; i > 0; i--) {
-                await Future.delayed(const Duration(seconds: 1));
-                if (!context.mounted) return;
-                setState(() {
-                  remainingSeconds = i - 1;
-                });
-              }
-            });
+    _undoCountdown = ValueNotifier<int>(5);
 
-            return Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Notification deleted${_deletedNotificationsStack.length > 1 ? ' (${_deletedNotificationsStack.length} in stack)' : ''}',
+    final snackBar = SnackBar(
+      backgroundColor: appTheme.gray_900_01,
+      content: ValueListenableBuilder<int>(
+        valueListenable: _undoCountdown!,
+        builder: (context, remainingSeconds, _) {
+          return Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Notification deleted${_deletedNotificationsStack.length > 1 ? ' (${_deletedNotificationsStack.length} in stack)' : ''}',
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: appTheme.deep_purple_A100.withAlpha(77),
+                  borderRadius: BorderRadius.circular(4.h),
+                ),
+                child: Text(
+                  '${remainingSeconds}s',
+                  style: TextStyle(
+                    color: appTheme.white_A700,
+                    fontSize: 12.fSize,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: appTheme.deep_purple_A100.withAlpha(77),
-                    borderRadius: BorderRadius.circular(4.h),
-                  ),
-                  child: Text(
-                    '${remainingSeconds}s',
-                    style: TextStyle(
-                      color: appTheme.white_A700,
-                      fontSize: 12.fSize,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-        duration: const Duration(seconds: 5),
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(bottom: 16.h, left: 16.w, right: 16.w),
-        action: SnackBarAction(
-          label: 'UNDO',
-          textColor: appTheme.deep_purple_A100,
-          onPressed: () => _handleUndo(),
-        ),
+              ),
+            ],
+          );
+        },
+      ),
+      duration: const Duration(seconds: 5),
+      behavior: SnackBarBehavior.floating,
+      margin: EdgeInsets.only(bottom: 16.h, left: 16.w, right: 16.w),
+      action: SnackBarAction(
+        label: 'UNDO',
+        textColor: appTheme.deep_purple_A100,
+        onPressed: () {
+          if (!mounted) return;
+          _cancelUndoCountdown(closeSnackBar: true);
+          _handleUndo();
+        },
       ),
     );
+
+    final controller = ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    _undoSnackBarController = controller;
+    controller.closed.then((_) {
+      if (!mounted) return;
+      _cancelUndoCountdown(closeSnackBar: false);
+    });
+
+    // Drive countdown + make sure snackbar is dismissed exactly at 0.
+    _undoCountdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted || _undoCountdown == null) {
+        t.cancel();
+        return;
+      }
+
+      final next = _undoCountdown!.value - 1;
+      _undoCountdown!.value = next;
+
+      if (next <= 0) {
+        t.cancel();
+        _undoCountdownTimer = null;
+
+        // Requirement: dismiss when countdown reaches 0 (not just via duration).
+        _undoSnackBarController?.close();
+        _cancelUndoCountdown(closeSnackBar: false);
+      }
+    });
   }
 
   /// Handle undo action - restore the last deleted notification
@@ -526,17 +573,25 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final notifications = state.notificationsModel?.notifications ?? [];
 
     if (notifications.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.notifications_none, size: 64.h, color: Colors.grey),
-            SizedBox(height: 2.h),
-            Text(
-              'No notifications yet',
-              style: TextStyle(fontSize: 16.fSize, color: Colors.grey),
-            ),
-          ],
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: EdgeInsets.only(top: 12.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.notifications_none, size: 64.h, color: Colors.grey),
+              SizedBox(height: 8.h),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.h),
+                child: Text(
+                  'No notifications yet',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16.fSize, color: Colors.grey),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

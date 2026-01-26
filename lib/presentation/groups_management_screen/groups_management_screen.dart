@@ -15,7 +15,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_group_card.dart';
 import '../../widgets/custom_group_invitation_card.dart';
-import '../../widgets/custom_image_view.dart';
+import '../../widgets/standard_title_bar.dart';
 import '../create_group_screen/create_group_screen.dart';
 import '../friends_management_screen/widgets/qr_scanner_overlay.dart';
 import '../group_edit_bottom_sheet/group_edit_bottom_sheet.dart';
@@ -90,53 +90,51 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: appTheme.gray_900_02,
-      body: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          children: [
-            SizedBox(height: 24.h),
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: 16.h),
-                child: Column(
-                  children: [
-                    _buildGroupsHeaderSection(context),
-                    SizedBox(height: 16.h),
+      // ✅ Whole-screen pull-to-refresh:
+      // Put the header INSIDE the scrollable so pulling from the top/header triggers refresh.
+      body: RefreshIndicator(
+        color: appTheme.deep_purple_A100,
+        backgroundColor: appTheme.gray_900_01,
+        displacement: 30,
+        onRefresh: _onRefresh,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              child: ConstrainedBox(
+                // ✅ Ensures the scrollable area fills the whole screen, so pull-to-refresh
+                // works from anywhere (not just where the list has content).
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: SizedBox(
+                  width: double.maxFinite,
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 24.h),
+                    child: Container(
+                      margin: EdgeInsets.symmetric(horizontal: 16.h),
+                      child: Column(
+                        children: [
+                          _buildGroupsHeaderSection(context),
+                          SizedBox(height: 16.h),
+                          SizedBox(height: 12.h),
 
-                    // ✅ Pull-to-refresh (matches MemoriesDashboard pattern)
-                    Expanded(
-                      child: RefreshIndicator(
-                        color: appTheme.deep_purple_A100,
-                        backgroundColor: appTheme.gray_900_01,
-                        displacement: 30,
-                        onRefresh: _onRefresh,
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(
-                            parent: BouncingScrollPhysics(),
-                          ),
-                          child: Column(
-                            children: [
-                              SizedBox(height: 12.h),
+                          // Invites (if any)
+                          _buildInvitesSection(context),
+                          _buildGroupInvitationList(context),
 
-                              // Invites (if any)
-                              _buildInvitesSection(context),
-                              _buildGroupInvitationList(context),
-
-                              // Groups
-                              SizedBox(height: 16.h),
-                              _buildGroupsList(context),
-
-                              SizedBox(height: 24.h),
-                            ],
-                          ),
-                        ),
+                          // Groups
+                          SizedBox(height: 16.h),
+                          _buildGroupsList(context),
+                          SizedBox(height: 24.h),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -149,56 +147,34 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
         final state = ref.watch(groupsManagementNotifier);
         final groupCount = state.groups?.length ?? 0;
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 26.h,
-              height: 26.h,
-              margin: EdgeInsets.only(top: 2.h),
-              child: Icon(
-                Icons.groups_rounded,
-                size: 26.h,
-                color: appTheme.deep_purple_A100,
+        return StandardTitleBar(
+          leadingIcon: Icons.groups_rounded,
+          title: 'Groups ($groupCount)',
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CustomButton(
+                text: 'New',
+                leftIcon: Icons.add,
+                onPressed: () => onTapNewGroup(context),
+                buttonStyle: CustomButtonStyle.fillPrimary,
+                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                height: 38.h,
+                padding: EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
               ),
-            ),
-            SizedBox(width: 6.h),
-            Container(
-              margin: EdgeInsets.only(top: 2.h),
-              child: Text(
-                'Groups ($groupCount)',
-                style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans,
+              SizedBox(width: 8.h),
+              CustomIconButton(
+                height: 44.h,
+                width: 44.h,
+                icon: Icons.camera_alt,
+                backgroundColor: appTheme.gray_900_01.withAlpha(179),
+                borderRadius: 22.h,
+                iconSize: 24.h,
+                iconColor: appTheme.gray_50,
+                onTap: () => onTapCameraButton(context),
               ),
-            ),
-            const Spacer(),
-
-            // Right side actions (New button + camera icon)
-            Row(
-              children: [
-                CustomButton(
-                  text: 'New',
-                  leftIcon: Icons.add,
-                  onPressed: () => onTapNewGroup(context),
-                  buttonStyle: CustomButtonStyle.fillPrimary,
-                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                  height: 38.h,
-                  padding:
-                  EdgeInsets.symmetric(horizontal: 14.h, vertical: 10.h),
-                ),
-                SizedBox(width: 8.h),
-                CustomIconButton(
-                  height: 44.h,
-                  width: 44.h,
-                  icon: Icons.camera_alt,
-                  backgroundColor: appTheme.gray_900_01.withAlpha(179),
-                  borderRadius: 22.h,
-                  iconSize: 24.h,
-                  iconColor: appTheme.gray_50,
-                  onTap: () => onTapCameraButton(context),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -344,6 +320,8 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                             : [''],
                         isCreator: isCreator,
                       ),
+                      // Tapping the row opens group details (read-only).
+                      onTap: () => onTapViewGroupInfo(context, group),
                       onActionTap: () => onTapGroupQR(context, group),
                       onDeleteTap:
                       isCreator ? () => onTapDeleteGroup(context, group) : null,
@@ -351,8 +329,6 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                       !isCreator ? () => onTapLeaveGroup(context, group) : null,
                       onEditTap:
                       isCreator ? () => onTapEditGroup(context, group) : null,
-                      onInfoTap:
-                      !isCreator ? () => onTapViewGroupInfo(context, group) : null,
                     ),
                   );
                 },
@@ -372,6 +348,8 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                       : [''],
                   isCreator: isCreator,
                 ),
+                // Tapping the row opens group details (read-only).
+                onTap: () => onTapViewGroupInfo(context, group),
                 onActionTap: () => onTapGroupQR(context, group),
                 onDeleteTap:
                 isCreator ? () => onTapDeleteGroup(context, group) : null,
@@ -379,8 +357,6 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                 !isCreator ? () => onTapLeaveGroup(context, group) : null,
                 onEditTap:
                 isCreator ? () => onTapEditGroup(context, group) : null,
-                onInfoTap:
-                !isCreator ? () => onTapViewGroupInfo(context, group) : null,
               ),
             );
           }).toList(),

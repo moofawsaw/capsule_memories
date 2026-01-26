@@ -2,6 +2,7 @@
 
 import '../../../core/app_export.dart';
 import '../../../services/feed_service.dart';
+import '../../../services/create_memory_preload_service.dart';
 import '../../../services/supabase_service.dart';
 import '../model/memory_feed_dashboard_model.dart';
 import '../../../utils/storage_utils.dart';
@@ -26,6 +27,9 @@ class MemoryFeedDashboardNotifier
 
   // Lifecycle + pagination
   bool _isDisposed = false;
+  bool _realtimeStarted = false;
+  bool _categoriesLoadRequested = false;
+  bool _createMemoryWarmRequested = false;
 
   /// IMPORTANT: Must match FeedService._pageSize
   static const int _pageSize = 10;
@@ -37,8 +41,43 @@ class MemoryFeedDashboardNotifier
     ),
   ) {
     loadInitialData();
+  }
+
+  void _startRealtimeIfNeeded() {
+    if (_isDisposed) return;
+    if (_realtimeStarted) return;
+    _realtimeStarted = true;
     _subscribeToStoryViews();
     _setupRealtimeSubscriptions();
+  }
+
+  void _maybeLoadCategories() {
+    if (_isDisposed) return;
+    if (_categoriesLoadRequested) return;
+
+    final client = SupabaseService.instance.client;
+    final isAuthed = client?.auth.currentUser != null;
+    if (!isAuthed) return;
+
+    final cats = state.categories ?? const [];
+    if (cats.isNotEmpty || state.isLoadingCategories) return;
+
+    _categoriesLoadRequested = true;
+    // Avoid blocking initial paint. Categories are below the fold anyway.
+    Future.microtask(loadCategories);
+  }
+
+  void _maybeWarmCreateMemoryDependencies() {
+    if (_isDisposed) return;
+    if (_createMemoryWarmRequested) return;
+
+    final client = SupabaseService.instance.client;
+    final isAuthed = client?.auth.currentUser != null;
+    if (!isAuthed) return;
+
+    _createMemoryWarmRequested = true;
+    // Fire-and-forget warm cache; CreateMemoryNotifier will consume it.
+    Future.microtask(() => CreateMemoryPreloadService.instance.warm());
   }
 
   /// Normalize a visibility value into 'public' | 'private' | ''
@@ -73,10 +112,25 @@ class MemoryFeedDashboardNotifier
     if (ids.isEmpty) return list;
 
     try {
-      final rows = await client
-          .from('memories')
-          .select('id, visibility, end_time')
-          .inFilter('id', ids);
+      dynamic rows;
+      try {
+        rows = await client
+            .from('memories')
+            .select('id, visibility, end_time')
+            .eq('is_daily_capsule', false)
+            .inFilter('id', ids);
+      } on PostgrestException catch (e) {
+        // Backward-compat: if migration not applied yet, retry without is_daily_capsule.
+        final msg = e.message.toLowerCase();
+        final code = (e.code ?? '').toString();
+        final isMissing =
+            code == '42703' || (msg.contains('is_daily_capsule') && msg.contains('does not exist'));
+        if (!isMissing) rethrow;
+        rows = await client
+            .from('memories')
+            .select('id, visibility, end_time')
+            .inFilter('id', ids);
+      }
 
       final memMap = <String, Map<String, dynamic>>{};
       for (final row in (rows as List<dynamic>)) {
@@ -167,42 +221,61 @@ class MemoryFeedDashboardNotifier
     if (_isDisposed) return;
 
     _safeSetState(
-      state.copyWith(isLoading: true, isLoadingActiveMemories: true),
+      state.copyWith(
+        isLoading: true,
+        isLoadingActiveMemories: true,
+        hasDbConnectionError: false,
+      ),
     );
 
     try {
-      // Active memories for current user
+      // ----------------------------
+      // 1) Prioritize above-the-fold
+      // ----------------------------
+      // Fetch active memories first so the primary CTA ("Create Memory"/"Create Story")
+      // can render quickly even if the rest of the dashboard is still loading.
       final rawActiveMemoriesData = await _feedService.fetchUserActiveMemories();
       final activeMemoriesData =
-      await _hydrateActiveMemoriesWithVisibility(rawActiveMemoriesData);
+          await _hydrateActiveMemoriesWithVisibility(rawActiveMemoriesData);
 
-      // Fetch initial page (offset 0) for all feeds
-      final happeningNowData =
-      await _feedService.fetchHappeningNowStories(offset: 0, limit: _pageSize);
-      final latestStoriesData =
-      await _feedService.fetchLatestStories(offset: 0, limit: _pageSize);
-      final publicMemoriesData =
-      await _feedService.fetchPublicMemories(offset: 0, limit: _pageSize);
-      final trendingData =
-      await _feedService.fetchTrendingStories(offset: 0, limit: _pageSize);
-      final longestStreakData =
-      await _feedService.fetchLongestStreakStories(offset: 0, limit: _pageSize);
-      final popularUserData =
-      await _feedService.fetchPopularUserStories(offset: 0, limit: _pageSize);
-      final popularNowData =
-      await _feedService.fetchPopularNowStories(offset: 0, limit: _pageSize);
+      if (_isDisposed) return;
+      _safeSetState(
+        state.copyWith(
+          isLoadingActiveMemories: false,
+          activeMemories: activeMemoriesData,
+        ),
+      );
+      // Start warming Create Memory deps as soon as the CTA can appear.
+      _maybeWarmCreateMemoryDependencies();
 
-      // ✅ NEW (required by MemoryFeedDashboardModel fields used in UI)
-      // NOTE: These FeedService methods must exist. If you haven't built them yet,
-      // return [] from the service so the UI compiles and stays deterministic.
-      final fromFriendsData =
-      await _feedService.fetchFromFriendsStories(offset: 0, limit: _pageSize);
-      final forYouStoriesData =
-      await _feedService.fetchForYouStories(offset: 0, limit: _pageSize);
-      final popularMemoriesData =
-      await _feedService.fetchPopularMemories(offset: 0, limit: _pageSize);
-      final forYouMemoriesData =
-      await _feedService.fetchForYouMemories(offset: 0, limit: _pageSize);
+      // -----------------------------------
+      // 2) Fetch remaining feeds in parallel
+      // -----------------------------------
+      final futures = await Future.wait([
+        _feedService.fetchHappeningNowStories(offset: 0, limit: _pageSize),
+        _feedService.fetchLatestStories(offset: 0, limit: _pageSize),
+        _feedService.fetchPublicMemories(offset: 0, limit: _pageSize),
+        _feedService.fetchTrendingStories(offset: 0, limit: _pageSize),
+        _feedService.fetchLongestStreakStories(offset: 0, limit: _pageSize),
+        _feedService.fetchPopularUserStories(offset: 0, limit: _pageSize),
+        _feedService.fetchPopularNowStories(offset: 0, limit: _pageSize),
+        _feedService.fetchFromFriendsStories(offset: 0, limit: _pageSize),
+        _feedService.fetchForYouStories(offset: 0, limit: _pageSize),
+        _feedService.fetchPopularMemories(offset: 0, limit: _pageSize),
+        _feedService.fetchForYouMemories(offset: 0, limit: _pageSize),
+      ]);
+
+      final happeningNowData = (futures[0] as List).cast<Map<String, dynamic>>();
+      final latestStoriesData = (futures[1] as List).cast<Map<String, dynamic>>();
+      final publicMemoriesData = (futures[2] as List).cast<Map<String, dynamic>>();
+      final trendingData = (futures[3] as List).cast<Map<String, dynamic>>();
+      final longestStreakData = (futures[4] as List).cast<Map<String, dynamic>>();
+      final popularUserData = (futures[5] as List).cast<Map<String, dynamic>>();
+      final popularNowData = (futures[6] as List).cast<Map<String, dynamic>>();
+      final fromFriendsData = (futures[7] as List).cast<Map<String, dynamic>>();
+      final forYouStoriesData = (futures[8] as List).cast<Map<String, dynamic>>();
+      final popularMemoriesData = (futures[9] as List).cast<Map<String, dynamic>>();
+      final forYouMemoriesData = (futures[10] as List).cast<Map<String, dynamic>>();
 
       // Transform happening now
       final happeningNowStories = happeningNowData.map((item) {
@@ -437,8 +510,8 @@ class MemoryFeedDashboardNotifier
         state.copyWith(
           memoryFeedDashboardModel: model,
           isLoading: false,
-          isLoadingActiveMemories: false,
-          activeMemories: activeMemoriesData,
+          hasDbConnectionError: false,
+          // `activeMemories` and `isLoadingActiveMemories` are updated earlier for speed.
           hasMoreHappeningNow: happeningNowData.length == _pageSize,
           hasMoreLatestStories: latestStoriesData.length == _pageSize,
           hasMorePublicMemories: publicMemoriesData.length == _pageSize,
@@ -451,12 +524,21 @@ class MemoryFeedDashboardNotifier
           hasMorePopularMemories: popularMemoriesData.length == _pageSize,
         ),
       );
+
+      // Defer background work until after the first useful paint.
+      _maybeLoadCategories();
+      _startRealtimeIfNeeded();
+      _maybeWarmCreateMemoryDependencies();
     } catch (e) {
       // ignore: avoid_print
       print('Error loading feed data: $e');
       if (!_isDisposed) {
         _safeSetState(
-          state.copyWith(isLoading: false, isLoadingActiveMemories: false),
+          state.copyWith(
+            isLoading: false,
+            isLoadingActiveMemories: false,
+            hasDbConnectionError: true,
+          ),
         );
       }
     }
@@ -559,6 +641,12 @@ class MemoryFeedDashboardNotifier
 
     // Story views subscription
     _feedService.unsubscribeFromStoryViews();
+    try {
+      _storyViewsSubscription?.unsubscribe();
+    } catch (_) {
+      // ignore
+    }
+    _storyViewsSubscription = null;
 
     // Stories + memories realtime subscriptions
     _cleanupSubscriptions();
@@ -638,13 +726,32 @@ class MemoryFeedDashboardNotifier
       if (client == null) return;
 
       // ✅ CRITICAL FIX: Check memory visibility BEFORE proceeding with real-time update
-      final memoryVisibilityCheck = await client
-          .from('memories')
-          .select('visibility')
-          .eq('id', memoryId)
-          .single();
+      Map<String, dynamic> memoryVisibilityCheck;
+      try {
+        final raw = await client
+            .from('memories')
+            .select('visibility, is_daily_capsule')
+            .eq('id', memoryId)
+            .single();
+        memoryVisibilityCheck = (raw as Map).cast<String, dynamic>();
+      } on PostgrestException catch (e) {
+        final msg = e.message.toLowerCase();
+        final code = (e.code ?? '').toString();
+        final isMissing =
+            code == '42703' || (msg.contains('is_daily_capsule') && msg.contains('does not exist'));
+        if (!isMissing) rethrow;
+        final raw = await client
+            .from('memories')
+            .select('visibility')
+            .eq('id', memoryId)
+            .single();
+        memoryVisibilityCheck = (raw as Map).cast<String, dynamic>();
+      }
 
       if (_isDisposed) return;
+
+      final isDailyCapsule = memoryVisibilityCheck['is_daily_capsule'] == true;
+      if (isDailyCapsule) return;
 
       final memoryVisibility = _normVisibility(memoryVisibilityCheck['visibility']);
 
@@ -809,27 +916,61 @@ class MemoryFeedDashboardNotifier
 
       final currentUserId = client.auth.currentUser?.id;
 
-      // Check if current user is a contributor to this memory
+      // Check if current user is a contributor OR creator of this memory
       bool isCurrentUserContributor = false;
       if (currentUserId != null) {
-        try {
-          final contributorCheck = await client
-              .from('memory_contributors')
-              .select('id')
-              .eq('memory_id', memoryId)
-              .eq('user_id', currentUserId)
-              .maybeSingle();
+        final creatorId = (payload.newRecord['creator_id'] ?? '').toString();
+        if (creatorId.isNotEmpty && creatorId == currentUserId) {
+          isCurrentUserContributor = true;
+        } else {
+          try {
+            final contributorCheck = await client
+                .from('memory_contributors')
+                .select('id')
+                .eq('memory_id', memoryId)
+                .eq('user_id', currentUserId)
+                .maybeSingle();
 
-          isCurrentUserContributor = contributorCheck != null;
-        } catch (e) {
-          // ignore: avoid_print
-          print('⚠️ REALTIME: Failed to check contributor status: $e');
+            isCurrentUserContributor = contributorCheck != null;
+          } catch (e) {
+            // ignore: avoid_print
+            print('⚠️ REALTIME: Failed to check contributor status: $e');
+          }
         }
       }
 
       // If current user is a contributor, update activeMemories list
       if (isCurrentUserContributor) {
-        final memoryDetails = await client.from('memories').select('''
+        Map<String, dynamic> memoryDetails;
+        try {
+          final raw = await client.from('memories').select('''
+              id,
+              title,
+              state,
+              visibility,
+              is_daily_capsule,
+              created_at,
+              end_time,
+              creator_id,
+              category_id,
+              memory_categories:category_id(
+                name,
+                icon_url
+              ),
+              user_profiles_public:creator_id(
+                id,
+                display_name,
+                avatar_url
+              )
+            ''').eq('id', memoryId).single();
+          memoryDetails = (raw as Map).cast<String, dynamic>();
+        } on PostgrestException catch (e) {
+          final msg = e.message.toLowerCase();
+          final code = (e.code ?? '').toString();
+          final isMissing =
+              code == '42703' || (msg.contains('is_daily_capsule') && msg.contains('does not exist'));
+          if (!isMissing) rethrow;
+          final raw = await client.from('memories').select('''
               id,
               title,
               state,
@@ -848,8 +989,12 @@ class MemoryFeedDashboardNotifier
                 avatar_url
               )
             ''').eq('id', memoryId).single();
+          memoryDetails = (raw as Map).cast<String, dynamic>();
+        }
 
         if (_isDisposed) return;
+
+        if (memoryDetails['is_daily_capsule'] == true) return;
 
         final category = memoryDetails['memory_categories'] as Map<String, dynamic>?;
         final creator = memoryDetails['user_profiles_public'] as Map<String, dynamic>?;
@@ -889,7 +1034,40 @@ class MemoryFeedDashboardNotifier
       // Continue with existing logic for public feed update
       if (visibility != 'public') return;
 
-      final response = await client.from('memories').select('''
+      Map<String, dynamic> response;
+      try {
+        final raw = await client.from('memories').select('''
+            id,
+            title,
+            is_daily_capsule,
+            start_time,
+            end_time,
+            location_name,
+            memory_categories(
+              icon_url
+            ),
+            memory_contributors(
+              user_profiles(
+                avatar_url
+              )
+            ),
+            stories(
+              thumbnail_url,
+              video_url
+            )
+          ''')
+            .eq('id', memoryId)
+            .eq('visibility', 'public')
+            .eq('is_daily_capsule', false)
+            .single();
+        response = (raw as Map).cast<String, dynamic>();
+      } on PostgrestException catch (e) {
+        final msg = e.message.toLowerCase();
+        final code = (e.code ?? '').toString();
+        final isMissing =
+            code == '42703' || (msg.contains('is_daily_capsule') && msg.contains('does not exist'));
+        if (!isMissing) rethrow;
+        final raw = await client.from('memories').select('''
             id,
             title,
             start_time,
@@ -908,8 +1086,12 @@ class MemoryFeedDashboardNotifier
               video_url
             )
           ''').eq('id', memoryId).eq('visibility', 'public').single();
+        response = (raw as Map).cast<String, dynamic>();
+      }
 
       if (_isDisposed) return;
+
+      if (response['is_daily_capsule'] == true) return;
 
       final contributors = response['memory_contributors'] as List;
       final stories = response['stories'] as List;
@@ -1446,18 +1628,18 @@ class MemoryFeedDashboardNotifier
 
   Future<void> refreshFeed() async {
     if (_isDisposed) return;
-    _safeSetState(state.copyWith(isLoading: true));
+    _safeSetState(state.copyWith(isLoading: true, hasDbConnectionError: false));
 
     try {
       await loadInitialData();
       if (!_isDisposed) {
-        _safeSetState(state.copyWith(isLoading: false));
+        _safeSetState(state.copyWith(isLoading: false, hasDbConnectionError: false));
       }
     } catch (e) {
       // ignore: avoid_print
       print('Error refreshing feed: $e');
       if (!_isDisposed) {
-        _safeSetState(state.copyWith(isLoading: false));
+        _safeSetState(state.copyWith(isLoading: false, hasDbConnectionError: true));
       }
     }
   }

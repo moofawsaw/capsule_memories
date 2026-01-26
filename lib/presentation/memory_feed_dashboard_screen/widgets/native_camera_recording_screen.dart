@@ -21,12 +21,14 @@ class NativeCameraRecordingScreen extends StatefulWidget {
   final String memoryId;
   final String memoryTitle;
   final String? categoryIcon;
+  final Map<String, dynamic>? storyEditArgs;
 
   const NativeCameraRecordingScreen({
     Key? key,
     required this.memoryId,
     required this.memoryTitle,
     this.categoryIcon,
+    this.storyEditArgs,
   }) : super(key: key);
 
   @override
@@ -544,6 +546,7 @@ class _NativeCameraRecordingScreenState
           'memory_id': widget.memoryId,
           'memory_title': widget.memoryTitle,
           'category_icon': widget.categoryIcon,
+          if (widget.storyEditArgs != null) ...widget.storyEditArgs!,
         },
       );
     } catch (e) {
@@ -657,6 +660,7 @@ class _NativeCameraRecordingScreenState
             'memory_id': widget.memoryId,
             'memory_title': widget.memoryTitle,
             'category_icon': widget.categoryIcon,
+            if (widget.storyEditArgs != null) ...widget.storyEditArgs!,
           },
         );
       }

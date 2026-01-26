@@ -77,19 +77,80 @@ class UserProfileService {
       final client = SupabaseService.instance.client;
       if (client == null) return null;
 
-      final response = await client
-          .from('user_profiles_public')
-          .select('id, username, display_name, avatar_url, follower_count, following_count, is_verified')
-          .eq('id', userId)
-          .maybeSingle();
-
-      if (response == null) {
-        debugPrint('⚠️ No PUBLIC profile found for user: $userId');
-        return null;
+      // Prefer the PUBLIC view/table first (RLS-safe).
+      Map<String, dynamic>? response;
+      try {
+        response = await client
+            .from('user_profiles_public')
+            .select(
+              'id, username, display_name, avatar_url, follower_count, following_count, is_verified',
+            )
+            .eq('id', userId)
+            .maybeSingle();
+      } catch (e) {
+        debugPrint('⚠️ Public profile lookup failed: $e');
+        response = null;
       }
 
-      debugPrint('✅ Public user profile fetched successfully for: $userId');
-      return response;
+      if (response != null) {
+        debugPrint('✅ Public user profile fetched successfully for: $userId');
+        return response;
+      }
+
+      // Fallback: some installations/views can exclude users who haven't posted yet.
+      // We only select public-safe fields (no email) from the private table.
+      debugPrint(
+        '⚠️ No PUBLIC profile found for user: $userId. Falling back to user_profiles.',
+      );
+
+      Map<String, dynamic>? fallback;
+      try {
+        fallback = await client
+            .from('user_profiles')
+            .select(
+              'id, username, display_name, avatar_url, follower_count, following_count, is_verified',
+            )
+            .eq('id', userId)
+            .maybeSingle();
+      } catch (e) {
+        debugPrint('⚠️ user_profiles fallback lookup failed: $e');
+        fallback = null;
+      }
+
+      if (fallback != null) {
+        debugPrint('✅ Fallback profile fetched successfully for: $userId');
+        return fallback;
+      }
+
+      // Final fallback: many parts of the app use the `profiles` table for avatar/name.
+      // Keep this PUBLIC-safe: only fetch id/username/display_name/avatar_url.
+      debugPrint(
+        '⚠️ No profile found in user_profiles for user: $userId. Falling back to profiles.',
+      );
+
+      try {
+        final res = await client
+            .from('profiles')
+            .select('id, username, display_name, avatar_url')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (res == null) {
+          debugPrint('⚠️ No profile found in profiles for user: $userId');
+          return null;
+        }
+
+        // Normalize shape to match callers expecting follower/following keys sometimes.
+        return {
+          ...res,
+          'follower_count': 0,
+          'following_count': 0,
+          'is_verified': false,
+        };
+      } catch (e) {
+        debugPrint('⚠️ profiles fallback lookup failed: $e');
+        return null;
+      }
     } catch (e) {
       debugPrint('❌ Error fetching PUBLIC user profile by ID: $e');
       return null;
@@ -235,11 +296,20 @@ class UserProfileService {
       }
 
       // Use public table so we never touch private profile data for others
-      final profile = await client
+      Map<String, dynamic>? profile = await client
           .from('user_profiles_public')
           .select('follower_count, following_count')
           .eq('id', userId)
           .maybeSingle();
+
+      // Fallback: same rationale as getPublicUserProfileById (users with 0 stories).
+      if (profile == null) {
+        profile = await client
+            .from('user_profiles')
+            .select('follower_count, following_count')
+            .eq('id', userId)
+            .maybeSingle();
+      }
 
       final storiesCount = await client
           .from('stories')
@@ -250,7 +320,7 @@ class UserProfileService {
       return {
         'followers': (profile?['follower_count'] as int?) ?? 0,
         'following': (profile?['following_count'] as int?) ?? 0,
-        'posts': storiesCount.count ?? 0,
+        'posts': storiesCount.count,
       };
     } catch (e) {
       print('❌ Error fetching user stats: $e');

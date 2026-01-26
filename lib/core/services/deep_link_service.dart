@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../../routes/app_routes.dart';
 import '../../services/supabase_service.dart';
@@ -29,6 +30,16 @@ class DeepLinkService with WidgetsBindingObserver {
   FeedStoryContext? _pendingStoryArgs;
   bool _navScheduled = false;
 
+  // ===== De-dupe (Android often delivers same deep link twice) =====
+  String? _lastHandledUri;
+  DateTime? _lastHandledAt;
+
+  String? _lastOpenedStoryId;
+  DateTime? _lastOpenedStoryAt;
+
+  // ===== Share link resolution (share.capapp.co/<code> -> capapp.co/story/<uuid>) =====
+  final Map<String, Future<String?>> _shareResolveInflight = {};
+
   // ===== Generic navigation queueing =====
   String? _pendingRoute;
   Object? _pendingRouteArgs;
@@ -41,6 +52,42 @@ class DeepLinkService with WidgetsBindingObserver {
   bool get hasPendingAction => _pendingSessionToken != null;
   bool get hasPendingStoryNavigation => _pendingStoryArgs != null;
   bool get hasPendingNavigation => _pendingRoute != null;
+
+  /// Handle a deep link coming from a non-AppLinks source (e.g. push notification tap).
+  /// Accepts:
+  /// - Full URLs: https://capapp.co/..., https://share.capapp.co/...
+  /// - Capsule scheme: capsule://...
+  /// - Relative paths: /story/<id>, /memory/<id>, /join/..., /app/...
+  Future<void> handleExternalDeepLink(String raw) async {
+    final s = raw.trim();
+    if (s.isEmpty) return;
+
+    // If it's an internal route, navigate directly (keeps behavior consistent).
+    if (s.startsWith('/app/') || s.startsWith('/auth/') || s.startsWith('/join/')) {
+      final uri = Uri.parse('https://capapp.co$s');
+      final args = uri.queryParameters.isEmpty ? null : Map<String, dynamic>.from(uri.queryParameters);
+      _queueNavigation(uri.path, args);
+      return;
+    }
+
+    Uri uri;
+    try {
+      uri = Uri.parse(s);
+    } catch (_) {
+      return;
+    }
+
+    // If it's a relative URI like "story/<id>", normalize to capapp.co.
+    if (uri.scheme.isEmpty) {
+      final path = s.startsWith('/') ? s : '/$s';
+      uri = Uri.parse('https://capapp.co$path');
+    }
+
+    await _handleDeepLink(uri);
+  }
+
+  /// Handle an already-parsed URI from an external source.
+  Future<void> handleExternalUri(Uri uri) => _handleDeepLink(uri);
 
   // ===========================
   // INIT / LIFECYCLE
@@ -93,11 +140,42 @@ class DeepLinkService with WidgetsBindingObserver {
   Future<void> _handleDeepLink(Uri uri) async {
     debugPrint('🔗 Deep link received: $uri');
 
+    // ------------------------------------------------------------
+    // SUPABASE AUTH CALLBACKS (OAuth / magic links / recovery)
+    // ------------------------------------------------------------
+    // Supabase uses custom schemes like:
+    // io.supabase.<anything>://login-callback/...
+    // If we ignore these, the OAuth flow will resume the app without a session.
+    if (uri.scheme.startsWith('io.supabase')) {
+      try {
+        final client = SupabaseService.instance.client;
+        if (client != null) {
+          await client.auth.getSessionFromUrl(uri);
+        }
+      } catch (e) {
+        debugPrint('❌ Supabase auth callback handling failed: $e');
+      }
+      return;
+    }
+
     if (uri.scheme != 'https' &&
         uri.scheme != 'http' &&
         uri.scheme != 'capsule') {
       return;
     }
+
+    // Android can dispatch both getInitialLink() and uriLinkStream for the same tap.
+    // De-dupe within a short window.
+    final now = DateTime.now();
+    final uriKey = uri.toString();
+    final lastAt = _lastHandledAt;
+    if (_lastHandledUri == uriKey &&
+        lastAt != null &&
+        now.difference(lastAt) < const Duration(milliseconds: 1200)) {
+      return;
+    }
+    _lastHandledUri = uriKey;
+    _lastHandledAt = now;
 
     // ---------- STORY (PUBLIC) ----------
     if (_isCapappStoryHttpLink(uri)) {
@@ -113,8 +191,11 @@ class DeepLinkService with WidgetsBindingObserver {
     }
 
     if (_isShareCapappLink(uri)) {
-      final storyId = uri.pathSegments.first;
-      if (storyId.isNotEmpty) _openStory(storyId);
+      final code = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
+      if (code.isNotEmpty) {
+        final resolved = await _resolveShareCodeToStoryId(code);
+        _openStory(resolved ?? code);
+      }
       return;
     }
 
@@ -206,6 +287,17 @@ class DeepLinkService with WidgetsBindingObserver {
   // ===========================
 
   void _openStory(String storyId) {
+    // De-dupe rapid repeated opens (defensive against double-delivery).
+    final now = DateTime.now();
+    final lastAt = _lastOpenedStoryAt;
+    if (_lastOpenedStoryId == storyId &&
+        lastAt != null &&
+        now.difference(lastAt) < const Duration(milliseconds: 1200)) {
+      return;
+    }
+    _lastOpenedStoryId = storyId;
+    _lastOpenedStoryAt = now;
+
     _pendingStoryArgs = FeedStoryContext(
       feedType: 'deep_link',
       initialStoryId: storyId,
@@ -355,6 +447,48 @@ class DeepLinkService with WidgetsBindingObserver {
 
   bool _isCapsuleCustomSchemeStoryLink(Uri uri) =>
       uri.scheme == 'capsule' && uri.host == 'story';
+
+  bool _looksLikeUuid(String s) {
+    final v = s.trim();
+    if (v.length != 36) return false;
+    return RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(v);
+  }
+
+  Future<String?> _resolveShareCodeToStoryId(String code) {
+    final normalized = code.trim();
+    if (normalized.isEmpty) return Future.value(null);
+    if (_looksLikeUuid(normalized)) return Future.value(normalized);
+
+    final existing = _shareResolveInflight[normalized];
+    if (existing != null) return existing;
+
+    final future = () async {
+      try {
+        final url = Uri.parse('https://share.capapp.co/$normalized');
+        final res = await http.get(url);
+        final body = res.body;
+
+        // The share page includes a link like:
+        // https://capapp.co/story/<uuid>
+        final match = RegExp(
+          r'https?://capapp\.co/story/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})',
+        ).firstMatch(body);
+
+        final id = match?.group(1);
+        return (id != null && id.isNotEmpty) ? id : null;
+      } catch (e) {
+        debugPrint('⚠️ Failed to resolve share code "$normalized": $e');
+        return null;
+      } finally {
+        _shareResolveInflight.remove(normalized);
+      }
+    }();
+
+    _shareResolveInflight[normalized] = future;
+    return future;
+  }
 
   // ===========================
   // INVITES

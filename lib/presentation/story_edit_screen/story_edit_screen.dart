@@ -11,6 +11,7 @@ import 'notifier/story_edit_notifier.dart';
 import 'notifier/story_edit_state.dart';
 import 'notifier/preupload_state.dart';
 import '../../services/network_quality_service.dart';
+import '../../services/daily_capsule_service.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
@@ -23,6 +24,15 @@ class StoryEditScreen extends ConsumerStatefulWidget {
   final String memoryTitle;
   final String? categoryIcon;
 
+  /// Optional: when set, this share completes the Daily Capsule for today.
+  /// Valid values: 'instant_story' | 'memory_post'
+  final String? dailyCapsuleCompletionType;
+
+  /// Optional: override navigation after successful share.
+  /// If provided, we will navigate to this route and clear the stack to root.
+  final String? afterShareRouteName;
+  final Object? afterShareRouteArgs;
+
   const StoryEditScreen({
     Key? key,
     required this.mediaPath,
@@ -30,6 +40,9 @@ class StoryEditScreen extends ConsumerStatefulWidget {
     required this.memoryId,
     required this.memoryTitle,
     this.categoryIcon,
+    this.dailyCapsuleCompletionType,
+    this.afterShareRouteName,
+    this.afterShareRouteArgs,
   }) : super(key: key);
 
   @override
@@ -289,6 +302,7 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
     );
   }
 
+  // ignore: unused_element
   void _cancelAndExitFlow(BuildContext context) {
     Navigator.of(context).popUntil((route) {
       final name = route.settings.name;
@@ -607,7 +621,7 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   Future<void> _onShareStory(BuildContext context) async {
     final notifier = ref.read(storyEditProvider.notifier);
 
-    final success = await notifier.finalizeShare(
+    final storyId = await notifier.finalizeShare(
       memoryId: widget.memoryId,
       mediaPath: widget.mediaPath, // ✅ FIXED: required
       isVideo: widget.isVideo,     // ✅ FIXED: required
@@ -616,8 +630,32 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
 
     if (!mounted) return;
 
+    final success = storyId != null && storyId.isNotEmpty;
     if (success) {
       _didShare = true;
+    }
+
+    // Daily Capsule completion hook
+    if (success && widget.dailyCapsuleCompletionType != null) {
+      try {
+        await DailyCapsuleService.instance.completeWithStory(
+          completionType: widget.dailyCapsuleCompletionType!,
+          storyId: storyId,
+          memoryId: widget.memoryId,
+        );
+      } catch (_) {
+        // Best-effort; navigation should still happen.
+      }
+    }
+
+    // Optional navigation override (used by Daily Capsule to avoid bouncing to timeline/feed)
+    if (success && widget.afterShareRouteName != null) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        widget.afterShareRouteName!,
+        (route) => route.isFirst,
+        arguments: widget.afterShareRouteArgs,
+      );
+      return;
     }
 
     if (success && _memoryVisibility == 'private') {

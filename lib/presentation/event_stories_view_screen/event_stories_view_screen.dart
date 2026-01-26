@@ -20,6 +20,7 @@ import '../../services/reaction_preloader.dart';
 import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
+import '../../services/avatar_helper_service.dart';
 import '../../services/feed_service.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/storage_utils.dart';
@@ -49,6 +50,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   String? _feedType;
   List<String> _storyIds = [];
   int _currentIndex = 0;
+  // ignore: unused_field
   int _startingIndex = 0;
 
   // DUAL MEDIA SLOTS for seamless transitions
@@ -113,9 +115,11 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   bool _isDragging = false;
 
   // Memory category data
+  // ignore: unused_field
   String? _memoryCategoryName;
   String? _memoryCategoryIcon;
   String? _memoryId;
+  List<String>? _memoryParticipantAvatars;
   String? _memoryState; // 'open' | 'sealed' (best-effort)
 
   bool get _isSealedMemory => (_memoryState ?? '').trim().toLowerCase() == 'sealed';
@@ -126,6 +130,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   bool _isCurrentUserCreator = false;
 
   // Prefetching state
+  // ignore: unused_field
   bool _isPrefetching = false;
 
   // ✅ Prevent tap-through when any modal/sheet is open
@@ -435,6 +440,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
+  // ignore: unused_element
   Future<Map<String, dynamic>?> _getStoryWithMemoryId(String storyId) async {
     try {
       final client = SupabaseService.instance.client;
@@ -773,38 +779,106 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       final client = SupabaseService.instance.client;
       if (client == null) return;
 
+      // IMPORTANT:
+      // This app uses `title` + `location_name` for memories elsewhere (timeline, feed, etc).
+      // Keep this query compatible with older/newer schema variants too.
       final response = await client.from('memories').select('''
-            id, 
+            id,
+            title,
             name,
             created_at,
+            location_name,
             location,
             visibility,
             state,
-            category_id, 
-            memory_categories(name, icon_name)
+            creator_id,
+            category_id,
+            memory_categories(name, icon_name, icon_url)
           ''').eq('id', memoryId).single();
 
-      final categoryData = response['memory_categories'];
-      final iconName = categoryData?['icon_name'] as String?;
+      final categoryData = (response['memory_categories'] as Map?)?.cast<String, dynamic>();
+      final iconName = (categoryData?['icon_name'] as String?)?.trim();
+      final iconUrl = (categoryData?['icon_url'] as String?)?.trim();
+
+      String? resolvedCategoryIcon;
+      if (iconName != null && iconName.isNotEmpty) {
+        final resolved = StorageUtils.resolveMemoryCategoryIconUrl(iconName);
+        if (resolved.trim().isNotEmpty) {
+          resolvedCategoryIcon = resolved.trim();
+        } else if (iconUrl != null && iconUrl.isNotEmpty) {
+          resolvedCategoryIcon = iconUrl;
+        }
+      } else if (iconUrl != null && iconUrl.isNotEmpty) {
+        resolvedCategoryIcon = iconUrl;
+      }
+
+      // Fetch participant avatars for snapshot navigation (best-effort).
+      List<String> participantAvatars = [];
+      try {
+        final contributorsResponse = await client
+            .from('memory_contributors')
+            .select('user_id, user_profiles(avatar_url)')
+            .eq('memory_id', memoryId);
+
+        participantAvatars = (contributorsResponse as List?)
+                ?.map((c) {
+                  final profile = (c['user_profiles'] as Map?)?.cast<String, dynamic>();
+                  return AvatarHelperService.getAvatarUrl(
+                    profile?['avatar_url'] as String?,
+                  );
+                })
+                .whereType<String>()
+                .where((u) => u.trim().isNotEmpty)
+                .toList() ??
+            <String>[];
+      } catch (_) {
+        participantAvatars = <String>[];
+      }
+
+      // Ensure creator avatar is included (creator may not be in contributors table).
+      try {
+        final creatorId = (response['creator_id'] as String?)?.trim();
+        if (creatorId != null && creatorId.isNotEmpty) {
+          final creatorRow = await client
+              .from('user_profiles')
+              .select('avatar_url')
+              .eq('id', creatorId)
+              .maybeSingle();
+          final creatorAvatar =
+              AvatarHelperService.getAvatarUrl((creatorRow?['avatar_url'] as String?)?.trim());
+          if (creatorAvatar.trim().isNotEmpty &&
+              !participantAvatars.contains(creatorAvatar)) {
+            participantAvatars = [creatorAvatar, ...participantAvatars];
+          }
+        }
+      } catch (_) {
+        // ignore
+      }
 
       _safeSetState(() {
         _memoryId = memoryId;
-        _memoryCategoryName = categoryData?['name'] as String?;
-        _memoryCategoryIcon = iconName != null
-            ? StorageUtils.resolveMemoryCategoryIconUrl(iconName)
+        _memoryCategoryName = (categoryData?['name'] as String?)?.trim();
+        _memoryCategoryIcon = (resolvedCategoryIcon != null && resolvedCategoryIcon.isNotEmpty)
+            ? resolvedCategoryIcon
             : null;
+        _memoryParticipantAvatars = participantAvatars.isEmpty ? null : participantAvatars;
         _memoryState = (response['state'] as String?)?.trim();
       });
 
       if (_currentStoryData != null) {
-        _currentStoryData!['memory_title'] = response['name'] as String?;
+        _currentStoryData!['memory_title'] =
+            (response['title'] as String?) ?? (response['name'] as String?);
         _currentStoryData!['memory_date'] = response['created_at'] as String?;
-        _currentStoryData!['memory_location'] = response['location'] as String?;
+        _currentStoryData!['memory_location'] =
+            (response['location_name'] as String?) ?? (response['location'] as String?);
         _currentStoryData!['memory_visibility'] =
         response['visibility'] as String?;
         _currentStoryData!['memory_state'] = response['state'] as String?;
       }
-    } catch (_) {}
+    } catch (e) {
+      // ignore: avoid_print
+      print('⚠️ _fetchMemoryCategory failed: $e');
+    }
   }
 
   Future<void> _initializeVideoPlayer(String videoUrl,
@@ -1781,6 +1855,21 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                           return;
                         }
 
+                        // Ensure memory metadata (state/category/avatars) is loaded before navigation,
+                        // otherwise the timeline header can end up missing category icon + member avatars
+                        // when coming from this screen.
+                        final needsRefresh = (_memoryId != resolvedMemoryId) ||
+                            (_memoryState == null || _memoryState!.trim().isEmpty) ||
+                            (_memoryCategoryIcon == null || _memoryCategoryIcon!.trim().isEmpty) ||
+                            (_memoryParticipantAvatars == null || _memoryParticipantAvatars!.isEmpty);
+                        if (needsRefresh) {
+                          try {
+                            await _fetchMemoryCategory(resolvedMemoryId);
+                          } catch (_) {
+                            // ignore
+                          }
+                        }
+
                         final navArgs = MemoryNavArgs(
                           memoryId: resolvedMemoryId,
                           snapshot: MemorySnapshot(
@@ -1789,7 +1878,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                                 _formatDate(_currentStoryData?['created_at'] as String?),
                             location: _currentStoryData?['memory_location'] as String?,
                             categoryIcon: _memoryCategoryIcon,
-                            participantAvatars: null,
+                            participantAvatars: _memoryParticipantAvatars,
                             isPrivate: _currentStoryData?['memory_visibility'] == 'private',
                           ),
                         );
@@ -1820,9 +1909,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                         ],
                       ),
                     ),
-                  // ✅ Timeline actions for sealed memories where the current user is a member
-                  // but NOT the creator: Leave + Share.
-                  _buildTimelineSection(),
                   Text(
                     _formatTimeAgo(_currentStoryData?['created_at'] as String? ?? ''),
                     style: TextStyleHelper.instance.body14RegularPlusJakartaSans
@@ -1838,10 +1924,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   }
 
   Widget _buildTopBar() {
-    final hasCategoryBadge = _memoryCategoryName != null &&
-        _memoryCategoryIcon != null &&
-        _memoryId != null;
-
     final location = _currentStoryData?['location'] as String?;
 
     return Padding(
@@ -1849,34 +1931,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       child: Row(
         children: [
           const Spacer(),
-          // Keep the top-right action bar for members EXCEPT the sealed non-creator case,
-          // which shows Leave + Share under the memory title (timeline section).
-          if (_isCurrentUserMember &&
-              !(_isSealedMemory && !_isCurrentUserCreator)) ...[
-            if (!_isCurrentUserCreator) ...[
-              _buildMemberActionCircle(
-                icon: Icons.logout,
-                iconColor: appTheme.red_500,
-                onTap: () async {
-                  final memoryId =
-                      _memoryId ?? (_currentStoryData?['memory_id'] as String?);
-                  if (memoryId == null || memoryId.isEmpty) return;
-                  await _confirmAndLeaveMemory(memoryId);
-                },
-              ),
-              SizedBox(width: 8.h),
-            ],
-            _buildMemberActionCircle(
-              icon: Icons.qr_code,
-              onTap: () async {
-                final memoryId =
-                    _memoryId ?? (_currentStoryData?['memory_id'] as String?);
-                if (memoryId == null || memoryId.isEmpty) return;
-                await _openMemoryShareSheet(memoryId);
-              },
-            ),
-            SizedBox(width: 10.h),
-          ],
           if (location != null && location.isNotEmpty)
             Container(
               padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),
@@ -1903,74 +1957,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                 ],
               ),
             ),
-          if (hasCategoryBadge)
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () async {
-                if (_isAnyModalOpen) return;
-
-                if (_memoryId != null && _currentStoryData != null) {
-                  final navArgs = MemoryNavArgs(
-                    memoryId: _memoryId!,
-                    snapshot: MemorySnapshot(
-                      title: _currentStoryData?['memory_title'] as String? ?? 'Memory',
-                      date: _currentStoryData?['memory_date'] as String? ??
-                          _formatDate(_currentStoryData?['created_at'] as String?),
-                      location: _currentStoryData?['memory_location'] as String?,
-                      categoryIcon: _memoryCategoryIcon,
-                      participantAvatars: null,
-                      isPrivate: _currentStoryData?['memory_visibility'] == 'private',
-                    ),
-                  );
-
-                  await _navigateToTimeline(navArgs);
-                }
-              },
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 8.h),
-                decoration: BoxDecoration(
-                  color: appTheme.blackCustom.withAlpha(153),
-                  borderRadius: BorderRadius.circular(20.h),
-                  border: Border.all(
-                    color: appTheme.whiteCustom.withAlpha(77),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_memoryCategoryIcon != null)
-                      CachedNetworkImage(
-                        imageUrl: _memoryCategoryIcon!,
-                        width: 20.h,
-                        height: 20.h,
-                        fit: BoxFit.contain,
-                        placeholder: (context, url) => SizedBox(
-                          width: 20.h,
-                          height: 20.h,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: appTheme.whiteCustom,
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Icon(
-                          Icons.category,
-                          size: 20.h,
-                          color: appTheme.whiteCustom,
-                        ),
-                      ),
-                    SizedBox(width: 6.h),
-                    Text(
-                      _memoryCategoryName!,
-                      style: TextStyleHelper.instance.body14MediumPlusJakartaSans
-                          .copyWith(color: appTheme.whiteCustom),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -1979,6 +1965,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   /// Timeline section actions shown under the memory title.
   /// For SEALED memories where the current user is a member but not the creator,
   /// we show Leave + Share here (instead of top-right bar).
+  // ignore: unused_element
   Widget _buildTimelineSection() {
     final bool shouldShow =
         _isCurrentUserMember && !_isCurrentUserCreator && _isSealedMemory;

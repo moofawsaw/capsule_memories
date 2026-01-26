@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/app_export.dart';
 import '../presentation/create_memory_screen/create_memory_screen.dart';
 import '../presentation/notifications_screen/notifier/notifications_notifier.dart';
+import '../services/network_connectivity_provider.dart';
 import '../services/avatar_state_service.dart';
 import '../services/create_memory_preload_service.dart';
 import '../services/supabase_service.dart';
@@ -237,6 +238,10 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
     final isAuthenticated = ref.watch(
       avatarStateProvider.select((s) => s.userId != null),
     );
+    final isOffline = ref.watch(isOfflineProvider).maybeWhen(
+          data: (v) => v,
+          orElse: () => false,
+        );
 
     // 🔥 Get current route to determine active state
     final currentRoute = ModalRoute.of(context)?.settings.name ?? '';
@@ -266,33 +271,36 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
           if (isAuthenticated) ...[
             // ➕ PLUS BUTTON (spin stays)
             if (widget.showIconButton) ...[
-              Container(
-                width: 46.h,
-                height: 46.h,
-                decoration: BoxDecoration(
-                  color: widget.iconButtonBackgroundColor ?? const Color(0x3BD81E29),
-                  borderRadius: BorderRadius.circular(22.h),
-                ),
-                child: IconButton(
-                  onPressed: () => _handlePlusButtonTap(context),
-                  padding: EdgeInsets.all(6.h),
-                  icon: AnimatedBuilder(
-                    animation: _plusSpinController,
-                    builder: (context, child) {
-                      final angle = _plusSpin.value * 2 * math.pi;
-                      return Transform.rotate(
-                        angle: angle,
-                        child: child,
-                      );
-                    },
-                    child: Icon(
-                      Icons.add,
-                      size: 34,
-                      color: Theme.of(context).colorScheme.onSurface,
+              isOffline
+                  ? _buildSquareSkeleton(size: 46.h, radius: 22.h)
+                  : Container(
+                      width: 46.h,
+                      height: 46.h,
+                      decoration: BoxDecoration(
+                        color: widget.iconButtonBackgroundColor ??
+                            const Color(0x3BD81E29),
+                        borderRadius: BorderRadius.circular(22.h),
+                      ),
+                      child: IconButton(
+                        onPressed: () => _handlePlusButtonTap(context),
+                        padding: EdgeInsets.all(6.h),
+                        icon: AnimatedBuilder(
+                          animation: _plusSpinController,
+                          builder: (context, child) {
+                            final angle = _plusSpin.value * 2 * math.pi;
+                            return Transform.rotate(
+                              angle: angle,
+                              child: child,
+                            );
+                          },
+                          child: Icon(
+                            Icons.add,
+                            size: 34,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
               SizedBox(width: 18.h),
             ],
 
@@ -334,56 +342,62 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
 
                 return Padding(
                   padding: EdgeInsets.only(left: index > 0 ? 6.h : 0),
-                  child: GestureDetector(
-                    onTap: () => _handleActionIconTap(context, actionType),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        SizedBox(
-                          width: 32.h,
-                          height: 32.h,
-                          child: Center(
-                            child: Icon(
-                              isActive ? filledIcon : outlineIcon,
-                              size: 32,
-                              color: iconColor,
-                            ),
+                  child: isOffline
+                      ? _buildSquareSkeleton(size: 32.h, radius: 16.h)
+                      : GestureDetector(
+                          onTap: () => _handleActionIconTap(context, actionType),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              SizedBox(
+                                width: 32.h,
+                                height: 32.h,
+                                child: Center(
+                                  child: Icon(
+                                    isActive ? filledIcon : outlineIcon,
+                                    size: 32,
+                                    color: iconColor,
+                                  ),
+                                ),
+                              ),
+                              if (isNotificationIcon && unreadCount > 0)
+                                Positioned(
+                                  right: -4.h,
+                                  top: -4.h,
+                                  child: Container(
+                                    padding: EdgeInsets.all(4.h),
+                                    decoration: BoxDecoration(
+                                      color: appTheme.colorFF52D1,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: appTheme.gray_900_02,
+                                        width: 1.5.h,
+                                      ),
+                                    ),
+                                    constraints: BoxConstraints(
+                                      minWidth: 18.h,
+                                      minHeight: 18.h,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        unreadCount > 99
+                                            ? '99+'
+                                            : unreadCount.toString(),
+                                        style: TextStyleHelper
+                                            .instance.body10BoldPlusJakartaSans
+                                            .copyWith(
+                                          color: appTheme.gray_50,
+                                          height: 1.0,
+                                          fontSize: unreadCount > 99 ? 8.h : 10.h,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                        if (isNotificationIcon && unreadCount > 0)
-                          Positioned(
-                            right: -4.h,
-                            top: -4.h,
-                            child: Container(
-                              padding: EdgeInsets.all(4.h),
-                              decoration: BoxDecoration(
-                                color: appTheme.colorFF52D1,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: appTheme.gray_900_02,
-                                  width: 1.5.h,
-                                ),
-                              ),
-                              constraints: BoxConstraints(
-                                minWidth: 18.h,
-                                minHeight: 18.h,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  unreadCount > 99 ? '99+' : unreadCount.toString(),
-                                  style: TextStyleHelper.instance.body10BoldPlusJakartaSans.copyWith(
-                                    color: appTheme.gray_50,
-                                    height: 1.0,
-                                    fontSize: unreadCount > 99 ? 8.h : 10.h,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
                 );
               }),
             ],
@@ -391,9 +405,63 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
 
           if (widget.showProfileImage) ...[
             SizedBox(width: 8.h),
-            _buildAuthenticationWidget(context),
+            isOffline ? _buildCircleSkeleton(size: 54.h) : _buildAuthenticationWidget(context),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildSquareSkeleton({required double size, required double radius}) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: appTheme.blue_gray_900_01,
+          borderRadius: BorderRadius.circular(radius),
+          // border: Border.all(
+          //   color: appTheme.blue_gray_300.withAlpha(40),
+          //   width: 1.h,
+          // ),
+        ),
+        // child: Center(
+        //   child: Container(
+        //     width: size * 0.46,
+        //     height: size * 0.46,
+        //     decoration: BoxDecoration(
+        //       color: appTheme.blue_gray_300.withAlpha(60),
+        //       borderRadius: BorderRadius.circular(radius / 2),
+        //     ),
+        //   ),
+        // ),
+      ),
+    );
+  }
+
+  Widget _buildCircleSkeleton({required double size}) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: appTheme.blue_gray_900_01,
+          shape: BoxShape.circle,
+          // border: Border.all(
+          //   color: appTheme.blue_gray_300.withAlpha(40),
+          //   width: 1.h,
+          // ),
+        ),
+        // child: Center(
+        //   child: Container(
+        //     width: size * 0.46,
+        //     height: size * 0.46,
+        //     decoration: BoxDecoration(
+        //       color: appTheme.blue_gray_300.withAlpha(60),
+        //       shape: BoxShape.circle,
+        //     ),
+        //   ),
+        // ),
       ),
     );
   }

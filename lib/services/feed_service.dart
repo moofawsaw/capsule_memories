@@ -16,6 +16,7 @@ class FeedService {
   static const int _pageSize = 10;
 
   // Keep StoryService instance for any non-static helpers you may already use elsewhere.
+  // ignore: unused_field
   final _storyService = StoryService();
 
   // NEW: Real-time subscription management
@@ -25,6 +26,27 @@ class FeedService {
   static const bool _debugFeed = false;
   void _log(String msg) {
     if (_debugFeed) print(msg);
+  }
+
+  bool _isMissingColumn(PostgrestException e, String columnName) {
+    final msg = (e.message).toLowerCase();
+    final details = (e.details ?? '').toString().toLowerCase();
+    final hint = (e.hint ?? '').toString().toLowerCase();
+    final code = (e.code ?? '').toString();
+    final col = columnName.toLowerCase();
+
+    // Postgres undefined_column is 42703
+    if (code == '42703') return true;
+    if (msg.contains('column') && msg.contains(col) && msg.contains('does not exist')) {
+      return true;
+    }
+    if (details.contains('column') && details.contains(col) && details.contains('does not exist')) {
+      return true;
+    }
+    if (hint.contains('column') && hint.contains(col) && hint.contains('does not exist')) {
+      return true;
+    }
+    return false;
   }
 
   // -----------------------------
@@ -615,9 +637,11 @@ class FeedService {
       final authorIds = await _fetchForYouAuthorIds(currentUserId);
       if (authorIds.isEmpty) return [];
 
-      final response = await _client!
-          .from('memories')
-          .select('''
+      dynamic response;
+      try {
+        response = await _client!
+            .from('memories')
+            .select('''
             id,
             title,
             created_at,
@@ -638,12 +662,46 @@ class FeedService {
               video_url
             )
           ''')
-          .eq('visibility', 'public')
-          .gt('stories_count', 0)
-          .eq('state', 'open')
-          .inFilter('creator_id', authorIds.toList())
-          .order('created_at', ascending: false)
-          .range(offset, offset + limit - 1);
+            .eq('visibility', 'public')
+            .eq('is_daily_capsule', false)
+            .gt('stories_count', 0)
+            .eq('state', 'open')
+            .inFilter('creator_id', authorIds.toList())
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
+      } on PostgrestException catch (e) {
+        // Backward-compat: if migration not applied yet, retry without is_daily_capsule.
+        if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+        response = await _client!
+            .from('memories')
+            .select('''
+            id,
+            title,
+            created_at,
+            expires_at,
+            location_name,
+            contributor_count,
+            state,
+            visibility,
+            creator_id,
+            category_id,
+            stories_count,
+            memory_categories:category_id(
+              name,
+              icon_url
+            ),
+            stories(
+              thumbnail_url,
+              video_url
+            )
+          ''')
+            .eq('visibility', 'public')
+            .gt('stories_count', 0)
+            .eq('state', 'open')
+            .inFilter('creator_id', authorIds.toList())
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
+      }
 
       final rows = (response as List);
 
@@ -837,9 +895,11 @@ class FeedService {
     if (_client == null) return [];
 
     try {
-      final response = await _client!
-          .from('memories')
-          .select('''
+      dynamic response;
+      try {
+        response = await _client!
+            .from('memories')
+            .select('''
           id,
           title,
           created_at,
@@ -860,11 +920,43 @@ class FeedService {
             video_url
           )
         ''')
-          .eq('visibility', 'public')
-          .gt('stories_count', 0)
-          .eq('state', 'open')
-          .order('created_at', ascending: false)
-          .range(offset, offset + limit - 1);
+            .eq('visibility', 'public')
+            .eq('is_daily_capsule', false)
+            .gt('stories_count', 0)
+            .eq('state', 'open')
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
+      } on PostgrestException catch (e) {
+        if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+        response = await _client!
+            .from('memories')
+            .select('''
+          id,
+          title,
+          created_at,
+          expires_at,
+          location_name,
+          contributor_count,
+          state,
+          visibility,
+          creator_id,
+          category_id,
+          stories_count,
+          memory_categories:category_id(
+            name,
+            icon_url
+          ),
+          stories(
+            thumbnail_url,
+            video_url
+          )
+        ''')
+            .eq('visibility', 'public')
+            .gt('stories_count', 0)
+            .eq('state', 'open')
+            .order('created_at', ascending: false)
+            .range(offset, offset + limit - 1);
+      }
 
       final rows = (response as List);
 
@@ -1389,9 +1481,11 @@ class FeedService {
     if (_client == null) return [];
 
     try {
-      final response = await _client!
-          .from('memories')
-          .select('''
+      dynamic response;
+      try {
+        response = await _client!
+            .from('memories')
+            .select('''
       id,
       title,
       created_at,
@@ -1413,11 +1507,44 @@ class FeedService {
         video_url
       )
     ''')
-          .eq('visibility', 'public')
-          .gt('stories_count', 0)
-          .eq('state', 'open')
-          .order('popularity_score', ascending: false)
-          .range(offset, offset + limit - 1);
+            .eq('visibility', 'public')
+            .eq('is_daily_capsule', false)
+            .gt('stories_count', 0)
+            .eq('state', 'open')
+            .order('popularity_score', ascending: false)
+            .range(offset, offset + limit - 1);
+      } on PostgrestException catch (e) {
+        if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+        response = await _client!
+            .from('memories')
+            .select('''
+      id,
+      title,
+      created_at,
+      expires_at,
+      location_name,
+      contributor_count,
+      state,
+      visibility,
+      creator_id,
+      category_id,
+      popularity_score,
+      stories_count,
+      memory_categories:category_id(
+        name,
+        icon_url
+      ),
+      stories(
+        thumbnail_url,
+        video_url
+      )
+    ''')
+            .eq('visibility', 'public')
+            .gt('stories_count', 0)
+            .eq('state', 'open')
+            .order('popularity_score', ascending: false)
+            .range(offset, offset + limit - 1);
+      }
 
       final rows = (response as List);
 
@@ -1687,17 +1814,17 @@ class FeedService {
           .select('memory_id')
           .eq('user_id', currentUserId);
 
-      if (contributorResponse.isEmpty) {
-        return [];
-      }
-
-      final memoryIds = (contributorResponse as List)
-          .map((c) => c['memory_id'] as String)
+      final contributorIds = (contributorResponse as List? ?? const [])
+          .map((c) => (c as Map)['memory_id'] as String?)
+          .whereType<String>()
+          .where((id) => id.trim().isNotEmpty)
           .toList();
 
-      final response = await _client!
-          .from('memories')
-          .select('''
+      dynamic response;
+      try {
+        response = await _client!
+            .from('memories')
+            .select('''
             id,
             title,
             state,
@@ -1716,10 +1843,50 @@ class FeedService {
               avatar_url
             )
           ''')
-          .inFilter('id', memoryIds)
-          .eq('state', 'open')
-          .gt('expires_at', DateTime.now().toIso8601String())
-          .order('created_at', ascending: false);
+            // Include both:
+            // - memories the user created
+            // - memories they joined via memory_contributors
+            .or(
+              contributorIds.isNotEmpty
+                  ? 'creator_id.eq.$currentUserId,id.in.(${contributorIds.join(",")})'
+                  : 'creator_id.eq.$currentUserId',
+            )
+            .eq('is_daily_capsule', false)
+            .eq('state', 'open')
+            .gt('expires_at', DateTime.now().toIso8601String())
+            .order('created_at', ascending: false);
+      } on PostgrestException catch (e) {
+        if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+        response = await _client!
+            .from('memories')
+            .select('''
+            id,
+            title,
+            state,
+            visibility,
+            created_at,
+            expires_at,
+            creator_id,
+            category_id,
+            memory_categories:category_id(
+              name,
+              icon_url
+            ),
+            user_profiles_public:creator_id(
+              id,
+              display_name,
+              avatar_url
+            )
+          ''')
+            .or(
+              contributorIds.isNotEmpty
+                  ? 'creator_id.eq.$currentUserId,id.in.(${contributorIds.join(",")})'
+                  : 'creator_id.eq.$currentUserId',
+            )
+            .eq('state', 'open')
+            .gt('expires_at', DateTime.now().toIso8601String())
+            .order('created_at', ascending: false);
+      }
 
       final activeMemories = (response as List).map((memory) {
         final category = memory['memory_categories'] as Map<String, dynamic>?;
@@ -1920,11 +2087,18 @@ class FeedService {
               display_name,
               avatar_url,
               username
+            ),
+            user_profiles!stories_contributor_id_fkey(
+              id,
+              display_name,
+              avatar_url,
+              username
             )
           ''').eq('id', storyId).single();
 
       final contributor =
-      response['user_profiles_public'] as Map<String, dynamic>?;
+          (response['user_profiles_public'] as Map<String, dynamic>?) ??
+          (response['user_profiles'] as Map<String, dynamic>?);
       final memory = response['memories'] as Map<String, dynamic>?;
       final textOverlays = response['text_overlays'] as List? ?? [];
 
@@ -1951,10 +2125,14 @@ class FeedService {
         'share_code': response['share_code'],
         'media_url': mediaUrl,
         'media_type': mediaType,
-        'user_name': contributor?['display_name'] ?? 'Unknown User',
-        'user_id': contributor?['id'] ?? '',
+        'user_name': (contributor?['display_name'] ??
+                contributor?['username'] ??
+                'Unknown User')
+            .toString(),
+        // Always keep a stable user_id even if profile join is missing.
+        'user_id': (contributor?['id'] ?? response['contributor_id'] ?? '').toString(),
         'user_avatar': AvatarHelperService.getAvatarUrl(
-          contributor?['avatar_url'],
+          (contributor?['avatar_url'] as String?)?.trim(),
         ),
         'created_at': response['created_at'] ?? '',
         'location': response['location_name'],

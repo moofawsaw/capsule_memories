@@ -3,7 +3,10 @@ import '../models/notifications_model.dart';
 
 part 'notifications_state.dart';
 
-final notificationsNotifier = StateNotifierProvider.autoDispose<
+// NOTE: This provider is used by the global header (AppBar) for unread count,
+// so it must NOT autoDispose; otherwise startup updates can be lost before the
+// header starts watching it.
+final notificationsNotifier = StateNotifierProvider<
     NotificationsNotifier, NotificationsState>(
   (ref) => NotificationsNotifier(
     NotificationsState(

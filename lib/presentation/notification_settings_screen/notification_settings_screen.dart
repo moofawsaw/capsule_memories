@@ -11,6 +11,7 @@ import '../../widgets/custom_notification_settings.dart';
 import '../../widgets/custom_settings_row.dart';
 import '../../widgets/custom_support_settings.dart';
 import '../../widgets/custom_warning_modal.dart';
+import '../../widgets/standard_title_bar.dart';
 import 'notifier/notification_settings_notifier.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -123,7 +124,7 @@ class NotificationSettingsScreenState
       body: SingleChildScrollView(
         child: Container(
           width: double.maxFinite,
-          padding: EdgeInsets.symmetric(vertical: 26.h),
+          padding: EdgeInsets.only(top: 24.h, bottom: 26.h),
           child: Column(
             spacing: 30.h,
             children: [
@@ -145,19 +146,9 @@ class NotificationSettingsScreenState
   Widget _buildSettingsHeader(BuildContext context) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16.h),
-      child: Row(
-        children: [
-          Icon(
-            Icons.settings,
-            size: 26.h,
-            color: appTheme.gray_50,
-          ),
-          SizedBox(width: 6.h),
-          Text(
-            'Settings',
-            style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans,
-          ),
-        ],
+      child: const StandardTitleBar(
+        leadingIcon: Icons.settings,
+        title: 'Settings',
       ),
     );
   }

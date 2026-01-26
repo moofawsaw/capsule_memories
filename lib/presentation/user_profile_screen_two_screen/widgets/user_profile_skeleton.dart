@@ -15,8 +15,6 @@ class UserProfileSkeleton extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       padding: EdgeInsets.only(
         top: 24.h,
-        left: 18.h,
-        right: 18.h,
       ),
       child: Column(
         children: [
@@ -28,8 +26,11 @@ class UserProfileSkeleton extends StatelessWidget {
           _buildStatsSkeleton(),
 
           if (showActions) ...[
-            SizedBox(height: 16.h), // ✅ MATCHES LOADED STATE
-            _buildActionsSkeleton(),
+            SizedBox(height: 16.h),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18.h),
+              child: _buildActionsSkeleton(),
+            ),
           ],
 
           SizedBox(height: 28.h),
@@ -95,15 +96,15 @@ class UserProfileSkeleton extends StatelessWidget {
   // This is following / followers count
   Widget _statCardSkeleton() {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 19.h, vertical: 12.h), // ✅ wider
+      padding: EdgeInsets.symmetric(horizontal: 9.h, vertical: 12.h), // ✅ wider
       decoration: BoxDecoration(
-        color: appTheme.gray_900,
+        // color: appTheme.gray_900,
         borderRadius: BorderRadius.circular(8.h),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _skeletonLine(width: 56.h, height: 18.h, radius: 6.h),
+          _skeletonLine(width: 92.h, height: 18.h, radius: 6.h),
         ],
       ),
     );
@@ -163,14 +164,15 @@ class UserProfileSkeleton extends StatelessWidget {
   Widget _buildStoriesGridSkeleton() {
     const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 3,
-      crossAxisSpacing: 1,
-      mainAxisSpacing: 1,
+      crossAxisSpacing: 2,
+      mainAxisSpacing: 2,
       childAspectRatio: 0.65,
     );
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       gridDelegate: gridDelegate,
       itemCount: 9,
       itemBuilder: (_, __) => const CustomStorySkeleton(

@@ -12,11 +12,16 @@ class CreateMemoryPreloadService {
 
   List<Map<String, dynamic>> _cachedGroups = const [];
   List<Map<String, dynamic>> _cachedCategories = const [];
+  bool _groupsLoaded = false;
+  bool _categoriesLoaded = false;
   DateTime? _lastWarmAt;
   Future<void>? _inflight;
 
   List<Map<String, dynamic>> get cachedGroups => _cachedGroups;
   List<Map<String, dynamic>> get cachedCategories => _cachedCategories;
+
+  bool get groupsLoaded => _groupsLoaded;
+  bool get categoriesLoaded => _categoriesLoaded;
 
   bool get hasGroups => _cachedGroups.isNotEmpty;
   bool get hasCategories => _cachedCategories.isNotEmpty;
@@ -41,10 +46,12 @@ class CreateMemoryPreloadService {
     try {
       // Groups (fast path via existing service)
       final groups = await GroupsService.fetchUserGroups();
-      if (groups.isNotEmpty) _cachedGroups = groups;
+      _cachedGroups = groups; // cache even if empty (avoids refetch on first open)
+      _groupsLoaded = true;
     } catch (e) {
       // ignore: avoid_print
       print('CreateMemoryPreloadService: groups preload failed: $e');
+      _groupsLoaded = false;
     }
 
     try {
@@ -65,10 +72,12 @@ class CreateMemoryPreloadService {
               })
           .toList();
 
-      if (categories.isNotEmpty) _cachedCategories = categories;
+      _cachedCategories = categories; // cache even if empty
+      _categoriesLoaded = true;
     } catch (e) {
       // ignore: avoid_print
       print('CreateMemoryPreloadService: categories preload failed: $e');
+      _categoriesLoaded = false;
     }
 
     _lastWarmAt = DateTime.now();

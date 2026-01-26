@@ -57,9 +57,6 @@ class FollowingListNotifier extends StateNotifier<FollowingListState> {
         return;
       }
 
-      // Start stories loading immediately (we will fill once we know following IDs)
-      state = state.copyWith(isLoadingStories: true, latestStories: const []);
-
       final followingData = await client
           .from('follows')
           .select('following_id, user_profiles!follows_following_id_fkey(*)')
@@ -97,11 +94,29 @@ class FollowingListNotifier extends StateNotifier<FollowingListState> {
           .map((u) => (u.id ?? '').trim())
           .where((id) => id.isNotEmpty)
           .toList();
-      await _loadLatestStoriesForFollowing(
-        client: client,
-        currentUserId: currentUser.id,
-        followingIds: followingIds,
-      );
+
+      // ✅ If there is nobody to fetch from, don't even start/flash stories loading.
+      if (followingIds.isEmpty) {
+        state = state.copyWith(
+          isLoadingStories: false,
+          latestStories: const [],
+        );
+      } else {
+        // ✅ Avoid "loading flash" when the section is currently hidden (empty).
+        // If we already have items, show skeleton while refreshing; otherwise fetch quietly.
+        final hasExistingStories = (state.latestStories ?? const []).isNotEmpty;
+        if (hasExistingStories) {
+          state = state.copyWith(isLoadingStories: true);
+        } else {
+          state = state.copyWith(isLoadingStories: false);
+        }
+
+        await _loadLatestStoriesForFollowing(
+          client: client,
+          currentUserId: currentUser.id,
+          followingIds: followingIds,
+        );
+      }
 
       // Keep search flags accurate if user already typed
       final q = (state.searchQuery ?? '').trim();

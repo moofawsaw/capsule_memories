@@ -122,8 +122,6 @@ class AvatarStateNotifier extends StateNotifier<AvatarState> {
   /// Load current user's avatar from database
   /// 🎯 HANDLES BOTH GOOGLE OAUTH URLS AND SUPABASE STORAGE KEYS
   Future<void> loadCurrentUserAvatar() async {
-    state = state.copyWith(isLoading: true);
-
     try {
       final client = SupabaseService.instance.client;
       if (client == null) {
@@ -137,6 +135,16 @@ class AvatarStateNotifier extends StateNotifier<AvatarState> {
         _unsubscribeRealtime();
         return;
       }
+
+      // ✅ If we already have a loaded avatar for this user, don't refetch.
+      // This prevents "glitch reloads" when UI screens open/close.
+      final existingUrl = (state.avatarUrl ?? '').trim();
+      if (state.userId == user.id && existingUrl.isNotEmpty && !state.isLoading) {
+        await _subscribeToAvatarChanges(user.id);
+        return;
+      }
+
+      state = state.copyWith(isLoading: true);
 
       final userProfile = await UserProfileService.instance.getCurrentUserProfile();
 

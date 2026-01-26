@@ -1,7 +1,7 @@
 import '../../core/app_export.dart';
 import '../../widgets/custom_icon_button_row.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
+import '../../widgets/standard_title_bar.dart';
 import '../qr_code_share_screen_two_screen/qr_code_share_screen_two_screen.dart';
 import './widgets/friends_section_widget.dart';
 import './widgets/incoming_requests_section_widget.dart';
@@ -91,36 +91,17 @@ class FriendsManagementScreenState
       // ✅ state lists are non-null now
       final friendsCount = state.filteredFriendsList.length;
 
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 26.h,
-            height: 26.h,
-            margin: EdgeInsets.only(top: 2.h),
-            child: Icon(
-              Icons.people_rounded,
-              size: 26.h,
-              color: appTheme.deep_purple_A100,
-            ),
-          ),
-          SizedBox(width: 6.h),
-          Container(
-            margin: EdgeInsets.only(top: 2.h),
-            child: Text(
-              'Friends ($friendsCount)',
-              style: TextStyleHelper.instance.title20ExtraBoldPlusJakartaSans,
-            ),
-          ),
-          Spacer(),
-          CustomIconButtonRow(
-            firstIcon: Icons.qr_code_scanner,
-            firstIconColor: appTheme.gray_50,
-            secondIcon: Icons.camera_alt,
-            onFirstIconTap: () => _openQRShareBottomSheet(context),
-            onSecondIconTap: () => onTapCameraButton(context),
-          ),
-        ],
+      return StandardTitleBar(
+        leadingIcon: Icons.people_rounded,
+        title: 'Friends ($friendsCount)',
+        trailing: CustomIconButtonRow(
+          firstIcon: Icons.qr_code_scanner,
+          firstIconColor: appTheme.gray_50,
+          secondIcon: Icons.camera_alt,
+          secondIconColor: appTheme.gray_50,
+          onFirstIconTap: () => _openQRShareBottomSheet(context),
+          onSecondIconTap: () => onTapCameraButton(context),
+        ),
       );
     });
   }

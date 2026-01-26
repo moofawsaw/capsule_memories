@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/app_export.dart';
+import '../../../core/services/native_facebook_sign_in_service.dart';
 import '../../../core/services/native_google_sign_in_service.dart';
 import '../../../core/services/deep_link_service.dart';
 import '../../../services/supabase_service.dart';
@@ -279,12 +281,62 @@ class LoginNotifier extends StateNotifier<LoginState> {
             'Supabase is not initialized. Please check your configuration.');
       }
 
-      // Sign in with Facebook OAuth with forced re-authentication
-      // Note: OAuth requires proper configuration in Supabase dashboard
+      // ANDROID NOTE:
+      // Native Facebook app-switch returns a classic access token which Supabase rejects
+      // in some environments ("bad id token"). For Android we use OAuth code flow but
+      // launch it in an in-app browser (Custom Tabs) to keep UX inside the app.
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final ok = await supabaseClient.auth.signInWithOAuth(
+          OAuthProvider.facebook,
+          redirectTo: 'io.supabase.capsulememories://login-callback/',
+          authScreenLaunchMode: LaunchMode.inAppBrowserView,
+        );
+        if (!ok) {
+          throw const AuthException(
+            'Failed to generate Facebook OAuth URL.',
+          );
+        }
+
+        _oauthTimeoutTimer = Timer(const Duration(seconds: 60), () {
+          if (state.isLoading ?? false) {
+            debugPrint('⏰ OAuth timeout - resetting loading state');
+            resetLoadingIfNotAuthenticated();
+          }
+        });
+        return;
+      }
+
+      // Native Facebook sign-in (mobile-first) → exchange access token with Supabase.
+      // This avoids the browser OAuth redirect flow entirely.
+      try {
+        await NativeFacebookSignInService.signIn(supabaseClient);
+        // Auth listener will update UI when session is established.
+        return;
+      } on AuthException catch (e) {
+        // If native FB isn't configured/available, fall back to browser OAuth.
+        final code = (e.code ?? '').trim();
+        final msg = e.message.toLowerCase();
+        const configErrorCodes = {
+          'providerConfigurationError',
+          'clientConfigurationError',
+          'uiUnavailable',
+          'operationInProgress',
+        };
+        final bool looksLikeAndroidTokenValidationEdgeCase =
+            (defaultTargetPlatform == TargetPlatform.android) &&
+                (msg.contains('bad id token') || msg.contains('bad_id_token'));
+        if (!configErrorCodes.contains(code) && !looksLikeAndroidTokenValidationEdgeCase) {
+          rethrow;
+        }
+
+        debugPrint(
+          'ℹ️ Native Facebook sign-in unavailable ($code). Falling back to OAuth.',
+        );
+      }
+
       await supabaseClient.auth.signInWithOAuth(
         OAuthProvider.facebook,
         redirectTo: 'io.supabase.capsulememories://login-callback/',
-        // Use an in-app browser (Custom Tabs on Android) for a smoother OAuth UX.
         authScreenLaunchMode: LaunchMode.inAppBrowserView,
       );
 
@@ -299,6 +351,21 @@ class LoginNotifier extends StateNotifier<LoginState> {
       // Note: OAuth flow will redirect to browser/app, so we don't set success here
       // The auth state change listener in main.dart will handle the success case
       // Don't set loading to false here as the OAuth flow is async
+    } on AuthException catch (e) {
+      String errorMessage = 'Facebook login failed. Please try again.';
+      if (e.message.contains('cancelled')) {
+        errorMessage = 'Facebook login was cancelled.';
+      } else if (e.message.contains('network')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else {
+        errorMessage = 'Facebook login failed: ${e.message}';
+      }
+
+      _oauthTimeoutTimer?.cancel();
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: errorMessage,
+      );
     } catch (e) {
       String errorMessage =
           'Facebook login failed. Please ensure Facebook OAuth is configured in Supabase dashboard.';

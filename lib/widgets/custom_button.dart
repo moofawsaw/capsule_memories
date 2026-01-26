@@ -8,6 +8,7 @@ class CustomButton extends StatelessWidget {
     this.onPressed,
     this.width,
     this.height,
+    this.size,
     this.buttonStyle,
     this.buttonTextStyle,
     this.isDisabled,
@@ -24,6 +25,7 @@ class CustomButton extends StatelessWidget {
 
   final double? width;
   final double? height;
+  final CustomButtonSize? size;
 
   final CustomButtonStyle? buttonStyle;
   final CustomButtonTextStyle? buttonTextStyle;
@@ -44,9 +46,10 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveSize = size ?? CustomButtonSize.primary;
     return Container(
       width: width,
-      height: height ?? 56.h,
+      height: height ?? effectiveSize.height,
       margin: margin,
       alignment: alignment,
       child: _buildButton(context),
@@ -55,7 +58,9 @@ class CustomButton extends StatelessWidget {
 
   Widget _buildButton(BuildContext context) {
     final style = buttonStyle ?? CustomButtonStyle.fillPrimary;
-    final baseTextStyle = buttonTextStyle ?? CustomButtonTextStyle.bodyMedium;
+    final effectiveSize = size ?? CustomButtonSize.primary;
+    final baseTextStyle =
+        buttonTextStyle ?? effectiveSize.defaultTextStyle;
     final textStyle = _resolveEffectiveTextStyle(context, style, baseTextStyle);
 
     final disabled = (isDisabled ?? false) || (isLoading ?? false);
@@ -109,6 +114,7 @@ class CustomButton extends StatelessWidget {
       CustomButtonTextStyle textStyle,
       bool disabled,
       ) {
+    final effectiveSize = size ?? CustomButtonSize.primary;
     return ElevatedButton(
       onPressed: disabled ? null : onPressed,
       style: ElevatedButton.styleFrom(
@@ -120,11 +126,7 @@ class CustomButton extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(style.borderRadius ?? 6.h),
         ),
-        padding: padding ??
-            EdgeInsets.symmetric(
-              horizontal: 16.h,
-              vertical: 12.h,
-            ),
+        padding: padding ?? effectiveSize.padding,
         minimumSize: const Size(0, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
@@ -137,6 +139,7 @@ class CustomButton extends StatelessWidget {
       CustomButtonTextStyle textStyle,
       bool disabled,
       ) {
+    final effectiveSize = size ?? CustomButtonSize.primary;
     return OutlinedButton(
       onPressed: disabled ? null : onPressed,
       style: OutlinedButton.styleFrom(
@@ -150,11 +153,7 @@ class CustomButton extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(style.borderRadius ?? 6.h),
         ),
-        padding: padding ??
-            EdgeInsets.symmetric(
-              horizontal: 16.h,
-              vertical: 12.h,
-            ),
+        padding: padding ?? effectiveSize.padding,
         minimumSize: const Size(0, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
@@ -167,6 +166,7 @@ class CustomButton extends StatelessWidget {
       CustomButtonTextStyle textStyle,
       bool disabled,
       ) {
+    final effectiveSize = size ?? CustomButtonSize.primary;
     return TextButton(
       onPressed: disabled ? null : onPressed,
       style: TextButton.styleFrom(
@@ -175,11 +175,7 @@ class CustomButton extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(style.borderRadius ?? 6.h),
         ),
-        padding: padding ??
-            EdgeInsets.symmetric(
-              horizontal: 16.h,
-              vertical: 12.h,
-            ),
+        padding: padding ?? effectiveSize.padding,
         minimumSize: const Size(0, 0),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
@@ -381,4 +377,43 @@ enum CustomButtonVariant {
   fill,
   outline,
   text,
+}
+
+/// Shared, consistent button sizing presets.
+///
+/// - `primary`: default 56dp height (used for main CTAs).
+/// - `compact`: medium-small height for inline actions like "Follow back",
+///   and friend invite Accept/Decline/Cancel actions.
+enum CustomButtonSize {
+  primary,
+  compact,
+}
+
+extension CustomButtonSizeX on CustomButtonSize {
+  double get height {
+    switch (this) {
+      case CustomButtonSize.primary:
+        return 56.h;
+      case CustomButtonSize.compact:
+        return 40.h;
+    }
+  }
+
+  EdgeInsetsGeometry get padding {
+    switch (this) {
+      case CustomButtonSize.primary:
+        return EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h);
+      case CustomButtonSize.compact:
+        return EdgeInsets.symmetric(horizontal: 14.h, vertical: 8.h);
+    }
+  }
+
+  CustomButtonTextStyle get defaultTextStyle {
+    switch (this) {
+      case CustomButtonSize.primary:
+        return CustomButtonTextStyle.bodyMedium;
+      case CustomButtonSize.compact:
+        return CustomButtonTextStyle.bodySmall;
+    }
+  }
 }

@@ -99,7 +99,7 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
     await cancelPreuploadAndCleanup();
   }
 
-  Future<bool> finalizeShare({
+  Future<String?> finalizeShare({
     required String memoryId,
     required String mediaPath,
     required bool isVideo,
@@ -502,7 +502,7 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
   // -------------------------
   // SHARE (DB COMMIT ONLY)
   // -------------------------
-  Future<bool> uploadAndShareStory({
+  Future<String?> uploadAndShareStory({
     required String memoryId,
     required String mediaPath,
     required bool isVideo,
@@ -545,7 +545,7 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         // If cancelled, do not post.
         if (state.preuploadState == PreuploadState.cancelled) {
           state = state.copyWith(isUploading: false, uploadStage: null);
-          return false;
+          return null;
         }
 
         // If failed, fail.
@@ -580,11 +580,15 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         );
 
         if (storyData == null) throw Exception('Failed to create story');
+        final createdStoryId = storyData['id']?.toString();
+        if (createdStoryId == null || createdStoryId.isEmpty) {
+          throw Exception('Story created but missing id');
+        }
 
         await _ensureContributorForMemory(memoryId: memoryId, userId: userId);
 
         state = state.copyWith(isUploading: false, uploadStage: 'Done');
-        return true;
+        return createdStoryId;
       }
 
       // IMAGE FLOW (still store relative path)
@@ -623,18 +627,22 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       );
 
       if (storyData == null) throw Exception('Failed to create story');
+      final createdStoryId = storyData['id']?.toString();
+      if (createdStoryId == null || createdStoryId.isEmpty) {
+        throw Exception('Story created but missing id');
+      }
 
       await _ensureContributorForMemory(memoryId: memoryId, userId: userId);
 
       state = state.copyWith(isUploading: false, uploadStage: 'Done');
-      return true;
+      return createdStoryId;
     } catch (e) {
       state = state.copyWith(
         isUploading: false,
         errorMessage: 'Failed to post story: $e',
         uploadStage: null,
       );
-      return false;
+      return null;
     }
   }
 }

@@ -22,6 +22,8 @@ class CustomStoryCard extends StatelessWidget {
 
     // ✅ optional, so you can override ONLY on /profile
     this.borderRadius,
+    this.showBorder = true,
+    this.showAvatar = true,
   }) : super(key: key);
 
   final String userName;
@@ -50,6 +52,8 @@ class CustomStoryCard extends StatelessWidget {
 
   // ✅ override card radius per usage (profile-only, feed can keep default)
   final BorderRadius? borderRadius;
+  final bool showBorder;
+  final bool showAvatar;
 
   @override
   Widget build(BuildContext context) {
@@ -57,12 +61,22 @@ class CustomStoryCard extends StatelessWidget {
         ? MemoryCategories.getByName(categoryText!)
         : MemoryCategories.custom;
 
+    final String? categoryLabel =
+        (categoryText ?? '').trim().isEmpty ? null : categoryText;
+    final String? ts = (timestamp ?? '').trim().isEmpty ? null : timestamp;
+
     // ✅ Single source of truth for this card's radius
     final BorderRadius cardRadius = borderRadius ?? BorderRadius.circular(8.h);
 
     // ✅ Long-press enabled only if a handler is provided and flag is true
     final bool longPressEnabled =
         enableLongPressActions && onLongPress != null;
+
+    final bool showMetaOverlay = showAvatar ||
+        userName.trim().isNotEmpty ||
+        categoryLabel != null ||
+        ts != null ||
+        showDelete;
 
     return Container(
       width: width ?? 116.h,
@@ -75,10 +89,12 @@ class CustomStoryCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: appTheme.gray_900_01,
-            border: Border.all(
-              color: appTheme.gray_900_02,
-              width: 1,
-            ),
+            border: showBorder
+                ? Border.all(
+                    color: appTheme.gray_900_02,
+                    width: 1,
+                  )
+                : null,
             borderRadius: cardRadius,
           ),
           child: Stack(
@@ -120,21 +136,21 @@ class CustomStoryCard extends StatelessWidget {
                   ),
                 ),
 
-              // Overlay content
-              Positioned(
-                left: 6.h,
-                right: 6.h,
-                top: 12.h,
-                bottom: 12.h,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildProfileAvatar(context),
-                    Spacer(),
-                    _buildUserInfo(context, category),
-                  ],
+              if (showMetaOverlay)
+                Positioned(
+                  left: 6.h,
+                  right: 6.h,
+                  top: 12.h,
+                  bottom: 12.h,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (showAvatar) _buildProfileAvatar(context),
+                      Spacer(),
+                      _buildUserInfo(context, category),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -176,14 +192,14 @@ class CustomStoryCard extends StatelessWidget {
             style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                 .copyWith(color: appTheme.whiteCustom, height: 1.29),
           ),
-        if (categoryText != null) ...[
+        if ((categoryText ?? '').trim().isNotEmpty) ...[
           SizedBox(height: userName.isNotEmpty ? 18.h : 0),
           _buildCategoryBadge(context, category),
         ],
-        if (timestamp != null) ...[
+        if ((timestamp ?? '').trim().isNotEmpty) ...[
           SizedBox(height: 4.h),
           Text(
-            timestamp!,
+            timestamp!.trim(),
             style: TextStyleHelper.instance.body12MediumPlusJakartaSans
                 .copyWith(color: appTheme.whiteCustom, height: 1.33),
           ),

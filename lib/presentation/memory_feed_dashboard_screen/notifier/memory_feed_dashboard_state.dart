@@ -4,6 +4,7 @@ part of 'memory_feed_dashboard_notifier.dart';
 class MemoryFeedDashboardState extends Equatable {
   final MemoryFeedDashboardModel? memoryFeedDashboardModel;
   final bool? isLoading;
+  final bool hasDbConnectionError;
   final bool isLoadingMore;
   final bool hasMoreHappeningNow;
   final bool hasMorePublicMemories;
@@ -21,6 +22,7 @@ class MemoryFeedDashboardState extends Equatable {
   MemoryFeedDashboardState({
     this.memoryFeedDashboardModel,
     this.isLoading = false,
+    this.hasDbConnectionError = false,
     this.isLoadingMore = false,
     this.hasMoreHappeningNow = true,
     this.hasMorePublicMemories = true,
@@ -39,6 +41,7 @@ class MemoryFeedDashboardState extends Equatable {
   MemoryFeedDashboardState copyWith({
     MemoryFeedDashboardModel? memoryFeedDashboardModel,
     bool? isLoading,
+    bool? hasDbConnectionError,
     bool? isLoadingMore,
     bool? hasMoreHappeningNow,
     bool? hasMorePublicMemories,
@@ -57,6 +60,7 @@ class MemoryFeedDashboardState extends Equatable {
       memoryFeedDashboardModel:
           memoryFeedDashboardModel ?? this.memoryFeedDashboardModel,
       isLoading: isLoading ?? this.isLoading,
+      hasDbConnectionError: hasDbConnectionError ?? this.hasDbConnectionError,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMoreHappeningNow: hasMoreHappeningNow ?? this.hasMoreHappeningNow,
       hasMorePublicMemories:
@@ -80,6 +84,7 @@ class MemoryFeedDashboardState extends Equatable {
   List<Object?> get props => [
         memoryFeedDashboardModel,
         isLoading,
+        hasDbConnectionError,
         isLoadingMore,
         hasMoreHappeningNow,
         hasMorePublicMemories,

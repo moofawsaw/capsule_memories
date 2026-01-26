@@ -5,7 +5,6 @@ import '../../services/groups_service.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_edit_text.dart';
-import '../../widgets/custom_image_view.dart';
 import '../../widgets/custom_search_view.dart';
 import '../../widgets/custom_user_status_row.dart';
 import '../groups_management_screen/models/groups_management_model.dart';
@@ -145,6 +144,8 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
   Widget _buildReadOnlyView(BuildContext context) {
     final media = MediaQuery.of(context);
     final maxHeight = media.size.height * 0.85;
+    final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
+    final isCreator = currentUserId != null && currentUserId == widget.group.creatorId;
 
     return SafeArea(
       top: false,
@@ -191,10 +192,42 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
                 ),
               ),
 
-              _buildLeaveGroupButton(context),
+              // In read-only "details" view:
+              // - Members can leave the group.
+              // - Creators should not see a destructive "Leave" action here.
+              isCreator ? _buildCloseButton(context) : _buildLeaveGroupButton(context),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCloseButton(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: appTheme.gray_900_02,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: double.infinity,
+            height: 1,
+            color: appTheme.gray_50.withAlpha(26),
+          ),
+          Padding(
+            padding: EdgeInsets.all(16.h),
+            child: SizedBox(
+              width: double.infinity,
+              child: CustomButton(
+                text: 'Close',
+                onPressed: () => Navigator.pop(context),
+                buttonStyle: CustomButtonStyle.outlineDark,
+                buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -364,7 +397,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
         final hasMe = currentUserId != null &&
             baseMembers.any((m) => m['id'] == currentUserId);
 
-        if (isCreator && currentUserId != null && !hasMe) {
+        if (isCreator && !hasMe) {
           return FutureBuilder<Map<String, dynamic>?>(
             future: _myProfileFuture ?? _fetchMyProfileFromDb(currentUserId),
             builder: (context, snapshot) {
@@ -518,7 +551,7 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
             baseMembers.any((m) => m['id'] == currentUserId);
 
         // ✅ If creator is missing from members list (empty group), inject them from DB
-        if (isCreator && currentUserId != null && !hasMe) {
+        if (isCreator && !hasMe) {
           return FutureBuilder<Map<String, dynamic>?>(
             future: _myProfileFuture ?? _fetchMyProfileFromDb(currentUserId),
             builder: (context, snapshot) {

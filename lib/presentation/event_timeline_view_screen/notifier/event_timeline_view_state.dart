@@ -1,12 +1,16 @@
 part of 'event_timeline_view_notifier.dart';
 
 class EventTimelineViewState extends Equatable {
+  static const Object _unset = Object();
+
   final EventTimelineViewModel? eventTimelineViewModel;
   final bool? isLoading;
   final bool? isSuccess;
   final String? errorMessage;
   final bool? isCurrentUserMember;
   final bool? isCurrentUserCreator;
+  final bool? hasPendingInvite;
+  final String? pendingInviteId;
 
   final List<TimelineStoryItem> timelineStories;
   final DateTime? memoryStartTime;
@@ -24,6 +28,8 @@ class EventTimelineViewState extends Equatable {
     this.errorMessage,
     this.isCurrentUserMember = false,
     this.isCurrentUserCreator = false,
+    this.hasPendingInvite = false,
+    this.pendingInviteId,
     this.timelineStories = const [],
     this.memoryStartTime,
     this.memoryEndTime,
@@ -40,6 +46,8 @@ class EventTimelineViewState extends Equatable {
     errorMessage,
     isCurrentUserMember,
     isCurrentUserCreator,
+    hasPendingInvite,
+    pendingInviteId,
     timelineStories,
     memoryStartTime,
     memoryEndTime,
@@ -55,6 +63,8 @@ class EventTimelineViewState extends Equatable {
     String? errorMessage,
     bool? isCurrentUserMember,
     bool? isCurrentUserCreator,
+    bool? hasPendingInvite,
+    Object? pendingInviteId = _unset,
     List<TimelineStoryItem>? timelineStories,
     DateTime? memoryStartTime,
     DateTime? memoryEndTime,
@@ -69,6 +79,10 @@ class EventTimelineViewState extends Equatable {
       errorMessage: errorMessage,
       isCurrentUserMember: isCurrentUserMember ?? this.isCurrentUserMember,
       isCurrentUserCreator: isCurrentUserCreator ?? this.isCurrentUserCreator,
+      hasPendingInvite: hasPendingInvite ?? this.hasPendingInvite,
+      pendingInviteId: pendingInviteId == _unset
+          ? this.pendingInviteId
+          : pendingInviteId as String?,
       timelineStories: timelineStories ?? this.timelineStories,
       memoryStartTime: memoryStartTime ?? this.memoryStartTime,
       memoryEndTime: memoryEndTime ?? this.memoryEndTime,

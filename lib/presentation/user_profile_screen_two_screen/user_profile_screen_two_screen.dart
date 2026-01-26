@@ -162,19 +162,24 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
           child: SingleChildScrollView(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.only(
-              top: 24.h,
-              left: 18.h,
-              right: 18.h,
-            ),
+            padding: EdgeInsets.only(top: 24.h),
             child: Column(
               children: [
-                _buildProfileHeader(context),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 18.h),
+                  child: _buildProfileHeader(context),
+                ),
                 SizedBox(height: 12.h),
-                _buildStats(context),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 18.h),
+                  child: _buildStats(context),
+                ),
                 if (_userId != null) ...[
                   SizedBox(height: 16.h),
-                  _buildActions(context),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18.h),
+                    child: _buildActions(context),
+                  ),
                 ],
                 SizedBox(height: 28.h),
                 _buildStories(context),
@@ -354,8 +359,8 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
 
     const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 3,
-      crossAxisSpacing: 1,
-      mainAxisSpacing: 1,
+      crossAxisSpacing: 2,
+      mainAxisSpacing: 2,
       childAspectRatio: 0.65,
     );
 
@@ -363,6 +368,7 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
       return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
         gridDelegate: gridDelegate,
         itemCount: 3,
         itemBuilder: (_, __) => const CustomStorySkeleton(),
@@ -376,25 +382,23 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       gridDelegate: gridDelegate,
       itemCount: stories.length,
       itemBuilder: (context, index) {
         final story = stories[index];
-        final me = _currentUserId;
-        final isMyStory =
-            me != null && me.isNotEmpty && (story.contributorId ?? '') == me;
-        final rawName = (story.userName ?? '').trim();
 
         return CustomStoryCard(
           borderRadius: BorderRadius.circular(0.h),
-          // Hide name for the current user's own stories (even if this screen is
-          // reached via a route arg that temporarily sets _userId).
-          userName: isMyStory ? '' : (rawName.isNotEmpty ? rawName : 'User'),
-          userAvatar: story.userAvatar ?? '',
+          showBorder: false,
+          showAvatar: false,
+          // Instagram-style grid: no username/category/timestamp overlays.
+          userName: '',
+          userAvatar: '',
           backgroundImage: story.backgroundImage ?? '',
-          categoryText: story.categoryText ?? 'Memory',
-          categoryIcon: story.categoryIcon ?? '',
-          timestamp: story.timestamp ?? 'Just now',
+          categoryText: null,
+          categoryIcon: null,
+          timestamp: null,
           onTap: () => _onTapStoryCard(context, index),
 
           // ✅ Long-press actions (SAFE, MATCHES MODEL)

@@ -34,7 +34,7 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(height: 36.h),
+                  SizedBox(height: 68.h),
                   _buildLogoSection(),
                   SizedBox(height: 24.h),
                   _buildForgotPasswordTitle(),
@@ -62,8 +62,8 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
         width: MediaQuery.of(context).size.width * 0.38,
         child: CustomImageView(
           imagePath: logoPath,
-          height: 26.h,
-          width: 130.h,
+          height: 32.h,
+          width: 160.h,
         ),
       ),
     );

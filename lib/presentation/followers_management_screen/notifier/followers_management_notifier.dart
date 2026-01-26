@@ -138,11 +138,12 @@ class FollowersManagementNotifier
           await _followsService.followUser(currentUser.id, followerId);
 
       if (success) {
-        state = state.copyWith(didFollowBack: true);
+        // Refresh list first (this triggers multiple state updates). Keep the
+        // follow-back toast pulse isolated so it can't fire repeatedly.
         await initialize();
 
-        // Reset success pulse
-        await Future.delayed(const Duration(milliseconds: 600));
+        // One-shot success pulse (true then immediately back to false).
+        state = state.copyWith(didFollowBack: true);
         state = state.copyWith(didFollowBack: false);
       }
     } catch (e) {
