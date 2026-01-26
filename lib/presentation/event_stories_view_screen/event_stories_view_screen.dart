@@ -2170,6 +2170,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     final caption = _currentStoryData?['caption'] as String?;
     final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : null;
     final isAuthenticated = Supabase.instance.client.auth.currentUser != null;
+    final bool isDailyCapsuleViewer =
+        (_feedType ?? '').trim().toLowerCase() == 'daily_capsule';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2177,7 +2179,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       children: [
         if (storyId != null) _buildBottomRightControls(),
         SizedBox(height: 12.h),
-        if (storyId != null && isAuthenticated)
+        // Daily Capsule viewer is intentionally simplified: no reactions UI.
+        if (!isDailyCapsuleViewer && storyId != null && isAuthenticated)
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),

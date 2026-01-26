@@ -18,6 +18,15 @@ final notificationsNotifier = StateNotifierProvider<
 class NotificationsNotifier extends StateNotifier<NotificationsState> {
   NotificationsNotifier(super.state);
 
+  DateTime _safeParseCreatedAt(dynamic v) {
+    if (v is DateTime) return v;
+    if (v is String) {
+      final dt = DateTime.tryParse(v);
+      if (dt != null) return dt;
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
   void setNotifications(List<Map<String, dynamic>> notifications) {
     final unreadCount =
         notifications.where((n) => !(n['is_read'] as bool)).length;
@@ -51,12 +60,17 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
   /// Add a notification back to local state (maintains sort order)
   void addNotification(Map<String, dynamic> notification) {
     final currentNotifications = state.notificationsModel?.notifications ?? [];
+    final id = notification['id'];
+    if (id == null) return;
 
-    // Insert and re-sort by created_at descending
-    final updatedNotifications = [...currentNotifications, notification];
+    // De-dupe by id, then insert and re-sort by created_at descending
+    final updatedNotifications = <Map<String, dynamic>>[
+      ...currentNotifications.where((n) => n['id'] != id),
+      notification,
+    ];
     updatedNotifications.sort((a, b) {
-      final aTime = DateTime.parse(a['created_at'] as String);
-      final bTime = DateTime.parse(b['created_at'] as String);
+      final aTime = _safeParseCreatedAt(a['created_at']);
+      final bTime = _safeParseCreatedAt(b['created_at']);
       return bTime.compareTo(aTime); // Descending order (newest first)
     });
 

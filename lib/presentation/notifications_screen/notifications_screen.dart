@@ -20,6 +20,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   // Stack to maintain deleted notifications for undo (most recent at end)
   final List<Map<String, dynamic>> _deletedNotificationsStack = [];
+  final Set<String> _pendingDeleteIds = {};
+  final Set<String> _undoRequestedIds = {};
 
   // Suppress "new notification" snackbar for notifications restored via UNDO
   final Set<String> _suppressNewSnackbarsForNotificationIds = {};
@@ -316,8 +318,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   /// Handle swipe-to-delete with optimistic UI update
   void _handleSwipeDelete(Map<String, dynamic> notification, String notificationId) {
+    if (_pendingDeleteIds.contains(notificationId)) return;
+    _pendingDeleteIds.add(notificationId);
+
     // 1. Save notification for potential undo
     final deletedNotification = Map<String, dynamic>.from(notification);
+    // Ensure stack only has one instance of this id
+    _deletedNotificationsStack.removeWhere((n) => n['id'] == notificationId);
     _deletedNotificationsStack.add(deletedNotification);
 
     // 2. IMMEDIATE: Remove from local state (fixes Dismissible error)
@@ -325,9 +332,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     notifier.removeNotification(notificationId);
 
     // 3. Call API async (soft delete)
-    _notificationService.deleteNotification(notificationId).catchError((error) {
-      // On error, restore to local state
-      _deletedNotificationsStack.removeLast();
+    _notificationService.deleteNotification(notificationId).then((_) {
+      _pendingDeleteIds.remove(notificationId);
+    }).catchError((error) {
+      _pendingDeleteIds.remove(notificationId);
+
+      // If user already hit UNDO, don't try to pop/restore again.
+      if (_undoRequestedIds.contains(notificationId)) {
+        return;
+      }
+
+      // On error, remove the matching entry from the stack (by id) and restore
+      _deletedNotificationsStack.removeWhere((n) => n['id'] == notificationId);
       notifier.addNotification(deletedNotification);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -430,6 +446,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     final notificationToRestore = _deletedNotificationsStack.removeLast();
     final restoreId = notificationToRestore['id'] as String;
+    _undoRequestedIds.add(restoreId);
 
     // Suppress snackbar for this restored notification
     _suppressNewSnackbarsForNotificationIds.add(restoreId);
@@ -441,6 +458,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     // Call restore API (UPDATE, not INSERT - no push triggered!)
     _notificationService.restoreNotification(restoreId).then((_) {
       debugPrint('✅ Notification restored in DB');
+      _undoRequestedIds.remove(restoreId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -456,6 +474,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }).catchError((error) {
       // On error, remove from local state again
       _suppressNewSnackbarsForNotificationIds.remove(restoreId);
+      _undoRequestedIds.remove(restoreId);
       notifier.removeNotification(restoreId);
       _deletedNotificationsStack.add(notificationToRestore);
       if (mounted) {

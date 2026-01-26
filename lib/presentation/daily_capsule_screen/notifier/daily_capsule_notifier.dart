@@ -46,7 +46,6 @@ class DailyCapsuleNotifier extends StateNotifier<DailyCapsuleState> {
   }
 
   Future<void> completeMood(String emoji) async {
-    if (state.todayEntry != null) return;
     state = state.copyWith(isCompleting: true, errorMessage: null);
     try {
       await _svc.completeMood(emoji);

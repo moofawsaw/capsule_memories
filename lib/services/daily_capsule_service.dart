@@ -250,14 +250,21 @@ class DailyCapsuleService {
     final userId = client?.auth.currentUser?.id;
     if (client == null || userId == null) return;
 
-    await client.from('daily_capsule_entries').insert({
-      'user_id': userId,
-      'local_date': todayLocalDateYmd,
-      'utc_offset_minutes': deviceUtcOffsetMinutes,
-      'completion_type': 'mood',
-      'mood_emoji': emoji,
-      'completed_at': DateTime.now().toUtc().toIso8601String(),
-    });
+    // Allow changing today's capsule: upsert on (user_id, local_date)
+    await client.from('daily_capsule_entries').upsert(
+      {
+        'user_id': userId,
+        'local_date': todayLocalDateYmd,
+        'utc_offset_minutes': deviceUtcOffsetMinutes,
+        'completion_type': 'mood',
+        'mood_emoji': emoji,
+        // IMPORTANT:
+        // Do NOT clear story_id here. If the user already created a capsule story today,
+        // we keep it "remembered" unless they explicitly delete the story.
+        'completed_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      onConflict: 'user_id,local_date',
+    );
 
     // Schedule next reminder (best-effort)
     unawaited(upsertSettingsIfNeeded());
@@ -272,17 +279,39 @@ class DailyCapsuleService {
     final userId = client?.auth.currentUser?.id;
     if (client == null || userId == null) return;
 
-    await client.from('daily_capsule_entries').insert({
-      'user_id': userId,
-      'local_date': todayLocalDateYmd,
-      'utc_offset_minutes': deviceUtcOffsetMinutes,
-      'completion_type': completionType,
-      'story_id': storyId,
-      'memory_id': memoryId,
-      'completed_at': DateTime.now().toUtc().toIso8601String(),
-    });
+    // Allow changing today's capsule: upsert on (user_id, local_date)
+    await client.from('daily_capsule_entries').upsert(
+      {
+        'user_id': userId,
+        'local_date': todayLocalDateYmd,
+        'utc_offset_minutes': deviceUtcOffsetMinutes,
+        'completion_type': completionType,
+        // Clear mood if switching from mood to a story-based capsule
+        'mood_emoji': null,
+        'story_id': storyId,
+        'memory_id': memoryId,
+        'completed_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      onConflict: 'user_id,local_date',
+    );
 
     unawaited(upsertSettingsIfNeeded());
+  }
+
+  bool _isMissingColumn(PostgrestException e, String columnName) {
+    final msg = (e.message).toLowerCase();
+    final details = (e.details ?? '').toString().toLowerCase();
+    final hint = (e.hint ?? '').toString().toLowerCase();
+    final code = (e.code ?? '').toString();
+    final col = columnName.toLowerCase();
+
+    if (code == '42703') return true;
+    if (msg.contains('column') && msg.contains(col) && msg.contains('does not exist')) return true;
+    if (details.contains('column') && details.contains(col) && details.contains('does not exist')) {
+      return true;
+    }
+    if (hint.contains('column') && hint.contains(col) && hint.contains('does not exist')) return true;
+    return false;
   }
 
   /// Memories user can post to from Daily Capsule (excludes the hidden Daily Capsule memory).
@@ -293,13 +322,25 @@ class DailyCapsuleService {
 
     try {
       // creator memories
-      final creator = await client
-          .from('memories')
-          .select('id, title, category_icon, end_time, visibility, is_daily_capsule')
-          .eq('creator_id', userId)
-          .eq('state', 'open')
-          .eq('is_daily_capsule', false)
-          .order('created_at', ascending: false);
+      dynamic creator;
+      try {
+        creator = await client
+            .from('memories')
+            .select('id, title, category_icon, end_time, visibility, is_daily_capsule')
+            .eq('creator_id', userId)
+            .eq('state', 'open')
+            .eq('is_daily_capsule', false)
+            .order('created_at', ascending: false);
+      } on PostgrestException catch (e) {
+        // Backward-compat: if migration not applied yet, retry without is_daily_capsule.
+        if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+        creator = await client
+            .from('memories')
+            .select('id, title, category_icon, end_time, visibility')
+            .eq('creator_id', userId)
+            .eq('state', 'open')
+            .order('created_at', ascending: false);
+      }
 
       // contributed memories
       final contributed = await client
@@ -315,13 +356,23 @@ class DailyCapsuleService {
 
       List<dynamic> joined = [];
       if (ids.isNotEmpty) {
-        joined = await client
-            .from('memories')
-            .select('id, title, category_icon, end_time, visibility, is_daily_capsule')
-            .inFilter('id', ids)
-            .eq('state', 'open')
-            .eq('is_daily_capsule', false)
-            .order('created_at', ascending: false);
+        try {
+          joined = await client
+              .from('memories')
+              .select('id, title, category_icon, end_time, visibility, is_daily_capsule')
+              .inFilter('id', ids)
+              .eq('state', 'open')
+              .eq('is_daily_capsule', false)
+              .order('created_at', ascending: false);
+        } on PostgrestException catch (e) {
+          if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
+          joined = await client
+              .from('memories')
+              .select('id, title, category_icon, end_time, visibility')
+              .inFilter('id', ids)
+              .eq('state', 'open')
+              .order('created_at', ascending: false);
+        }
       }
 
       final all = <Map<String, dynamic>>[
@@ -335,6 +386,15 @@ class DailyCapsuleService {
       for (final m in all) {
         final id = (m['id'] ?? '').toString();
         if (id.isEmpty || seen.contains(id)) continue;
+
+        // Backward-compat: if we couldn't filter by is_daily_capsule in SQL,
+        // make a best-effort exclusion by title + private visibility.
+        final title = (m['title'] ?? '').toString().trim();
+        final vis = (m['visibility'] ?? '').toString().trim();
+        if (title == dailyCapsuleMemoryTitle && vis == 'private') {
+          continue;
+        }
+
         seen.add(id);
         deduped.add(m);
       }
