@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../app_export.dart';
 import '../../services/supabase_service.dart';
 import '../../services/feed_service.dart';
+import '../../services/story_service.dart';
 
 class StoryActionsSheet {
   static Future<void> show({
@@ -17,6 +18,7 @@ class StoryActionsSheet {
     required String caption,
     required bool isVideo,
     String? deepLink,
+    VoidCallback? onDeleted,
   }) async {
     // ✅ Your SupabaseService.client is nullable in this codebase
     final SupabaseClient? client = SupabaseService.instance.client;
@@ -87,10 +89,9 @@ class StoryActionsSheet {
                     if (confirm != true) return;
 
                     try {
-                      await _deleteStory(
-                        client: client,
-                        storyId: storyId,
-                      );
+                      final ok = await StoryService().deleteStory(storyId);
+                      if (!ok) throw Exception('delete failed');
+                      onDeleted?.call();
                       _toast(context, 'Deleted');
                     } catch (_) {
                       _toast(context, 'Delete failed');
@@ -110,34 +111,6 @@ class StoryActionsSheet {
         );
       },
     );
-  }
-
-  static Future<void> _deleteStory({
-    required SupabaseClient client,
-    required String storyId,
-  }) async {
-    // 1) fetch paths (if they exist)
-    final story = await client
-        .from('stories')
-        .select('media_path, thumb_path')
-        .eq('id', storyId)
-        .single();
-
-    final String? mediaPath = story['media_path'] as String?;
-    final String? thumbPath = story['thumb_path'] as String?;
-
-    // 2) delete row
-    await client.from('stories').delete().eq('id', storyId);
-
-    // 3) delete objects (bucket name may differ in your project)
-    final storage = client.storage.from('stories');
-
-    if (mediaPath != null && mediaPath.isNotEmpty) {
-      await storage.remove([mediaPath]);
-    }
-    if (thumbPath != null && thumbPath.isNotEmpty) {
-      await storage.remove([thumbPath]);
-    }
   }
 
   static Future<bool?> _confirmDelete(BuildContext context) {

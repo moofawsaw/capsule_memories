@@ -697,10 +697,89 @@ class StoryService {
   }
 
   Future<bool> _deleteStoryInternal(String storyId) async {
+    final supabase = _supabase;
+    if (supabase == null) return false;
+
+    String? _toStoryMediaPath(String? urlOrPath) {
+      if (urlOrPath == null) return null;
+      var s = urlOrPath.trim();
+      if (s.isEmpty || s == 'null' || s == 'undefined') return null;
+
+      // Stored as relative path (preferred)
+      if (!s.startsWith('http://') && !s.startsWith('https://')) {
+        if (s.startsWith('/')) s = s.substring(1);
+        if (s.startsWith('story-media/')) s = s.substring('story-media/'.length);
+        return s.isEmpty ? null : s;
+      }
+
+      // Stored as public URL -> extract bucket-relative path if possible
+      try {
+        final uri = Uri.parse(s);
+        const marker = '/storage/v1/object/public/story-media/';
+        final idx = uri.path.indexOf(marker);
+        if (idx >= 0) {
+          final p = uri.path.substring(idx + marker.length);
+          return p.isEmpty ? null : p;
+        }
+      } catch (_) {}
+
+      return null;
+    }
+
+    // Best-effort fetch of media paths for storage cleanup.
+    Map<String, dynamic>? story;
     try {
-      await _supabase?.from('stories').delete().eq('id', storyId);
+      final res = await supabase
+          .from('stories')
+          .select('image_url, video_url, thumbnail_url')
+          .eq('id', storyId)
+          .maybeSingle();
+      if (res != null) story = Map<String, dynamic>.from(res as Map);
+    } catch (_) {
+      story = null;
+    }
+
+    // 1) Best-effort storage cleanup FIRST (RLS policy checks `stories` row exists).
+    try {
+      final storage = supabase.storage.from('story-media');
+      final paths = <String>[];
+      final p1 = _toStoryMediaPath(story?['image_url'] as String?);
+      final p2 = _toStoryMediaPath(story?['video_url'] as String?);
+      final p3 = _toStoryMediaPath(story?['thumbnail_url'] as String?);
+      if (p1 != null && p1.isNotEmpty) paths.add(p1);
+      if (p2 != null && p2.isNotEmpty) paths.add(p2);
+      if (p3 != null && p3.isNotEmpty) paths.add(p3);
+      if (paths.isNotEmpty) {
+        await storage.remove(paths);
+      }
+    } catch (_) {
+      // ignore cleanup failures
+    }
+
+    // 2) Hard-delete the story row.
+    try {
+      await supabase.from('stories').delete().eq('id', storyId);
       return true;
+    } on PostgrestException catch (e) {
+      // If hard delete is blocked by RLS or schema expectations, attempt soft delete.
+      try {
+        await supabase
+            .from('stories')
+            .update({'is_disabled': true})
+            .eq('id', storyId);
+        return true;
+      } on PostgrestException catch (_) {
+        // ignore
+      } catch (_) {
+        // ignore
+      }
+
+      // ignore: avoid_print
+      print('❌ deleteStory failed: ${e.message}');
+      return false;
     } catch (e) {
+      // ignore: avoid_print
+      print('❌ deleteStory failed: $e');
       return false;
     }
   }

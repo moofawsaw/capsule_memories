@@ -6,9 +6,11 @@ import '../../core/app_export.dart';
 import '../../core/models/feed_story_context.dart';
 import '../../services/avatar_helper_service.dart';
 import '../../services/daily_capsule_service.dart';
+import '../../services/feed_service.dart';
 import '../../services/story_service.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_image_view.dart';
 import '../../widgets/standard_title_bar.dart';
 import '../memory_feed_dashboard_screen/widgets/native_camera_recording_screen.dart';
 import 'notifier/daily_capsule_notifier.dart';
@@ -24,6 +26,7 @@ class DailyCapsuleScreen extends ConsumerStatefulWidget {
 class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   final _svc = DailyCapsuleService.instance;
+  final _feedSvc = FeedService();
   final Map<String, Future<_DailyCapsuleStoryThumbData?>> _storyThumbFutures = {};
   DateTime _historyMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
@@ -1001,7 +1004,14 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
   Future<void> _onPostToMemory() async {
     await _svc.upsertSettingsIfNeeded();
 
-    final memories = await _svc.fetchEligibleMemoriesForPosting();
+    // IMPORTANT: match the app's main "Create Story" memory retrieval logic.
+    // This prevents Daily Capsule from drifting and fixes false "no open memories" cases.
+    final raw = await _feedSvc.fetchUserActiveMemories();
+    final memories = raw.where((m) {
+      final title = (m['title'] ?? '').toString().trim();
+      final vis = (m['visibility'] ?? '').toString().trim().toLowerCase();
+      return !(title == DailyCapsuleService.dailyCapsuleMemoryTitle && vis == 'private');
+    }).toList();
     if (!mounted) return;
 
     if (memories.isEmpty) {
@@ -1062,7 +1072,8 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
                     itemBuilder: (context, idx) {
                       final m = memories[idx];
                       final title = (m['title'] ?? 'Memory').toString();
-                      final icon = (m['category_icon'] ?? '').toString();
+                      final icon = (m['category_icon'] ?? '').toString().trim();
+                      final bool iconIsUrl = icon.startsWith('http://') || icon.startsWith('https://');
                       return GestureDetector(
                         onTap: () => Navigator.pop(context, m),
                         child: Container(
@@ -1073,11 +1084,21 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
                           ),
                           child: Row(
                             children: [
-                              if (icon.isNotEmpty)
+                              if (iconIsUrl)
+                                CustomImageView(
+                                  imagePath: icon,
+                                  width: 20.h,
+                                  height: 20.h,
+                                  fit: BoxFit.contain,
+                                )
+                              else if (icon.isNotEmpty)
                                 Text(icon, style: TextStyle(fontSize: 18.h))
                               else
-                                Icon(Icons.photo_library_outlined,
-                                    color: appTheme.gray_50, size: 18.h),
+                                Icon(
+                                  Icons.photo_library_outlined,
+                                  color: appTheme.gray_50,
+                                  size: 18.h,
+                                ),
                               SizedBox(width: 12.h),
                               Expanded(
                                 child: Text(
@@ -1287,3 +1308,4 @@ class _DailyCapsuleCompactStoryCard extends StatelessWidget {
     );
   }
 }
+

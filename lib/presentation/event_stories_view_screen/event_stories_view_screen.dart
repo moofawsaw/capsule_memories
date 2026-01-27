@@ -22,6 +22,7 @@ import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../services/avatar_helper_service.dart';
 import '../../services/feed_service.dart';
+import '../../services/story_service.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
@@ -2348,8 +2349,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     _safeSetState(() => _isAnyModalOpen = true);
 
     try {
-      // TODO: replace with your existing delete confirm UI + delete logic.
-      await showModalBottomSheet(
+      final bool? confirm = await showModalBottomSheet<bool>(
         context: context,
         backgroundColor: Colors.transparent,
         barrierColor: Colors.black.withAlpha(180),
@@ -2376,7 +2376,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                       Expanded(
                         child: CustomButton(
                           text: 'Cancel',
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => Navigator.pop(context, false),
                           buttonStyle: CustomButtonStyle.fillGray,
                           buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                         ),
@@ -2386,8 +2386,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                         child: CustomButton(
                           text: 'Delete',
                           onPressed: () {
-                            // TODO: your delete logic here
-                            Navigator.pop(context);
+                            Navigator.pop(context, true);
                           },
                           buttonStyle: CustomButtonStyle.fillPrimary,
                           buttonTextStyle: CustomButtonTextStyle.bodyMedium,
@@ -2401,6 +2400,84 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           );
         },
       );
+
+      if (confirm != true) return;
+
+      final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : _initialStoryId;
+      if (storyId == null || storyId.trim().isEmpty) return;
+
+      final svc = StoryService();
+      final ok = await svc.deleteStory(storyId);
+      if (!ok) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Delete failed'),
+              backgroundColor: appTheme.gray_900_01,
+            ),
+          );
+        }
+        return;
+      }
+
+      // If this viewer was opened from Daily Capsule, clear the entry's story_id reference too.
+      try {
+        final bool isDailyCapsuleViewer =
+            (_feedType ?? '').trim().toLowerCase() == 'daily_capsule';
+        if (isDailyCapsuleViewer) {
+          final client = SupabaseService.instance.client;
+          final userId = client?.auth.currentUser?.id;
+          if (client != null && userId != null) {
+            await client
+                .from('daily_capsule_entries')
+                .update({'story_id': null, 'memory_id': null})
+                .eq('user_id', userId)
+                .eq('story_id', storyId);
+          }
+        }
+      } catch (_) {
+        // best-effort
+      }
+
+      // Remove story from local viewer list and navigate appropriately.
+      final idx = _storyIds.indexOf(storyId);
+      if (idx >= 0) {
+        _storyIds.removeAt(idx);
+        if (_storyIds.isEmpty) {
+          _performHardMediaReset();
+          if (mounted) Navigator.pop(context);
+          return;
+        }
+
+        if (_currentIndex >= _storyIds.length) {
+          _currentIndex = _storyIds.length - 1;
+        }
+        _initialStoryId = _storyIds[_currentIndex];
+
+        // Reset controller to keep PageView in sync with the new list.
+        final old = _pageController;
+        _pageController = PageController(initialPage: _currentIndex);
+        try {
+          old?.dispose();
+        } catch (_) {}
+
+        _performHardMediaReset();
+        await _loadStoryAtIndex(_currentIndex);
+      } else {
+        // Fallback: just close
+        _performHardMediaReset();
+        if (mounted) Navigator.pop(context);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Deleted'),
+            backgroundColor: appTheme.gray_900_01,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } finally {
       if (!_isDisposed && mounted) {
         _safeSetState(() => _isAnyModalOpen = false);

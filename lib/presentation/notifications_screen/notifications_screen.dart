@@ -43,7 +43,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   @override
   void dispose() {
-    _cancelUndoCountdown(closeSnackBar: false);
+    // IMPORTANT: close the snackbar first, and dispose the notifier only
+    // after the snackbar is fully closed. Disposing early can crash because
+    // SnackBar's ValueListenableBuilder may still read the notifier.
+    _cancelUndoCountdown(closeSnackBar: true);
     _notificationService.unsubscribeFromNotifications();
     super.dispose();
   }
@@ -52,12 +55,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     _undoCountdownTimer?.cancel();
     _undoCountdownTimer = null;
 
+    if (closeSnackBar) {
+      // If a snackbar is showing, close it and let its `closed` callback
+      // dispose the notifier safely.
+      if (_undoSnackBarController != null) {
+        _undoSnackBarController?.close();
+        return;
+      }
+    }
+
+    // Safe to dispose now (no snackbar is showing).
     _undoCountdown?.dispose();
     _undoCountdown = null;
-
-    if (closeSnackBar) {
-      _undoSnackBarController?.close();
-    }
     _undoSnackBarController = null;
   }
 
@@ -365,12 +374,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     // Ensure we only ever have ONE countdown + ONE snackbar active.
     _cancelUndoCountdown(closeSnackBar: true);
 
-    _undoCountdown = ValueNotifier<int>(5);
+    // Each SnackBar owns its own notifier; dispose it only after `closed`.
+    final countdown = ValueNotifier<int>(5);
+    _undoCountdown = countdown;
 
     final snackBar = SnackBar(
       backgroundColor: appTheme.gray_900_01,
       content: ValueListenableBuilder<int>(
-        valueListenable: _undoCountdown!,
+        valueListenable: countdown,
         builder: (context, remainingSeconds, _) {
           return Row(
             children: [
@@ -415,19 +426,32 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final controller = ScaffoldMessenger.of(context).showSnackBar(snackBar);
     _undoSnackBarController = controller;
     controller.closed.then((_) {
-      if (!mounted) return;
-      _cancelUndoCountdown(closeSnackBar: false);
+      // Always clean up after the snackbar fully closes (even if this screen
+      // has since been disposed).
+      _undoCountdownTimer?.cancel();
+      _undoCountdownTimer = null;
+
+      try {
+        countdown.dispose();
+      } catch (_) {
+        // ignore
+      }
+
+      if (identical(_undoCountdown, countdown)) {
+        _undoCountdown = null;
+      }
+      _undoSnackBarController = null;
     });
 
     // Drive countdown + make sure snackbar is dismissed exactly at 0.
     _undoCountdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted || _undoCountdown == null) {
+      if (!mounted) {
         t.cancel();
         return;
       }
 
-      final next = _undoCountdown!.value - 1;
-      _undoCountdown!.value = next;
+      final next = countdown.value - 1;
+      countdown.value = next;
 
       if (next <= 0) {
         t.cancel();
@@ -435,7 +459,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
         // Requirement: dismiss when countdown reaches 0 (not just via duration).
         _undoSnackBarController?.close();
-        _cancelUndoCountdown(closeSnackBar: false);
+        // Do not dispose the notifier here; wait for SnackBar `closed`.
       }
     });
   }
