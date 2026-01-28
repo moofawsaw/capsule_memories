@@ -1207,9 +1207,9 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
     final Color bg = isSealed
         ? appTheme.blue_gray_300.withAlpha(38)
-        : appTheme.deep_purple_A100.withAlpha(38);
+        : appTheme.green_500.withAlpha(38);
 
-    final Color fg = isSealed ? appTheme.blue_gray_300 : appTheme.deep_purple_A100;
+    final Color fg = isSealed ? appTheme.blue_gray_300 : appTheme.green_500;
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 6.h),

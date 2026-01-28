@@ -28,6 +28,32 @@ import 'package:flutter_udid/flutter_udid.dart';
 // ✅ Platform import that doesn't break web builds.
 import 'platform_stub.dart' if (dart.library.io) 'dart:io';
 
+// ---------------------------------------------------------------------------
+// Deep link normalization
+// ---------------------------------------------------------------------------
+// Keep this as a string constant so it works in background isolate too.
+const String _dailyCapsuleDeepLink = '/app/daily-capsule';
+
+String? _normalizeDeepLinkFromData(Map<String, dynamic> data, String? raw) {
+  final candidate = (raw ?? '').toString().trim();
+
+  // If server already provided a deep link, normalize common legacy variants.
+  if (candidate.isNotEmpty) {
+    final v = candidate.replaceAll('\\', '/').trim();
+    if (v == '/daily-capsule' || v == '/daily_capsule') return _dailyCapsuleDeepLink;
+    if (v == '/app/daily_capsule' || v == '/app/dailycapsule') return _dailyCapsuleDeepLink;
+    return v;
+  }
+
+  // Fallback to known data keys
+  final kind = (data['kind'] ?? data['type'] ?? '').toString().trim().toLowerCase();
+  if (kind == 'daily_capsule_reminder' || kind == 'daily-capsule-reminder') {
+    return _dailyCapsuleDeepLink;
+  }
+
+  return null;
+}
+
 /// ---------------------------------------------------------------------------
 /// TOP-LEVEL HELPER: Create circular bitmap from image bytes
 /// Must be top-level so background isolate can access it
@@ -171,7 +197,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               styleInformation: styleInformation,
             ),
           ),
-          payload: message.data['deep_link'],
+          payload: _normalizeDeepLinkFromData(
+            message.data,
+            message.data['deep_link']?.toString(),
+          ),
         );
 
         debugPrint('✅ Android BG notification displayed: $title');
@@ -686,7 +715,10 @@ class PushNotificationService {
     await showNotification(
       title: title,
       body: body,
-      payload: message.data['deep_link']?.toString(),
+      payload: _normalizeDeepLinkFromData(
+        message.data,
+        message.data['deep_link']?.toString(),
+      ),
       id: message.hashCode,
       imageUrl: imageUrl,
       imageType: imageType,
@@ -699,13 +731,21 @@ class PushNotificationService {
   /// TAP HANDLING
   /// -------------------------------------------------------------------------
   void _handleNotificationTap(RemoteMessage message) {
-    final link = message.data['deep_link'];
+    final link = _normalizeDeepLinkFromData(
+      message.data,
+      message.data['deep_link']?.toString(),
+    );
     if (link != null) _handleDeepLink(link);
     unawaited(_refreshIosBadgeCount());
   }
 
   void _onNotificationTapped(NotificationResponse response) {
-    final link = response.payload;
+    // Local notification payloads are already "deep_link" strings, but still normalize
+    // in case older payloads used legacy paths.
+    final link = _normalizeDeepLinkFromData(
+      const <String, dynamic>{},
+      response.payload?.toString(),
+    );
     if (link != null) _handleDeepLink(link);
     unawaited(_refreshIosBadgeCount());
   }

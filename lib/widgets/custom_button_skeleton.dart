@@ -46,7 +46,7 @@ class _CustomButtonSkeletonState extends State<CustomButtonSkeleton>
           height: widget.height ?? 48.h,
           margin: widget.margin,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24.h),
+            borderRadius: BorderRadius.circular(6.h),
             gradient: LinearGradient(
               begin: Alignment(-1.0 - _shimmerController.value * 2, 0.0),
               end: Alignment(1.0 - _shimmerController.value * 2, 0.0),

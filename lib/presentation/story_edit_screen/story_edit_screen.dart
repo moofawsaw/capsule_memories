@@ -99,19 +99,31 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
       final response = await client
           .from('memories')
           .select(
-          'created_at, location_name, visibility, memory_categories(icon_url)')
+          'created_at, location_name, visibility, category_icon, memory_categories(icon_url)')
           .eq('id', widget.memoryId)
           .single();
 
       final rawCategory = response['memory_categories'];
+      final fallbackIcon = (response['category_icon'] as String?)?.trim() ?? '';
 
       Map<String, dynamic>? category;
       if (rawCategory is Map) {
         category = Map<String, dynamic>.from(rawCategory);
       }
 
+      String? resolvedUrl = category?['icon_url']?.toString().trim();
+      if ((resolvedUrl == null || resolvedUrl.isEmpty) &&
+          (fallbackIcon.startsWith('http://') || fallbackIcon.startsWith('https://'))) {
+        resolvedUrl = fallbackIcon;
+      }
+      if ((resolvedUrl == null || resolvedUrl.isEmpty) &&
+          (widget.categoryIcon?.trim().startsWith('http://') == true ||
+              widget.categoryIcon?.trim().startsWith('https://') == true)) {
+        resolvedUrl = widget.categoryIcon?.trim();
+      }
+
       setState(() {
-        _categoryIconUrl = category?['icon_url']?.toString();
+        _categoryIconUrl = resolvedUrl;
         _createdAt = DateTime.tryParse(response['created_at']?.toString() ?? '');
         _locationName = response['location_name']?.toString();
         _memoryVisibility = response['visibility']?.toString();

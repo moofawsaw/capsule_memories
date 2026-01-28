@@ -759,6 +759,8 @@ class StoryService {
     // 2) Hard-delete the story row.
     try {
       await supabase.from('stories').delete().eq('id', storyId);
+      // Best-effort: clear Daily Capsule references to this story for current user.
+      _clearDailyCapsuleRefsBestEffort(storyId);
       return true;
     } on PostgrestException catch (e) {
       // If hard delete is blocked by RLS or schema expectations, attempt soft delete.
@@ -767,6 +769,7 @@ class StoryService {
             .from('stories')
             .update({'is_disabled': true})
             .eq('id', storyId);
+        _clearDailyCapsuleRefsBestEffort(storyId);
         return true;
       } on PostgrestException catch (_) {
         // ignore
@@ -781,6 +784,23 @@ class StoryService {
       // ignore: avoid_print
       print('❌ deleteStory failed: $e');
       return false;
+    }
+  }
+
+  void _clearDailyCapsuleRefsBestEffort(String storyId) {
+    try {
+      final uid = _supabase?.auth.currentUser?.id;
+      if (uid == null || uid.isEmpty) return;
+      // Don't await: deletion should not be blocked by this cleanup.
+      unawaited(
+        _supabase!
+            .from('daily_capsule_entries')
+            .update({'story_id': null, 'memory_id': null})
+            .eq('user_id', uid)
+            .eq('story_id', storyId),
+      );
+    } catch (_) {
+      // ignore
     }
   }
 

@@ -1096,18 +1096,35 @@ class MemoryFeedDashboardNotifier
       final contributors = response['memory_contributors'] as List;
       final stories = response['stories'] as List;
 
+      // Normalize contributor avatar URLs so realtime-inserted cards render correctly.
+      // If we pass raw storage paths (or nulls) here, the card will treat them as
+      // "provided" and will NOT refetch, resulting in broken avatars until refresh.
+      final List<String> contributorAvatars = [];
+      for (final c in contributors) {
+        if (c is! Map) continue;
+        final dynamic profile =
+            c['user_profiles'] ?? c['user_profiles_public'];
+        String? raw;
+        if (profile is Map) {
+          raw = (profile['avatar_url'] as String?)?.trim();
+        } else {
+          raw = (c['avatar_url'] as String?)?.trim();
+        }
+        final resolved = StorageUtils.resolveAvatarUrl(raw) ?? '';
+        if (resolved.isNotEmpty) contributorAvatars.add(resolved);
+      }
+
       final newMemoryData = CustomMemoryItem(
         id: response['id'],
         title: response['title'],
         date: DateTime.parse(response['start_time']).toString(),
         iconPath: response['memory_categories']['icon_url'] ?? '',
-        profileImages: contributors
-            .map((c) => c['user_profiles']['avatar_url'] as String)
-            .toList(),
+        profileImages: contributorAvatars,
         mediaItems: stories
             .map(
               (s) => CustomMediaItem(
-            imagePath: s['thumbnail_url'] ?? '',
+            imagePath: StorageUtils.resolveStoryMediaUrl(s['thumbnail_url']) ??
+                (s['thumbnail_url'] ?? ''),
             hasPlayButton: s['video_url'] != null,
           ),
         )

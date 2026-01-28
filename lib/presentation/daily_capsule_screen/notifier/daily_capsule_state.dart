@@ -8,6 +8,8 @@ class DailyCapsuleState extends Equatable {
   final int streakCount;
   final String? errorMessage;
 
+  static const _Unset _unset = _Unset();
+
   const DailyCapsuleState({
     this.isLoading = false,
     this.isCompleting = false,
@@ -20,7 +22,7 @@ class DailyCapsuleState extends Equatable {
   DailyCapsuleState copyWith({
     bool? isLoading,
     bool? isCompleting,
-    Map<String, dynamic>? todayEntry,
+    Object? todayEntry = _unset,
     List<Map<String, dynamic>>? archiveEntries,
     int? streakCount,
     String? errorMessage,
@@ -28,7 +30,10 @@ class DailyCapsuleState extends Equatable {
     return DailyCapsuleState(
       isLoading: isLoading ?? this.isLoading,
       isCompleting: isCompleting ?? this.isCompleting,
-      todayEntry: todayEntry ?? this.todayEntry,
+      // Allow explicitly clearing todayEntry by passing null.
+      todayEntry: identical(todayEntry, _unset)
+          ? this.todayEntry
+          : todayEntry as Map<String, dynamic>?,
       archiveEntries: archiveEntries ?? this.archiveEntries,
       streakCount: streakCount ?? this.streakCount,
       errorMessage: errorMessage,
@@ -44,5 +49,9 @@ class DailyCapsuleState extends Equatable {
         streakCount,
         errorMessage,
       ];
+}
+
+class _Unset {
+  const _Unset();
 }
 

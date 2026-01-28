@@ -23,6 +23,23 @@ class UserMenuScreen extends ConsumerStatefulWidget {
 class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   bool _avatarLoadRequested = false;
 
+  Widget _newBadge() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: appTheme.deep_purple_A100,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        'NEW',
+        style: TextStyleHelper.instance.body12BoldPlusJakartaSans.copyWith(
+          color: appTheme.gray_900_02,
+          letterSpacing: 0.6,
+        ),
+      ),
+    );
+  }
+
   bool _isNetworkUrl(String? s) {
     final v = (s ?? '').trim();
     return v.startsWith('http://') || v.startsWith('https://');
@@ -374,6 +391,7 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
       CustomNavigationDrawerItem(
         icon: Icons.auto_awesome_rounded,
         label: 'Daily Capsule',
+        trailing: _newBadge(),
         onTap: () => onTapDailyCapsule(context),
       ),
       CustomNavigationDrawerItem(

@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
@@ -47,44 +47,96 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
       print(
           '🔍 QR TIMELINE SHARE: Fetching memory details for: ${widget.memoryId}');
 
-      // Fetch memory with all necessary details INCLUDING qr_code_url
-      final response =
-          await SupabaseService.instance.client?.from('memories').select('''
-            id,
-            title,
-            invite_code,
-            qr_code_url,
-            contributor_count,
-            state,
-            created_at,
-            location_name,
-            user_profiles!memories_creator_id_fkey(
-              id,
-              username,
-              display_name,
-              avatar_url
-            )
-          ''').eq('id', widget.memoryId).single();
-
-      if (response == null) {
+      final memoryId = widget.memoryId.trim();
+      if (memoryId.isEmpty) {
         setState(() {
-          _errorMessage = 'Memory not found';
+          _errorMessage = 'Missing memory id';
           _isLoading = false;
         });
         return;
       }
 
-      // Fetch stories count
-      final storiesResponse = await SupabaseService.instance.client
-          ?.from('stories')
-          .select('id')
-          .eq('memory_id', widget.memoryId);
+      final client = SupabaseService.instance.client;
+      if (client == null) {
+        setState(() {
+          _errorMessage = 'Not connected (Supabase not initialized)';
+          _isLoading = false;
+        });
+        return;
+      }
 
-      final storiesCount = storiesResponse?.length ?? 0;
+      final user = client.auth.currentUser;
+      if (user == null) {
+        setState(() {
+          _errorMessage = 'Not authenticated';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Fetch memory details.
+      //
+      // IMPORTANT:
+      // This screen previously relied on a PostgREST relationship join:
+      // `user_profiles!memories_creator_id_fkey(...)`.
+      // If the relationship isn't present in the schema cache (common in dev/staging
+      // when migrations differ), PostgREST throws and we end up stuck on "Retry".
+      //
+      // Fix: fetch the memory row without any relationship joins, and treat counts as
+      // best-effort so the sheet still loads even if auxiliary queries fail.
+      //
+      // NOTE: To be schema-tolerant across environments, we intentionally use
+      // `select()` (all columns) rather than selecting explicit column names.
+      // Selecting a non-existent column causes PostgREST to throw.
+      final response = await client.from('memories').select().eq('id', memoryId).maybeSingle();
+
+      if (response == null) {
+        setState(() {
+          _errorMessage = 'Memory not found (or you do not have access)';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Count stories + members (best-effort; don't break the sheet if these fail)
+      int storiesCount = 0;
+      int membersCount = 0;
+      try {
+        final storiesCountRes = await client
+            .from('stories')
+            .select('id')
+            .eq('memory_id', memoryId)
+            .count(CountOption.exact);
+        storiesCount = storiesCountRes.count;
+      } catch (e) {
+        // ignore: avoid_print
+        print('⚠️ QR TIMELINE SHARE: Failed to count stories: $e');
+      }
+      try {
+        final membersCountRes = await client
+            .from('memory_contributors')
+            .select('user_id')
+            .eq('memory_id', memoryId)
+            .count(CountOption.exact);
+        membersCount = membersCountRes.count;
+      } catch (e) {
+        // ignore: avoid_print
+        print('⚠️ QR TIMELINE SHARE: Failed to count members: $e');
+      }
+
+      // contributor_count is optional (may not exist in older schemas)
+      final rawContributorCount = response['contributor_count'];
+      final contributorCount = (rawContributorCount is int)
+          ? rawContributorCount
+          : int.tryParse(rawContributorCount?.toString() ?? '') ?? 0;
+      // Prefer explicit membersCount if it looks valid, else fallback to contributor_count.
+      final resolvedMembersCount =
+          (membersCount > contributorCount) ? membersCount : contributorCount;
       print('✅ QR TIMELINE SHARE: Successfully loaded memory');
-      print('   - Title: ${response['title']}');
+      print('   - Title: ${response['title'] ?? response['name']}');
       print('   - Invite Code: ${response['invite_code']}');
       print('   - QR Code URL: ${response['qr_code_url']}');
+      print('   - Members: $resolvedMembersCount');
       print('   - Stories: $storiesCount');
 
       // 🔍 ENHANCED DEBUG - Check qr_code_url status
@@ -97,16 +149,35 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
       print('   - Full response keys: ${response.keys.toList()}');
 
       setState(() {
+        final title = ((response['title'] ?? '') as dynamic).toString().trim();
+        final name = ((response['name'] ?? '') as dynamic).toString().trim();
         _memoryData = {
           ...response,
+          // Normalize for the existing UI extraction:
+          'title': title.isNotEmpty ? title : (name.isNotEmpty ? name : null),
+          'contributor_count': resolvedMembersCount,
           'stories_count': storiesCount,
         };
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, st) {
       print('❌ ERROR fetching memory for QR share: $e');
+      print(st);
+
+      String message = 'Failed to load memory details';
+      if (e is PostgrestException) {
+        final code = (e.code ?? '').toString();
+        final details = (e.details ?? '').toString();
+        final hint = (e.hint ?? '').toString();
+        // Provide something actionable in the UI.
+        message = e.message;
+        if (code.isNotEmpty) message = '$message (code: $code)';
+        if (details.isNotEmpty) message = '$message\n$details';
+        if (hint.isNotEmpty) message = '$message\n$hint';
+      }
+
       setState(() {
-        _errorMessage = 'Failed to load memory details';
+        _errorMessage = message;
         _isLoading = false;
       });
     }
@@ -182,7 +253,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
               Text(
                 _errorMessage ?? 'Failed to load memory',
                 style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                    .copyWith(color: appTheme.white_A700),
+                    .copyWith(color: appTheme.gray_50),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 16.h),
@@ -237,7 +308,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         Text(
           'Share Memory',
           style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-              .copyWith(color: appTheme.white_A700),
+              .copyWith(color: appTheme.gray_50),
         ),
         SizedBox(height: 8.h),
         Text(
@@ -254,7 +325,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         Text(
           memoryTitle,
           style: TextStyleHelper.instance.title20BoldPlusJakartaSans
-              .copyWith(color: appTheme.white_A700),
+              .copyWith(color: appTheme.gray_50),
           textAlign: TextAlign.center,
         ),
         if (locationName != null) ...[
@@ -341,7 +412,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         Text(
           value,
           style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
-              .copyWith(color: appTheme.white_A700),
+              .copyWith(color: appTheme.gray_50),
         ),
         SizedBox(height: 4.h),
         Text(
@@ -413,7 +484,8 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
 
   /// Copy URL to clipboard with correct deep link
   void _copyUrlToClipboard() async {
-    final inviteCode = _memoryData!['invite_code'] as String;
+    final inviteCode = (_memoryData?['invite_code'] as String?)?.trim() ?? '';
+    if (inviteCode.isEmpty) return;
     final url = 'https://capapp.co/join/memory/$inviteCode';
 
     await Clipboard.setData(ClipboardData(text: url));
@@ -438,18 +510,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         });
       }
     });
-  }
-
-  /// Download QR code as image
-  void _downloadQRCode() {
-    // TODO: Implement QR code download functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('QR code download feature coming soon'),
-        backgroundColor: appTheme.deep_purple_A100,
-        duration: Duration(seconds: 2),
-      ),
-    );
   }
 
   /// Share link via system share sheet

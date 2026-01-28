@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../core/app_export.dart';
 
@@ -59,8 +61,54 @@ class CustomQrCodeCard extends StatelessWidget {
     final hasData = qrData != null && qrData!.trim().isNotEmpty;
 
     if (hasNetwork) {
-      content = Image.network(
-        qrImageUrl!,
+      final url = qrImageUrl!.trim();
+      final lower = url.toLowerCase();
+      final isSvg = lower.endsWith('.svg') || lower.contains('image/svg');
+
+      if (isSvg) {
+        content = FutureBuilder<String>(
+          future: _fetchSvg(url),
+          builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return SizedBox(
+                width: size,
+                height: size,
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: appTheme.deep_purple_A100,
+                  ),
+                ),
+              );
+            }
+
+            if (snap.hasError || (snap.data ?? '').trim().isEmpty) {
+              if (onImageErrorFallbackToGenerated && hasData) {
+                return _buildGeneratedQr(size);
+              }
+              return SizedBox(
+                width: size,
+                height: size,
+                child: Center(
+                  child: Icon(
+                    Icons.qr_code_2_rounded,
+                    color: appTheme.gray_900_02,
+                    size: 36.h,
+                  ),
+                ),
+              );
+            }
+
+            return SvgPicture.string(
+              snap.data!,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+            );
+          },
+        );
+      } else {
+        content = Image.network(
+          url,
         width: size,
         height: size,
         fit: BoxFit.contain,
@@ -97,7 +145,8 @@ class CustomQrCodeCard extends StatelessWidget {
             ),
           );
         },
-      );
+        );
+      }
     } else if (hasAsset) {
       content = Image.asset(
         assetImagePath!,
@@ -136,5 +185,13 @@ class CustomQrCodeCard extends StatelessWidget {
       backgroundColor: appTheme.white_A700,
       foregroundColor: appTheme.blackCustom,
     );
+  }
+
+  static Future<String> _fetchSvg(String url) async {
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return res.body;
+    }
+    throw Exception('Failed to load SVG (${res.statusCode})');
   }
 }

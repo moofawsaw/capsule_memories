@@ -77,6 +77,10 @@ class CustomNavigationDrawer extends StatelessWidget {
                       .copyWith(color: appTheme.gray_50),
             ),
           ),
+          if (item.trailing != null) ...[
+            SizedBox(width: 10.h),
+            item.trailing!,
+          ],
         ],
       ),
     );
@@ -89,6 +93,7 @@ class CustomNavigationDrawerItem {
     required this.icon,
     required this.label,
     this.onTap,
+    this.trailing,
   });
 
   /// Material Design icon for the menu item
@@ -99,4 +104,7 @@ class CustomNavigationDrawerItem {
 
   /// Callback function when item is tapped
   final VoidCallback? onTap;
+
+  /// Optional trailing widget (e.g., badge)
+  final Widget? trailing;
 }

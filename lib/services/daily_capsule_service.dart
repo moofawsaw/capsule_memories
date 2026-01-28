@@ -14,11 +14,79 @@ class DailyCapsuleService {
   SupabaseClient? get _client => SupabaseService.instance.client;
 
   static const String dailyCapsuleMemoryTitle = 'Daily Capsule';
+  static const String userTagTable = 'user_tags';
+  static const String _dailyCapsuleCategoryEmoji = '🗓️';
+
+  Future<void> _ensureContributorForMemory({
+    required String memoryId,
+    required String userId,
+  }) async {
+    final client = _client;
+    if (client == null) return;
+    final mid = memoryId.trim();
+    final uid = userId.trim();
+    if (mid.isEmpty || uid.isEmpty) return;
+    try {
+      await client.from('memory_contributors').insert({
+        'memory_id': mid,
+        'user_id': uid,
+        'joined_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {
+      // best-effort; ignore duplicates / RLS / schema variants
+    }
+  }
+
+  Future<String?> _fetchDefaultCategoryId() async {
+    final client = _client;
+    if (client == null) return null;
+    try {
+      // Prefer a "Custom" category if it exists; else fall back to first active category.
+      dynamic row;
+      try {
+        row = await client
+            .from('memory_categories')
+            .select('id')
+            .eq('is_active', true)
+            .ilike('name', '%custom%')
+            .maybeSingle();
+      } catch (_) {
+        row = null;
+      }
+      if (row is Map && (row['id'] ?? '').toString().trim().isNotEmpty) {
+        return row['id']?.toString();
+      }
+
+      row = await client
+          .from('memory_categories')
+          .select('id')
+          .eq('is_active', true)
+          .order('display_order', ascending: true)
+          .limit(1)
+          .maybeSingle();
+      if (row is Map && (row['id'] ?? '').toString().trim().isNotEmpty) {
+        return row['id']?.toString();
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Device offset in minutes from UTC (ex: PST = -480).
   int get deviceUtcOffsetMinutes => DateTime.now().timeZoneOffset.inMinutes;
 
   DateTime get _nowLocal => DateTime.now();
+
+  String _normalizeTagName(String input) {
+    var t = input.trim();
+    if (t.startsWith('#')) t = t.substring(1).trim();
+    // collapse internal whitespace
+    t = t.replaceAll(RegExp(r'\s+'), ' ');
+    return t;
+  }
+
+  String _normalizeTagKey(String input) => _normalizeTagName(input).toLowerCase();
 
   String get todayLocalDateYmd {
     final now = _nowLocal;
@@ -86,7 +154,7 @@ class DailyCapsuleService {
       try {
         final raw = await client
             .from('memories')
-            .select('id')
+            .select('id, category_id, category_icon')
             .eq('creator_id', userId)
             .eq('is_daily_capsule', true)
             .maybeSingle();
@@ -100,7 +168,7 @@ class DailyCapsuleService {
         // Backward-compat: fall back to title match until migration applied.
         final raw = await client
             .from('memories')
-            .select('id')
+            .select('id, category_id, category_icon')
             .eq('creator_id', userId)
             .eq('title', dailyCapsuleMemoryTitle)
             .eq('visibility', 'private')
@@ -109,10 +177,48 @@ class DailyCapsuleService {
       }
 
       final id = existing?['id']?.toString();
-      if (id != null && id.isNotEmpty) return id;
+      if (id != null && id.isNotEmpty) {
+        // Ensure the creator is a contributor (so member count + memory info works everywhere).
+        unawaited(_ensureContributorForMemory(memoryId: id, userId: userId));
+
+        // Backfill category_id for existing Daily Capsule memory so UIs can render category icons.
+        final existingCategoryId = (existing?['category_id'] ?? '').toString().trim();
+        if (existingCategoryId.isEmpty) {
+          final categoryId = await _fetchDefaultCategoryId();
+          if (categoryId != null && categoryId.isNotEmpty) {
+            try {
+              await client.from('memories').update({
+                'category_id': categoryId,
+                'category_icon': _dailyCapsuleCategoryEmoji,
+              }).eq('id', id);
+            } catch (_) {
+              // best-effort
+            }
+          } else {
+            // At least provide a local/emoji icon for places that use category_icon directly.
+            try {
+              await client.from('memories').update({
+                'category_icon': _dailyCapsuleCategoryEmoji,
+              }).eq('id', id);
+            } catch (_) {}
+          }
+        } else {
+          // Ensure category_icon is populated (best-effort)
+          final existingIcon = (existing?['category_icon'] ?? '').toString().trim();
+          if (existingIcon.isEmpty) {
+            try {
+              await client.from('memories').update({
+                'category_icon': _dailyCapsuleCategoryEmoji,
+              }).eq('id', id);
+            } catch (_) {}
+          }
+        }
+        return id;
+      }
 
       final nowUtc = DateTime.now().toUtc();
       final farFuture = DateTime.utc(2200, 1, 1);
+      final categoryId = await _fetchDefaultCategoryId();
 
       Map<String, dynamic> created;
       try {
@@ -121,6 +227,8 @@ class DailyCapsuleService {
             .insert({
               'title': dailyCapsuleMemoryTitle,
               'creator_id': userId,
+              if (categoryId != null && categoryId.isNotEmpty) 'category_id': categoryId,
+              'category_icon': _dailyCapsuleCategoryEmoji,
               'visibility': 'private',
               'duration': '3_days',
               'state': 'open',
@@ -143,6 +251,8 @@ class DailyCapsuleService {
             .insert({
               'title': dailyCapsuleMemoryTitle,
               'creator_id': userId,
+              if (categoryId != null && categoryId.isNotEmpty) 'category_id': categoryId,
+              'category_icon': _dailyCapsuleCategoryEmoji,
               'visibility': 'private',
               'duration': '3_days',
               'state': 'open',
@@ -155,7 +265,11 @@ class DailyCapsuleService {
         created = (raw as Map).cast<String, dynamic>();
       }
 
-      return created['id']?.toString();
+      final newId = created['id']?.toString();
+      if (newId != null && newId.trim().isNotEmpty) {
+        unawaited(_ensureContributorForMemory(memoryId: newId, userId: userId));
+      }
+      return newId;
     } on PostgrestException catch (e) {
       debugPrint('❌ ensureDailyCapsuleMemoryId failed: ${e.message}');
       return null;
@@ -181,6 +295,152 @@ class DailyCapsuleService {
       return Map<String, dynamic>.from(res);
     } catch (_) {
       return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchUserTags({int limit = 100}) async {
+    final client = _client;
+    final userId = client?.auth.currentUser?.id;
+    if (client == null || userId == null) return [];
+
+    try {
+      try {
+        final res = await client
+            .from(userTagTable)
+            .select('id, name, normalized_name, color_hex, created_at')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .limit(limit);
+        return List<Map<String, dynamic>>.from(res as List? ?? const []);
+      } on PostgrestException catch (e) {
+        // Backward-compat: if color_hex hasn't been migrated yet.
+        if (!_isMissingColumn(e, 'color_hex')) rethrow;
+        final res = await client
+            .from(userTagTable)
+            .select('id, name, normalized_name, created_at')
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .limit(limit);
+        return List<Map<String, dynamic>>.from(res as List? ?? const []);
+      }
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> createOrGetUserTag(
+    String name, {
+    String? colorHex,
+  }) async {
+    final client = _client;
+    final userId = client?.auth.currentUser?.id;
+    if (client == null || userId == null) return null;
+
+    final normalized = _normalizeTagName(name);
+    if (normalized.isEmpty) return null;
+
+    final key = _normalizeTagKey(normalized);
+    final safeColor = (colorHex ?? '#8B5CF6').toString().trim();
+
+    try {
+      // Upsert by (user_id, normalized_name) and return row.
+      try {
+        final res = await client
+            .from(userTagTable)
+            .upsert(
+              {
+                'user_id': userId,
+                'name': normalized,
+                'normalized_name': key,
+                'color_hex': safeColor,
+                'created_at': DateTime.now().toUtc().toIso8601String(),
+              },
+              onConflict: 'user_id,normalized_name',
+            )
+            .select('id, name, normalized_name, color_hex, created_at')
+            .single();
+        return Map<String, dynamic>.from(res as Map);
+      } on PostgrestException catch (e) {
+        // Backward-compat: if color_hex hasn't been migrated yet.
+        if (!_isMissingColumn(e, 'color_hex')) rethrow;
+        final res = await client
+            .from(userTagTable)
+            .upsert(
+              {
+                'user_id': userId,
+                'name': normalized,
+                'normalized_name': key,
+                'created_at': DateTime.now().toUtc().toIso8601String(),
+              },
+              onConflict: 'user_id,normalized_name',
+            )
+            .select('id, name, normalized_name, created_at')
+            .single();
+        return Map<String, dynamic>.from(res as Map);
+      }
+    } catch (_) {
+      // If schema isn't applied yet, fail silently.
+      return null;
+    }
+  }
+
+  Future<bool> setTodayTag({required String tagId}) async {
+    final client = _client;
+    final userId = client?.auth.currentUser?.id;
+    if (client == null || userId == null) return false;
+
+    try {
+      await client
+          .from('daily_capsule_entries')
+          .update({'tag_id': tagId})
+          .eq('user_id', userId)
+          .eq('local_date', todayLocalDateYmd);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> clearTodayTag() async {
+    final client = _client;
+    final userId = client?.auth.currentUser?.id;
+    if (client == null || userId == null) return false;
+
+    try {
+      await client
+          .from('daily_capsule_entries')
+          .update({'tag_id': null})
+          .eq('user_id', userId)
+          .eq('local_date', todayLocalDateYmd);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<List<String>> fetchStoryIdsForTag(String tagId, {int limit = 200}) async {
+    final client = _client;
+    final userId = client?.auth.currentUser?.id;
+    if (client == null || userId == null) return [];
+
+    try {
+      final res = await client
+          .from('daily_capsule_entries')
+          .select('story_id')
+          .eq('user_id', userId)
+          .eq('tag_id', tagId)
+          .not('story_id', 'is', null)
+          .order('local_date', ascending: false)
+          .limit(limit);
+
+      final ids = <String>[];
+      for (final r in (res as List? ?? const [])) {
+        final id = (r as Map)['story_id']?.toString();
+        if (id != null && id.isNotEmpty) ids.add(id);
+      }
+      return ids;
+    } catch (_) {
+      return [];
     }
   }
 
@@ -229,6 +489,23 @@ class DailyCapsuleService {
       );
     } catch (_) {
       return 0;
+    }
+
+    // If the user hasn't completed *today* yet, the streak should still reflect
+    // consecutive completions up through yesterday (or the most recent day).
+    // Example: user completed yesterday, it's now just after midnight -> streak should be 1.
+    if (entriesDesc.isNotEmpty) {
+      final first = parseDate(entriesDesc.first['local_date']);
+      if (first != null) {
+        final todayOnly = DateTime(expected.year, expected.month, expected.day);
+        final diffDays = todayOnly.difference(first).inDays;
+        // If newest entry is exactly yesterday (diffDays == 1), start from yesterday.
+        // If newest entry is today (diffDays == 0), keep expected as today.
+        // Otherwise (gap or future), keep expected as today; loop below will yield 0.
+        if (diffDays == 1) {
+          expected = expected.subtract(const Duration(days: 1));
+        }
+      }
     }
 
     for (final e in entriesDesc) {

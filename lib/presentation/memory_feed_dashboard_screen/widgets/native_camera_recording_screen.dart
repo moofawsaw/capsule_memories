@@ -680,6 +680,7 @@ class _NativeCameraRecordingScreenState
   @override
   Widget build(BuildContext context) {
     return SafeArea(
+      bottom: false,
       child: Scaffold(
         backgroundColor: Colors.black,
         body: _errorMessage != null

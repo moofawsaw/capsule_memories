@@ -296,6 +296,7 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
               ? () => NavigatorService.pushNamed(AppRoutes.appFollowers)
               : null,
           child: CustomStatCard(
+            textColor: appTheme.gray_50,
             count: model?.followersCount ?? '0',
             label: 'followers',
           ),
@@ -307,6 +308,7 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
               ? () => NavigatorService.pushNamed(AppRoutes.appFollowing)
               : null,
           child: CustomStatCard(
+            textColor: appTheme.gray_50,
             count: model?.followingCount ?? '0',
             label: 'following',
           ),
@@ -325,8 +327,17 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
     );
 
     final setStyle = CustomButtonStyle(
-      backgroundColor: appTheme.blue_gray_900, // "set" state
-      variant: CustomButtonVariant.fill,
+      // "Set" state should be obviously different than the filled/unset state.
+      // Use an outline style with light text on dark background.
+      backgroundColor: appTheme.transparentCustom,
+      borderSide: BorderSide(color: appTheme.gray_50, width: 1.5),
+      variant: CustomButtonVariant.outline,
+    );
+
+    final setTextStyle = CustomButtonTextStyle(
+      color: appTheme.gray_50,
+      fontSize: 16,
+      fontWeight: FontWeight.w700,
     );
 
     return Row(
@@ -336,6 +347,7 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             text: state.isFollowing ? 'Unfollow' : 'Follow',
             leftIcon: state.isFollowing ? Icons.person_remove : Icons.person_add,
             buttonStyle: state.isFollowing ? setStyle : unsetStyle,
+            buttonTextStyle: state.isFollowing ? setTextStyle : null,
             onPressed: notifier.toggleFollow,
           ),
         ),
@@ -345,6 +357,7 @@ class _UserProfileScreenTwoState extends ConsumerState<UserProfileScreenTwo> {
             text: state.isFriend ? 'Unfriend' : 'Add Friend',
             leftIcon: state.isFriend ? Icons.person_remove : Icons.group_add,
             buttonStyle: state.isFriend ? setStyle : unsetStyle,
+            buttonTextStyle: state.isFriend ? setTextStyle : null,
             onPressed:
             state.isFriend ? notifier.unfriendUser : notifier.sendFriendRequest,
           ),

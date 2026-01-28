@@ -68,6 +68,11 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   bool _isCurrentVideoInitialized = false;
   bool _isNextVideoInitialized = false;
 
+  // ✅ Keep the immediate previous video controller for fast back navigation.
+  // This avoids re-buffering when users go forward then quickly back.
+  VideoPlayerController? _prevVideoController;
+  int? _prevVideoIndex;
+
   PageController? _pageController;
 
   // Timer animation controllers
@@ -570,6 +575,16 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       VideoPlayerController? prefetchedVideo = _takePrefetchedVideo(index);
       bool prefetchedVideoInitialized = _isControllerUsable(prefetchedVideo);
 
+      // ✅ If we cached the immediate previous controller (fast back), reuse it.
+      if (prefetchedVideo == null &&
+          _prevVideoIndex == index &&
+          _isControllerUsable(_prevVideoController)) {
+        prefetchedVideo = _prevVideoController;
+        prefetchedVideoInitialized = true;
+        _prevVideoController = null;
+        _prevVideoIndex = null;
+      }
+
       if (storyData == null &&
           _nextStoryData != null &&
           _nextStoryData!['id'] == storyId) {
@@ -727,14 +742,19 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         _stopFastForwardHold();
       }
 
+      // Remember the index we are leaving so we can keep its controller for fast back.
+      final previousIndex = _currentIndex;
+
       _safeSetState(() {
         _currentIndex = newIndex;
         _initialStoryId = storyId;
+        // Navigating between stories should resume playback.
+        _isPaused = false;
       });
 
       await _crossfadeController?.forward();
 
-      await _swapMediaSlots();
+      await _swapMediaSlots(previousIndex: previousIndex);
 
       _isTransitioning = false;
 
@@ -756,12 +776,21 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     }
   }
 
-  Future<void> _swapMediaSlots() async {
+  Future<void> _swapMediaSlots({required int previousIndex}) async {
     if (_currentVideoController != null) {
+      // Keep the previous controller alive for instant back navigation.
       try {
         await _currentVideoController!.pause();
-        await _currentVideoController!.dispose();
       } catch (_) {}
+
+      // Cap memory: keep at most 1 previous controller.
+      if (_prevVideoController != null) {
+        try {
+          await _prevVideoController!.dispose();
+        } catch (_) {}
+      }
+      _prevVideoController = _currentVideoController;
+      _prevVideoIndex = previousIndex;
     }
 
     _currentStoryData = _nextStoryData;
@@ -794,6 +823,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
             state,
             creator_id,
             category_id,
+            category_icon,
             memory_categories(name, icon_name, icon_url)
           ''').eq('id', memoryId).single();
 
@@ -811,6 +841,15 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         }
       } else if (iconUrl != null && iconUrl.isNotEmpty) {
         resolvedCategoryIcon = iconUrl;
+      }
+
+      // Fallback: some memories may have no category_id join but do have category_icon set.
+      if (resolvedCategoryIcon == null || resolvedCategoryIcon.trim().isEmpty) {
+        final fallback = (response['category_icon'] as String?)?.trim();
+        if (fallback != null &&
+            (fallback.startsWith('http://') || fallback.startsWith('https://'))) {
+          resolvedCategoryIcon = fallback;
+        }
       }
 
       // Fetch participant avatars for snapshot navigation (best-effort).
@@ -944,6 +983,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
     if (_currentIndex < _storyIds.length - 1) {
       _triggerHapticFeedback(HapticFeedbackType.light);
+      // ✅ Always resume on navigation (fixes "back/forward doesn't play").
+      _safeSetState(() => _isPaused = false);
 
       _pageController?.nextPage(
         duration: const Duration(milliseconds: 260),
@@ -970,6 +1011,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
     if (_currentIndex > 0) {
       _triggerHapticFeedback(HapticFeedbackType.light);
+      // ✅ Always resume on navigation (fixes "back doesn't play").
+      _safeSetState(() => _isPaused = false);
 
       _pageController?.previousPage(
         duration: const Duration(milliseconds: 260),
@@ -1064,7 +1107,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     _isDisposed = true;
     _isActiveInTree = false;
     WidgetsBinding.instance.removeObserver(this);
-    _performHardMediaReset();
+    _immediateMuteAndPauseAllVideos();
+    // Best-effort hard stop; dispose can't await.
+    unawaited(_performHardMediaReset());
     _timerController?.dispose();
     _crossfadeController?.dispose();
     _pageController?.dispose();
@@ -1086,8 +1131,43 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     super.dispose();
   }
 
-  void _performHardMediaReset() {
+  void _immediateMuteAndPauseAllVideos() {
+    // Do a synchronous "audio kill switch" first. This prevents intermittent
+    // background playback during route pop gestures while we await disposals.
     try {
+      _currentVideoController?.setVolume(0.0);
+    } catch (_) {}
+    try {
+      _currentVideoController?.pause();
+    } catch (_) {}
+
+    try {
+      _nextVideoController?.setVolume(0.0);
+    } catch (_) {}
+    try {
+      _nextVideoController?.pause();
+    } catch (_) {}
+
+    try {
+      _prevVideoController?.setVolume(0.0);
+    } catch (_) {}
+    try {
+      _prevVideoController?.pause();
+    } catch (_) {}
+
+    for (final ctrl in _prefetchVideoByIndex.values) {
+      try {
+        ctrl.setVolume(0.0);
+      } catch (_) {}
+      try {
+        ctrl.pause();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _performHardMediaReset() async {
+    try {
+      _immediateMuteAndPauseAllVideos();
       _loadToken++;
       _timerController?.stop();
       _timerController?.reset();
@@ -1105,24 +1185,66 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         } catch (_) {}
         _currentVideoEndListener = null;
 
-        _currentVideoController!.pause();
-        _currentVideoController!.setVolume(0.0);
+        try {
+          await _currentVideoController!.pause();
+        } catch (_) {}
+        try {
+          _currentVideoController!.setVolume(0.0);
+        } catch (_) {}
         // NOTE:
         // Don't call seekTo() right before dispose(). seekTo is async and may
         // continue after disposal, causing "VideoPlayerController used after being disposed".
-        _currentVideoController!.dispose();
+        try {
+          await _currentVideoController!.dispose();
+        } catch (_) {}
         _currentVideoController = null;
         _isCurrentVideoInitialized = false;
       }
 
+      if (_prevVideoController != null) {
+        try {
+          await _prevVideoController!.pause();
+        } catch (_) {}
+        try {
+          _prevVideoController!.setVolume(0.0);
+        } catch (_) {}
+        try {
+          await _prevVideoController!.dispose();
+        } catch (_) {}
+        _prevVideoController = null;
+        _prevVideoIndex = null;
+      }
+
       if (_nextVideoController != null) {
-        _nextVideoController!.pause();
-        _nextVideoController!.setVolume(0.0);
+        try {
+          await _nextVideoController!.pause();
+        } catch (_) {}
+        try {
+          _nextVideoController!.setVolume(0.0);
+        } catch (_) {}
         // NOTE: same reasoning as above—avoid async work right before dispose.
-        _nextVideoController!.dispose();
+        try {
+          await _nextVideoController!.dispose();
+        } catch (_) {}
         _nextVideoController = null;
         _isNextVideoInitialized = false;
       }
+
+      // Prefetched controllers are never supposed to play, but dispose them anyway.
+      for (final ctrl in _prefetchVideoByIndex.values) {
+        try {
+          ctrl.setVolume(0.0);
+        } catch (_) {}
+        try {
+          await ctrl.pause();
+        } catch (_) {}
+        try {
+          await ctrl.dispose();
+        } catch (_) {}
+      }
+      _prefetchVideoByIndex.clear();
+      _prefetchInitializedVideoIndex.clear();
+      _prefetchInFlight.clear();
 
       _currentStoryData = null;
       _nextStoryData = null;
@@ -1238,10 +1360,20 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
+      // Account for top UI (SafeArea + timer bars + header) and bottom UI
+      // so the skeleton is centered in the actual content viewing area
+      final topInset = MediaQuery.of(context).padding.top;
+      final bottomInset = MediaQuery.of(context).padding.bottom;
+      final topOffset = topInset + 140.h; // timer bars + header
+      final bottomOffset = bottomInset + 230.h; // bottom info area
+
       return Scaffold(
         backgroundColor: appTheme.gray_900_02,
-        body: Center(
-          child: CircularProgressIndicator(color: appTheme.colorFF3A3A),
+        body: Padding(
+          padding: EdgeInsets.only(top: topOffset, bottom: bottomOffset),
+          child: Center(
+            child: CircularProgressIndicator(color: appTheme.colorFF3A3A),
+          ),
         ),
       );
     }
@@ -1268,9 +1400,9 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
               CustomButton(
                 text: 'Go Back',
                 width: 200.h,
-                onPressed: () {
-                  _performHardMediaReset();
-                  Navigator.pop(context);
+                onPressed: () async {
+                  await _performHardMediaReset();
+                  if (mounted) Navigator.pop(context);
                 },
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
@@ -1283,7 +1415,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
     return WillPopScope(
       onWillPop: () async {
-        _performHardMediaReset();
+        await _performHardMediaReset();
         return true;
       },
       child: Scaffold(
@@ -1312,8 +1444,8 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
             if (dragDistance > 100 || velocity > 500) {
               _triggerHapticFeedback(HapticFeedbackType.medium);
-              _performHardMediaReset();
-              Navigator.of(context).pop();
+              await _performHardMediaReset();
+              if (mounted) Navigator.of(context).pop();
             }
 
             _safeSetState(() {
@@ -2158,7 +2290,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           .eq('user_id', currentUserId);
 
       if (!mounted) return;
-      _performHardMediaReset();
+      await _performHardMediaReset();
       NavigatorService.popAndPushNamed(AppRoutes.appMemories);
     } finally {
       if (_isDisposed || !mounted) return;
@@ -2444,7 +2576,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       if (idx >= 0) {
         _storyIds.removeAt(idx);
         if (_storyIds.isEmpty) {
-          _performHardMediaReset();
+          await _performHardMediaReset();
           if (mounted) Navigator.pop(context);
           return;
         }
@@ -2461,11 +2593,11 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           old?.dispose();
         } catch (_) {}
 
-        _performHardMediaReset();
+        await _performHardMediaReset();
         await _loadStoryAtIndex(_currentIndex);
       } else {
         // Fallback: just close
-        _performHardMediaReset();
+        await _performHardMediaReset();
         if (mounted) Navigator.pop(context);
       }
 

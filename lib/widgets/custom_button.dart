@@ -200,15 +200,20 @@ class CustomButton extends StatelessWidget {
     final hasLeftIcon = leftIcon != null;
     final hasRightIcon = rightIcon != null;
     final hasText = text != null && text!.isNotEmpty;
+    final effectiveTextStyle = TextStyleHelper.instance.bodyTextPlusJakartaSans.copyWith(
+      color: textStyle.color,
+      fontSize: textStyle.fontSize,
+      fontWeight: textStyle.fontWeight,
+      height: 1.0, // helps prevent bottom clipping in tight heights
+    );
 
     if (!hasLeftIcon && !hasRightIcon && hasText) {
       return Text(
         text!,
         overflow: TextOverflow.ellipsis,
-        maxLines: 2,
+        maxLines: 1,
         textAlign: TextAlign.center,
-        style: TextStyleHelper.instance.bodyTextPlusJakartaSans
-            .copyWith(color: textStyle.color),
+        style: effectiveTextStyle,
       );
     }
 
@@ -224,10 +229,9 @@ class CustomButton extends StatelessWidget {
           Text(
             text!,
             overflow: TextOverflow.ellipsis,
-            maxLines: 2,
+            maxLines: 1,
             textAlign: TextAlign.center,
-            style: TextStyleHelper.instance.bodyTextPlusJakartaSans
-                .copyWith(color: textStyle.color),
+            style: effectiveTextStyle,
           ),
         if (hasRightIcon) ...[
           if (hasText) SizedBox(width: 8.h),
@@ -387,6 +391,7 @@ enum CustomButtonVariant {
 enum CustomButtonSize {
   primary,
   compact,
+  mini,
 }
 
 extension CustomButtonSizeX on CustomButtonSize {
@@ -396,6 +401,8 @@ extension CustomButtonSizeX on CustomButtonSize {
         return 56.h;
       case CustomButtonSize.compact:
         return 40.h;
+      case CustomButtonSize.mini:
+        return 32.h;
     }
   }
 
@@ -405,6 +412,9 @@ extension CustomButtonSizeX on CustomButtonSize {
         return EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h);
       case CustomButtonSize.compact:
         return EdgeInsets.symmetric(horizontal: 14.h, vertical: 8.h);
+      case CustomButtonSize.mini:
+        // True symmetric padding for tiny outlined buttons.
+        return EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h);
     }
   }
 
@@ -413,6 +423,8 @@ extension CustomButtonSizeX on CustomButtonSize {
       case CustomButtonSize.primary:
         return CustomButtonTextStyle.bodyMedium;
       case CustomButtonSize.compact:
+        return CustomButtonTextStyle.bodySmall;
+      case CustomButtonSize.mini:
         return CustomButtonTextStyle.bodySmall;
     }
   }
