@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/app_export.dart';
@@ -220,6 +221,20 @@ class MyApp extends ConsumerWidget {
       builder: (context, child) {
         ThemeHelper().setThemeMode(themeMode);
 
+        final brightness = Theme.of(context).brightness;
+        final isLight = brightness == Brightness.light;
+        final SystemUiOverlayStyle overlayStyle = isLight
+            ? SystemUiOverlayStyle.dark.copyWith(
+                statusBarColor: Colors.transparent, // Android
+                statusBarBrightness: Brightness.light, // iOS (light bg => dark icons)
+                statusBarIconBrightness: Brightness.dark, // Android
+              )
+            : SystemUiOverlayStyle.light.copyWith(
+                statusBarColor: Colors.transparent, // Android
+                statusBarBrightness: Brightness.dark, // iOS (dark bg => light icons)
+                statusBarIconBrightness: Brightness.light, // Android
+              );
+
         // Global "tap away to dismiss keyboard" behavior.
         // Use Listener so we don't compete with child gestures.
         final wrapped = Listener(
@@ -228,11 +243,14 @@ class MyApp extends ConsumerWidget {
           child: child!,
         );
 
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(1.0),
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyle,
+          child: MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(1.0),
+            ),
+            child: wrapped,
           ),
-          child: wrapped,
         );
       },
       navigatorKey: NavigatorService.navigatorKey,

@@ -426,7 +426,7 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
   Widget _buildDarkModeToggle(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final themeMode = ref.watch(themeModeProvider);
-      final bool isDark = themeMode == ThemeMode.dark;
+      final bool isDark = ThemeModeNotifier.isDarkEffectiveForMode(themeMode);
 
       return Container(
         margin: EdgeInsets.only(left: 12.h, right: 12.h, top: 8.h),

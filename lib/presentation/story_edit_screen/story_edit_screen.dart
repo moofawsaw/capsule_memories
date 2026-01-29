@@ -3,6 +3,7 @@
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
@@ -15,6 +16,8 @@ import '../../services/daily_capsule_service.dart';
 
 import '../../core/app_export.dart';
 import '../../services/supabase_service.dart';
+import '../../services/location_service.dart';
+import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
 
 class StoryEditScreen extends ConsumerStatefulWidget {
@@ -23,6 +26,10 @@ class StoryEditScreen extends ConsumerStatefulWidget {
   final String memoryId;
   final String memoryTitle;
   final String? categoryIcon;
+  final int? recordedDurationSeconds;
+  final double? prefetchedLocationLat;
+  final double? prefetchedLocationLng;
+  final String? prefetchedLocationName;
 
   /// Optional: when set, this share completes the Daily Capsule for today.
   /// Valid values: 'instant_story' | 'memory_post'
@@ -40,6 +47,10 @@ class StoryEditScreen extends ConsumerStatefulWidget {
     required this.memoryId,
     required this.memoryTitle,
     this.categoryIcon,
+    this.recordedDurationSeconds,
+    this.prefetchedLocationLat,
+    this.prefetchedLocationLng,
+    this.prefetchedLocationName,
     this.dailyCapsuleCompletionType,
     this.afterShareRouteName,
     this.afterShareRouteArgs,
@@ -58,6 +69,7 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   String? _categoryIconUrl;
   DateTime? _createdAt;
   String? _locationName;
+  String? _prefetchedCurrentLocationName;
   bool _isLoadingMemoryDetails = true;
 
   String? _memoryVisibility;
@@ -78,10 +90,20 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
         mediaPath: widget.mediaPath,
         isVideo: widget.isVideo,
         memoryId: widget.memoryId,
+        recordedDurationSeconds: widget.recordedDurationSeconds,
+        prefetchedLocationLat: widget.prefetchedLocationLat,
+        prefetchedLocationLng: widget.prefetchedLocationLng,
+        prefetchedLocationName: widget.prefetchedLocationName,
       );
 
       _fetchMemoryDetails();
       if (widget.isVideo) _initializeVideoPlayer();
+
+      // If the camera didn't have a location ready in time, try a quick best-effort
+      // fetch here so the header can still show it before posting.
+      if ((widget.prefetchedLocationName ?? '').trim().isEmpty) {
+        _prefetchCurrentLocationForHeader();
+      }
     });
 
     _captionController.addListener(() {
@@ -94,24 +116,80 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
       setState(() => _isLoadingMemoryDetails = true);
 
       final client = SupabaseService.instance.client;
-      if (client == null) return;
+      if (client == null) {
+        debugPrint('⚠️ StoryEdit: Supabase client is null');
+        return;
+      }
 
       final response = await client
           .from('memories')
           .select(
-          'created_at, location_name, visibility, category_icon, memory_categories(icon_url)')
+          // Use the same embedding style used elsewhere in the app for consistency.
+          'created_at, location_name, visibility, category_id, memory_categories(icon_name, icon_url)')
           .eq('id', widget.memoryId)
           .single();
 
       final rawCategory = response['memory_categories'];
       final fallbackIcon = (response['category_icon'] as String?)?.trim() ?? '';
+      final String? categoryId = (response['category_id'] as String?)?.trim();
 
       Map<String, dynamic>? category;
       if (rawCategory is Map) {
         category = Map<String, dynamic>.from(rawCategory);
+      } else if (rawCategory is List && rawCategory.isNotEmpty && rawCategory.first is Map) {
+        category = Map<String, dynamic>.from(rawCategory.first as Map);
       }
 
-      String? resolvedUrl = category?['icon_url']?.toString().trim();
+      String? iconName = category?['icon_name']?.toString().trim();
+      String? iconUrl = category?['icon_url']?.toString().trim();
+
+      String? resolvedUrl;
+      if (iconName != null && iconName.isNotEmpty) {
+        final resolved = StorageUtils.resolveMemoryCategoryIconUrl(iconName);
+        if (resolved.trim().isNotEmpty) {
+          resolvedUrl = resolved.trim();
+        } else if (iconUrl != null && iconUrl.isNotEmpty) {
+          // icon_url is often a bucket path/filename; resolve it to a public URL.
+          final resolvedFromUrl = StorageUtils.resolveMemoryCategoryIconUrl(iconUrl);
+          resolvedUrl = resolvedFromUrl.trim().isNotEmpty ? resolvedFromUrl : iconUrl;
+        }
+      } else if (iconUrl != null && iconUrl.isNotEmpty) {
+        // icon_url is often a bucket path/filename; resolve it to a public URL.
+        final resolvedFromUrl = StorageUtils.resolveMemoryCategoryIconUrl(iconUrl);
+        resolvedUrl = resolvedFromUrl.trim().isNotEmpty ? resolvedFromUrl : iconUrl;
+      }
+
+      // Fallback: if embed didn't come back for any reason, fetch category directly by id.
+      if ((resolvedUrl == null || resolvedUrl.trim().isEmpty) &&
+          categoryId != null &&
+          categoryId.isNotEmpty) {
+        try {
+          final catRow = await client
+              .from('memory_categories')
+              .select('icon_name, icon_url')
+              .eq('id', categoryId)
+              .maybeSingle();
+          if (catRow != null) {
+            iconName = (catRow['icon_name'] as String?)?.trim();
+            iconUrl = (catRow['icon_url'] as String?)?.trim();
+            if (iconName != null && iconName.isNotEmpty) {
+              final resolved = StorageUtils.resolveMemoryCategoryIconUrl(iconName);
+              if (resolved.trim().isNotEmpty) {
+                resolvedUrl = resolved.trim();
+              }
+            }
+            if ((resolvedUrl == null || resolvedUrl.trim().isEmpty) &&
+                iconUrl != null &&
+                iconUrl.isNotEmpty) {
+              final resolvedFromUrl = StorageUtils.resolveMemoryCategoryIconUrl(iconUrl);
+              resolvedUrl = resolvedFromUrl.trim().isNotEmpty ? resolvedFromUrl : iconUrl;
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ StoryEdit: category lookup failed: $e');
+        }
+      }
+
       if ((resolvedUrl == null || resolvedUrl.isEmpty) &&
           (fallbackIcon.startsWith('http://') || fallbackIcon.startsWith('https://'))) {
         resolvedUrl = fallbackIcon;
@@ -122,6 +200,15 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
         resolvedUrl = widget.categoryIcon?.trim();
       }
 
+      debugPrint('🧩 StoryEdit category debug:');
+      debugPrint('   memoryId=${widget.memoryId}');
+      debugPrint('   category_id=$categoryId');
+      debugPrint('   raw memory_categories type=${rawCategory.runtimeType}');
+      debugPrint('   icon_name=$iconName');
+      debugPrint('   icon_url=$iconUrl');
+      debugPrint('   fallback category_icon=$fallbackIcon');
+      debugPrint('   resolved category url=$resolvedUrl');
+
       setState(() {
         _categoryIconUrl = resolvedUrl;
         _createdAt = DateTime.tryParse(response['created_at']?.toString() ?? '');
@@ -129,8 +216,45 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
         _memoryVisibility = response['visibility']?.toString();
         _isLoadingMemoryDetails = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ StoryEdit: _fetchMemoryDetails failed: $e');
       setState(() => _isLoadingMemoryDetails = false);
+    }
+  }
+
+  Future<void> _prefetchCurrentLocationForHeader() async {
+    try {
+      Map<String, dynamic>? coords;
+      try {
+        coords = await LocationService.getCoordsOnly(
+          timeout: const Duration(seconds: 3),
+        );
+      } catch (_) {
+        coords = null;
+      }
+
+      final double? lat = (coords?['latitude'] as num?)?.toDouble();
+      final double? lng = (coords?['longitude'] as num?)?.toDouble();
+      if (lat == null || lng == null) return;
+
+      String? name;
+      try {
+        name = await LocationService.getLocationNameBestEffort(
+          lat,
+          lng,
+          timeout: const Duration(seconds: 6),
+        );
+      } catch (_) {
+        name = null;
+      }
+
+      if (!mounted) return;
+      if ((name ?? '').trim().isEmpty) return;
+      setState(() {
+        _prefetchedCurrentLocationName = name!.trim();
+      });
+    } catch (_) {
+      // best-effort
     }
   }
 
@@ -169,27 +293,39 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(storyEditProvider);
 
-    return PopScope(
-      canPop: true,
-      onPopInvoked: (didPop) async {
-        if (!didPop) return;
-        await _cleanupIfNeeded();
-      },
-      child: SafeArea(
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: state.isLoading
-              ? Center(
-            child: CircularProgressIndicator(
-              color: appTheme.deep_purple_A100,
-            ),
-          )
-              : Stack(
-            children: [
-              _buildMediaPreview(),
-              _buildTopOverlay(),
-              _buildBottomOverlay(state),
-            ],
+    // Force light status bar icons for this dark fullscreen editor.
+    final overlayStyle = SystemUiOverlayStyle.light.copyWith(
+      statusBarColor: Colors.transparent, // Android
+      statusBarBrightness: Brightness.dark, // iOS (dark bg => light icons)
+      statusBarIconBrightness: Brightness.light, // Android
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: PopScope(
+        canPop: true,
+        onPopInvoked: (didPop) async {
+          if (!didPop) return;
+          await _cleanupIfNeeded();
+        },
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: state.isLoading
+                ? Center(
+                    child: CircularProgressIndicator(
+                      color: appTheme.deep_purple_A100,
+                    ),
+                  )
+                : Stack(
+                    children: [
+                      _buildMediaPreview(),
+                      _buildTopOverlay(),
+                      _buildBottomOverlay(state),
+                    ],
+                  ),
           ),
         ),
       ),
@@ -254,13 +390,20 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   }
 
   Widget _buildTopOverlay() {
+    final double safeTop = MediaQuery.paddingOf(context).top;
     return Positioned(
       top: 0,
       left: 0,
       right: 0,
       child: Container(
         padding:
-        EdgeInsets.only(left: 12.w, right: 12.w, top: 10.h, bottom: 12.h),
+        EdgeInsets.only(
+          left: 12.w,
+          right: 12.w,
+          // Keep media under status bar, but push controls below it.
+          top: safeTop + 10.h,
+          bottom: 12.h,
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -327,6 +470,12 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   }
 
   Widget _memoryMetaCard() {
+    final locText = (widget.prefetchedLocationName ?? '').trim().isNotEmpty
+        ? (widget.prefetchedLocationName ?? '').trim()
+        : ((_prefetchedCurrentLocationName ?? '').trim().isNotEmpty
+            ? (_prefetchedCurrentLocationName ?? '').trim()
+            : (_locationName ?? '').trim());
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: BackdropFilter(
@@ -365,11 +514,11 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
                               fontSize: 13.sp,
                             ),
                           ),
-                        if (_locationName != null) ...[
+                        if (locText.isNotEmpty) ...[
                           SizedBox(width: 10.w),
                           Expanded(
                             child: Text(
-                              _locationName!,
+                              locText,
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 13.sp,

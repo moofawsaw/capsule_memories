@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../app_export.dart';
 import '../../services/supabase_service.dart';
 import '../../services/feed_service.dart';
-import '../../services/story_service.dart';
+import '../../services/user_profile_service.dart';
 
 class StoryActionsSheet {
   static Future<void> show({
@@ -89,7 +89,8 @@ class StoryActionsSheet {
                     if (confirm != true) return;
 
                     try {
-                      final ok = await StoryService().deleteStory(storyId);
+                      final ok =
+                          await UserProfileService.instance.deleteStory(storyId);
                       if (!ok) throw Exception('delete failed');
                       onDeleted?.call();
                       _toast(context, 'Deleted');

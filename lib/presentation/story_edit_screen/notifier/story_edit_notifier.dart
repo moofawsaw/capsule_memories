@@ -18,6 +18,7 @@ import '../../../services/story_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/supabase_tus_uploader.dart' as tus;
 import '../../../services/video_compression_service.dart';
+import '../../../services/location_service.dart';
 import '../models/story_edit_model.dart';
 
 final storyEditProvider =
@@ -49,12 +50,17 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
   // Critical: keep the ONE preupload future so Share can await it (no re-upload)
   Future<void>? _preuploadFuture;
 
+  // ✅ Location prefetch (best-effort) so Share isn't blocked by GPS/geocode.
+  Future<Map<String, dynamic>?>? _locationPrefetchFuture;
+
   // One-time warmup per notifier lifetime
   bool _didWarmup = false;
 
   static const int _mb = 1024 * 1024;
   static const int _wifiCompressThresholdBytes = 18 * _mb;
   static const int _cellCompressThresholdBytes = 8 * _mb;
+
+  int? _recordedDurationSeconds;
 
   @override
   void dispose() {
@@ -68,6 +74,10 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
     required String mediaPath,
     required bool isVideo,
     required String memoryId,
+    int? recordedDurationSeconds,
+    double? prefetchedLocationLat,
+    double? prefetchedLocationLng,
+    String? prefetchedLocationName,
   }) {
     state = state.copyWith(isLoading: false);
 
@@ -86,11 +96,34 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
       alsoWarmUrlStore: true,
     ));
 
+    // If the recorder already prefetched location, reuse it (don't prompt again).
+    if (prefetchedLocationLat != null || prefetchedLocationLng != null) {
+      _locationPrefetchFuture = Future.value(<String, dynamic>{
+        'lat': prefetchedLocationLat,
+        'lng': prefetchedLocationLng,
+        'location_name': (prefetchedLocationName ?? '').trim().isNotEmpty
+            ? prefetchedLocationName
+            : null,
+      });
+    } else if (prefetchedLocationName != null &&
+        prefetchedLocationName.trim().isNotEmpty) {
+      // Name-only is still useful for UI; keep it around.
+      _locationPrefetchFuture = Future.value(<String, dynamic>{
+        'lat': null,
+        'lng': null,
+        'location_name': prefetchedLocationName.trim(),
+      });
+    }
+
+    // Start location prefetch for BOTH image + video stories.
+    _startLocationPrefetch();
+
     if (isVideo) {
       _pendingStoryId = _uuid.v4();
       _pendingVideoPath = 'videos/${_pendingStoryId!}.mp4';
       _pendingThumbPath = 'thumbnails/${_pendingStoryId!}.jpg';
 
+      _recordedDurationSeconds = recordedDurationSeconds;
       unawaited(startPreupload(memoryId: memoryId, mediaPath: mediaPath));
     }
   }
@@ -173,6 +206,48 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         // Best-effort only
       }
     }());
+  }
+
+  void _startLocationPrefetch() {
+    if (_locationPrefetchFuture != null) return;
+
+    _locationPrefetchFuture = () async {
+      try {
+        // Keep same timeouts as StoryService, but do it early while preupload is running.
+        Map<String, dynamic>? coords;
+        try {
+          coords = await LocationService.getCoordsOnly(
+            timeout: const Duration(seconds: 3),
+          );
+        } catch (_) {
+          coords = null;
+        }
+
+        final double? lat = (coords?['latitude'] as num?)?.toDouble();
+        final double? lng = (coords?['longitude'] as num?)?.toDouble();
+
+        String? locationName;
+        if (lat != null && lng != null) {
+          try {
+            locationName = await LocationService.getLocationNameBestEffort(
+              lat,
+              lng,
+              timeout: const Duration(seconds: 6),
+            );
+          } catch (_) {
+            locationName = null;
+          }
+        }
+
+        return <String, dynamic>{
+          'lat': lat,
+          'lng': lng,
+          'location_name': locationName,
+        };
+      } catch (_) {
+        return null;
+      }
+    }();
   }
 
   // -------------------------
@@ -351,39 +426,49 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
 
       // Generate thumb from original
       _setStage('Preparing upload...');
+
       final swThumb = Stopwatch()..start();
-      tempThumb = await _generateVideoThumbnail(originalFile.path);
-      swThumb.stop();
+      final thumbFuture = _generateVideoThumbnail(originalFile.path)
+          .whenComplete(() => swThumb.stop());
+
+      File uploadFile = originalFile;
+      Future<File> compressFuture = Future.value(originalFile);
+
+      if (_shouldCompress(net, origLen)) {
+        final swComp = Stopwatch()..start();
+        compressFuture = () async {
+          try {
+            final NetworkQuality useQuality =
+                (net == NetworkQuality.cellular || net == NetworkQuality.unknown)
+                    ? NetworkQuality.cellular
+                    : NetworkQuality.wifi;
+
+            final f = await VideoCompressionService.compressForNetwork(
+              input: originalFile,
+              quality: useQuality,
+            ).timeout(
+              _compressionTimeout(net),
+              onTimeout: () => originalFile,
+            );
+            return f;
+          } catch (_) {
+            return originalFile;
+          } finally {
+            swComp.stop();
+            debugPrint('🟣 preupload: compress ${swComp.elapsedMilliseconds}ms');
+          }
+        }();
+      }
+
+      // Await both concurrently (saves time vs sequential thumb -> compress).
+      final results = await Future.wait<dynamic>([thumbFuture, compressFuture]);
+      tempThumb = results[0] as File?;
+      uploadFile = results[1] as File;
+
       debugPrint('🟣 preupload: thumb gen ${swThumb.elapsedMilliseconds}ms');
 
-      // Compress only if needed
-      File uploadFile = originalFile;
-      if (_shouldCompress(net, origLen)) {
-        _setStage('Preparing upload...');
-        final swComp = Stopwatch()..start();
-        try {
-          final NetworkQuality useQuality =
-          (net == NetworkQuality.cellular || net == NetworkQuality.unknown)
-              ? NetworkQuality.cellular
-              : NetworkQuality.wifi;
-
-          uploadFile = await VideoCompressionService.compressForNetwork(
-            input: originalFile,
-            quality: useQuality,
-          ).timeout(
-            _compressionTimeout(net),
-            onTimeout: () => originalFile,
-          );
-
-          if (uploadFile.path != originalFile.path) {
-            tempCompressed = uploadFile;
-          }
-        } catch (_) {
-          uploadFile = originalFile;
-        } finally {
-          swComp.stop();
-          debugPrint('🟣 preupload: compress ${swComp.elapsedMilliseconds}ms');
-        }
+      if (uploadFile.path != originalFile.path) {
+        tempCompressed = uploadFile;
       }
 
       state = state.copyWith(
@@ -566,7 +651,32 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
 
         _setStage('Creating story...');
 
-        final durationSeconds = await _getVideoDuration(mediaPath);
+        // Prefer duration from recorder to avoid video decoder init during "Posting...".
+        final durationSeconds = (_recordedDurationSeconds != null &&
+                _recordedDurationSeconds! > 0)
+            ? _recordedDurationSeconds!
+            : await _getVideoDuration(mediaPath);
+
+        // Try to use prefetched location if ready; don't block share on GPS/geocode.
+        Map<String, dynamic>? loc;
+        final lf = _locationPrefetchFuture;
+        if (lf != null) {
+          try {
+            loc = await lf.timeout(
+              const Duration(milliseconds: 800),
+              onTimeout: () => null,
+            );
+          } catch (_) {
+            loc = null;
+          }
+        }
+
+        final double? lat = (loc?['lat'] as num?)?.toDouble();
+        final double? lng = (loc?['lng'] as num?)?.toDouble();
+        final String? locationName =
+            (loc?['location_name'] as String?)?.trim().isNotEmpty == true
+                ? (loc?['location_name'] as String?)
+                : null;
 
         final storyData = await _storyService.createStory(
           memoryId: memoryId,
@@ -576,6 +686,11 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
           thumbnailUrl: thumbRel,
           caption: caption.isNotEmpty ? caption : null,
           durationSeconds: durationSeconds,
+          // If prefetch didn't complete, do not stall sharing on location.
+          skipLocationLookup: (lat == null || lng == null),
+          locationLat: lat,
+          locationLng: lng,
+          locationNameOverride: locationName,
           // backfillLocationAsync defaults to false in StoryService now
         );
 
@@ -615,6 +730,27 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
 
       _setStage('Creating story...');
 
+      // Try to use prefetched location if ready; don't block share on GPS/geocode.
+      Map<String, dynamic>? loc;
+      final lf = _locationPrefetchFuture;
+      if (lf != null) {
+        try {
+          loc = await lf.timeout(
+            const Duration(milliseconds: 800),
+            onTimeout: () => null,
+          );
+        } catch (_) {
+          loc = null;
+        }
+      }
+
+      final double? lat = (loc?['lat'] as num?)?.toDouble();
+      final double? lng = (loc?['lng'] as num?)?.toDouble();
+      final String? locationName =
+          (loc?['location_name'] as String?)?.trim().isNotEmpty == true
+              ? (loc?['location_name'] as String?)
+              : null;
+
       final storyData = await _storyService.createStory(
         memoryId: memoryId,
         contributorId: userId,
@@ -623,6 +759,11 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         thumbnailUrl: imageRelativePath,
         caption: caption.isNotEmpty ? caption : null,
         durationSeconds: 5,
+        // If prefetch didn't complete, do not stall sharing on location.
+        skipLocationLookup: (lat == null || lng == null),
+        locationLat: lat,
+        locationLng: lng,
+        locationNameOverride: locationName,
         // backfillLocationAsync defaults to false in StoryService now
       );
 

@@ -1,5 +1,7 @@
 // lib/presentation/user_profile_screen_two/notifier/user_profile_screen_two_notifier.dart
 
+import 'dart:async';
+
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/app_export.dart';
@@ -29,7 +31,14 @@ final userProfileScreenTwoNotifier = StateNotifierProvider.autoDispose<
 
 class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoState> {
   UserProfileScreenTwoNotifier(this.ref, UserProfileScreenTwoState state)
-      : super(state);
+      : super(state) {
+    _storyDeletedSub =
+        UserProfileService.instance.storyDeletedStream.listen(_onStoryDeleted);
+    ref.onDispose(() {
+      _storyDeletedSub?.cancel();
+      _storyDeletedSub = null;
+    });
+  }
 
   final Ref ref;
 
@@ -38,8 +47,31 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
   final BlockedUsersService _blockedUsersService = BlockedUsersService();
   final StoryService _storyService = StoryService();
 
+  StreamSubscription<String>? _storyDeletedSub;
+
   String? get _currentUserId =>
       SupabaseService.instance.client?.auth.currentUser?.id;
+
+  void _onStoryDeleted(String storyId) {
+    final id = storyId.trim();
+    if (id.isEmpty) return;
+
+    final currentItems =
+        state.userProfileScreenTwoModel?.storyItems ?? <StoryItemModel>[];
+    if (currentItems.isEmpty) return;
+
+    final updatedItems =
+        currentItems.where((item) => item.storyId != id).toList();
+    if (updatedItems.length == currentItems.length) {
+      return;
+    }
+
+    state = state.copyWith(
+      userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
+        storyItems: updatedItems,
+      ),
+    );
+  }
 
   bool _isNetworkUrl(String? s) {
     if (s == null) return false;
@@ -418,15 +450,16 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
 
   Future<bool> deleteStory(String storyId) async {
     try {
-      if (storyId.trim().isEmpty) return false;
+      final id = storyId.trim();
+      if (id.isEmpty) return false;
 
-      final success = await _storyService.deleteStory(storyId);
+      final success = await UserProfileService.instance.deleteStory(id);
       if (!success) return false;
 
       final currentItems =
           state.userProfileScreenTwoModel?.storyItems ?? <StoryItemModel>[];
       final updatedItems =
-      currentItems.where((item) => item.storyId != storyId).toList();
+      currentItems.where((item) => item.storyId != id).toList();
 
       state = state.copyWith(
         userProfileScreenTwoModel: state.userProfileScreenTwoModel?.copyWith(
@@ -492,19 +525,20 @@ class UserProfileScreenTwoNotifier extends StateNotifier<UserProfileScreenTwoSta
   }
 
   Future<bool> deleteStoryFromProfile(String storyId) async {
-    if (storyId.isEmpty) return false;
+    final id = storyId.trim();
+    if (id.isEmpty) return false;
 
     final currentItems =
         state.userProfileScreenTwoModel?.storyItems ?? <StoryItemModel>[];
     final updatedItems =
-    currentItems.where((s) => s.storyId != storyId).toList();
+    currentItems.where((s) => s.storyId != id).toList();
 
     state = state.copyWith(
       userProfileScreenTwoModel:
       state.userProfileScreenTwoModel?.copyWith(storyItems: updatedItems),
     );
 
-    final success = await _storyService.deleteStory(storyId);
+    final success = await UserProfileService.instance.deleteStory(id);
 
     if (!success) {
       state = state.copyWith(

@@ -174,6 +174,20 @@ class AppRoutes {
         final String? categoryIcon =
             (args['category_icon'] as String?) ?? (args['categoryIcon'] as String?);
 
+        final int? recordedDurationSeconds = (args['duration_seconds'] is int)
+            ? (args['duration_seconds'] as int)
+            : int.tryParse((args['duration_seconds'] ?? '').toString());
+
+        final double? prefetchedLat = (args['prefetch_location_lat'] is num)
+            ? (args['prefetch_location_lat'] as num).toDouble()
+            : double.tryParse((args['prefetch_location_lat'] ?? '').toString());
+        final double? prefetchedLng = (args['prefetch_location_lng'] is num)
+            ? (args['prefetch_location_lng'] as num).toDouble()
+            : double.tryParse((args['prefetch_location_lng'] ?? '').toString());
+        final String? prefetchedLocationName =
+            (args['prefetch_location_name'] as String?) ??
+                (args['prefetchedLocationName'] as String?);
+
         final String? afterShareRouteName =
             (args['after_share_route'] as String?) ?? (args['afterShareRoute'] as String?);
         final Object? afterShareArgs = args['after_share_args'] ?? args['afterShareArgs'];
@@ -188,6 +202,10 @@ class AppRoutes {
           memoryId: memoryId,
           memoryTitle: memoryTitle,
           categoryIcon: categoryIcon,
+          recordedDurationSeconds: recordedDurationSeconds,
+          prefetchedLocationLat: prefetchedLat,
+          prefetchedLocationLng: prefetchedLng,
+          prefetchedLocationName: prefetchedLocationName,
           afterShareRouteName: afterShareRouteName,
           afterShareRouteArgs: afterShareArgs,
           dailyCapsuleCompletionType: dailyCapsuleCompletionType,
@@ -517,6 +535,9 @@ class AppRoutes {
         memoryId: args['memory_id'] as String,
         memoryTitle: args['memory_title'] as String,
         categoryIcon: args['category_icon'] as String?,
+        recordedDurationSeconds: (args['duration_seconds'] is int)
+            ? (args['duration_seconds'] as int)
+            : int.tryParse((args['duration_seconds'] ?? '').toString()),
         afterShareRouteName: args['after_share_route'] as String?,
         afterShareRouteArgs: args['after_share_args'],
         dailyCapsuleCompletionType: args['daily_capsule_completion_type'] as String?,

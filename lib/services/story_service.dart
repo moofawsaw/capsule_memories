@@ -447,6 +447,15 @@ class StoryService {
 
     // Keep the param for compatibility, but default it OFF to avoid post-submit prompts.
     bool backfillLocationAsync = false,
+
+    // ✅ Optional: provide precomputed location to avoid blocking the share path.
+    double? locationLat,
+    double? locationLng,
+    String? locationNameOverride,
+
+    // ✅ If true, skip GPS + reverse geocode entirely (fastest).
+    // Use when you want "Share" to be instant (especially on cellular).
+    bool skipLocationLookup = false,
   }) async {
     if (_supabase == null) {
       throw Exception('Supabase client is null (not initialized)');
@@ -456,22 +465,32 @@ class StoryService {
       final nowUtc = DateTime.now().toUtc();
       final captureUtc = (captureTimestamp ?? nowUtc).toUtc();
 
-      // ✅ Coords first (this is what triggers iOS permission prompt, and it happens BEFORE insert)
-      Map<String, dynamic>? coords;
-      try {
-        coords = await LocationService.getCoordsOnly(
-          timeout: const Duration(seconds: 3),
-        );
-      } catch (_) {
-        coords = null;
+      // ✅ Location (best-effort). Prefer provided values to avoid blocking.
+      double? lat = locationLat;
+      double? lng = locationLng;
+      String? locationName =
+          (locationNameOverride ?? '').trim().isNotEmpty ? locationNameOverride : null;
+
+      if (!skipLocationLookup && (lat == null || lng == null)) {
+        // Coords first (this can trigger iOS permission prompt; keep it BEFORE insert)
+        Map<String, dynamic>? coords;
+        try {
+          coords = await LocationService.getCoordsOnly(
+            timeout: const Duration(seconds: 3),
+          );
+        } catch (_) {
+          coords = null;
+        }
+
+        lat ??= (coords?['latitude'] as num?)?.toDouble();
+        lng ??= (coords?['longitude'] as num?)?.toDouble();
       }
 
-      final double? lat = (coords?['latitude'] as num?)?.toDouble();
-      final double? lng = (coords?['longitude'] as num?)?.toDouble();
-
-      // ✅ Best-effort name (does not cause permission prompt; uses coords)
-      String? locationName;
-      if (lat != null && lng != null) {
+      if (!skipLocationLookup &&
+          locationName == null &&
+          lat != null &&
+          lng != null) {
+        // Best-effort name (does not cause permission prompt; uses coords)
         try {
           locationName = await LocationService.getLocationNameBestEffort(
             lat,

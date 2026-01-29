@@ -287,9 +287,9 @@
 				897AA59B9243BB853751223A /* [CP] Copy Pods Resources */,
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
+				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				B7E0C4E58A64FDB43A3EA96D /* [CP] Embed Pods Frameworks */,
 				7816FF752F23095100ACCE80 /* Embed Foundation Extensions */,
-				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 			);
 			buildRules = (
 			);
@@ -403,9 +403,13 @@
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputPaths = (
-				"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}",
-			);
+			/*
+			 NOTE:
+			 Do NOT declare Runner.app/Info.plist as an input for this phase.
+			 With NotificationService.appex embedding + [CP] Embed Pods Frameworks,
+			 Xcode 15+ can form a dependency cycle (codesign ↔ embed frameworks ↔ plist ↔ embed extension).
+			 This phase is already `alwaysOutOfDate = 1`, so it will run as needed.
+			*/
 			name = "Thin Binary";
 			outputPaths = (
 			);

@@ -15,7 +15,6 @@ class DailyCapsuleService {
 
   static const String dailyCapsuleMemoryTitle = 'Daily Capsule';
   static const String userTagTable = 'user_tags';
-  static const String _dailyCapsuleCategoryEmoji = '🗓️';
 
   Future<void> _ensureContributorForMemory({
     required String memoryId,
@@ -154,7 +153,7 @@ class DailyCapsuleService {
       try {
         final raw = await client
             .from('memories')
-            .select('id, category_id, category_icon')
+            .select('id, category_id')
             .eq('creator_id', userId)
             .eq('is_daily_capsule', true)
             .maybeSingle();
@@ -168,7 +167,7 @@ class DailyCapsuleService {
         // Backward-compat: fall back to title match until migration applied.
         final raw = await client
             .from('memories')
-            .select('id, category_id, category_icon')
+            .select('id, category_id')
             .eq('creator_id', userId)
             .eq('title', dailyCapsuleMemoryTitle)
             .eq('visibility', 'private')
@@ -189,28 +188,10 @@ class DailyCapsuleService {
             try {
               await client.from('memories').update({
                 'category_id': categoryId,
-                'category_icon': _dailyCapsuleCategoryEmoji,
               }).eq('id', id);
             } catch (_) {
               // best-effort
             }
-          } else {
-            // At least provide a local/emoji icon for places that use category_icon directly.
-            try {
-              await client.from('memories').update({
-                'category_icon': _dailyCapsuleCategoryEmoji,
-              }).eq('id', id);
-            } catch (_) {}
-          }
-        } else {
-          // Ensure category_icon is populated (best-effort)
-          final existingIcon = (existing?['category_icon'] ?? '').toString().trim();
-          if (existingIcon.isEmpty) {
-            try {
-              await client.from('memories').update({
-                'category_icon': _dailyCapsuleCategoryEmoji,
-              }).eq('id', id);
-            } catch (_) {}
           }
         }
         return id;
@@ -228,7 +209,6 @@ class DailyCapsuleService {
               'title': dailyCapsuleMemoryTitle,
               'creator_id': userId,
               if (categoryId != null && categoryId.isNotEmpty) 'category_id': categoryId,
-              'category_icon': _dailyCapsuleCategoryEmoji,
               'visibility': 'private',
               'duration': '3_days',
               'state': 'open',
@@ -252,7 +232,6 @@ class DailyCapsuleService {
               'title': dailyCapsuleMemoryTitle,
               'creator_id': userId,
               if (categoryId != null && categoryId.isNotEmpty) 'category_id': categoryId,
-              'category_icon': _dailyCapsuleCategoryEmoji,
               'visibility': 'private',
               'duration': '3_days',
               'state': 'open',
@@ -603,7 +582,9 @@ class DailyCapsuleService {
       try {
         creator = await client
             .from('memories')
-            .select('id, title, category_icon, end_time, visibility, is_daily_capsule')
+            .select(
+              'id, title, category_id, end_time, visibility, is_daily_capsule, memory_categories:category_id(icon_url)',
+            )
             .eq('creator_id', userId)
             .eq('state', 'open')
             .eq('is_daily_capsule', false)
@@ -613,7 +594,7 @@ class DailyCapsuleService {
         if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
         creator = await client
             .from('memories')
-            .select('id, title, category_icon, end_time, visibility')
+            .select('id, title, category_id, end_time, visibility, memory_categories:category_id(icon_url)')
             .eq('creator_id', userId)
             .eq('state', 'open')
             .order('created_at', ascending: false);
@@ -636,7 +617,9 @@ class DailyCapsuleService {
         try {
           joined = await client
               .from('memories')
-              .select('id, title, category_icon, end_time, visibility, is_daily_capsule')
+              .select(
+                'id, title, category_id, end_time, visibility, is_daily_capsule, memory_categories:category_id(icon_url)',
+              )
               .inFilter('id', ids)
               .eq('state', 'open')
               .eq('is_daily_capsule', false)
@@ -645,7 +628,7 @@ class DailyCapsuleService {
           if (!_isMissingColumn(e, 'is_daily_capsule')) rethrow;
           joined = await client
               .from('memories')
-              .select('id, title, category_icon, end_time, visibility')
+              .select('id, title, category_id, end_time, visibility, memory_categories:category_id(icon_url)')
               .inFilter('id', ids)
               .eq('state', 'open')
               .order('created_at', ascending: false);
@@ -661,19 +644,30 @@ class DailyCapsuleService {
       final seen = <String>{};
       final deduped = <Map<String, dynamic>>[];
       for (final m in all) {
-        final id = (m['id'] ?? '').toString();
+        final mm = Map<String, dynamic>.from(m);
+        final id = (mm['id'] ?? '').toString();
         if (id.isEmpty || seen.contains(id)) continue;
+
+        // Normalize: always provide `category_icon` for UI consumers, sourced from category join.
+        final cat = mm['memory_categories'];
+        if (cat is Map) {
+          final iconUrl = (cat['icon_url'] ?? '').toString().trim();
+          if (iconUrl.isNotEmpty) {
+            mm['category_icon'] = iconUrl;
+          }
+        }
+        mm['category_icon'] ??= '';
 
         // Backward-compat: if we couldn't filter by is_daily_capsule in SQL,
         // make a best-effort exclusion by title + private visibility.
-        final title = (m['title'] ?? '').toString().trim();
-        final vis = (m['visibility'] ?? '').toString().trim();
+        final title = (mm['title'] ?? '').toString().trim();
+        final vis = (mm['visibility'] ?? '').toString().trim();
         if (title == dailyCapsuleMemoryTitle && vis == 'private') {
           continue;
         }
 
         seen.add(id);
-        deduped.add(m);
+        deduped.add(mm);
       }
       return deduped;
     } catch (_) {

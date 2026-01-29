@@ -54,4 +54,3 @@ class DailyCapsuleState extends Equatable {
 class _Unset {
   const _Unset();
 }
-

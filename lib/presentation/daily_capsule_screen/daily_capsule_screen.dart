@@ -2523,4 +2523,3 @@ class _MonthStickyHeaderDelegate extends SliverPersistentHeaderDelegate {
     return oldDelegate.title != title;
   }
 }
-

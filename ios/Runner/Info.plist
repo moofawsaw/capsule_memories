@@ -59,6 +59,14 @@
 		</dict>
 		<key>NSCameraUsageDescription</key>
 		<string>Capsule needs camera access to scan QR codes</string>
+		<!-- Google Cast local network discovery -->
+		<key>NSLocalNetworkUsageDescription</key>
+		<string>Capsule uses the local network to discover and connect to Cast-enabled devices.</string>
+		<key>NSBonjourServices</key>
+		<array>
+			<string>_googlecast._tcp</string>
+			<string>_CC1AD845._googlecast._tcp</string>
+		</array>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 		<string>Capsule needs access to your location to tag stories with where they were captured</string>
 		<key>NSLocationAlwaysUsageDescription</key>

@@ -85,19 +85,28 @@ class ChromecastService {
     }
   }
 
-  /// Connect to a specific Chromecast device
+  /// Show the native Cast device chooser dialog.
+  ///
+  /// On Android/iOS, Cast device selection is driven by the native Cast dialog UI.
+  Future<void> showCastDialog() async {
+    try {
+      await _channel.invokeMethod('showCastDialog');
+    } on PlatformException catch (e) {
+      debugPrint('❌ Show cast dialog error: ${e.message}');
+      onError?.call('Failed to open Cast dialog: ${e.message}');
+    }
+  }
+
+  /// Connect to a specific Chromecast device.
+  ///
+  /// NOTE: Modern Cast SDKs expect the native Cast dialog to handle device selection.
+  /// This method is kept for compatibility and will open the Cast dialog.
   Future<bool> connectToDevice(String deviceId) async {
     try {
-      final bool? connected = await _channel.invokeMethod('connect', {
+      final bool? ok = await _channel.invokeMethod('connect', {
         'deviceId': deviceId,
       });
-
-      if (connected == true) {
-        _isConnected = true;
-        debugPrint('✅ Connected to Chromecast device: $deviceId');
-        return true;
-      }
-      return false;
+      return ok == true;
     } on PlatformException catch (e) {
       debugPrint('❌ Connection error: ${e.message}');
       onError?.call('Failed to connect: ${e.message}');
@@ -153,6 +162,37 @@ class ChromecastService {
     }
   }
 
+  /// Cast a full playlist/queue to the connected Chromecast device.
+  ///
+  /// `items` elements should include:
+  /// - mediaUrl (String, required)
+  /// - mediaType ('video'|'image')
+  /// - contentType (mime type String)
+  /// - title/subtitle/thumbnailUrl (optional)
+  /// - customData (Map<String, dynamic>, optional) for future custom receiver UI
+  Future<bool> castQueue({
+    required List<Map<String, dynamic>> items,
+    int startIndex = 0,
+  }) async {
+    if (!_isConnected) {
+      debugPrint('❌ Cannot cast queue: No device connected');
+      onError?.call('Please connect to a Chromecast device first');
+      return false;
+    }
+
+    try {
+      final bool? success = await _channel.invokeMethod('castQueue', {
+        'items': items,
+        'startIndex': startIndex,
+      });
+      return success == true;
+    } on PlatformException catch (e) {
+      debugPrint('❌ Cast queue error: ${e.message}');
+      onError?.call('Failed to cast playlist: ${e.message}');
+      return false;
+    }
+  }
+
   /// Play the currently casted media
   Future<void> play() async {
     try {
@@ -170,6 +210,24 @@ class ChromecastService {
       debugPrint('⏸️ Paused casted media');
     } on PlatformException catch (e) {
       debugPrint('❌ Pause error: ${e.message}');
+    }
+  }
+
+  /// Advance to the next item in the cast queue (if any).
+  Future<void> queueNext() async {
+    try {
+      await _channel.invokeMethod('queueNext');
+    } on PlatformException catch (e) {
+      debugPrint('❌ Queue next error: ${e.message}');
+    }
+  }
+
+  /// Go to the previous item in the cast queue (if any).
+  Future<void> queuePrev() async {
+    try {
+      await _channel.invokeMethod('queuePrev');
+    } on PlatformException catch (e) {
+      debugPrint('❌ Queue prev error: ${e.message}');
     }
   }
 

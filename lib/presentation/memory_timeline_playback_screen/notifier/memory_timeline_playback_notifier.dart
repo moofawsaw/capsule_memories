@@ -79,9 +79,11 @@ class MemoryTimelinePlaybackNotifier
       state = state.copyWith(isChromecastConnected: isConnected);
 
       if (isConnected) {
-        if (state.currentStory != null) {
-          _castCurrentStory();
-        }
+        // When casting starts, stop local playback and cast the full playlist.
+        unawaited(_disposeVideoControllerSafely());
+        _stopImageAutoAdvance();
+        _stopProgressTicker();
+        unawaited(_castPlaylistQueue(startIndex: state.currentStoryIndex ?? 0));
       }
     };
 
@@ -498,9 +500,9 @@ class MemoryTimelinePlaybackNotifier
     // Dispose current controller safely
     await _disposeVideoControllerSafely();
 
-    // Chromecast cast
+    // Casting mode: don't play locally (receiver handles playback).
     if (_chromecastService.isConnected) {
-      await _castCurrentStory();
+      return;
     }
 
     // IMAGE
@@ -581,20 +583,23 @@ class MemoryTimelinePlaybackNotifier
   void togglePlayPause() {
     final isPlaying = !(state.isPlaying ?? false);
 
+    if (_chromecastService.isConnected) {
+      // In casting mode, only control the receiver (no local playback/progress).
+      if (isPlaying) {
+        _chromecastService.play();
+      } else {
+        _chromecastService.pause();
+      }
+      state = state.copyWith(isPlaying: isPlaying);
+      return;
+    }
+
     final c = currentVideoController;
     if (c != null) {
       if (isPlaying) {
         c.play();
       } else {
         c.pause();
-      }
-    }
-
-    if (_chromecastService.isConnected) {
-      if (isPlaying) {
-        _chromecastService.play();
-      } else {
-        _chromecastService.pause();
       }
     }
 
@@ -627,6 +632,9 @@ class MemoryTimelinePlaybackNotifier
     final nextIndex = (state.currentStoryIndex ?? 0) + 1;
 
     if (nextIndex < (state.totalStories ?? 0)) {
+      if (_chromecastService.isConnected) {
+        await _chromecastService.queueNext();
+      }
       await _loadStory(nextIndex);
     } else {
       _stopImageAutoAdvance();
@@ -638,12 +646,20 @@ class MemoryTimelinePlaybackNotifier
   Future<void> skipBackward() async {
     final prevIndex = (state.currentStoryIndex ?? 0) - 1;
     if (prevIndex >= 0) {
+      if (_chromecastService.isConnected) {
+        await _chromecastService.queuePrev();
+      }
       await _loadStory(prevIndex);
     }
   }
 
   Future<void> jumpToStory(int index) async {
     if (index >= 0 && index < (state.totalStories ?? 0)) {
+      if (_chromecastService.isConnected) {
+        // Queue item IDs are receiver-assigned; simplest way is to reload the queue
+        // starting from the desired index.
+        await _castPlaylistQueue(startIndex: index);
+      }
       await _loadStory(index);
     }
   }
@@ -659,48 +675,67 @@ class MemoryTimelinePlaybackNotifier
       await _chromecastService.disconnect();
       state = state.copyWith(isChromecastConnected: false);
     } else {
-      final devices = _chromecastService.availableDevices;
-
-      if (devices.isEmpty) {
-        state = state.copyWith(
-          errorMessage: 'No Chromecast devices found on your network',
-        );
-        return;
-      }
-
-      final firstDevice = devices.first;
-      final connected =
-      await _chromecastService.connectToDevice(firstDevice.id);
-
-      if (connected) {
-        state = state.copyWith(isChromecastConnected: true);
-        if (state.currentStory != null) {
-          await _castCurrentStory();
-        }
-      }
+      await _chromecastService.showCastDialog();
     }
   }
 
-  Future<void> _castCurrentStory() async {
-    final story = state.currentStory;
-    if (story == null) return;
-
-    final mediaUrl =
-    story.mediaType == 'video' ? story.videoUrl : story.imageUrl;
-
-    if (mediaUrl == null || mediaUrl.isEmpty) return;
-
-    await _chromecastService.castMedia(
-      mediaUrl: mediaUrl,
-      mediaType: story.mediaType ?? 'image',
-      title: state.memoryTitle ?? 'Memory',
-      description: '${story.contributorName} • ${story.timestamp}',
-      thumbnailUrl: story.thumbnailUrl,
-    );
-
-    if (story.mediaType == 'video' && state.isPlaying == true) {
-      await _chromecastService.play();
+  String _guessContentType({required PlaybackStoryModel story, required String url}) {
+    final lower = url.toLowerCase();
+    if (story.mediaType == 'video') {
+      if (lower.endsWith('.mp4')) return 'video/mp4';
+      if (lower.endsWith('.m3u8')) return 'application/x-mpegURL';
+      if (lower.endsWith('.mov')) return 'video/quicktime';
+      return 'video/mp4';
     }
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+
+  Future<void> _castPlaylistQueue({required int startIndex}) async {
+    final stories = state.stories;
+    if (stories == null || stories.isEmpty) return;
+
+    final memTitle = state.memoryTitle ?? 'Memory';
+    final total = stories.length;
+
+    final items = <Map<String, dynamic>>[];
+    for (int i = 0; i < stories.length; i++) {
+      final s = stories[i];
+      final mediaUrl = (s.mediaType == 'video') ? s.videoUrl : s.imageUrl;
+      if (mediaUrl == null || mediaUrl.trim().isEmpty) continue;
+
+      final url = mediaUrl.trim();
+      final contentType = _guessContentType(story: s, url: url);
+      final subtitle = '${s.contributorName ?? 'Unknown'} • ${(s.timestamp ?? '').trim()}'.trim();
+      final thumb = (s.thumbnailUrl ?? s.imageUrl ?? '').trim();
+
+      items.add({
+        'mediaUrl': url,
+        'mediaType': (s.mediaType ?? 'image'),
+        'contentType': contentType,
+        'title': memTitle,
+        'subtitle': subtitle,
+        'thumbnailUrl': thumb,
+        // Forward-looking: used by a future custom receiver UI.
+        'customData': <String, dynamic>{
+          'index': i,
+          'total': total,
+          'contributorName': s.contributorName,
+          'timestamp': s.timestamp,
+          'imageDurationSeconds': _imageDisplayDuration.inSeconds,
+          'storyId': s.storyId,
+        },
+      });
+    }
+
+    if (items.isEmpty) return;
+
+    await _chromecastService.castQueue(
+      items: items,
+      startIndex: startIndex.clamp(0, items.length - 1),
+    );
   }
 
   void toggleFavorite(int index) {

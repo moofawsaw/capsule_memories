@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ignore_for_file: unused_field
@@ -211,10 +212,25 @@ class _CustomAppBarState extends ConsumerState<CustomAppBar>
       ),
     );
 
+    // Force status bar icon color explicitly.
+    // AppBar can override parent AnnotatedRegion when background is transparent.
+    final Color scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final Color appBarBg = widget.backgroundColor ?? appTheme.transparentCustom;
+    final Color effectiveBg = (appBarBg.alpha == 0) ? scaffoldBg : appBarBg;
+    final bool isLightBg =
+        ThemeData.estimateBrightnessForColor(effectiveBg) == Brightness.light;
+    final overlayStyle = (isLightBg ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light)
+        .copyWith(
+      statusBarColor: Colors.transparent, // Android
+      statusBarBrightness: isLightBg ? Brightness.light : Brightness.dark, // iOS
+      statusBarIconBrightness: isLightBg ? Brightness.dark : Brightness.light, // Android
+    );
+
     return AppBar(
       backgroundColor: widget.backgroundColor ?? appTheme.transparentCustom,
       elevation: 0,
       automaticallyImplyLeading: false,
+      systemOverlayStyle: overlayStyle,
       toolbarHeight: widget.customHeight ?? 102.h,
       title: _buildAppBarContent(context, unreadCount),
       titleSpacing: 0,

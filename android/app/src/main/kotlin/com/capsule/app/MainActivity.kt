@@ -1,11 +1,13 @@
 package com.capsule.app
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.util.Log
 import android.net.Uri
 import android.provider.MediaStore
+
+import androidx.mediarouter.app.MediaRouteChooserDialogFragment
 
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
@@ -13,10 +15,13 @@ import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaMetadata
 import com.google.android.gms.cast.MediaLoadRequestData
+import com.google.android.gms.cast.MediaQueueItem
+import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.google.android.gms.common.images.WebImage
+import org.json.JSONObject
 
-class MainActivity: FlutterActivity() {
+class MainActivity: FlutterFragmentActivity() {
 
     private val CHROMECAST_CHANNEL = "com.capsule.app/chromecast"
 
@@ -27,6 +32,7 @@ class MainActivity: FlutterActivity() {
     private var castSession: CastSession? = null
     private var remoteMediaClient: RemoteMediaClient? = null
     private var methodChannel: MethodChannel? = null
+    private val castDialogTag = "capsule_cast_dialog"
 
     private val sessionManagerListener = object : SessionManagerListener<CastSession> {
         override fun onSessionStarted(session: CastSession, sessionId: String) {
@@ -76,6 +82,23 @@ class MainActivity: FlutterActivity() {
         override fun onSessionResumeFailed(session: CastSession, error: Int) {}
     }
 
+    private fun showCastChooserDialog() {
+        try {
+            val ctx = castContext ?: CastContext.getSharedInstance(this).also { castContext = it }
+            val selector = ctx.mergedSelector ?: return
+
+            val fm = supportFragmentManager
+            if (fm.findFragmentByTag(castDialogTag) != null) return
+
+            val dialog = MediaRouteChooserDialogFragment()
+            dialog.setRouteSelector(selector)
+            dialog.show(fm, castDialogTag)
+        } catch (e: Exception) {
+            Log.e("Chromecast", "Show cast dialog error: ${e.message}")
+            methodChannel?.invokeMethod("onCastError", "Failed to open Cast dialog")
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -110,6 +133,14 @@ class MainActivity: FlutterActivity() {
                 }
 
                 "connect" -> {
+                    // In Cast SDK, device selection should be driven by the Cast dialog.
+                    // We keep this method for backward compatibility with Flutter code.
+                    runOnUiThread { showCastChooserDialog() }
+                    result.success(true)
+                }
+
+                "showCastDialog" -> {
+                    runOnUiThread { showCastChooserDialog() }
                     result.success(true)
                 }
 
@@ -179,6 +210,90 @@ class MainActivity: FlutterActivity() {
                     }
                 }
 
+                "castQueue" -> {
+                    val args = call.arguments as? Map<*, *>
+                    val itemsRaw = args?.get("items") as? List<*>
+                    val startIndexRaw = args?.get("startIndex")
+
+                    if (itemsRaw == null || itemsRaw.isEmpty()) {
+                        result.error("INVALID_ARGS", "Queue items are required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val startIndex = when (startIndexRaw) {
+                        is Int -> startIndexRaw
+                        is Number -> startIndexRaw.toInt()
+                        is String -> startIndexRaw.toIntOrNull() ?: 0
+                        else -> 0
+                    }.coerceIn(0, itemsRaw.size - 1)
+
+                    val client = remoteMediaClient
+                    if (client == null) {
+                        result.error("NO_SESSION", "No active casting session", null)
+                        return@setMethodCallHandler
+                    }
+
+                    try {
+                        val queueItems = itemsRaw.mapNotNull { raw ->
+                            val m = raw as? Map<*, *> ?: return@mapNotNull null
+                            val mediaUrl = (m["mediaUrl"] as? String)?.trim().orEmpty()
+                            if (mediaUrl.isEmpty()) return@mapNotNull null
+
+                            val contentType = (m["contentType"] as? String)?.trim().takeUnless { it.isNullOrEmpty() }
+                                ?: "video/mp4"
+                            val title = (m["title"] as? String) ?: "Capsule"
+                            val subtitle = (m["subtitle"] as? String) ?: ""
+                            val thumbnailUrl = (m["thumbnailUrl"] as? String)?.trim().takeUnless { it.isNullOrEmpty() }
+                            val mediaType = (m["mediaType"] as? String)?.trim()?.lowercase() ?: ""
+
+                            val metadata = MediaMetadata(
+                                if (mediaType == "image") MediaMetadata.MEDIA_TYPE_PHOTO else MediaMetadata.MEDIA_TYPE_MOVIE
+                            )
+                            metadata.putString(MediaMetadata.KEY_TITLE, title)
+                            metadata.putString(MediaMetadata.KEY_SUBTITLE, subtitle)
+                            if (thumbnailUrl != null) {
+                                try { metadata.addImage(WebImage(Uri.parse(thumbnailUrl))) } catch (_: Exception) {}
+                            }
+
+                            val mediaInfoBuilder = MediaInfo.Builder(mediaUrl)
+                                .setContentType(contentType)
+                                .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                                .setMetadata(metadata)
+
+                            val customData = m["customData"] as? Map<*, *>
+                            if (customData != null) {
+                                try { mediaInfoBuilder.setCustomData(JSONObject(customData)) } catch (_: Exception) {}
+                            }
+
+                            val mediaInfo = mediaInfoBuilder.build()
+                            MediaQueueItem.Builder(mediaInfo)
+                                .setAutoplay(true)
+                                .build()
+                        }.toTypedArray()
+
+                        if (queueItems.isEmpty()) {
+                            result.error("INVALID_ARGS", "No valid queue items", null)
+                            return@setMethodCallHandler
+                        }
+
+                        client.queueLoad(
+                            queueItems,
+                            startIndex,
+                            MediaStatus.REPEAT_MODE_REPEAT_OFF,
+                            JSONObject()
+                        ).setResultCallback { r ->
+                            if (r.status.isSuccess) {
+                                result.success(true)
+                            } else {
+                                result.error("CAST_ERROR", "Failed to load queue", null)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("Chromecast", "castQueue error: ${e.message}")
+                        result.error("CAST_ERROR", e.message, null)
+                    }
+                }
+
                 "play" -> {
                     try { remoteMediaClient?.play(); result.success(null) }
                     catch (e: Exception) { result.error("PLAY_ERROR", e.message, null) }
@@ -187,6 +302,16 @@ class MainActivity: FlutterActivity() {
                 "pause" -> {
                     try { remoteMediaClient?.pause(); result.success(null) }
                     catch (e: Exception) { result.error("PAUSE_ERROR", e.message, null) }
+                }
+
+                "queueNext" -> {
+                    try { remoteMediaClient?.queueNext(null); result.success(null) }
+                    catch (e: Exception) { result.error("QUEUE_NEXT_ERROR", e.message, null) }
+                }
+
+                "queuePrev" -> {
+                    try { remoteMediaClient?.queuePrev(null); result.success(null) }
+                    catch (e: Exception) { result.error("QUEUE_PREV_ERROR", e.message, null) }
                 }
 
                 "stop" -> {

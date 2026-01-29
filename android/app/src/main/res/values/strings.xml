@@ -6,4 +6,8 @@
     <string name="facebook_app_id">1220121002780015</string>
     <string name="fb_login_protocol_scheme">fb1220121002780015</string>
     <string name="facebook_client_token">96210f785513f8a8e881be9654f95eda</string>
+
+    <!-- Google Cast (default media receiver) -->
+    <!-- Default receiver app id: CC1AD845 -->
+    <string name="cast_app_id">CC1AD845</string>
 </resources>

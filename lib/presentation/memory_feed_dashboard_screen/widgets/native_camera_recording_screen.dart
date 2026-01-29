@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/network_quality_service.dart';
+import '../../../services/location_service.dart';
 
 import '../../../core/app_export.dart';
 import '../../../widgets/custom_image_view.dart';
@@ -48,6 +49,10 @@ class _NativeCameraRecordingScreenState
   // Track current camera direction
   bool _isRearCamera = true;
 
+  // ✅ Choose capture resolution based on network for faster cellular posting.
+  // Default to high; override during init once quality is known.
+  ResolutionPreset _resolutionPreset = ResolutionPreset.high;
+
   Timer? _releaseToleranceTimer;
 
   // Progress animation
@@ -66,6 +71,12 @@ class _NativeCameraRecordingScreenState
   bool _warmupDone = false;
   bool _pendingPhotoTap = false;
   bool _isCapturing = false;
+
+  // ✅ Prefetch user location ASAP (before recording starts)
+  Future<Map<String, dynamic>?>? _locationPrefetchFuture;
+  double? _prefetchedLat;
+  double? _prefetchedLng;
+  String? _prefetchedLocationName;
 
   // Orientation locking (native camera feel)
   bool _orientationLocked = false;
@@ -98,6 +109,9 @@ class _NativeCameraRecordingScreenState
     unawaited(SupabaseService.instance.warmUploadPipeline());
     NetworkQualityService.prime();
 
+    // ✅ Start location prefetch immediately on entry (non-blocking).
+    _startLocationPrefetch();
+
 
     _progressController = AnimationController(
       vsync: this,
@@ -115,6 +129,76 @@ class _NativeCameraRecordingScreenState
         curve: Curves.elasticOut,
       ),
     );
+  }
+
+  void _startLocationPrefetch() {
+    if (_locationPrefetchFuture != null) return;
+    _locationPrefetchFuture = () async {
+      try {
+        Map<String, dynamic>? coords;
+        try {
+          coords = await LocationService.getCoordsOnly(
+            timeout: const Duration(seconds: 3),
+          );
+        } catch (_) {
+          coords = null;
+        }
+
+        final double? lat = (coords?['latitude'] as num?)?.toDouble();
+        final double? lng = (coords?['longitude'] as num?)?.toDouble();
+
+        String? name;
+        if (lat != null && lng != null) {
+          try {
+            name = await LocationService.getLocationNameBestEffort(
+              lat,
+              lng,
+              timeout: const Duration(seconds: 6),
+            );
+          } catch (_) {
+            name = null;
+          }
+        }
+
+        if (!mounted) return null;
+        setState(() {
+          _prefetchedLat = lat;
+          _prefetchedLng = lng;
+          _prefetchedLocationName = name;
+        });
+
+        return <String, dynamic>{
+          'lat': lat,
+          'lng': lng,
+          'location_name': name,
+        };
+      } catch (_) {
+        return null;
+      }
+    }();
+  }
+
+  Future<void> _awaitLocationPrefetchForArgs() async {
+    final f = _locationPrefetchFuture;
+    if (f == null) return;
+    try {
+      final res = await f.timeout(
+        const Duration(milliseconds: 800),
+        onTimeout: () => null,
+      );
+      if (res == null) return;
+      final double? lat = (res['lat'] as num?)?.toDouble();
+      final double? lng = (res['lng'] as num?)?.toDouble();
+      final String? name = (res['location_name'] as String?)?.trim();
+      if (!mounted) return;
+      setState(() {
+        _prefetchedLat ??= lat;
+        _prefetchedLng ??= lng;
+        _prefetchedLocationName ??= (name != null && name.isNotEmpty) ? name : null;
+      });
+    } catch (_) {
+      // best-effort only
+    }
   }
 
   @override
@@ -249,6 +333,16 @@ class _NativeCameraRecordingScreenState
         return;
       }
 
+      // Decide resolution preset (best-effort; do not block on errors).
+      try {
+        final q = await NetworkQualityService.getQuality();
+        // Wi-Fi: keep highest quality. Cellular/unknown: prefer 720p-ish for speed/reliability.
+        _resolutionPreset =
+            (q == NetworkQuality.wifi) ? ResolutionPreset.high : ResolutionPreset.medium;
+      } catch (_) {
+        _resolutionPreset = ResolutionPreset.high;
+      }
+
       // Use rear camera on mobile, front camera on web
       final camera = kIsWeb
           ? _cameras.firstWhere(
@@ -268,7 +362,7 @@ class _NativeCameraRecordingScreenState
 
       _cameraController = CameraController(
         camera,
-        kIsWeb ? ResolutionPreset.high : ResolutionPreset.high,
+        kIsWeb ? ResolutionPreset.high : _resolutionPreset,
         enableAudio: true,
         // OPTIMIZATION: Use more efficient pixel format
         imageFormatGroup: kIsWeb ? null : ImageFormatGroup.yuv420,
@@ -376,7 +470,7 @@ class _NativeCameraRecordingScreenState
 
       _cameraController = CameraController(
         newCamera,
-        kIsWeb ? ResolutionPreset.high : ResolutionPreset.high,
+        kIsWeb ? ResolutionPreset.high : _resolutionPreset,
         enableAudio: true,
         // OPTIMIZATION: Use more efficient pixel format
         imageFormatGroup: kIsWeb ? null : ImageFormatGroup.yuv420,
@@ -538,6 +632,9 @@ class _NativeCameraRecordingScreenState
 
       if (!mounted) return;
 
+      // Ensure we pass prefetched location if it's ready (best-effort).
+      await _awaitLocationPrefetchForArgs();
+
       Navigator.of(context).pushNamed(
         AppRoutes.appStoryEdit,
         arguments: {
@@ -546,6 +643,10 @@ class _NativeCameraRecordingScreenState
           'memory_id': widget.memoryId,
           'memory_title': widget.memoryTitle,
           'category_icon': widget.categoryIcon,
+          if (_prefetchedLat != null) 'prefetch_location_lat': _prefetchedLat,
+          if (_prefetchedLng != null) 'prefetch_location_lng': _prefetchedLng,
+          if ((_prefetchedLocationName ?? '').trim().isNotEmpty)
+            'prefetch_location_name': _prefetchedLocationName,
           if (widget.storyEditArgs != null) ...widget.storyEditArgs!,
         },
       );
@@ -652,6 +753,15 @@ class _NativeCameraRecordingScreenState
       }
 
       if (mounted) {
+        final start = _recordingStartTime;
+        final rawSeconds = (start == null)
+            ? _elapsedSeconds
+            : DateTime.now().difference(start).inSeconds;
+        final durationSeconds = rawSeconds.clamp(1, _maxRecordingDurationSeconds);
+
+        // Ensure we pass prefetched location if it's ready (best-effort).
+        await _awaitLocationPrefetchForArgs();
+
         Navigator.of(context).pushNamed(
           AppRoutes.appStoryEdit,
           arguments: {
@@ -660,6 +770,11 @@ class _NativeCameraRecordingScreenState
             'memory_id': widget.memoryId,
             'memory_title': widget.memoryTitle,
             'category_icon': widget.categoryIcon,
+            'duration_seconds': durationSeconds,
+            if (_prefetchedLat != null) 'prefetch_location_lat': _prefetchedLat,
+            if (_prefetchedLng != null) 'prefetch_location_lng': _prefetchedLng,
+            if ((_prefetchedLocationName ?? '').trim().isNotEmpty)
+              'prefetch_location_name': _prefetchedLocationName,
             if (widget.storyEditArgs != null) ...widget.storyEditArgs!,
           },
         );
@@ -679,23 +794,34 @@ class _NativeCameraRecordingScreenState
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: _errorMessage != null
-            ? _buildErrorView()
-            : !_isInitialized
-            ? _buildLoadingView()
-            : Stack(
-          children: [
-            // OPTIMIZATION: Wrap camera preview in RepaintBoundary
-            Positioned.fill(
-              child: _buildCameraPreviewNative(),
-            ),
-            _buildTopHeader(),
-            _buildRecordingControls(),
-          ],
+    // Force light status bar icons for this dark fullscreen camera.
+    final overlayStyle = SystemUiOverlayStyle.light.copyWith(
+      statusBarColor: Colors.transparent, // Android
+      statusBarBrightness: Brightness.dark, // iOS (dark bg => light icons)
+      statusBarIconBrightness: Brightness.light, // Android
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: _errorMessage != null
+              ? _buildErrorView()
+              : !_isInitialized
+                  ? _buildLoadingView()
+                  : Stack(
+                      children: [
+                        // OPTIMIZATION: Wrap camera preview in RepaintBoundary
+                        Positioned.fill(
+                          child: _buildCameraPreviewNative(),
+                        ),
+                        _buildTopHeader(),
+                        _buildRecordingControls(),
+                      ],
+                    ),
         ),
       ),
     );
@@ -741,12 +867,19 @@ class _NativeCameraRecordingScreenState
   }
 
   Widget _buildTopHeader() {
+    final double safeTop = MediaQuery.paddingOf(context).top;
     return Positioned(
       top: 0,
       left: 0,
       right: 0,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 12.h),
+        padding: EdgeInsets.only(
+          left: 16.h,
+          right: 16.h,
+          // Keep preview under status bar, but push controls below it.
+          top: safeTop + 12.h,
+          bottom: 12.h,
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,

@@ -62,6 +62,10 @@ flutter { source '../..' }
 dependencies {
     implementation "androidx.multidex:multidex:2.0.1"
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+
+    // Required for MediaRoute dialogs used by Cast device chooser
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "androidx.mediarouter:mediarouter:1.7.0"
     
     // Import the Firebase BoM
     implementation platform('com.google.firebase:firebase-bom:34.7.0')

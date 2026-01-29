@@ -22,8 +22,8 @@ import '../../core/models/feed_story_context.dart';
 import '../../core/utils/memory_nav_args.dart';
 import '../../services/avatar_helper_service.dart';
 import '../../services/feed_service.dart';
-import '../../services/story_service.dart';
 import '../../services/supabase_service.dart';
+import '../../services/user_profile_service.dart';
 import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_image_view.dart';
@@ -823,7 +823,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
             state,
             creator_id,
             category_id,
-            category_icon,
             memory_categories(name, icon_name, icon_url)
           ''').eq('id', memoryId).single();
 
@@ -2494,13 +2493,14 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
             ),
             child: SafeArea(
               top: false,
+              bottom: false,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     'Delete story?',
                     style: TextStyleHelper.instance.body16BoldPlusJakartaSans
-                        .copyWith(color: appTheme.whiteCustom),
+                        .copyWith(color: appTheme.gray_50),
                   ),
                   SizedBox(height: 12.h),
                   Row(
@@ -2509,7 +2509,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                         child: CustomButton(
                           text: 'Cancel',
                           onPressed: () => Navigator.pop(context, false),
-                          buttonStyle: CustomButtonStyle.fillGray,
+                          buttonStyle: CustomButtonStyle.outlineDark,
                           buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                         ),
                       ),
@@ -2538,8 +2538,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
       final storyId = _storyIds.isNotEmpty ? _storyIds[_currentIndex] : _initialStoryId;
       if (storyId == null || storyId.trim().isEmpty) return;
 
-      final svc = StoryService();
-      final ok = await svc.deleteStory(storyId);
+      final ok = await UserProfileService.instance.deleteStory(storyId);
       if (!ok) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

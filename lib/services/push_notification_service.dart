@@ -141,8 +141,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
         final String? imageType = message.data['image_type'] as String?;
         final bool isAvatar = imageType == 'user_avatar' || imageType == 'avatar';
+        final bool isIcon = imageType == 'icon';
+        final bool useCompactLargeIcon = isAvatar || isIcon;
 
-        debugPrint('📦 BG image: $imageUrl, type: $imageType, isAvatar: $isAvatar');
+        debugPrint(
+            '📦 BG image: $imageUrl, type: $imageType, isAvatar: $isAvatar, isIcon: $isIcon');
 
         AndroidBitmap<Object>? largeIcon;
         StyleInformation? styleInformation;
@@ -154,15 +157,22 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
                 .timeout(const Duration(seconds: 10));
 
             if (response.statusCode == 200) {
-              if (isAvatar) {
-                // Circular avatar for largeIcon
-                final circularBytes = await _createCircularBitmapFromBytes(response.bodyBytes);
-                if (circularBytes != null) {
-                  largeIcon = ByteArrayAndroidBitmap(circularBytes);
-                  debugPrint('✅ BG circular avatar created');
+              if (useCompactLargeIcon) {
+                if (isAvatar) {
+                  // Circular avatar for compact largeIcon
+                  final circularBytes =
+                      await _createCircularBitmapFromBytes(response.bodyBytes);
+                  if (circularBytes != null) {
+                    largeIcon = ByteArrayAndroidBitmap(circularBytes);
+                    debugPrint('✅ BG circular avatar created');
+                  }
+                } else {
+                  // "icon" type: show as compact largeIcon (no circle crop)
+                  largeIcon = ByteArrayAndroidBitmap(response.bodyBytes);
+                  debugPrint('✅ BG icon largeIcon ready');
                 }
               } else {
-                // Rectangle BigPicture for non-avatar images
+                // Rectangle BigPicture for expanded view (stories, memories, etc.)
                 final tempDir = await getTemporaryDirectory();
                 final file = io.File('${tempDir.path}/bg_notification_${message.hashCode}.jpg');
                 await file.writeAsBytes(response.bodyBytes, flush: true);
@@ -590,28 +600,38 @@ class PushNotificationService {
       AndroidBitmap<Object>? largeIcon;
 
       if (!kIsWeb && Platform.isAndroid) {
-        // Determine if this is an avatar that should be circular
+        // Determine if this should show in compact view as a largeIcon
         final bool isAvatar = imageType == 'user_avatar' || imageType == 'avatar';
+        final bool isIcon = imageType == 'icon';
+        final bool useCompactLargeIcon = isAvatar || isIcon;
 
         if (imageUrl != null && imageUrl.isNotEmpty) {
           try {
             debugPrint('🖼️ Downloading notification image: $imageUrl');
-            debugPrint('🖼️ Image type: $imageType, isAvatar: $isAvatar');
+            debugPrint(
+                '🖼️ Image type: $imageType, isAvatar: $isAvatar, isIcon: $isIcon');
 
             final response = await http
                 .get(Uri.parse(imageUrl))
                 .timeout(const Duration(seconds: 10));
 
             if (response.statusCode == 200) {
-              if (isAvatar) {
-                // Circular avatar for largeIcon
-                final circularBytes = await _createCircularBitmapFromBytes(response.bodyBytes);
-                if (circularBytes != null) {
-                  largeIcon = ByteArrayAndroidBitmap(circularBytes);
-                  debugPrint('✅ Circular avatar created for notification');
+              if (useCompactLargeIcon) {
+                if (isAvatar) {
+                  // Circular avatar for compact largeIcon
+                  final circularBytes =
+                      await _createCircularBitmapFromBytes(response.bodyBytes);
+                  if (circularBytes != null) {
+                    largeIcon = ByteArrayAndroidBitmap(circularBytes);
+                    debugPrint('✅ Circular avatar created for notification');
+                  }
+                } else {
+                  // "icon" type: show as compact largeIcon (no circle crop)
+                  largeIcon = ByteArrayAndroidBitmap(response.bodyBytes);
+                  debugPrint('✅ Icon largeIcon ready for notification');
                 }
               } else {
-                // Rectangle BigPicture for non-avatar images (stories, memories, etc.)
+                // Rectangle BigPicture for expanded view (stories, memories, etc.)
                 final tempDir = await getTemporaryDirectory();
                 final file = io.File('${tempDir.path}/notification_$notificationId.jpg');
                 await file.writeAsBytes(response.bodyBytes, flush: true);

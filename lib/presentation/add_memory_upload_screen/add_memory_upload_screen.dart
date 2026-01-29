@@ -539,7 +539,7 @@ class AddMemoryUploadScreenState extends ConsumerState<AddMemoryUploadScreen> {
                 child: CustomButton(
                   text: 'Cancel',
                   onPressed: () => _onTapCancel(context),
-                  buttonStyle: CustomButtonStyle.fillDark,
+                  buttonStyle: CustomButtonStyle.outlineDark,
                   buttonTextStyle: CustomButtonTextStyle.bodySmallPrimary,
                 ),
               ),

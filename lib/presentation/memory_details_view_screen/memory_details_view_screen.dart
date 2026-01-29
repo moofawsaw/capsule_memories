@@ -536,7 +536,7 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
             text: 'Cinema Mode',
             width: double.infinity,
             buttonStyle: CustomButtonStyle.outlineDark,
-            buttonTextStyle: CustomButtonTextStyle.bodyMediumGray,
+            buttonTextStyle: CustomButtonTextStyle.bodyMedium,
             leftIcon: Icons.theaters_outlined, // ✅ Material icon
             onPressed: () => onTapReplayAll(context),
           ),

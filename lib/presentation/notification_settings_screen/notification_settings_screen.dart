@@ -157,7 +157,7 @@ class NotificationSettingsScreenState
   Widget _buildDarkModeSection(BuildContext context) {
     return Consumer(builder: (context, ref, _) {
       final themeMode = ref.watch(themeModeProvider);
-      final isDark = themeMode == ThemeMode.dark;
+      final isDark = ThemeModeNotifier.isDarkEffectiveForMode(themeMode);
 
       return CustomSettingsRow(
         useIconData: true,

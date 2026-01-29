@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/theme_helper.dart';
@@ -12,6 +13,36 @@ final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>(
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   static const String _themeKey = 'theme_mode';
 
+  void _applySystemUiForMode(ThemeMode mode) {
+    final isDark = isDarkEffectiveForMode(mode);
+    SystemChrome.setSystemUIOverlayStyle(
+      (isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(
+        statusBarColor: Colors.transparent, // Android
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light, // iOS
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark, // Android
+      ),
+    );
+  }
+  
+  /// Returns the effective dark/light choice for a [ThemeMode].
+  /// - **dark** -> true
+  /// - **light** -> false
+  /// - **system** -> follows device brightness
+  ///
+  /// This is important because many UIs (a simple toggle) are boolean, but
+  /// the stored mode can be `ThemeMode.system`.
+  static bool isDarkEffectiveForMode(ThemeMode mode) {
+    if (mode == ThemeMode.dark) return true;
+    if (mode == ThemeMode.light) return false;
+    try {
+      return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+          Brightness.dark;
+    } catch (_) {
+      // If binding isn't ready for some reason, default to dark (safer for current palette).
+      return true;
+    }
+  }
+
   /// If [initialMode] is provided (e.g. during app bootstrap), we can skip
   /// async hydration to avoid a first-frame theme flash.
   ThemeModeNotifier({
@@ -22,6 +53,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
       _loadThemeMode();
     } else {
       _updateThemeHelper();
+      _applySystemUiForMode(state);
     }
   }
 
@@ -87,6 +119,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
         }
       }
       _updateThemeHelper();
+      _applySystemUiForMode(state);
     } catch (e) {
       debugPrint('Error loading theme mode: $e');
     }
@@ -95,10 +128,13 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   /// Toggle between light and dark mode
   Future<void> toggleTheme() async {
     try {
-      // If currently following system, default toggle goes to explicit dark.
-      final newMode = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+      // Toggle the *effective* theme.
+      // If currently following system, flip relative to device brightness.
+      final currentlyDark = isDarkEffectiveForMode(state);
+      final newMode = currentlyDark ? ThemeMode.light : ThemeMode.dark;
       state = newMode;
       _updateThemeHelper();
+      _applySystemUiForMode(newMode);
 
       // Save to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
@@ -113,6 +149,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
     try {
       state = mode;
       _updateThemeHelper();
+      _applySystemUiForMode(mode);
 
       // Save to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
@@ -129,4 +166,7 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 
   /// Check if current mode is dark
   bool get isDarkMode => state == ThemeMode.dark;
+
+  /// Check if the *effective* theme is dark (handles ThemeMode.system).
+  bool get isDarkEffective => isDarkEffectiveForMode(state);
 }

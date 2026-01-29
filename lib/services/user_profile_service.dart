@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 
 import './supabase_service.dart';
+import './story_service.dart';
 
 class UserProfileService {
   static UserProfileService? _instance;
@@ -9,6 +11,32 @@ class UserProfileService {
       _instance ??= UserProfileService._();
 
   UserProfileService._();
+
+  final StreamController<String> _storyDeletedController =
+      StreamController<String>.broadcast();
+
+  /// Emits story IDs when the current user deletes a story.
+  Stream<String> get storyDeletedStream => _storyDeletedController.stream;
+
+  void _emitStoryDeleted(String storyId) {
+    final id = storyId.trim();
+    if (id.isEmpty) return;
+    if (_storyDeletedController.isClosed) return;
+    _storyDeletedController.add(id);
+  }
+
+  /// Delete a story and notify listeners (e.g. profile story grid).
+  ///
+  /// NOTE: This is a convenience wrapper around `StoryService.deleteStory()`
+  /// that also broadcasts deletion so any listening UI can update immediately.
+  Future<bool> deleteStory(String storyId) async {
+    final id = storyId.trim();
+    if (id.isEmpty) return false;
+
+    final ok = await StoryService().deleteStory(id);
+    if (ok) _emitStoryDeleted(id);
+    return ok;
+  }
 
   /// Upload avatar to Supabase Storage and return file path
   /// Works on both web and mobile platforms

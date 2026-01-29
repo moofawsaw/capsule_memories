@@ -68,7 +68,9 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
           .maybeSingle();
 
       if (response != null) {
-        final isDark = ref.read(themeModeProvider) == ThemeMode.dark;
+        final isDark = ThemeModeNotifier.isDarkEffectiveForMode(
+          ref.read(themeModeProvider),
+        );
 
         // Pass empty string for avatar_url if null/empty to trigger letter avatar
         final avatarUrl = response['avatar_url'] as String?;
@@ -97,7 +99,9 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
   void syncDarkModeFromTheme() {
     final model = state.userMenuModel;
     if (model == null) return;
-    final isDark = ref.read(themeModeProvider) == ThemeMode.dark;
+    final isDark = ThemeModeNotifier.isDarkEffectiveForMode(
+      ref.read(themeModeProvider),
+    );
     if ((model.isDarkModeEnabled ?? true) == isDark) return;
     state = state.copyWith(
       userMenuModel: model.copyWith(isDarkModeEnabled: isDark),
@@ -105,7 +109,9 @@ class UserMenuNotifier extends StateNotifier<UserMenuState> {
   }
 
   void toggleDarkMode() async {
-    final currentIsDark = ref.read(themeModeProvider) == ThemeMode.dark;
+    final currentIsDark = ThemeModeNotifier.isDarkEffectiveForMode(
+      ref.read(themeModeProvider),
+    );
     final newDarkModeValue = !currentIsDark;
 
     // Update local state
