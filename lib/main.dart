@@ -15,6 +15,7 @@ import 'presentation/notifications_screen/notifier/notifications_notifier.dart';
 import 'services/network_quality_service.dart';
 import 'services/notification_service.dart';
 import 'services/push_notification_service.dart';
+import 'services/create_memory_preload_service.dart';
 import 'services/supabase_service.dart';
 
 var globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -55,6 +56,14 @@ Future<void> main() async {
   if (supabaseReady) {
     // Setup notification listener
     _setupGlobalNotificationListener();
+
+    // ✅ Preload Create Memory dependencies BEFORE first paint.
+    // This ensures Create Memory bottom sheet opens instantly (no skeleton/loading).
+    try {
+      await CreateMemoryPreloadService.instance.warm(force: true);
+    } catch (e) {
+      debugPrint('⚠️ CreateMemory preload failed: $e');
+    }
   } else {
     // Provide clear feedback when Supabase is not initialized
     debugPrint('⚠️ Supabase not initialized. App will run in limited mode.');

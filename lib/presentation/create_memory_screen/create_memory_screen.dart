@@ -352,11 +352,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   // ✅ Used to keep title visible when keyboard opens
   final GlobalKey _nameSectionKey = GlobalKey();
 
-  // ✅ Tune this to match your pinned bar's real height
-  // (buttons row + padding + top border). Keeps content from hiding behind it.
-  final double _pinnedBarReserve =
-      110; // in "logical px" then scaled via .h below
-
   @override
   void initState() {
     super.initState();
@@ -377,13 +372,14 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
       }
     });
 
-    if (widget.preSelectedCategoryId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await ref
-            .read(createMemoryNotifier.notifier)
-            .initializeWithCategory(widget.preSelectedCategoryId!);
-      });
-    }
+    // Apply optional pre-selected category after first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final pre = widget.preSelectedCategoryId;
+      if (!mounted) return;
+      if (pre != null && pre.trim().isNotEmpty) {
+        await ref.read(createMemoryNotifier.notifier).initializeWithCategory(pre);
+      }
+    });
   }
 
   @override
@@ -397,7 +393,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
   Widget build(BuildContext context) {
     return Consumer(
       builder: (context, ref, _) {
-        final state = ref.watch(createMemoryNotifier);
+        ref.watch(createMemoryNotifier);
 
         final double bottomInset = MediaQuery.of(context).viewInsets.bottom;
         final bool keyboardOpen = bottomInset > 0;

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import './avatar_helper_service.dart';
@@ -25,7 +26,7 @@ class FeedService {
   // Toggle verbose logs without ripping out print() everywhere.
   static const bool _debugFeed = false;
   void _log(String msg) {
-    if (_debugFeed) print(msg);
+    if (_debugFeed) debugPrint(msg);
   }
 
   bool _isMissingColumn(PostgrestException e, String columnName) {
@@ -75,7 +76,7 @@ class FeedService {
       }
       return viewedIds;
     } catch (e) {
-      print('❌ ERROR fetching viewed story IDs: $e');
+      _log('❌ ERROR fetching viewed story IDs: $e');
       return {};
     }
   }
@@ -114,7 +115,7 @@ class FeedService {
 
       return byMemory;
     } catch (e) {
-      print('❌ ERROR fetching contributor avatars batch: $e');
+      _log('❌ ERROR fetching contributor avatars batch: $e');
       return {};
     }
   }
@@ -159,7 +160,7 @@ class FeedService {
       ids.remove(currentUserId);
       return ids;
     } catch (e) {
-      print('❌ ERROR fetching friend IDs: $e');
+      _log('❌ ERROR fetching friend IDs: $e');
       return {};
     }
   }
@@ -184,7 +185,7 @@ class FeedService {
       ids.remove(currentUserId);
       return ids;
     } catch (e) {
-      print('❌ ERROR fetching following IDs: $e');
+      _log('❌ ERROR fetching following IDs: $e');
       return {};
     }
   }
@@ -237,7 +238,7 @@ class FeedService {
       final rows = (response as List);
       return rows.isNotEmpty;
     } catch (e) {
-      print('❌ ERROR checking For You author stories: $e');
+      _log('❌ ERROR checking For You author stories: $e');
       return false;
     }
   }
@@ -284,7 +285,7 @@ class FeedService {
       final rows = (response as List);
       return rows.isNotEmpty;
     } catch (e) {
-      print('❌ ERROR checking active friend stories: $e');
+      _log('❌ ERROR checking active friend stories: $e');
       return false;
     }
   }
@@ -330,9 +331,9 @@ class FeedService {
     }
 
     if (validationErrors.isNotEmpty) {
-      print('❌ VALIDATION FAILED [$context] for memory "${memory['id']}":');
+      _log('❌ VALIDATION FAILED [$context] for memory "${memory['id']}":');
       for (final error in validationErrors) {
-        print('  - $error');
+        _log('  - $error');
       }
       return false;
     }
@@ -349,7 +350,7 @@ class FeedService {
     required Function(String storyId, String userId) onStoryViewed,
   }) {
     if (_client == null) {
-      print('❌ ERROR: Cannot subscribe to story views - client is null');
+      _log('❌ ERROR: Cannot subscribe to story views - client is null');
       return null;
     }
 
@@ -373,10 +374,10 @@ class FeedService {
       )
           .subscribe();
 
-      print('✅ SUCCESS: Subscribed to real-time story views');
+      _log('✅ SUCCESS: Subscribed to real-time story views');
       return _storyViewsChannel;
     } catch (e) {
-      print('❌ ERROR subscribing to story views: $e');
+      _log('❌ ERROR subscribing to story views: $e');
       return null;
     }
   }
@@ -385,7 +386,7 @@ class FeedService {
     if (_storyViewsChannel != null) {
       _storyViewsChannel!.unsubscribe();
       _storyViewsChannel = null;
-      print('✅ SUCCESS: Unsubscribed from real-time story views');
+      _log('✅ SUCCESS: Unsubscribed from real-time story views');
     }
   }
 
@@ -404,7 +405,7 @@ class FeedService {
     try {
       final currentUserId = _client!.auth.currentUser?.id;
       if (currentUserId == null) {
-        print('❌ ERROR: No authenticated user');
+        _log('❌ ERROR: No authenticated user');
         return [];
       }
 
@@ -499,7 +500,7 @@ class FeedService {
 
       return validatedStories;
     } catch (e) {
-      print('❌ ERROR fetching From Friends stories: $e');
+      _log('❌ ERROR fetching From Friends stories: $e');
       return [];
     }
   }
@@ -519,7 +520,7 @@ class FeedService {
     try {
       final currentUserId = _client!.auth.currentUser?.id;
       if (currentUserId == null) {
-        print('❌ ERROR: No authenticated user');
+        _log('❌ ERROR: No authenticated user');
         return [];
       }
 
@@ -611,7 +612,7 @@ class FeedService {
 
       return validatedStories;
     } catch (e) {
-      print('❌ ERROR fetching For You stories: $e');
+      _log('❌ ERROR fetching For You stories: $e');
       return [];
     }
   }
@@ -630,7 +631,7 @@ class FeedService {
     try {
       final currentUserId = _client!.auth.currentUser?.id;
       if (currentUserId == null) {
-        print('❌ ERROR: No authenticated user');
+        _log('❌ ERROR: No authenticated user');
         return [];
       }
 
@@ -762,7 +763,7 @@ class FeedService {
 
       return transformedMemories;
     } catch (e) {
-      print('❌ ERROR fetching For You memories: $e');
+      _log('❌ ERROR fetching For You memories: $e');
       return [];
     }
   }
@@ -878,7 +879,7 @@ class FeedService {
 
       return validatedStories;
     } catch (e) {
-      print('❌ ERROR fetching happening now stories: $e');
+      _log('❌ ERROR fetching happening now stories: $e');
       return [];
     }
   }
@@ -1020,7 +1021,7 @@ class FeedService {
 
       return transformedMemories;
     } catch (e) {
-      print('❌ ERROR fetching public memories: $e');
+      _log('❌ ERROR fetching public memories: $e');
       return [];
     }
   }
@@ -1129,7 +1130,7 @@ class FeedService {
 
       return validatedStories;
     } catch (e) {
-      print('Error fetching trending stories: $e');
+      _log('Error fetching trending stories: $e');
       return [];
     }
   }
@@ -1240,7 +1241,7 @@ class FeedService {
 
       return validatedStories;
     } catch (e) {
-      print('❌ ERROR fetching longest streak stories: $e');
+      _log('❌ ERROR fetching longest streak stories: $e');
       return [];
     }
   }
@@ -1351,7 +1352,7 @@ class FeedService {
 
       return validatedStories;
     } catch (e) {
-      print('❌ ERROR fetching popular user stories: $e');
+      _log('❌ ERROR fetching popular user stories: $e');
       return [];
     }
   }
@@ -1464,7 +1465,7 @@ class FeedService {
 
       return validatedStories;
     } catch (e) {
-      print('❌ ERROR fetching popular now stories: $e');
+      _log('❌ ERROR fetching popular now stories: $e');
       return [];
     }
   }
@@ -1605,7 +1606,7 @@ class FeedService {
 
       return transformedMemories;
     } catch (e) {
-      print('❌ ERROR fetching popular memories: $e');
+      _log('❌ ERROR fetching popular memories: $e');
       return [];
     }
   }
@@ -1711,8 +1712,8 @@ class FeedService {
 
       return validatedStories;
     } catch (e, stackTrace) {
-      print('❌ ERROR in fetchLatestStories(): $e');
-      print('Stack trace: $stackTrace');
+      _log('❌ ERROR in fetchLatestStories(): $e');
+      _log('Stack trace: $stackTrace');
       return [];
     }
   }
@@ -1723,7 +1724,7 @@ class FeedService {
     try {
       final client = SupabaseService.instance.client;
       if (client == null) {
-        print('❌ ERROR: Supabase client not initialized');
+        _log('❌ ERROR: Supabase client not initialized');
         return [];
       }
 
@@ -1744,7 +1745,7 @@ class FeedService {
 
       return storyIds;
     } catch (e) {
-      print('❌ ERROR fetching latest story IDs: $e');
+      _log('❌ ERROR fetching latest story IDs: $e');
       return [];
     }
   }
@@ -1755,7 +1756,7 @@ class FeedService {
     try {
       final client = SupabaseService.instance.client;
       if (client == null) {
-        print('❌ ERROR: Supabase client not initialized');
+        _log('❌ ERROR: Supabase client not initialized');
         return [];
       }
 
@@ -1777,17 +1778,17 @@ class FeedService {
           .order('created_at', ascending: false);
 
       if (response.isEmpty) {
-        print('⚠️ WARNING: No happening now stories found');
+        _log('⚠️ WARNING: No happening now stories found');
         return [];
       }
 
       final storyIds =
       (response as List).map((story) => story['id'] as String).toList();
 
-      print('✅ SUCCESS: Fetched ${storyIds.length} happening now story IDs');
+      _log('✅ SUCCESS: Fetched ${storyIds.length} happening now story IDs');
       return storyIds;
     } catch (e) {
-      print('❌ ERROR fetching happening now story IDs: $e');
+      _log('❌ ERROR fetching happening now story IDs: $e');
       return [];
     }
   }
@@ -1804,7 +1805,7 @@ class FeedService {
     try {
       final currentUserId = _client!.auth.currentUser?.id;
       if (currentUserId == null) {
-        print('❌ ERROR: No authenticated user');
+        _log('❌ ERROR: No authenticated user');
         return [];
       }
 
@@ -1916,7 +1917,7 @@ class FeedService {
 
       return activeMemories;
     } catch (e) {
-      print('❌ ERROR fetching user active memories: $e');
+      _log('❌ ERROR fetching user active memories: $e');
       return [];
     }
   }
@@ -2049,7 +2050,7 @@ class FeedService {
         'storiesList': stories,
       };
     } catch (e) {
-      print('Error fetching memory details: $e');
+      _log('Error fetching memory details: $e');
       return null;
     }
   }
@@ -2145,7 +2146,7 @@ class FeedService {
         'memory_visibility': memory?['visibility'] ?? '',
       };
     } catch (e) {
-      print('❌ ERROR fetching story details: $e');
+      _log('❌ ERROR fetching story details: $e');
       return null;
     }
   }
@@ -2166,7 +2167,7 @@ class FeedService {
 
       return (response as List).map((item) => item['id'] as String).toList();
     } catch (e) {
-      print('❌ ERROR fetching memory story IDs: $e');
+      _log('❌ ERROR fetching memory story IDs: $e');
       return [];
     }
   }

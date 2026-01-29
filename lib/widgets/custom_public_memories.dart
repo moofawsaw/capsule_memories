@@ -63,8 +63,6 @@ class CustomPublicMemories extends StatelessWidget {
           .limit(1);
       return (res as List).isNotEmpty;
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ FEED EXISTS CHECK failed for memory $memoryId: $e');
       return false;
     }
   }
@@ -427,14 +425,11 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
     // Avoid double-subscribing
     if (_membersChannel != null && _membersSubForMemoryId == memoryId) {
-      _rtLog('🔁 realtime already subscribed');
       return;
     }
 
     _stopMembersRealtime();
     _membersSubForMemoryId = memoryId;
-
-    _rtLog('🛰️ realtime subscribe -> table=memory_contributors filter=memory_id=eq.$memoryId');
 
     final ch = client.channel('memory_contributors:$memoryId');
 
@@ -451,7 +446,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       ),
       callback: (payload) {
         _lastMembersRtAt = DateTime.now();
-        _rtLog('📡 RT payload event=${payload.eventType} table=${payload.table}');
 
         if (!mounted) return;
 
@@ -459,7 +453,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         _membersRtDebounce?.cancel();
         _membersRtDebounce = Timer(const Duration(milliseconds: 250), () async {
           if (!mounted) return;
-          _rtLog('🔄 RT -> refetch memberCount + memberAvatars');
           await _fetchMemberCount();
           await _fetchMemberAvatars();
           if (!mounted) return;
@@ -471,7 +464,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     _membersChannel = ch;
 
     ch.subscribe((status, [ref]) {
-      _rtLog('✅ subscribe status=$status ref=$ref');
     });
   }
 
@@ -487,16 +479,8 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
     _membersSubForMemoryId = null;
 
     if (ch != null) {
-      _rtLog('🛑 realtime removeChannel');
       client.removeChannel(ch);
     }
-  }
-
-// Small log helper
-  void _rtLog(String msg) {
-    final mem = widget.memory.id ?? '';
-    // ignore: avoid_print
-    print('🟣 [PublicMemoryCard] ${DateTime.now().toIso8601String()} mem=$mem | $msg');
   }
 
   List<TimelineStoryItem> _timelineStories = <TimelineStoryItem>[];
@@ -505,17 +489,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
   bool _isLoadingTimeline = true;
   bool _isUserCreatedMemory = false;
   int _memberCount = 0;
-  int _rtEventCount = 0;
-  int _avatarsFetchCount = 0;
-  int _countFetchCount = 0;
   DateTime? _lastRtAt;
-
-  String _dbgNow() => DateTime.now().toIso8601String();
-
-  void _dbg(String msg) {
-    // ignore: avoid_print
-    print('🟣 [PublicMemoryCard] ${_dbgNow()} mem=${widget.memory.id} | $msg');
-  }
 
   // ✅ feed-safe member avatars for header (first 3)
   List<String> _memberAvatars = <String>[];
@@ -581,56 +555,42 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         _isUserCreatedMemory = creatorId != null && creatorId == currentUser.id;
       });
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ Error checking memory ownership (fallback): $e');
       if (mounted) setState(() => _isUserCreatedMemory = false);
     }
   }
 
-  Future<void> _fetchMemberCount({String debugFrom = 'manual'}) async {
-    _countFetchCount += 1;
+  Future<void> _fetchMemberCount() async {
     final memoryId = widget.memory.id;
-
-    _dbg('👥 fetchMemberCount(#$_countFetchCount) from=$debugFrom memoryId=$memoryId');
 
     if (memoryId == null || memoryId.isEmpty) {
       if (mounted) setState(() => _memberCount = 0);
-      _dbg('👥 fetchMemberCount: memoryId missing -> memberCount=0');
       return;
     }
 
     try {
       final members = await _membersService.fetchMemoryMembers(memoryId);
-      _dbg('👥 fetchMemberCount: service returned ${members.length} members');
 
       if (!mounted) return;
       setState(() => _memberCount = members.length);
     } catch (e) {
-      _dbg('❌ fetchMemberCount error: $e');
       if (mounted) setState(() => _memberCount = 0);
     }
   }
 
 
   // ✅ fetch top 3 member avatars when profileImages isn't provided (feed)
-  Future<void> _fetchMemberAvatars({String debugFrom = 'manual'}) async {
-    _avatarsFetchCount += 1;
+  Future<void> _fetchMemberAvatars() async {
     final memoryId = widget.memory.id;
 
-    _dbg('🧑 fetchMemberAvatars(#$_avatarsFetchCount) from=$debugFrom memoryId=$memoryId');
-
     if (memoryId == null || memoryId.isEmpty) {
-      _dbg('🧑 fetchMemberAvatars: memoryId missing (return)');
       return;
     }
 
     // If caller already provided profileImages (dashboard), prefer that.
     final provided = widget.memory.profileImages ?? <String>[];
-    _dbg('🧑 provided profileImages=${provided.length}');
 
     if (provided.isNotEmpty) {
       final take = provided.take(3).toList();
-      _dbg('🧑 using PROVIDED avatars -> ${take.length}');
       if (mounted) setState(() => _memberAvatars = take);
       return;
     }
@@ -639,7 +599,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
       if (mounted) setState(() => _isLoadingMemberAvatars = true);
 
       final List<dynamic> members = await _membersService.fetchMemoryMembers(memoryId);
-      _dbg('🧑 service.fetchMemoryMembers returned ${members.length} rows');
 
       final List<String> avatars = [];
 
@@ -653,8 +612,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
         final String resolved = AvatarHelperService.getAvatarUrl(rawAvatar);
 
-        _dbg('🧑 row user_id=${m['user_id']} rawAvatar=$rawAvatar resolved=$resolved');
-
         if (resolved.isNotEmpty) {
           avatars.add(resolved);
         }
@@ -667,10 +624,7 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         _memberAvatars = avatars;
         _isLoadingMemberAvatars = false;
       });
-
-      _dbg('🧑 fetchMemberAvatars DONE -> stored=${_memberAvatars.length}');
     } catch (e) {
-      _dbg('❌ fetchMemberAvatars error: $e');
       if (!mounted) return;
       setState(() => _isLoadingMemberAvatars = false);
     }
@@ -825,8 +779,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
         _isLoadingTimeline = false;
       });
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ PUBLIC MEMORY CARD: Error loading timeline: $e');
       if (!mounted) return;
 
       setState(() {
@@ -1128,7 +1080,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   @override
   Widget build(BuildContext context) {
-    _dbg('BUILD: memberCount=$_memberCount memberAvatars=${_memberAvatars.length} isLoadingAvatars=$_isLoadingMemberAvatars lastRtAt=$_lastRtAt');
     final bool isFeed = widget.variant == MemoryCardVariant.feed;
     final double cardHeight = isFeed ? 300.h : 330.h;
 
@@ -1229,8 +1180,6 @@ class _PublicMemoryCardState extends State<_PublicMemoryCard> {
 
   Widget _buildMemoryHeader(BuildContext context) {
     final CustomMemoryItem memory = widget.memory;
-    // ignore: avoid_print
-    print('🧩 CARD ICON RAW: ${memory.iconPath}');
 
     final bool showBadges = _shouldShowBadges(memory);
     final double headerHeight = showBadges ? 110.h : 74.h;

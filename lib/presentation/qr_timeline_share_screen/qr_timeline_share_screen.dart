@@ -44,9 +44,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         _errorMessage = null;
       });
 
-      print(
-          '🔍 QR TIMELINE SHARE: Fetching memory details for: ${widget.memoryId}');
-
       final memoryId = widget.memoryId.trim();
       if (memoryId.isEmpty) {
         setState(() {
@@ -110,7 +107,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         storiesCount = storiesCountRes.count;
       } catch (e) {
         // ignore: avoid_print
-        print('⚠️ QR TIMELINE SHARE: Failed to count stories: $e');
       }
       try {
         final membersCountRes = await client
@@ -121,7 +117,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         membersCount = membersCountRes.count;
       } catch (e) {
         // ignore: avoid_print
-        print('⚠️ QR TIMELINE SHARE: Failed to count members: $e');
       }
 
       // contributor_count is optional (may not exist in older schemas)
@@ -132,21 +127,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
       // Prefer explicit membersCount if it looks valid, else fallback to contributor_count.
       final resolvedMembersCount =
           (membersCount > contributorCount) ? membersCount : contributorCount;
-      print('✅ QR TIMELINE SHARE: Successfully loaded memory');
-      print('   - Title: ${response['title'] ?? response['name']}');
-      print('   - Invite Code: ${response['invite_code']}');
-      print('   - QR Code URL: ${response['qr_code_url']}');
-      print('   - Members: $resolvedMembersCount');
-      print('   - Stories: $storiesCount');
-
-      // 🔍 ENHANCED DEBUG - Check qr_code_url status
-      final rawQrUrl = response['qr_code_url'];
-      print('🔍 DEBUG qr_code_url analysis:');
-      print('   - Raw value: $rawQrUrl');
-      print('   - Type: ${rawQrUrl.runtimeType}');
-      print('   - Is null: ${rawQrUrl == null}');
-      print('   - Is empty string: ${rawQrUrl == ""}');
-      print('   - Full response keys: ${response.keys.toList()}');
 
       setState(() {
         final title = ((response['title'] ?? '') as dynamic).toString().trim();
@@ -160,10 +140,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
         };
         _isLoading = false;
       });
-    } catch (e, st) {
-      print('❌ ERROR fetching memory for QR share: $e');
-      print(st);
-
+    } catch (e) {
       String message = 'Failed to load memory details';
       if (e is PostgrestException) {
         final code = (e.code ?? '').toString();
@@ -280,12 +257,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
 
     // Generate correct deep link URL
     final deepLinkUrl = 'https://capapp.co/join/memory/$inviteCode';
-
-// DEBUG: Log what we extracted
-    print('📋 _buildContent data extraction:');
-    print('   - inviteCode: "$inviteCode"');
-    print('   - qrCodeUrl: "$qrCodeUrl"');
-    print('   - deepLinkUrl: "$deepLinkUrl"');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,

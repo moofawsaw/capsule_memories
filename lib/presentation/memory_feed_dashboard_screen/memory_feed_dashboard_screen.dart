@@ -197,15 +197,6 @@ class _MemoryFeedDashboardScreenState
       builder: (context, ref, _) {
         final state = ref.watch(memoryFeedDashboardProvider);
         final activeMemories = state.activeMemories;
-        final isLoadingActiveMemories = state.isLoadingActiveMemories;
-
-        // Show skeleton loader while loading active memories
-        if (isLoadingActiveMemories) {
-          return Container(
-            margin: EdgeInsets.symmetric(horizontal: 20.h),
-            child: _buildActionButtonSkeleton(),
-          );
-        }
 
         if (activeMemories.isEmpty) {
           // Show "Create Memory" button when no active memories
@@ -242,44 +233,6 @@ class _MemoryFeedDashboardScreenState
           );
         }
       },
-    );
-  }
-
-  /// Build skeleton loader for action button
-  Widget _buildActionButtonSkeleton() {
-    return SizedBox(
-      height: 56.h, // EXACT match to CustomButton
-      width: double.infinity,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: appTheme.blue_gray_900_01,
-          borderRadius: BorderRadius.circular(6.h), // match button radius
-        ),
-        child: Center(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 20.h,
-                height: 20.h,
-                decoration: BoxDecoration(
-                  color: appTheme.blue_gray_300.withAlpha(77),
-                  borderRadius: BorderRadius.circular(4.h),
-                ),
-              ),
-              SizedBox(width: 8.h),
-              Container(
-                width: 110.h, // closer to real text width
-                height: 16.h,
-                decoration: BoxDecoration(
-                  color: appTheme.blue_gray_300.withAlpha(77),
-                  borderRadius: BorderRadius.circular(4.h),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

@@ -198,20 +198,8 @@ class MemoryFeedDashboardNotifier
         };
       }).toList();
 
-      if (merged.isNotEmpty) {
-        for (int i = 0; i < merged.length && i < 3; i++) {
-          final mm = merged[i];
-          // ignore: avoid_print
-          print(
-            '✅ ACTIVE MEMORY HYDRATE: title="${mm['title']}" id="${mm['id'] ?? mm['memory_id']}" visibility="${mm['visibility']}" end_time="${mm['end_time']}" expiration_text="${mm['expiration_text']}"',
-          );
-        }
-      }
-
       return merged;
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ HYDRATE VISIBILITY/END_TIME FAILED: $e');
       return list;
     }
   }
@@ -530,8 +518,6 @@ class MemoryFeedDashboardNotifier
       _startRealtimeIfNeeded();
       _maybeWarmCreateMemoryDependencies();
     } catch (e) {
-      // ignore: avoid_print
-      print('Error loading feed data: $e');
       if (!_isDisposed) {
         _safeSetState(
           state.copyWith(
@@ -549,10 +535,6 @@ class MemoryFeedDashboardNotifier
     try {
       final currentUserId = Supabase.instance.client.auth.currentUser?.id;
       if (currentUserId == null) {
-        // ignore: avoid_print
-        print(
-          'ℹ️ INFO: Real-time subscription skipped (optional - requires authentication)',
-        );
         return;
       }
 
@@ -563,11 +545,7 @@ class MemoryFeedDashboardNotifier
           }
         },
       );
-    } catch (e, st) {
-      // ignore: avoid_print
-      print('❌ ERROR subscribing to story views: $e');
-      // ignore: avoid_print
-      print(st);
+    } catch (e) {
     }
   }
 
@@ -658,8 +636,6 @@ class MemoryFeedDashboardNotifier
   void _setupRealtimeSubscriptions() {
     final client = SupabaseService.instance.client;
     if (client == null) {
-      // ignore: avoid_print
-      print('⚠️ REALTIME: Supabase client not available');
       return;
     }
 
@@ -696,8 +672,6 @@ class MemoryFeedDashboardNotifier
       )
           .subscribe();
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ REALTIME: Error setting up subscriptions: $e');
     }
   }
 
@@ -706,8 +680,6 @@ class MemoryFeedDashboardNotifier
       _storiesChannel?.unsubscribe();
       _memoriesChannel?.unsubscribe();
     } catch (e) {
-      // ignore: avoid_print
-      print('⚠️ REALTIME: Error cleaning up subscriptions: $e');
     }
   }
 
@@ -757,10 +729,6 @@ class MemoryFeedDashboardNotifier
 
       // ⛔ STOP: If memory is private, do NOT add story to "Happening Now" feed
       if (memoryVisibility != 'public') {
-        // ignore: avoid_print
-        print(
-          '🔒 REALTIME: Skipped private memory story from appearing in real-time feed (memory_id: $memoryId, visibility: $memoryVisibility)',
-        );
         return;
       }
 
@@ -841,8 +809,6 @@ class MemoryFeedDashboardNotifier
 
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ REALTIME: Error handling new story: $e');
     }
   }
 
@@ -898,8 +864,6 @@ class MemoryFeedDashboardNotifier
 
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ REALTIME: Error handling story update: $e');
     }
   }
 
@@ -933,8 +897,6 @@ class MemoryFeedDashboardNotifier
 
             isCurrentUserContributor = contributorCheck != null;
           } catch (e) {
-            // ignore: avoid_print
-            print('⚠️ REALTIME: Failed to check contributor status: $e');
           }
         }
       }
@@ -1027,8 +989,6 @@ class MemoryFeedDashboardNotifier
 
         _safeSetState(state.copyWith(activeMemories: updatedActiveMemories));
 
-        // ignore: avoid_print
-        print('✅ REALTIME: Added new memory "${newActiveMemory['title']}" to active memories');
       }
 
       // Continue with existing logic for public feed update
@@ -1145,8 +1105,6 @@ class MemoryFeedDashboardNotifier
       final updatedModel = currentModel.copyWith(publicMemories: updatedMemories);
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ REALTIME: Error handling new memory: $e');
     }
   }
 
@@ -1174,8 +1132,6 @@ class MemoryFeedDashboardNotifier
       final updatedModel = currentModel.copyWith(publicMemories: updatedMemories);
       _safeSetState(state.copyWith(memoryFeedDashboardModel: updatedModel));
     } catch (e) {
-      // ignore: avoid_print
-      print('❌ REALTIME: Error handling memory update: $e');
     }
   }
 
@@ -1210,8 +1166,6 @@ class MemoryFeedDashboardNotifier
     } catch (e) {
       if (e.toString().contains('dispose') || e.toString().contains('Bad state')) {
         _isDisposed = true;
-        // ignore: avoid_print
-        print('⚠️ FEED NOTIFIER: Attempted to set state after dispose');
       } else {
         rethrow;
       }
@@ -1270,8 +1224,6 @@ class MemoryFeedDashboardNotifier
         isLoadingMore: false,
       ));
     } catch (e) {
-      // ignore: avoid_print
-      print('Error loading more happening now: $e');
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
@@ -1324,18 +1276,12 @@ class MemoryFeedDashboardNotifier
         isLoadingMore: false,
       ));
     } catch (e) {
-      // ignore: avoid_print
-      print('Error loading more latest stories: $e');
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
 
   Future<void> loadMorePublicMemories() async {
     if (_isDisposed || state.isLoadingMore || !state.hasMorePublicMemories) {
-      // ignore: avoid_print
-      print(
-        '🛑 loadMorePublicMemories skipped: _isDisposed=$_isDisposed, isLoadingMore=${state.isLoadingMore}, hasMorePublicMemories=${state.hasMorePublicMemories}',
-      );
       return;
     }
 
@@ -1346,14 +1292,8 @@ class MemoryFeedDashboardNotifier
       final currentMemories = currentModel.publicMemories ?? <CustomMemoryItem>[];
       final offset = currentMemories.length;
 
-      // ignore: avoid_print
-      print('🌍 loadMorePublicMemories START offset=$offset limit=$_pageSize');
-
       final newData =
       await _feedService.fetchPublicMemories(offset: offset, limit: _pageSize);
-
-      // ignore: avoid_print
-      print('✅ fetchPublicMemories returned rows=${newData.length}');
 
       if (_isDisposed) return;
 
@@ -1395,15 +1335,7 @@ class MemoryFeedDashboardNotifier
         isLoadingMore: false,
       ));
 
-      // ignore: avoid_print
-      print(
-        '🏁 loadMorePublicMemories DONE total=${updatedMemories.length} hasMore=${newData.length == _pageSize}',
-      );
-    } catch (e, st) {
-      // ignore: avoid_print
-      print('❌ Error loading more public memories: $e');
-      // ignore: avoid_print
-      print(st);
+    } catch (e) {
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
@@ -1456,8 +1388,6 @@ class MemoryFeedDashboardNotifier
         isLoadingMore: false,
       ));
     } catch (e) {
-      // ignore: avoid_print
-      print('Error loading more trending: $e');
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
@@ -1514,8 +1444,6 @@ class MemoryFeedDashboardNotifier
         isLoadingMore: false,
       ));
     } catch (e) {
-      // ignore: avoid_print
-      print('Error loading more longest streak: $e');
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
@@ -1568,8 +1496,6 @@ class MemoryFeedDashboardNotifier
         isLoadingMore: false,
       ));
     } catch (e) {
-      // ignore: avoid_print
-      print('Error loading more popular users: $e');
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
@@ -1633,8 +1559,6 @@ class MemoryFeedDashboardNotifier
         isLoadingMore: false,
       ));
     } catch (e) {
-      // ignore: avoid_print
-      print('Error loading more popular memories: $e');
       _safeSetState(state.copyWith(isLoadingMore: false));
     }
   }
@@ -1653,8 +1577,6 @@ class MemoryFeedDashboardNotifier
         _safeSetState(state.copyWith(isLoading: false, hasDbConnectionError: false));
       }
     } catch (e) {
-      // ignore: avoid_print
-      print('Error refreshing feed: $e');
       if (!_isDisposed) {
         _safeSetState(state.copyWith(isLoading: false, hasDbConnectionError: true));
       }
@@ -1789,8 +1711,6 @@ class MemoryFeedDashboardNotifier
         categories: categories,
       ));
     } catch (e) {
-      // ignore: avoid_print
-      print('Error loading categories: $e');
       _safeSetState(state.copyWith(
         isLoadingCategories: false,
         categories: [],

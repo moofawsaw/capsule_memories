@@ -259,6 +259,14 @@ class PushNotificationService {
   String? _fcmToken;
   String? _deviceId;
 
+  // Foreground duplicate prevention:
+  // - In this app we can receive both an FCM push AND a realtime DB INSERT
+  //   for the same event while the app is foreground.
+  // - The realtime path sometimes has an empty body -> "title-only" notification.
+  // - We defensively dedupe identical notifications in a short window.
+  static const Duration _dedupeWindow = Duration(seconds: 3);
+  final Map<String, int> _recentNotificationSignatures = <String, int>{};
+
   // ✅ Android notification channel constants
   static const String _androidChannelId = 'capsule_default';
   static const String _androidChannelName = 'Capsule Notifications';
@@ -593,8 +601,36 @@ class PushNotificationService {
     if (kIsWeb) return;
 
     try {
-      final notificationId =
-          id ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000);
+      final normalizedTitle = title.trim();
+      final normalizedBody = body.trim();
+
+      // Avoid "title-only" duplicates (common from realtime insert payloads).
+      // If you truly want title-only notifications later, add an explicit flag.
+      if (normalizedBody.isEmpty) {
+        debugPrint('🔕 Skipping notification with empty body: $normalizedTitle');
+        return;
+      }
+
+      final signature = [
+        normalizedTitle,
+        normalizedBody,
+        (payload ?? '').trim(),
+        (imageUrl ?? '').trim(),
+        (imageType ?? '').trim(),
+      ].join('|');
+
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      _pruneRecentNotificationSignatures(nowMs);
+      final lastShownMs = _recentNotificationSignatures[signature];
+      if (lastShownMs != null &&
+          (nowMs - lastShownMs) <= _dedupeWindow.inMilliseconds) {
+        debugPrint('🔁 Deduped notification (recently shown): $normalizedTitle');
+        return;
+      }
+      _recentNotificationSignatures[signature] = nowMs;
+
+      // Prefer a stable ID so duplicate calls update instead of creating another.
+      final notificationId = id ?? (signature.hashCode & 0x7fffffff);
 
       StyleInformation? styleInformation;
       AndroidBitmap<Object>? largeIcon;
@@ -676,17 +712,23 @@ class PushNotificationService {
 
       await _flutterLocalNotificationsPlugin.show(
         notificationId,
-        title,
-        body,
+        normalizedTitle,
+        normalizedBody,
         details,
         payload: payload,
       );
 
-      debugPrint('✅ Notification displayed: $title');
+      debugPrint('✅ Notification displayed: $normalizedTitle');
     } catch (e, st) {
       debugPrint('❌ showNotification failed: $e');
       debugPrint('$st');
     }
+  }
+
+  void _pruneRecentNotificationSignatures(int nowMs) {
+    if (_recentNotificationSignatures.isEmpty) return;
+    final cutoffMs = nowMs - _dedupeWindow.inMilliseconds;
+    _recentNotificationSignatures.removeWhere((_, ts) => ts < cutoffMs);
   }
 
   /// -------------------------------------------------------------------------

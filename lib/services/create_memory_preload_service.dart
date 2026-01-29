@@ -1,8 +1,10 @@
 import './groups_service.dart';
 import './supabase_service.dart';
 
-/// Preloads Create Memory dependencies (groups + categories) AFTER initial paint.
-/// This avoids jank on the first bottom-sheet open while keeping splash fast.
+/// Preloads Create Memory dependencies (groups + categories).
+///
+/// This is intended to run during app bootstrap so the Create Memory bottom sheet
+/// opens instantly (no skeleton/loading). It is safe to call multiple times.
 class CreateMemoryPreloadService {
   CreateMemoryPreloadService._();
 

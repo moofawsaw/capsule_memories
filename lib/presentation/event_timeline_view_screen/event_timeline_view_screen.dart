@@ -31,15 +31,16 @@ class EventTimelineViewScreen extends ConsumerStatefulWidget {
 }
 
 // ============================
-// SKELETONS (MATCH SEALED VIEW)
+// SINGLE SKELETON (MATCH SEALED VIEW)
 // ============================
 
-// ============================
-// SKELETONS (MATCH CustomMemorySkeleton)
-// ============================
+class _TimelineViewSkeleton extends StatelessWidget {
+  const _TimelineViewSkeleton();
 
-class _OpenTimelineViewSkeleton extends StatelessWidget {
-  const _OpenTimelineViewSkeleton();
+  // Match sealed timeline skeleton sizing (MemoryDetailsViewScreen)
+  static const double _storyCardW = 90; // 90.h
+  static const double _storyCardH = 120; // 120.h
+  static const double _storyRadius = 12; // 12.h
 
   @override
   Widget build(BuildContext context) {
@@ -48,87 +49,37 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: 12.h),
-
-          // Header skeleton
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.h),
-            child: Container(
-              padding: EdgeInsets.all(16.h),
-              decoration: BoxDecoration(
-                color: appTheme.gray_900_01, // surface
-                borderRadius: BorderRadius.circular(16.h),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44.h,
-                        height: 44.h,
-                        decoration: BoxDecoration(
-                          color: appTheme.blue_gray_300.withAlpha(77),
-                          borderRadius: BorderRadius.circular(14.h),
-                        ),
-                      ),
-                      SizedBox(width: 12.h),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              height: 14.h,
-                              width: 180.h,
-                              decoration: BoxDecoration(
-                                color:
-                                appTheme.blue_gray_300.withAlpha(77),
-                                borderRadius:
-                                BorderRadius.circular(6.h),
-                              ),
-                            ),
-                            SizedBox(height: 10.h),
-                            Container(
-                              height: 12.h,
-                              width: 140.h,
-                              decoration: BoxDecoration(
-                                color:
-                                appTheme.blue_gray_300.withAlpha(77),
-                                borderRadius:
-                                BorderRadius.circular(6.h),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(width: 12.h),
-                      Container(
-                        width: 56.h,
-                        height: 28.h,
-                        decoration: BoxDecoration(
-                          color: appTheme.blue_gray_300.withAlpha(77),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 14.h),
-                  Container(
-                    height: 12.h,
-                    width: 220.h,
-                    decoration: BoxDecoration(
-                      color: appTheme.blue_gray_300.withAlpha(77),
-                      borderRadius: BorderRadius.circular(6.h),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Header (sealed-style): CustomEventCard renders its own skeleton.
+          const CustomEventCard(isLoading: true),
 
           SizedBox(height: 16.h),
 
-          const _OpenTimelineSkeletonSection(),
+          // Timeline section skeleton (sealed-style)
+          Container(
+            margin: EdgeInsets.only(top: 6.h),
+            padding: EdgeInsets.symmetric(horizontal: 16.h),
+            width: double.maxFinite,
+            child: Column(
+              children: [
+                SizedBox(height: 44.h),
+                Container(
+                  height: 220.h,
+                  width: double.maxFinite,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_01,
+                    borderRadius: BorderRadius.circular(16.h),
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                Container(
+                  width: double.maxFinite,
+                  height: 1,
+                  color: appTheme.blue_gray_900,
+                ),
+                SizedBox(height: 16.h),
+              ],
+            ),
+          ),
 
           SizedBox(height: 18.h),
 
@@ -139,7 +90,7 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
               height: 14.h,
               width: 120.h,
               decoration: BoxDecoration(
-                color: appTheme.blue_gray_300.withAlpha(77),
+                color: appTheme.blue_gray_900,
                 borderRadius: BorderRadius.circular(6.h),
               ),
             ),
@@ -147,127 +98,44 @@ class _OpenTimelineViewSkeleton extends StatelessWidget {
 
           SizedBox(height: 14.h),
 
-          const _StoriesSkeletonRow(),
+          // Stories row skeleton
+          SizedBox(
+            height: _storyCardH.h,
+            child: ListView.separated(
+              padding: EdgeInsets.symmetric(horizontal: 20.h),
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 4,
+              separatorBuilder: (_, __) => SizedBox(width: 8.h),
+              itemBuilder: (_, __) {
+                return Container(
+                  width: _storyCardW.h,
+                  height: _storyCardH.h,
+                  decoration: BoxDecoration(
+                    color: appTheme.gray_900_01,
+                    borderRadius: BorderRadius.circular(_storyRadius.h),
+                  ),
+                );
+              },
+            ),
+          ),
 
           SizedBox(height: 24.h),
 
-          // Button skeleton shells
+          // Button skeletons (match rest of app)
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 24.h),
             child: Column(
               children: [
-                Container(
-                  height: 48.h,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_900_01,
-                    borderRadius: BorderRadius.circular(14.h),
-                  ),
-                ),
+                CustomButtonSkeleton(),
                 SizedBox(height: 12.h),
-                Container(
-                  height: 48.h,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: appTheme.gray_900_01,
-                    borderRadius: BorderRadius.circular(14.h),
-                  ),
-                ),
+                CustomButtonSkeleton(),
               ],
             ),
           ),
 
           SizedBox(height: 20.h),
         ],
-      ),
-    );
-  }
-}
-
-class _OpenTimelineSkeletonSection extends StatelessWidget {
-  const _OpenTimelineSkeletonSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(top: 6.h),
-      padding: EdgeInsets.symmetric(horizontal: 16.h),
-      width: double.maxFinite,
-      child: Column(
-        children: [
-          SizedBox(height: 44.h),
-          Container(
-            height: 220.h,
-            width: double.maxFinite,
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_01,
-              borderRadius: BorderRadius.circular(16.h),
-            ),
-          ),
-          SizedBox(height: 16.h),
-          Container(
-            width: double.maxFinite,
-            height: 1,
-            color: appTheme.blue_gray_300.withAlpha(51),
-          ),
-          SizedBox(height: 16.h),
-        ],
-      ),
-    );
-  }
-}
-
-class _StoriesSkeletonRow extends StatelessWidget {
-  const _StoriesSkeletonRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 140.h,
-      child: ListView.separated(
-        padding: EdgeInsets.symmetric(horizontal: 20.h),
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 4,
-        separatorBuilder: (_, __) => SizedBox(width: 12.h),
-        itemBuilder: (_, __) {
-          return Container(
-            width: 120.h,
-            decoration: BoxDecoration(
-              color: appTheme.gray_900_01,
-              borderRadius: BorderRadius.circular(16.h),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(12.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color:
-                        appTheme.blue_gray_300.withAlpha(51),
-                        borderRadius:
-                        BorderRadius.circular(12.h),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 10.h),
-                  Container(
-                    height: 12.h,
-                    width: 70.h,
-                    decoration: BoxDecoration(
-                      color:
-                      appTheme.blue_gray_300.withAlpha(77),
-                      borderRadius:
-                      BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
       ),
     );
   }
@@ -492,18 +360,18 @@ class EventTimelineViewScreenState
         expectedMemoryId.trim().isNotEmpty &&
         currentMemoryId != expectedMemoryId.trim());
 
-    if (waitingForExpectedMemory) {
-      return Scaffold(
-        backgroundColor: appTheme.gray_900_02,
-        body: const _OpenTimelineViewSkeleton(),
-      );
-    }
-
     final isLoading = state.isLoading ?? false;
     final hasSnapshot = state.eventTimelineViewModel != null;
 
     // Single source of truth for initial-load skeleton
     final effectiveLoading = isLoading || (_booting && !hasSnapshot);
+
+    if (waitingForExpectedMemory || effectiveLoading) {
+      return Scaffold(
+        backgroundColor: appTheme.gray_900_02,
+        body: const _TimelineViewSkeleton(),
+      );
+    }
 
     return Scaffold(
       backgroundColor: appTheme.gray_900_02,
@@ -526,18 +394,7 @@ class EventTimelineViewScreenState
               _buildTimelineSection(context),
               _buildStoriesSection(context),
               SizedBox(height: 18.h),
-              effectiveLoading
-                  ? Container(
-                margin: EdgeInsets.symmetric(horizontal: 24.h),
-                child: Column(
-                  children: [
-                    CustomButtonSkeleton(),
-                    SizedBox(height: 12.h),
-                    CustomButtonSkeleton(),
-                  ],
-                ),
-              )
-                  : _buildActionButtons(context),
+              _buildActionButtons(context),
               SizedBox(height: 20.h),
             ],
           ),
@@ -586,13 +443,7 @@ class EventTimelineViewScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
-
-        final isLoading = state.isLoading ?? false;
         final hasSnapshot = state.eventTimelineViewModel != null;
-
-        if (isLoading && hasSnapshot) {
-          return const _OpenTimelineSkeletonSection();
-        }
 
         if (!hasSnapshot) {
           return const SizedBox.shrink();
@@ -864,19 +715,6 @@ class EventTimelineViewScreenState
             child: Consumer(
               builder: (context, ref, _) {
                 final state = ref.watch(eventTimelineViewNotifier);
-                final isLoading = state.isLoading ?? false;
-                final hasSnapshot = state.eventTimelineViewModel != null;
-
-                if (isLoading && hasSnapshot) {
-                  return Container(
-                    height: 14.h,
-                    width: 120.h,
-                    decoration: BoxDecoration(
-                      color: appTheme.blue_gray_900,
-                      borderRadius: BorderRadius.circular(6.h),
-                    ),
-                  );
-                }
 
                 final storyCount =
                     state.eventTimelineViewModel?.customStoryItems?.length ?? 0;
@@ -900,12 +738,6 @@ class EventTimelineViewScreenState
     return Consumer(
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
-        final isLoading = state.isLoading ?? false;
-        final hasSnapshot = state.eventTimelineViewModel != null;
-
-        if (isLoading && hasSnapshot) {
-          return const _StoriesSkeletonRow();
-        }
 
         if (!_hasCompletedFirstLoad) return const SizedBox.shrink();
 
