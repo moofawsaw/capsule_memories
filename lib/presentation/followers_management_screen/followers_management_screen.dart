@@ -32,7 +32,6 @@ class FollowersManagementScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Followed back'),
-              backgroundColor: appTheme.deep_purple_A100,
             ),
           );
         }

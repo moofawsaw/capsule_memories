@@ -157,14 +157,17 @@ serve(async (req) => {
       const nowLocalMs = now + offsetMin * 60 * 1000
       const localDate = ymdFromUtcMillis(nowLocalMs)
 
-      // Skip if user has disabled daily capsule pushes OR master pushes
+      // Skip if user has disabled Daily Capsule reminder pushes OR master pushes
       const { data: prefs } = await supabase
         .from('email_preferences')
-        .select('push_notifications_enabled, push_daily_capsule')
+        .select('push_notifications_enabled, push_daily_capsule_reminder, push_daily_capsule')
         .eq('user_id', userId)
         .maybeSingle()
 
-      if (prefs && (prefs.push_notifications_enabled === false || prefs.push_daily_capsule === false)) {
+      const reminderEnabled =
+        (prefs?.push_daily_capsule_reminder ?? prefs?.push_daily_capsule) !== false
+
+      if (prefs && (prefs.push_notifications_enabled === false || reminderEnabled === false)) {
         // Still advance schedule to tomorrow
         const localNow = new Date(nowLocalMs)
         const nextIso = computeNextReminderAtIso({

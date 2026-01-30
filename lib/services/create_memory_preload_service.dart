@@ -8,7 +8,8 @@ import './supabase_service.dart';
 class CreateMemoryPreloadService {
   CreateMemoryPreloadService._();
 
-  static final CreateMemoryPreloadService instance = CreateMemoryPreloadService._();
+  static final CreateMemoryPreloadService instance =
+      CreateMemoryPreloadService._();
 
   static const Duration _ttl = Duration(minutes: 15);
 
@@ -27,6 +28,13 @@ class CreateMemoryPreloadService {
 
   bool get hasGroups => _cachedGroups.isNotEmpty;
   bool get hasCategories => _cachedCategories.isNotEmpty;
+
+  /// Allows feature flows (like Create Memory) to keep the groups cache in-sync
+  /// when realtime membership changes occur, without forcing a full warm (groups + categories).
+  void updateGroupsCache(List<Map<String, dynamic>> groups) {
+    _cachedGroups = groups;
+    _groupsLoaded = true;
+  }
 
   bool get isFresh =>
       _lastWarmAt != null && DateTime.now().difference(_lastWarmAt!) < _ttl;
@@ -48,7 +56,8 @@ class CreateMemoryPreloadService {
     try {
       // Groups (fast path via existing service)
       final groups = await GroupsService.fetchUserGroups();
-      _cachedGroups = groups; // cache even if empty (avoids refetch on first open)
+      _cachedGroups =
+          groups; // cache even if empty (avoids refetch on first open)
       _groupsLoaded = true;
     } catch (e) {
       // ignore: avoid_print
@@ -85,4 +94,3 @@ class CreateMemoryPreloadService {
     _lastWarmAt = DateTime.now();
   }
 }
-

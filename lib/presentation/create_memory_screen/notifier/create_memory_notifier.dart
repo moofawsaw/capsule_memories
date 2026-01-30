@@ -4,14 +4,15 @@ import '../../../services/create_memory_preload_service.dart';
 import '../../../services/memory_cache_service.dart';
 import '../../../services/memory_service.dart';
 import '../../../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../friends_management_screen/widgets/qr_scanner_overlay.dart';
 import '../models/create_memory_model.dart';
 
 part 'create_memory_state.dart';
 
 final createMemoryNotifier =
-StateNotifierProvider.autoDispose<CreateMemoryNotifier, CreateMemoryState>(
-      (ref) => CreateMemoryNotifier(
+    StateNotifierProvider.autoDispose<CreateMemoryNotifier, CreateMemoryState>(
+  (ref) => CreateMemoryNotifier(
     CreateMemoryState(
       createMemoryModel: CreateMemoryModel(),
     ),
@@ -21,6 +22,7 @@ StateNotifierProvider.autoDispose<CreateMemoryNotifier, CreateMemoryState>(
 class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   final _cacheService = MemoryCacheService();
   final _memoryService = MemoryService();
+  RealtimeChannel? _userMembershipChannel;
 
   CreateMemoryNotifier(CreateMemoryState state) : super(state) {
     initialize();
@@ -55,9 +57,40 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       ),
     );
 
-    // Only fetch on-demand if we haven't preloaded yet.
-    if (!preload.groupsLoaded) _fetchAvailableGroups();
+    // Keep groups list in-sync while the sheet is open.
+    _startUserGroupMembershipSubscription();
+
+    // Fetch in the background if cache is missing or stale.
+    // (We still seed from cache so the sheet opens instantly.)
+    if (!preload.groupsLoaded || !preload.isFresh) {
+      _fetchAvailableGroups();
+    }
     if (!preload.categoriesLoaded) _fetchAvailableCategories();
+  }
+
+  void _startUserGroupMembershipSubscription() {
+    // Avoid duplicate subscriptions (autoDispose can recreate this notifier).
+    if (_userMembershipChannel != null) return;
+
+    final supabase = SupabaseService.instance.client;
+    final userId = supabase?.auth.currentUser?.id;
+    if (supabase == null || userId == null) return;
+
+    try {
+      _userMembershipChannel =
+          GroupsService.subscribeToUserGroupMembershipChanges(
+        onMembershipChanged: _handleUserMembershipChanged,
+      );
+    } catch (e) {
+      print(
+          'CreateMemoryNotifier: failed to subscribe to membership changes: $e');
+    }
+  }
+
+  void _handleUserMembershipChanged() {
+    if (!mounted) return;
+    // Fire-and-forget refresh (callback is sync).
+    _fetchAvailableGroups();
   }
 
   Future<void> initializeWithCategory(String categoryId) async {
@@ -95,9 +128,33 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
     try {
       final groups = await GroupsService.fetchUserGroups();
 
+      if (!mounted) return;
+
+      // Keep the preload cache in sync so reopen won't show stale groups.
+      CreateMemoryPreloadService.instance.updateGroupsCache(groups);
+
+      final selectedGroupId = state.createMemoryModel?.selectedGroup;
+      final hasSelectedGroup =
+          selectedGroupId != null && selectedGroupId.isNotEmpty;
+      final stillInSelectedGroup = hasSelectedGroup
+          ? groups.any((g) => (g['id'] as String?) == selectedGroupId)
+          : false;
+
+      // Only clear group-related state if a previously-selected group becomes invalid.
+      final shouldClearSelectedGroup =
+          hasSelectedGroup && !stillInSelectedGroup;
+
       state = state.copyWith(
         createMemoryModel: state.createMemoryModel?.copyWith(
           availableGroups: groups,
+          selectedGroup: shouldClearSelectedGroup ? null : selectedGroupId,
+          groupMembers: shouldClearSelectedGroup
+              ? const <Map<String, dynamic>>[]
+              : (state.createMemoryModel?.groupMembers ??
+                  const <Map<String, dynamic>>[]),
+          invitedUserIds: shouldClearSelectedGroup
+              ? <String>{}
+              : (state.createMemoryModel?.invitedUserIds ?? <String>{}),
         ),
       );
     } catch (e) {
@@ -123,12 +180,12 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
       final categories = (response as List)
           .map<Map<String, dynamic>>((category) => {
-        'id': category['id'] as String,
-        'name': category['name'] as String,
-        'tagline': category['tagline'] as String?,
-        'icon_name': category['icon_name'] as String?,
-        'icon_url': category['icon_url'] as String?,
-      })
+                'id': category['id'] as String,
+                'name': category['name'] as String,
+                'tagline': category['tagline'] as String?,
+                'icon_name': category['icon_name'] as String?,
+                'icon_url': category['icon_url'] as String?,
+              })
           .toList();
 
       state = state.copyWith(
@@ -236,11 +293,13 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       final members = await _fetchGroupMembers(groupId);
 
       // Convert group members -> invitedUserIds set (exclude current user)
-      final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
+      final currentUserId =
+          SupabaseService.instance.client?.auth.currentUser?.id;
       final Set<String> autoInvites = {};
 
       for (final m in members) {
-        final uid = (m['id'] as String?)?.trim(); // GroupsService returns 'id' as profile/user id
+        final uid = (m['id'] as String?)
+            ?.trim(); // GroupsService returns 'id' as profile/user id
         if (uid == null || uid.isEmpty) continue;
         if (currentUserId != null && uid == currentUserId) continue;
         autoInvites.add(uid);
@@ -276,8 +335,8 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
   void updateSearchQuery(String query) {
     final filteredUsers = state.createMemoryModel
-        ?.copyWith(searchQuery: query)
-        .getFilteredUsers() ??
+            ?.copyWith(searchQuery: query)
+            .getFilteredUsers() ??
         [];
 
     state = state.copyWith(
@@ -290,7 +349,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
 
   void toggleUserInvite(String userId) {
     final currentInvitedUsers =
-    Set<String>.from(state.createMemoryModel?.invitedUserIds ?? {});
+        Set<String>.from(state.createMemoryModel?.invitedUserIds ?? {});
 
     if (currentInvitedUsers.contains(userId)) {
       currentInvitedUsers.remove(userId);
@@ -356,14 +415,14 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
       }
 
       final visibility =
-      state.createMemoryModel?.isPublic == true ? 'public' : 'private';
+          state.createMemoryModel?.isPublic == true ? 'public' : 'private';
 
       final selectedGroupId = state.createMemoryModel?.selectedGroup;
 
       // ✅ If a group is selected, invitedUserIds is already auto-populated in updateSelectedGroup.
       // (Still defensively compute it here in case selection happened without fetch finishing.)
       Set<String> finalInvitedSet =
-      Set<String>.from(state.createMemoryModel?.invitedUserIds ?? {});
+          Set<String>.from(state.createMemoryModel?.invitedUserIds ?? {});
 
       if (selectedGroupId != null && selectedGroupId.isNotEmpty) {
         if ((state.createMemoryModel?.groupMembers ?? []).isNotEmpty) {
@@ -411,19 +470,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         throw Exception('Failed to create memory - service returned null');
       }
 
-      // ✅ Persist group_id on the memory (so MemoryMembersService.fetchMemoryGroupInfo works)
-      if (selectedGroupId != null && selectedGroupId.isNotEmpty) {
-        try {
-          await supabase!
-              .from('memories')
-              .update({'group_id': selectedGroupId})
-              .eq('id', memoryId);
-          print('✅ Set memories.group_id = $selectedGroupId');
-        } catch (e) {
-          print('⚠️ Failed to set group_id on memory: $e');
-          // Non-fatal: members are still added via invitedUserIds
-        }
-      }
+      // NOTE: group_id is already persisted by MemoryService.createMemory().
 
       print('✅ Memory created successfully with ID: $memoryId');
 
@@ -453,9 +500,9 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
               invitedUserIds: {},
               groupMembers: [],
               availableGroups:
-              state.createMemoryModel?.availableGroups ?? const [],
+                  state.createMemoryModel?.availableGroups ?? const [],
               availableCategories:
-              state.createMemoryModel?.availableCategories ?? const [],
+                  state.createMemoryModel?.availableCategories ?? const [],
             ),
           );
 
@@ -487,7 +534,7 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
         groupMembers: [],
         availableGroups: state.createMemoryModel?.availableGroups ?? const [],
         availableCategories:
-        state.createMemoryModel?.availableCategories ?? const [],
+            state.createMemoryModel?.availableCategories ?? const [],
       ),
     );
 
@@ -500,6 +547,12 @@ class CreateMemoryNotifier extends StateNotifier<CreateMemoryState> {
   void dispose() {
     state.memoryNameController?.dispose();
     state.searchController?.dispose();
+
+    try {
+      _userMembershipChannel?.unsubscribe();
+    } catch (_) {}
+    _userMembershipChannel = null;
+
     super.dispose();
   }
 }

@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:video_player/video_player.dart';
 
 import '../../core/app_export.dart';
+import '../../services/chromecast_service.dart';
 import '../../widgets/custom_image_view.dart';
 import './models/memory_timeline_playback_model.dart';
 import './notifier/memory_timeline_playback_notifier.dart';
@@ -221,6 +222,13 @@ class MemoryTimelinePlaybackScreenState
   // ✅ NEW: Toggle mute + apply to current video controller
   Future<void> _toggleMute() async {
     setState(() => _isMuted = !_isMuted);
+    final isCasting =
+        ref.read(memoryTimelinePlaybackNotifier).isChromecastConnected ?? false;
+    if (isCasting) {
+      // In cast mode, control receiver volume (0 or 1 as a simple mute toggle).
+      await ChromecastService().setVolume(_isMuted ? 0.0 : 1.0);
+      return;
+    }
     await _applyVolumeToCurrentController();
   }
 
@@ -446,6 +454,55 @@ class MemoryTimelinePlaybackScreenState
           'No stories available',
           style: TextStyle(color: Colors.white, fontSize: 16.sp),
         ),
+      );
+    }
+
+    // Chromecast mode: don't try to render local VideoPlayer (controller is disposed).
+    if (state.isChromecastConnected == true) {
+      final thumb = (currentStory.thumbnailUrl ??
+              currentStory.imageUrl ??
+              '').trim();
+
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          if (thumb.isNotEmpty)
+            CustomImageView(
+              imagePath: thumb,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+            )
+          else
+            Container(color: Colors.black),
+          Container(color: Colors.black.withAlpha(120)),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cast, color: Colors.white, size: 64.h),
+                SizedBox(height: 10.h),
+                Text(
+                  'Casting to your device',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 6.h),
+                Text(
+                  'Use the controls to control playback',
+                  style: TextStyle(
+                    color: Colors.white.withAlpha(180),
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       );
     }
 

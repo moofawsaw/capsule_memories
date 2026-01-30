@@ -101,11 +101,11 @@ class AccountRegistrationScreenState
           accountRegistrationNotifier,
               (previous, current) {
             if (current.isSuccess ?? false) {
-              TextInput.finishAutofillContext();
+              // ✅ Allow iOS Keychain to offer saving credentials when applicable.
+              TextInput.finishAutofillContext(shouldSave: true);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('Account created successfully!'),
-                  backgroundColor: appTheme.colorFF52D1,
                 ),
               );
               ref.read(accountRegistrationNotifier.notifier).clearForm();
@@ -122,7 +122,6 @@ class AccountRegistrationScreenState
                 SnackBar(
                   content:
                   Text(current.errorMessage ?? 'Registration failed'),
-                  backgroundColor: appTheme.colorFFD81E,
                 ),
               );
             }
@@ -159,7 +158,8 @@ class AccountRegistrationScreenState
                 hintText: 'Email',
                 prefixIcon: Icons.mail_outline,
                 keyboardType: TextInputType.emailAddress,
-                autofillHints: const [AutofillHints.email],
+                autofillHints: const [AutofillHints.username, AutofillHints.email],
+                textInputAction: TextInputAction.next,
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validateEmail(value),
@@ -178,6 +178,7 @@ class AccountRegistrationScreenState
                 prefixIcon: Icons.lock_outline,
                 isPassword: true,
                 autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.done,
                 validator: (value) => ref
                     .read(accountRegistrationNotifier.notifier)
                     .validatePassword(value),

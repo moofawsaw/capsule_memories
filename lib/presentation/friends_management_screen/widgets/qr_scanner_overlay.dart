@@ -248,7 +248,7 @@ class _QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
                         ),
                         child: Icon(
                           _flashEnabled ? Icons.flash_on : Icons.flash_off,
-                          color: appTheme.white_A700,
+                          color: appTheme.gray_50,
                           size: 24.h,
                         ),
                       ),
@@ -320,7 +320,7 @@ class _QRScannerOverlayState extends ConsumerState<QRScannerOverlay> {
                           textAlign: TextAlign.center,
                           style: TextStyleHelper
                               .instance.body14RegularPlusJakartaSans
-                              .copyWith(color: appTheme.white_A700),
+                              .copyWith(color: appTheme.gray_50),
                         ),
                       ],
                     ),

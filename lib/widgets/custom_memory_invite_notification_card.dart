@@ -39,6 +39,30 @@ class MemoryInviteNotificationCard extends StatefulWidget {
 class _MemoryInviteNotificationCardState
     extends State<MemoryInviteNotificationCard> {
   bool _isLoading = false;
+  bool _syncedInviteAction = false;
+  String? _syncedActionTaken;
+  String? _syncedActionDate;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncInviteActionIfNeeded();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant MemoryInviteNotificationCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If notification data changed, allow re-sync once.
+    if (oldWidget.notification['id'] != widget.notification['id']) {
+      _syncedInviteAction = false;
+      _syncedActionTaken = null;
+      _syncedActionDate = null;
+    }
+    _syncInviteActionIfNeeded();
+  }
 
   String _formatTimestamp(DateTime dateTime) {
     final now = DateTime.now();
@@ -115,6 +139,61 @@ class _MemoryInviteNotificationCardState
   );
   }
 
+  Future<void> _syncInviteActionIfNeeded() async {
+    if (_syncedInviteAction) return;
+    _syncedInviteAction = true;
+
+    final data = (widget.notification['data'] as Map?)?.cast<String, dynamic>() ?? {};
+    // If the notification already contains an action, trust it.
+    if ((data['action_taken'] as String?)?.trim().isNotEmpty == true &&
+        (data['action_date'] as String?)?.trim().isNotEmpty == true) {
+      return;
+    }
+
+    final ctx = _inviteCtx();
+    final inviteId = (ctx.inviteId ?? '').trim();
+    final notificationId = (ctx.notificationId ?? '').trim();
+    if (inviteId.isEmpty || notificationId.isEmpty) return;
+
+    final invite = await NotificationService.instance.getMemoryInviteById(inviteId);
+    if (!mounted) return;
+    if (invite == null) return;
+
+    final status = (invite['status'] ?? '').toString().trim();
+    final respondedAt = invite['responded_at']?.toString();
+    if (status != 'accepted' || respondedAt == null || respondedAt.trim().isEmpty) {
+      return;
+    }
+
+    // Locally reflect accepted state immediately (even before notification row updates).
+    setState(() {
+      _syncedActionTaken = 'accepted';
+      _syncedActionDate = respondedAt;
+    });
+
+    // Persist the same "accepted" markers the notifications screen uses when accepting in-card.
+    try {
+      final formattedDate = _formatActionDate(respondedAt);
+      await NotificationService.instance.updateNotificationContent(
+        notificationId: notificationId,
+        newMessage: 'You joined "${ctx.memoryTitle}" on $formattedDate',
+        additionalData: {
+          'action_taken': 'accepted',
+          'action_date': respondedAt,
+          if (ctx.memoryId != null) 'memory_id': ctx.memoryId,
+          if (ctx.inviteId != null) 'invite_id': ctx.inviteId,
+          'inviter_name': ctx.inviterName,
+          'memory_title': ctx.memoryTitle,
+        },
+      );
+    } catch (_) {
+      // Best-effort: UI is already updated locally.
+    }
+
+    // Ensure parent list reloads so this card reflects the persisted update too.
+    widget.onActionCompleted();
+  }
+
   Future<void> _handleAccept() async {
   final ctx = _inviteCtx();
 
@@ -123,7 +202,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   const SnackBar(
   content: Text('Invalid invite - missing notification id'),
-  backgroundColor: Colors.red,
   ),
   );
   return;
@@ -135,7 +213,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   const SnackBar(
   content: Text('Invalid invite - missing invite and memory information'),
-  backgroundColor: Colors.red,
   ),
   );
   return;
@@ -153,7 +230,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   const SnackBar(
   content: Text('This invite has already been responded to'),
-  backgroundColor: Colors.orange,
   ),
   );
   }
@@ -183,7 +259,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   const SnackBar(
   content: Text('This invite has already been responded to'),
-  backgroundColor: Colors.orange,
   ),
   );
   }
@@ -235,10 +310,11 @@ class _MemoryInviteNotificationCardState
   );
 
   if (mounted) {
+  ScaffoldMessenger.of(context).clearSnackBars();
   ScaffoldMessenger.of(context).showSnackBar(
   SnackBar(
   content: const Text('You joined the memory!'),
-  backgroundColor: Colors.green,
+  duration: const Duration(seconds: 3),
   action: ctx.memoryId != null
   ? SnackBarAction(
   label: 'View',
@@ -263,7 +339,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   SnackBar(
   content: Text('Failed to accept invite: $error'),
-  backgroundColor: Colors.red,
   ),
   );
   }
@@ -281,7 +356,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   const SnackBar(
   content: Text('Invalid invite - missing notification id'),
-  backgroundColor: Colors.red,
   ),
   );
   return;
@@ -293,7 +367,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   const SnackBar(
   content: Text('Invalid invite - missing invite and memory information'),
-  backgroundColor: Colors.red,
   ),
   );
   return;
@@ -310,7 +383,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   const SnackBar(
   content: Text('This invite has already been responded to'),
-  backgroundColor: Colors.orange,
   ),
   );
   }
@@ -364,7 +436,6 @@ class _MemoryInviteNotificationCardState
   ScaffoldMessenger.of(context).showSnackBar(
   SnackBar(
   content: Text('Failed to decline invite: $error'),
-  backgroundColor: Colors.red,
   ),
   );
   }
@@ -379,9 +450,9 @@ class _MemoryInviteNotificationCardState
   Widget build(BuildContext context) {
     final isRead = widget.notification['is_read'] as bool? ?? false;
     final data = widget.notification['data'] as Map<String, dynamic>?;
-    final actionTaken = data?['action_taken'] as String?;
-    final actionDate = data?['action_date'] as String?;
-    final memoryId = data?['memory_id'] as String?;
+    final actionTaken = (data?['action_taken'] as String?) ?? _syncedActionTaken;
+    final actionDate = (data?['action_date'] as String?) ?? _syncedActionDate;
+    final memoryId = (data?['memory_id'] as String?) ?? _inviteCtx().memoryId;
 
     final inviterName = data?['inviter_name'] as String? ??
         widget.notification['enriched_data']?['inviter_name'] as String? ??

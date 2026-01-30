@@ -10,6 +10,7 @@ class VideoCompressionService {
   // Tune these as you like.
   // Goal: avoid "compression tax" for videos that are already small.
   static const int _mb = 1024 * 1024;
+  static const int _compressThresholdBytes = 35 * _mb;
 
   static Future<File> compressForNetwork({
     required File input,
@@ -18,33 +19,18 @@ class VideoCompressionService {
     if (!await input.exists()) return input;
 
     // ✅ FAST PATH: skip compression if file is already small.
-    // These thresholds are intentionally conservative to restore "snappy" sharing.
+    // We keep media quality consistent across cellular + Wi‑Fi.
     final int origLen = await input.length();
     if (origLen <= 0) return input;
 
-    // On Wi-Fi, don’t waste time compressing smaller videos.
-    if (quality == NetworkQuality.wifi && origLen <= 18 * _mb) {
-      return input;
-    }
-
-    // On cellular/unknown, still skip if very small.
-    if (quality != NetworkQuality.wifi && origLen <= 8 * _mb) {
+    // Only compress when the file is notably large.
+    if (origLen <= _compressThresholdBytes) {
       return input;
     }
 
     try {
-      VideoQuality q;
-      switch (quality) {
-        case NetworkQuality.wifi:
-          q = VideoQuality.Res1280x720Quality;
-          break;
-        case NetworkQuality.cellular:
-          q = VideoQuality.Res1280x720Quality; // ✅ keep 720p minimum
-          break;
-        default:
-          q = VideoQuality.Res1280x720Quality; // ✅ keep 720p minimum
-          break;
-      }
+      // If we do compress, use a predictable setting.
+      final VideoQuality q = VideoQuality.Res1280x720Quality;
 
       final MediaInfo? info = await VideoCompress.compressVideo(
         input.path,

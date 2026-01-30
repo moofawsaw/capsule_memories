@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../../core/app_export.dart';
+import '../../core/services/deep_link_service.dart';
+import '../../core/utils/memory_nav_args.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/custom_confirmation_dialog.dart';
 import '../../widgets/custom_memory_invite_notification_card.dart';
@@ -26,6 +28,82 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   // Suppress "new notification" snackbar for notifications restored via UNDO
   final Set<String> _suppressNewSnackbarsForNotificationIds = {};
 
+  // Some notifications are inserted first, then enriched moments later (title/message/data).
+  // When we receive an "empty" realtime insert, do a short follow-up refresh.
+  Timer? _notificationEnrichmentRefreshTimer;
+
+  Future<Map<String, dynamic>?> _fetchNotificationWithRetry(
+    String notificationId, {
+    int attempts = 4,
+    Duration initialDelay = const Duration(milliseconds: 250),
+  }) async {
+    Duration delay = initialDelay;
+    for (int i = 0; i < attempts; i++) {
+      final n = await _notificationService.getNotificationById(notificationId);
+      if (n != null) {
+        final title = (n['title'] ?? '').toString().trim();
+        final msg = (n['message'] ?? '').toString().trim();
+        final data = n['data'];
+        final hasData = data is Map && data.isNotEmpty;
+        if (title.isNotEmpty || msg.isNotEmpty || hasData) {
+          return n;
+        }
+      }
+      await Future.delayed(delay);
+      delay += const Duration(milliseconds: 250);
+    }
+    return await _notificationService.getNotificationById(notificationId);
+  }
+
+  String? _deepLinkFromNotificationRow(Map<String, dynamic> notification) {
+    final raw = notification['data'];
+    final Map<String, dynamic>? data =
+        raw is Map ? Map<String, dynamic>.from(raw) : null;
+
+    final direct = (data?['deep_link'] ?? data?['deepLink'])?.toString().trim();
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    final memoryId = (data?['memory_id'] ?? '').toString().trim();
+    final storyId = (data?['story_id'] ?? '').toString().trim();
+    if (memoryId.isNotEmpty && storyId.isNotEmpty) {
+      return 'https://capapp.co/memory/$memoryId/story/$storyId';
+    }
+    return null;
+  }
+
+  Future<void> _showForegroundSnackbarForNotificationId(
+    String notificationId,
+  ) async {
+    final row = await _fetchNotificationWithRetry(notificationId);
+    if (!mounted) return;
+
+    final title = (row?['title'] ?? '').toString().trim();
+    final message = (row?['message'] ?? '').toString().trim();
+    final text = message.isNotEmpty
+        ? message
+        : (title.isNotEmpty ? title : 'New notification');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'View',
+          onPressed: () {
+            // IMPORTANT:
+            // Foreground "View" must navigate exactly like tapping the in-app notification row.
+            // Reuse the same handler to ensure parity across all notification types.
+            if (!mounted) return;
+            if (row is Map<String, dynamic>) {
+              _handleNotificationTap(row);
+              return;
+            }
+          },
+        ),
+      ),
+    );
+  }
+
   // Undo snackbar countdown plumbing
   ValueNotifier<int>? _undoCountdown;
   Timer? _undoCountdownTimer;
@@ -47,6 +125,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     // after the snackbar is fully closed. Disposing early can crash because
     // SnackBar's ValueListenableBuilder may still read the notifier.
     _cancelUndoCountdown(closeSnackBar: true);
+    _notificationEnrichmentRefreshTimer?.cancel();
+    _notificationEnrichmentRefreshTimer = null;
     _notificationService.unsubscribeFromNotifications();
     super.dispose();
   }
@@ -74,8 +154,28 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     try {
       _notificationService.subscribeToNotifications(
         onNewNotification: (notification) {
+          if (!mounted) return;
+
           // Always refresh list silently to reflect latest DB state
           _loadNotifications();
+
+          // If this was inserted without payload fields (common when a follow-up update enriches it),
+          // schedule a second refresh shortly after.
+          final title = (notification['title'] ?? '').toString().trim();
+          final message = (notification['message'] ?? '').toString().trim();
+          final data = notification['data'];
+          final hasData = data is Map && data.isNotEmpty;
+          final isBlank = title.isEmpty && message.isEmpty && !hasData;
+          if (isBlank) {
+            _notificationEnrichmentRefreshTimer?.cancel();
+            _notificationEnrichmentRefreshTimer = Timer(
+              const Duration(milliseconds: 900),
+              () {
+                if (!mounted) return;
+                _loadNotifications();
+              },
+            );
+          }
 
           // If this notification was restored via UNDO, don't show snackbar
           final id = notification['id'] as String?;
@@ -92,16 +192,31 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
             // Only show snackbar if notification is brand new (within last 2 seconds)
             if (timeDifference.inSeconds <= 2 && mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(notification['message'] ?? 'New notification'),
-                  duration: const Duration(seconds: 3),
-                  action: SnackBarAction(
-                    label: 'View',
-                    onPressed: () => _handleNotificationTap(notification),
+              // Avoid showing a blank snackbar (common when row is enriched right after insert).
+              // Also ensure View action doesn't depend on this widget still being alive.
+              if (isBlank && id != null) {
+                unawaited(_showForegroundSnackbarForNotificationId(id));
+              } else {
+                final text = message.isNotEmpty
+                    ? message
+                    : (title.isNotEmpty ? title : 'New notification');
+                final link = _deepLinkFromNotificationRow(notification);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(text),
+                    duration: const Duration(seconds: 3),
+                    action: SnackBarAction(
+                      label: 'View',
+                      onPressed: () {
+                        final deepLink = (link ?? '').trim();
+                        if (deepLink.isNotEmpty) {
+                          DeepLinkService().handleExternalDeepLink(deepLink);
+                        }
+                      },
+                    ),
                   ),
-                ),
-              );
+                );
+              }
             }
           }
         },
@@ -113,8 +228,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   Future<void> _loadNotifications() async {
     try {
+      if (!mounted) return;
       final notifier = ref.read(notificationsNotifier.notifier);
       final notifications = await _notificationService.getNotifications();
+      if (!mounted) return;
       notifier.setNotifications(notifications);
     } catch (error) {
       debugPrint('❌ Error loading notifications: $error');
@@ -128,6 +245,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   Future<void> _markAsRead(String notificationId) async {
     try {
+      if (!mounted) return;
       await _notificationService.markAsRead(notificationId);
       await _loadNotifications();
     } catch (error) {
@@ -142,6 +260,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Future<void> _toggleReadState(
       String notificationId, bool currentReadState) async {
     try {
+      if (!mounted) return;
       await _notificationService.toggleReadState(
           notificationId, currentReadState);
       await _loadNotifications();
@@ -157,6 +276,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   Future<void> _markAllAsRead() async {
     try {
+      if (!mounted) return;
       await _notificationService.markAllAsRead();
       await _loadNotifications();
       if (mounted) {
@@ -239,7 +359,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     final notificationId = notification['id'] as String?;
     final type = notification['type'] as String?;
-    final data = notification['data'] as Map<String, dynamic>?;
+    final rawData = notification['data'];
+    final Map<String, dynamic>? data =
+        rawData is Map ? Map<String, dynamic>.from(rawData) : null;
     final isRead = notification['is_read'] as bool? ?? false;
 
     // Mark as read if unread
@@ -247,9 +369,56 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       _markAsRead(notificationId);
     }
 
+    // ------------------------------------------------------------------
+    // STORY-IN-MEMORY NAV (preferred):
+    // These notifications ("A new story was added to {memory}") should open
+    // inside the memory timeline context (playlist), same as push deep links.
+    // This avoids opening EventStoriesViewScreen with a raw Map args.
+    // ------------------------------------------------------------------
+    final String memoryIdFromData =
+        (data?['memory_id'] ?? data?['memoryId'] ?? data?['memoryID'] ?? '')
+            .toString()
+            .trim();
+    final String storyIdFromData =
+        (data?['story_id'] ?? data?['storyId'] ?? data?['storyID'] ?? '')
+            .toString()
+            .trim();
+
+    if (memoryIdFromData.isNotEmpty && storyIdFromData.isNotEmpty) {
+      Navigator.pushNamed(
+        context,
+        AppRoutes.appTimeline,
+        arguments: MemoryNavArgs(
+          memoryId: memoryIdFromData,
+          initialStoryId: storyIdFromData,
+        ).toMap(),
+      );
+      return;
+    }
+
+    // ------------------------------------------------------------------
+    // IMPORTANT: Prefer deep-link navigation when available.
+    // Push notifications navigate via DeepLinkService; in-app taps should
+    // behave identically to avoid “opens wrong screen / doesn’t open story”.
+    // ------------------------------------------------------------------
+    final String? deepLink = (data?['deep_link'] ?? data?['deepLink'])?.toString();
+    final String deepLinkTrim = (deepLink ?? '').trim();
+    if (deepLinkTrim.isNotEmpty) {
+      DeepLinkService().handleExternalDeepLink(deepLinkTrim);
+      return;
+    }
+
     // Navigate based on type
     if (type == null) {
       debugPrint('⚠️ Notification type is null');
+      return;
+    }
+
+    // Daily Capsule notifications → navigate to Daily Capsule screen
+    if (type == 'daily_capsule_reminder' ||
+        type == 'friend_daily_capsule_completed') {
+      debugPrint('🔔 Navigating to Daily Capsule');
+      Navigator.pushNamed(context, AppRoutes.appDailyCapsule);
       return;
     }
 
@@ -261,11 +430,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
 
     // Memory-related notifications → navigate to /timeline with memory ID
+    // Only handle the memory notification types we still support.
     if (type == 'memory_invite' ||
         type == 'memory_expiring' ||
-        type == 'memory_sealed' ||
-        type == 'memory_update' ||
-        type.startsWith('memory_')) {
+        type == 'memory_sealed') {
       final memoryId = data?['memory_id'];
       if (memoryId != null) {
         debugPrint('🔔 Navigating to memory timeline: $memoryId');
@@ -280,24 +448,20 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return;
     }
 
-    // Story-related notifications → navigate to specific story
-    if (type == 'new_story' ||
-        type == 'story_mention' ||
-        type == 'story_reaction' ||
-        type.startsWith('story_')) {
-      final memoryId = data?['memory_id'];
-      final storyId = data?['story_id'];
-
-      if (memoryId != null) {
-        debugPrint(
-            '🔔 Navigating to story view: memory=$memoryId, story=$storyId');
+    // Story-related notifications → navigate to story inside memory (timeline->viewer)
+    // NOTE: Most story notifications now include deep_link and are handled above.
+    if (type.contains('story') || type.startsWith('story_')) {
+      final memoryId = (data?['memory_id'] ?? '').toString().trim();
+      final storyId = (data?['story_id'] ?? '').toString().trim();
+      if (memoryId.isNotEmpty && storyId.isNotEmpty) {
+        DeepLinkService().handleExternalDeepLink(
+          'https://capapp.co/memory/$memoryId/story/$storyId',
+        );
+      } else if (memoryId.isNotEmpty) {
         Navigator.pushNamed(
           context,
-          AppRoutes.appBsStories,
-          arguments: {
-            'memoryId': memoryId,
-            if (storyId != null) 'storyId': storyId,
-          },
+          AppRoutes.appTimeline,
+          arguments: {'id': memoryId},
         );
       } else {
         debugPrint('⚠️ Missing memory_id for story notification');
@@ -320,6 +484,24 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       }
       return;
     }
+
+    // Group-related notifications → navigate to /groups with group ID
+    // Only handle group invites (we no longer generate group_join/group_added notifications).
+    if (type == 'group_invite') {
+      final groupId = data?['group_id'];
+      if (groupId != null) {
+        debugPrint('🔔 Navigating to group: $groupId');
+        Navigator.pushNamed(
+          context,
+          AppRoutes.appGroups,
+          arguments: {'groupId': groupId},
+        );
+      } else {
+        debugPrint('⚠️ Missing group_id for group notification');
+      }
+      return;
+    }
+
 
     // Default case for unknown notification types
     debugPrint('⚠️ Unknown notification type: $type - no navigation handler');
@@ -379,7 +561,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     _undoCountdown = countdown;
 
     final snackBar = SnackBar(
-      backgroundColor: appTheme.gray_900_01,
       content: ValueListenableBuilder<int>(
         valueListenable: countdown,
         builder: (context, remainingSeconds, _) {
@@ -587,6 +768,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         return Icons.photo_library_outlined;
       case 'friend_new_story':
         return Icons.person_pin_outlined;
+      case 'friend_daily_capsule_completed':
+      case 'daily_capsule_reminder':
+        return Icons.calendar_today_outlined;
       case 'friend_request':
       case 'followed':
         return Icons.person_add_alt_1_outlined;

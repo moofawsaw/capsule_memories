@@ -5,7 +5,6 @@ import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
 
-import '../utils/storage_utils.dart'; // for StorageUtils.supabaseUrl
 import 'network_quality_service.dart';
 import 'supabase_tus_uploader.dart';
 import 'video_compression_service.dart';
@@ -65,12 +64,9 @@ class StoryUploadService {
       const int mb = 1024 * 1024;
       final origLen = await mediaFile.length();
 
-// ✅ 720p minimum strategy:
-// - Wi-Fi: usually upload original (fastest). Compress only if it's notably large.
-// - Cellular/unknown: compress only when it’s likely to be slow or fail.
-      final bool shouldTryCompression =
-          (quality == NetworkQuality.wifi && origLen > 35 * mb) ||
-              (quality != NetworkQuality.wifi && origLen > 20 * mb);
+      // Keep the saved/uploaded video quality consistent across networks.
+      // Only compress when the file is notably large.
+      final bool shouldTryCompression = origLen > 35 * mb;
 
       if (shouldTryCompression) {
         uploadFile = await VideoCompressionService.compressForNetwork(

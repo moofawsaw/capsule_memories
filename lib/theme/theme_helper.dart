@@ -80,7 +80,7 @@ class ThemeHelper {
         contentTextStyle: TextStyle(color: colors.gray_50), // light text
         actionTextColor: colors.deep_purple_A100,
         behavior: SnackBarBehavior.floating,
-        elevation: 6,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(6),
         ),
@@ -108,7 +108,7 @@ class ThemeHelper {
         contentTextStyle: TextStyle(color: colors.black_900),
         actionTextColor: colors.deep_purple_A100,
         behavior: SnackBarBehavior.floating,
-        elevation: 6,
+        elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(6),
         ),
@@ -130,7 +130,7 @@ class ThemeHelper {
           contentTextStyle: TextStyle(color: colors.gray_50),
           actionTextColor: colors.deep_purple_A100,
           behavior: SnackBarBehavior.floating,
-          elevation: 6,
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(6),
           ),

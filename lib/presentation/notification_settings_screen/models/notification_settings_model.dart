@@ -9,10 +9,10 @@ class NotificationSettingsModel extends Equatable {
     this.memoryInvitesEnabled,
     this.memoryActivityEnabled,
     this.memorySealedEnabled,
-    this.reactionsEnabled,
     this.newFollowersEnabled,
     this.friendRequestsEnabled,
     this.groupInvitesEnabled,
+    this.dailyCapsuleEnabled,
     this.id,
     this.createdAt,
   }) {
@@ -20,10 +20,10 @@ class NotificationSettingsModel extends Equatable {
     memoryInvitesEnabled = memoryInvitesEnabled ?? true;
     memoryActivityEnabled = memoryActivityEnabled ?? true;
     memorySealedEnabled = memorySealedEnabled ?? true;
-    reactionsEnabled = reactionsEnabled ?? true;
     newFollowersEnabled = newFollowersEnabled ?? true;
     friendRequestsEnabled = friendRequestsEnabled ?? true;
     groupInvitesEnabled = groupInvitesEnabled ?? true;
+    dailyCapsuleEnabled = dailyCapsuleEnabled ?? true;
     id = id ?? "";
   }
 
@@ -31,10 +31,10 @@ class NotificationSettingsModel extends Equatable {
   bool? memoryInvitesEnabled;
   bool? memoryActivityEnabled;
   bool? memorySealedEnabled;
-  bool? reactionsEnabled;
   bool? newFollowersEnabled;
   bool? friendRequestsEnabled;
   bool? groupInvitesEnabled;
+  bool? dailyCapsuleEnabled;
   String? id;
   final DateTime? createdAt;
 
@@ -43,10 +43,10 @@ class NotificationSettingsModel extends Equatable {
     bool? memoryInvitesEnabled,
     bool? memoryActivityEnabled,
     bool? memorySealedEnabled,
-    bool? reactionsEnabled,
     bool? newFollowersEnabled,
     bool? friendRequestsEnabled,
     bool? groupInvitesEnabled,
+    bool? dailyCapsuleEnabled,
     String? id,
     DateTime? createdAt,
   }) {
@@ -57,11 +57,11 @@ class NotificationSettingsModel extends Equatable {
       memoryActivityEnabled:
           memoryActivityEnabled ?? this.memoryActivityEnabled,
       memorySealedEnabled: memorySealedEnabled ?? this.memorySealedEnabled,
-      reactionsEnabled: reactionsEnabled ?? this.reactionsEnabled,
       newFollowersEnabled: newFollowersEnabled ?? this.newFollowersEnabled,
       friendRequestsEnabled:
           friendRequestsEnabled ?? this.friendRequestsEnabled,
       groupInvitesEnabled: groupInvitesEnabled ?? this.groupInvitesEnabled,
+      dailyCapsuleEnabled: dailyCapsuleEnabled ?? this.dailyCapsuleEnabled,
       id: id ?? this.id,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -73,10 +73,10 @@ class NotificationSettingsModel extends Equatable {
         memoryInvitesEnabled,
         memoryActivityEnabled,
         memorySealedEnabled,
-        reactionsEnabled,
         newFollowersEnabled,
         friendRequestsEnabled,
         groupInvitesEnabled,
+        dailyCapsuleEnabled,
         id,
       ];
 }

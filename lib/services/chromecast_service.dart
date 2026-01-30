@@ -263,6 +263,24 @@ class ChromecastService {
     }
   }
 
+  /// Fetch current receiver playback status (best-effort).
+  /// Used to keep the in-app overlay in sync with the TV.
+  Future<Map<String, dynamic>?> getPlaybackStatus() async {
+    try {
+      final res = await _channel.invokeMethod('getPlaybackStatus');
+      if (res is Map) {
+        return Map<String, dynamic>.from(res);
+      }
+      return null;
+    } on PlatformException catch (e) {
+      debugPrint('❌ getPlaybackStatus error: ${e.message}');
+      return null;
+    } catch (e) {
+      debugPrint('❌ getPlaybackStatus error: $e');
+      return null;
+    }
+  }
+
   // Handler methods for platform callbacks
 
   void _handleDeviceDiscovered(Map<dynamic, dynamic> deviceData) {

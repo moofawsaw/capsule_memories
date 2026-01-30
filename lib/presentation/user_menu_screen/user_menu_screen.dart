@@ -359,7 +359,6 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
         duration: const Duration(seconds: 2),
       ),
     );
@@ -369,7 +368,6 @@ class UserMenuScreenState extends ConsumerState<UserMenuScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
         duration: const Duration(seconds: 3),
       ),
     );

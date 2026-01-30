@@ -223,7 +223,6 @@ class EventTimelineViewScreenState
               SnackBar(
                 content:
                 const Text('Please select a memory to view its timeline'),
-                backgroundColor: appTheme.deep_purple_A100,
                 duration: const Duration(seconds: 3),
               ),
             );
@@ -366,7 +365,11 @@ class EventTimelineViewScreenState
     // Single source of truth for initial-load skeleton
     final effectiveLoading = isLoading || (_booting && !hasSnapshot);
 
-    if (waitingForExpectedMemory || effectiveLoading) {
+    // IMPORTANT:
+    // Only show the *full-screen* skeleton when we don't have a snapshot yet.
+    // If we already have snapshot data and we're doing a refresh (isLoading=true),
+    // keep rendering the screen and let inner widgets show section skeletons.
+    if (waitingForExpectedMemory || (!hasSnapshot && effectiveLoading)) {
       return Scaffold(
         backgroundColor: appTheme.gray_900_02,
         body: const _TimelineViewSkeleton(),
@@ -486,15 +489,13 @@ class EventTimelineViewScreenState
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (hasPendingInvite && !isCurrentUserMember) ...[
-                          CustomButton(
-                            text: 'Join',
-                            height: 36.h,
-                            width: 92.h,
-                            leftIcon: Icons.check_rounded,
-                            buttonStyle: CustomButtonStyle.fillPrimary,
-                            buttonTextStyle: CustomButtonTextStyle.bodySmall,
-                            onPressed: () => onTapAcceptInvite(context),
-                          ),
+                          // We already show join CTAs elsewhere for pending invites.
+                          // Keep the action bar visually consistent with a skeleton row.
+                          const _CircleIconSkeleton(),
+                          SizedBox(width: 8.h),
+                          const _CircleIconSkeleton(),
+                          SizedBox(width: 8.h),
+                          const _CircleIconSkeleton(),
                           SizedBox(width: 8.h),
                         ],
                         if (isCurrentUserMember && !isCurrentUserCreator) ...[
@@ -641,6 +642,7 @@ class EventTimelineViewScreenState
   Widget _buildTimelineEmptyState(BuildContext context) {
     final state = ref.watch(eventTimelineViewNotifier);
     final isCurrentUserMember = state.isCurrentUserMember ?? false;
+    final hasPendingInvite = state.hasPendingInvite ?? false;
     final bool isSealed =
         state.eventTimelineViewModel?.isSealed ?? state.isSealed ?? false;
 
@@ -691,7 +693,8 @@ class EventTimelineViewScreenState
             else
               CustomButton(
                 text: 'Join Memory',
-                onPressed: () => onTapJoinFromTimeline(context),
+                onPressed: () =>
+                    hasPendingInvite ? onTapAcceptInvite(context) : onTapJoinFromTimeline(context),
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 height: 40.h,
@@ -779,6 +782,7 @@ class EventTimelineViewScreenState
       builder: (context, ref, _) {
         final state = ref.watch(eventTimelineViewNotifier);
         final isCurrentUserMember = state.isCurrentUserMember ?? false;
+        final hasPendingInvite = state.hasPendingInvite ?? false;
         final bool sealedKnown =
             state.isSealed != null || state.eventTimelineViewModel?.isSealed != null;
         final bool isSealed =
@@ -808,6 +812,20 @@ class EventTimelineViewScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Pending invite CTA should live in the "primary action" slot (same place
+              // as Create Story), above Cinema Mode.
+              if (!isCurrentUserMember && hasPendingInvite) ...[
+                CustomButton(
+                  text: 'Join Memory',
+                  width: double.infinity,
+                  buttonStyle: CustomButtonStyle.fillPrimary,
+                  buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                  leftIcon: Icons.check_rounded,
+                  onPressed: () => onTapAcceptInvite(context),
+                ),
+                SizedBox(height: 12.h),
+              ],
+
               if (hasStories) ...[
                 CustomButton(
                   text: 'Cinema Mode',
@@ -867,7 +885,6 @@ class EventTimelineViewScreenState
           SnackBar(
             content: const Text(
                 'Accept the memory invite to start creating stories'),
-            backgroundColor: appTheme.deep_purple_A100,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -882,6 +899,7 @@ class EventTimelineViewScreenState
 
       showDialog(
         context: context,
+        useRootNavigator: true,
         barrierDismissible: false,
         builder: (_) => Center(
           child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
@@ -890,13 +908,15 @@ class EventTimelineViewScreenState
 
       await notifier.joinMemory(memoryId);
 
-      if (context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
+      }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Successfully joined memory!'),
-            backgroundColor: appTheme.deep_purple_A100,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -905,12 +925,14 @@ class EventTimelineViewScreenState
       await notifier.loadMemoryStories(memoryId);
       await notifier.validateMemoryData(memoryId);
     } catch (e) {
-      if (context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to join memory: ${e.toString()}'),
-            backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -924,6 +946,7 @@ class EventTimelineViewScreenState
 
       showDialog(
         context: context,
+        useRootNavigator: true,
         barrierDismissible: false,
         builder: (_) => Center(
           child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
@@ -932,30 +955,31 @@ class EventTimelineViewScreenState
 
       await notifier.leaveMemory(memoryId);
 
-      if (context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
+      }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('You left the memory'),
-            backgroundColor: appTheme.deep_purple_A100,
             duration: const Duration(seconds: 2),
           ),
         );
       }
 
-      await Future.delayed(const Duration(milliseconds: 250));
-
-      if (context.mounted) {
-        NavigatorService.popAndPushNamed(AppRoutes.appMemories);
-      }
+      // Stay on this timeline screen and refresh state/UI.
+      await notifier.validateMemoryData(memoryId);
     } catch (e) {
-      if (context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) nav.pop();
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to leave memory: ${e.toString()}'),
-            backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -973,6 +997,7 @@ class EventTimelineViewScreenState
 
     showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (_) => Center(
         child: CircularProgressIndicator(color: appTheme.deep_purple_A100),
@@ -981,31 +1006,33 @@ class EventTimelineViewScreenState
 
     try {
       await ref.read(eventTimelineViewNotifier.notifier).acceptPendingInviteAndJoin();
-
-      if (context.mounted) Navigator.pop(context);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('You joined the memory!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
     } catch (e) {
-      if (context.mounted) Navigator.pop(context);
       if (context.mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to join memory: $e'),
-            backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
       }
+      rethrow;
+    } finally {
+      // Always dismiss the loader, even if the screen rebuilt underneath.
+      final nav = NavigatorService.navigatorKey.currentState;
+      if (nav != null && nav.canPop()) {
+        nav.pop();
+      }
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('You joined the memory!'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -1060,7 +1087,6 @@ class EventTimelineViewScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Missing memory. Please reopen the timeline.'),
-          backgroundColor: appTheme.deep_purple_A100,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -1246,7 +1272,6 @@ class EventTimelineViewScreenState
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('Memory deleted successfully'),
-                      backgroundColor: appTheme.deep_purple_A100,
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -1264,7 +1289,6 @@ class EventTimelineViewScreenState
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Failed to delete memory: ${e.toString()}'),
-                      backgroundColor: Colors.red,
                       duration: const Duration(seconds: 3),
                     ),
                   );
@@ -1310,6 +1334,22 @@ class _CircleIconButton extends StatelessWidget {
         child: Center(
           child: Icon(icon, color: fg, size: 22.h),
         ),
+      ),
+    );
+  }
+}
+
+class _CircleIconSkeleton extends StatelessWidget {
+  const _CircleIconSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 36.h,
+      width: 36.h,
+      decoration: BoxDecoration(
+        color: appTheme.gray_900_01,
+        borderRadius: BorderRadius.circular(24.h),
       ),
     );
   }

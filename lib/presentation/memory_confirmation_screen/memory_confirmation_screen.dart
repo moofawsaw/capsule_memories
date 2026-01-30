@@ -42,6 +42,8 @@ class _MemoryConfirmationScreenState
   String? groupName;
   List<Map<String, dynamic>> _groupMembers = [];
   Set<String> _existingMemberUserIds = {};
+  // ✅ Track already-invited users so they can't be invited twice.
+  Set<String> _invitedUserIds = {};
 
   // Loading and error states
   bool _isLoadingDetails = false;
@@ -97,12 +99,45 @@ class _MemoryConfirmationScreenState
 
       if (memoryId.isNotEmpty) {
         await _fetchMemoryDetails();
+        await _loadExistingInvites();
       } else {
         setState(() {
           _isLoadingDetails = false;
           _fetchError = 'Memory ID not provided';
         });
       }
+    }
+  }
+
+  /// Load existing pending invites for this memory so we can disable re-invites.
+  Future<void> _loadExistingInvites() async {
+    try {
+      if (memoryId.isEmpty) return;
+      final supabase = SupabaseService.instance.client;
+      if (supabase == null) return;
+
+      final rows = await supabase
+          .from('memory_invites')
+          .select('user_id')
+          .eq('memory_id', memoryId);
+
+      final ids = <String>{};
+      if (rows is List) {
+        for (final r in rows) {
+          final m = (r is Map) ? r.cast<String, dynamic>() : <String, dynamic>{};
+          final uid = (m['user_id'] ?? '').toString().trim();
+          if (uid.isNotEmpty) ids.add(uid);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _invitedUserIds = ids;
+        // Also ensure invited users can't remain selected
+        _selectedFriendIds.removeWhere((id) => ids.contains(id));
+      });
+    } catch (_) {
+      // non-fatal
     }
   }
 
@@ -290,6 +325,7 @@ class _MemoryConfirmationScreenState
 
   void _filterFriends(String query) {
     final memberIds = _existingMemberUserIds;
+    final invitedIds = _invitedUserIds;
 
     setState(() {
       if (query.isEmpty) {
@@ -312,12 +348,16 @@ class _MemoryConfirmationScreenState
 
       // If someone is now a member, ensure they cannot remain selected
       _selectedFriendIds.removeWhere((id) => memberIds.contains(id));
+      // If someone is now invited, ensure they cannot remain selected
+      _selectedFriendIds.removeWhere((id) => invitedIds.contains(id));
     });
   }
 
   void _toggleFriendSelection(String friendId) {
     // safety: never allow selecting an existing group member
     if (_existingMemberUserIds.contains(friendId)) return;
+    // safety: never allow selecting someone already invited
+    if (_invitedUserIds.contains(friendId)) return;
 
     setState(() {
       if (_selectedFriendIds.contains(friendId)) {
@@ -342,12 +382,20 @@ class _MemoryConfirmationScreenState
 
       final currentUserId = SupabaseService.instance.client?.auth.currentUser?.id;
 
+      final sentIds = <String>{};
       for (final friendId in _selectedFriendIds) {
-        await SupabaseService.instance.client?.from('memory_invites').insert({
-          'memory_id': memoryId,
-          'user_id': friendId,
-          'invited_by': currentUserId,
-        });
+        // Skip if already invited (defensive)
+        if (_invitedUserIds.contains(friendId)) continue;
+        try {
+          await SupabaseService.instance.client?.from('memory_invites').insert({
+            'memory_id': memoryId,
+            'user_id': friendId,
+            'invited_by': currentUserId,
+          });
+          sentIds.add(friendId);
+        } catch (_) {
+          // continue sending remaining invites
+        }
       }
 
       if (mounted) Navigator.pop(context);
@@ -355,18 +403,20 @@ class _MemoryConfirmationScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Invites sent successfully!'),
-          backgroundColor: appTheme.deep_purple_A100,
         ),
       );
 
-      setState(() => _selectedFriendIds.clear());
+      // ✅ Optimistically reflect invited state immediately (prevents re-invite).
+      if (mounted) {
+        setState(() {
+          _invitedUserIds.addAll(sentIds);
+          _selectedFriendIds.removeAll(sentIds);
+        });
+      }
     } catch (_) {
       if (mounted) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to send invites'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Failed to send invites')),
       );
     }
   }
@@ -885,14 +935,16 @@ class _MemoryConfirmationScreenState
                                       _filteredFriends[index];
                                       final friendId = _friendUserId(friend);
 
-                                      final isAdded =
+                                      final isMember =
                                           _existingMemberUserIds.contains(friendId);
+                                      final isInvited =
+                                          _invitedUserIds.contains(friendId);
                                       final isSelected =
                                       _selectedFriendIds
                                           .contains(friendId);
 
                                       return Opacity(
-                                        opacity: isAdded ? 0.6 : 1.0,
+                                        opacity: (isMember || isInvited) ? 0.6 : 1.0,
                                         child: ListTile(
                                         contentPadding:
                                         EdgeInsets.symmetric(
@@ -930,7 +982,7 @@ class _MemoryConfirmationScreenState
                                               color: appTheme
                                                   .blue_gray_300),
                                         ),
-                                        trailing: isAdded
+                                        trailing: (isMember || isInvited)
                                             ? Container(
                                                 padding: EdgeInsets.symmetric(
                                                   horizontal: 10.h,
@@ -956,7 +1008,7 @@ class _MemoryConfirmationScreenState
                                                     ),
                                                     SizedBox(width: 6.h),
                                                     Text(
-                                                      'Already in memory',
+                                                      isMember ? 'Added' : 'Invited',
                                                       style: TextStyleHelper
                                                           .instance
                                                           .body12MediumPlusJakartaSans
@@ -987,7 +1039,7 @@ class _MemoryConfirmationScreenState
                                                   ),
                                                 ),
                                               ),
-                                        onTap: isAdded
+                                        onTap: (isMember || isInvited)
                                             ? null
                                             : () => _toggleFriendSelection(friendId),
                                       ),

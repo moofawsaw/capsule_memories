@@ -1,4 +1,5 @@
 import '../core/app_export.dart';
+import './custom_image_view.dart';
 
 /** CustomGroupCard - A reusable group card component that displays group information with member avatars and action buttons. Supports flexible member avatar stacking and customizable styling for group management interfaces. */
 class CustomGroupCard extends StatelessWidget {
@@ -105,7 +106,8 @@ class CustomGroupCard extends StatelessWidget {
                 ),
                 child: Text(
                   'Creator',
-                  style: TextStyleHelper.instance.bodyTextRegularPlusJakartaSans.copyWith(
+                  style: TextStyleHelper.instance.bodyTextRegularPlusJakartaSans
+                      .copyWith(
                     color: appTheme.whiteCustom,
                     fontSize: 10.fSize,
                     fontWeight: FontWeight.w600,
@@ -115,7 +117,8 @@ class CustomGroupCard extends StatelessWidget {
             ],
           ],
         ),
-        SizedBox(height: groupData.memberImages?.isNotEmpty == true ? 6.h : 4.h),
+        SizedBox(
+            height: groupData.memberImages?.isNotEmpty == true ? 6.h : 4.h),
         _buildMemberInfo(context),
       ],
     );
@@ -152,12 +155,12 @@ class CustomGroupCard extends StatelessWidget {
       return GestureDetector(
         onTap: memberId != null
             ? () {
-          Navigator.pushNamed(
-            context,
-            AppRoutes.appProfileUser,
-            arguments: memberId,
-          );
-        }
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.appProfileUser,
+                  arguments: memberId,
+                );
+              }
             : null,
         child: SizedBox(
           width: size,
@@ -197,7 +200,8 @@ class CustomGroupCard extends StatelessWidget {
           final int index = (count - 1) - i; // reverse paint order
 
           final String imagePath = images[index];
-          final String? memberId = index < memberIds.length ? memberIds[index] : null;
+          final String? memberId =
+              index < memberIds.length ? memberIds[index] : null;
 
           return Positioned(
             left: (index * _avatarOffsetPx).h,
@@ -313,35 +317,14 @@ class _GroupAvatarImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isNetwork = imagePath.startsWith('http');
-
-    if (isNetwork) {
-      return Image.network(
-        imagePath,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        alignment: Alignment.center,
-        errorBuilder: (_, __, ___) => Container(
-          width: size,
-          height: size,
-          color: appTheme.gray_900_02,
-          alignment: Alignment.center,
-          child: Icon(
-            Icons.person,
-            size: (size * 0.55),
-            color: appTheme.blue_gray_300,
-          ),
-        ),
-      );
-    }
-
-    return Image.asset(
-      imagePath,
-      width: size,
+    return CustomImageView(
+      imagePath: imagePath,
       height: size,
+      width: size,
       fit: BoxFit.cover,
-      alignment: Alignment.center,
+      isCircular: true,
+      // Avoid treating non-url strings as assets here; show placeholder instead.
+      networkOnly: true,
     );
   }
 }

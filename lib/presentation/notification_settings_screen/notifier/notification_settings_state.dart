@@ -3,12 +3,16 @@ part of 'notification_settings_notifier.dart';
 class NotificationSettingsState extends Equatable {
   final bool? pushNotificationsEnabled;
   final bool? memoryInvitesEnabled;
-  final bool? memoryActivityEnabled;
+  // Split: independent notification types
+  final bool? newStoryEnabled;
+  final bool? memoryExpiringEnabled;
   final bool? memorySealedEnabled;
-  final bool? reactionsEnabled;
-  final bool? newFollowersEnabled;
+  final bool? followedEnabled;
+  final bool? newFollowerEnabled;
   final bool? friendRequestsEnabled;
   final bool? groupInvitesEnabled;
+  final bool? dailyCapsuleReminderEnabled;
+  final bool? friendDailyCapsuleCompletedEnabled;
 
   // Privacy settings
   final bool? privateAccountEnabled;
@@ -24,12 +28,15 @@ class NotificationSettingsState extends Equatable {
   NotificationSettingsState({
     this.pushNotificationsEnabled,
     this.memoryInvitesEnabled,
-    this.memoryActivityEnabled,
+    this.newStoryEnabled,
+    this.memoryExpiringEnabled,
     this.memorySealedEnabled,
-    this.reactionsEnabled,
-    this.newFollowersEnabled,
+    this.followedEnabled,
+    this.newFollowerEnabled,
     this.friendRequestsEnabled,
     this.groupInvitesEnabled,
+    this.dailyCapsuleReminderEnabled,
+    this.friendDailyCapsuleCompletedEnabled,
     this.privateAccountEnabled,
     this.showLocationEnabled,
     this.allowMemoryInvitesEnabled,
@@ -44,12 +51,15 @@ class NotificationSettingsState extends Equatable {
   List<Object?> get props => [
         pushNotificationsEnabled,
         memoryInvitesEnabled,
-        memoryActivityEnabled,
+        newStoryEnabled,
+        memoryExpiringEnabled,
         memorySealedEnabled,
-        reactionsEnabled,
-        newFollowersEnabled,
+        followedEnabled,
+        newFollowerEnabled,
         friendRequestsEnabled,
         groupInvitesEnabled,
+        dailyCapsuleReminderEnabled,
+        friendDailyCapsuleCompletedEnabled,
         privateAccountEnabled,
         showLocationEnabled,
         allowMemoryInvitesEnabled,
@@ -63,12 +73,15 @@ class NotificationSettingsState extends Equatable {
   NotificationSettingsState copyWith({
     bool? pushNotificationsEnabled,
     bool? memoryInvitesEnabled,
-    bool? memoryActivityEnabled,
+    bool? newStoryEnabled,
+    bool? memoryExpiringEnabled,
     bool? memorySealedEnabled,
-    bool? reactionsEnabled,
-    bool? newFollowersEnabled,
+    bool? followedEnabled,
+    bool? newFollowerEnabled,
     bool? friendRequestsEnabled,
     bool? groupInvitesEnabled,
+    bool? dailyCapsuleReminderEnabled,
+    bool? friendDailyCapsuleCompletedEnabled,
     bool? privateAccountEnabled,
     bool? showLocationEnabled,
     bool? allowMemoryInvitesEnabled,
@@ -82,14 +95,18 @@ class NotificationSettingsState extends Equatable {
       pushNotificationsEnabled:
           pushNotificationsEnabled ?? this.pushNotificationsEnabled,
       memoryInvitesEnabled: memoryInvitesEnabled ?? this.memoryInvitesEnabled,
-      memoryActivityEnabled:
-          memoryActivityEnabled ?? this.memoryActivityEnabled,
+      newStoryEnabled: newStoryEnabled ?? this.newStoryEnabled,
+      memoryExpiringEnabled: memoryExpiringEnabled ?? this.memoryExpiringEnabled,
       memorySealedEnabled: memorySealedEnabled ?? this.memorySealedEnabled,
-      reactionsEnabled: reactionsEnabled ?? this.reactionsEnabled,
-      newFollowersEnabled: newFollowersEnabled ?? this.newFollowersEnabled,
+      followedEnabled: followedEnabled ?? this.followedEnabled,
+      newFollowerEnabled: newFollowerEnabled ?? this.newFollowerEnabled,
       friendRequestsEnabled:
           friendRequestsEnabled ?? this.friendRequestsEnabled,
       groupInvitesEnabled: groupInvitesEnabled ?? this.groupInvitesEnabled,
+      dailyCapsuleReminderEnabled:
+          dailyCapsuleReminderEnabled ?? this.dailyCapsuleReminderEnabled,
+      friendDailyCapsuleCompletedEnabled: friendDailyCapsuleCompletedEnabled ??
+          this.friendDailyCapsuleCompletedEnabled,
       privateAccountEnabled:
           privateAccountEnabled ?? this.privateAccountEnabled,
       showLocationEnabled: showLocationEnabled ?? this.showLocationEnabled,

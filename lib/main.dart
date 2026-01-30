@@ -158,14 +158,6 @@ void _setupGlobalNotificationListener() {
           onNewNotification: (notification) async {
             debugPrint('New notification: ${notification['title']}');
 
-            // OPTIONAL: local notification for foreground (Android handled by channels internally)
-            // Safe on iOS (no-op internally if not supported)
-            await PushNotificationService.instance.showNotification(
-              title: (notification['title'] ?? 'Capsule').toString(),
-              body: (notification['body'] ?? '').toString(),
-              payload: notification['deep_link']?.toString(),
-            );
-
             // 🔥 STEP 3: Reload notification count when new notification arrives
             await _loadInitialNotificationCount();
           },

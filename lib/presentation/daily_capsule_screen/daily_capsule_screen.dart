@@ -1014,7 +1014,6 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Mood: $detail'),
-            backgroundColor: appTheme.gray_900_01,
           ),
         );
       }
@@ -1470,7 +1469,6 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
                                     SnackBar(
                                       content: const Text(
                                           'Could not create tag. Try again.'),
-                                      backgroundColor: appTheme.gray_900_01,
                                     ),
                                   );
                                   return;
@@ -1516,7 +1514,6 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Could not set tag. Try again.'),
-          backgroundColor: appTheme.gray_900_01,
         ),
       );
     }
@@ -1650,7 +1647,6 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Mood: $mood'),
-                backgroundColor: appTheme.gray_900_01,
               ),
             );
           }
@@ -2115,7 +2111,6 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
                         content: const Text(
                           'Remove your story first to select a mood.',
                         ),
-                        backgroundColor: appTheme.gray_900_01,
                       ),
                     );
                     return;
@@ -2159,7 +2154,6 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Could not start Daily Capsule. Try again.'),
-          backgroundColor: appTheme.red_500,
         ),
       );
       return;
@@ -2201,7 +2195,6 @@ class _DailyCapsuleScreenState extends ConsumerState<DailyCapsuleScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('No open memories available to post to.'),
-          backgroundColor: appTheme.gray_900_01,
         ),
       );
       return;

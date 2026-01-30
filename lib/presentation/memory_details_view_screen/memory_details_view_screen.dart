@@ -655,7 +655,6 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Invalid memory id'),
-            backgroundColor: Colors.red,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -686,7 +685,6 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Invalid memory id'),
-            backgroundColor: Colors.red,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -745,7 +743,6 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('Memory deleted successfully'),
-                      backgroundColor: appTheme.deep_purple_A100,
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -763,7 +760,6 @@ class MemoryDetailsViewScreenState extends ConsumerState<MemoryDetailsViewScreen
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Failed to delete memory: ${e.toString()}'),
-                      backgroundColor: Colors.red,
                       duration: const Duration(seconds: 3),
                     ),
                   );

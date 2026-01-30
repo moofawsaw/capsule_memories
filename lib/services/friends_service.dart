@@ -18,8 +18,9 @@ class FriendsService {
         throw Exception('User not authenticated');
       }
 
-      // Get all friends where user is either user_id or friend_id
-      final response1 = await _supabase!.from('friends').select('''
+      // Friends table is stored bidirectionally (two rows per friendship),
+      // so we only need the "user_id = current user" direction.
+      final response = await _supabase!.from('friends').select('''
             id,
             created_at,
             friend:friend_id (
@@ -30,24 +31,12 @@ class FriendsService {
             )
           ''').eq('user_id', userId);
 
-      final response2 = await _supabase!.from('friends').select('''
-            id,
-            created_at,
-            friend:user_id (
-              id,
-              username,
-              display_name,
-              avatar_url
-            )
-          ''').eq('friend_id', userId);
-
-      // Combine and transform results with proper avatar URL conversion
-      final friends1 = (response1 as List).map((item) {
+      // Transform results with avatar URL conversion (fast path: public URL).
+      return (response as List).map((item) {
         final friend = item['friend'];
         final avatarPath = friend['avatar_url'];
         String avatarUrl = '';
 
-        // ✅ USE getPublicUrl() for public avatars
         if (avatarPath != null && avatarPath.isNotEmpty) {
           if (avatarPath.startsWith('http://') ||
               avatarPath.startsWith('https://')) {
@@ -74,53 +63,6 @@ class FriendsService {
           'created_at': item['created_at'],
         };
       }).toList();
-
-      final friends2 = (response2 as List).map((item) {
-        final friend = item['friend'];
-        final avatarPath = friend['avatar_url'];
-        String avatarUrl = '';
-
-        // ✅ USE getPublicUrl() for public avatars
-        if (avatarPath != null && avatarPath.isNotEmpty) {
-          if (avatarPath.startsWith('http://') ||
-              avatarPath.startsWith('https://')) {
-            avatarUrl = avatarPath;
-          } else {
-            try {
-              final cleanPath = avatarPath.startsWith('/')
-                  ? avatarPath.substring(1)
-                  : avatarPath;
-              avatarUrl =
-                  _supabase!.storage.from('avatars').getPublicUrl(cleanPath);
-            } catch (e) {
-              debugPrint('Error generating avatar URL: $e');
-            }
-          }
-        }
-
-        return {
-          'id': friend['id'],
-          'username': friend['username'],
-          'display_name': friend['display_name'],
-          'avatar_url': avatarUrl,
-          'friendship_id': item['id'],
-          'created_at': item['created_at'],
-        };
-      }).toList();
-
-      // Combine both lists
-      final allFriends = [...friends1, ...friends2];
-
-      // Deduplicate based on friend user ID to avoid showing same friend twice
-      final Map<String, Map<String, dynamic>> uniqueFriends = {};
-      for (var friend in allFriends) {
-        final friendId = friend['id'] as String;
-        if (!uniqueFriends.containsKey(friendId)) {
-          uniqueFriends[friendId] = friend;
-        }
-      }
-
-      return uniqueFriends.values.toList();
     } catch (e) {
       debugPrint('Error fetching friends: $e');
       return [];
@@ -419,7 +361,6 @@ class FriendsService {
     }
   }
 
-
   /// Checks if there's a pending friend request in either direction
   Future<bool> hasPendingRequest(String userId1, String userId2) async {
     try {
@@ -429,8 +370,8 @@ class FriendsService {
           .from('friend_requests')
           .select('id')
           .or(
-        'and(sender_id.eq.$userId1,receiver_id.eq.$userId2),and(sender_id.eq.$userId2,receiver_id.eq.$userId1)',
-      )
+            'and(sender_id.eq.$userId1,receiver_id.eq.$userId2),and(sender_id.eq.$userId2,receiver_id.eq.$userId1)',
+          )
           .eq('status', 'pending')
           .limit(1);
 
@@ -440,7 +381,6 @@ class FriendsService {
       return false;
     }
   }
-
 
   /// Sends a friend request
   Future<bool> sendFriendRequest(String senderId, String receiverId) async {
@@ -541,7 +481,6 @@ class FriendsService {
           .maybeSingle();
 
       if (friendCheck != null) return 'friends';
-
 
       // Check if pending request sent
       final sentRequestCheck = await _supabase!

@@ -18,14 +18,15 @@ class _AppScaffoldMessengerState extends ScaffoldMessengerState {
   }) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    // Only inject margin if the call-site did not specify one.
-    final SnackBar finalBar = (snackBar.margin == null)
-        ? _rebuildSnackBarWith(
-            snackBar,
-            margin: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomInset),
-            behavior: SnackBarBehavior.floating,
-          )
-        : snackBar;
+    // Enforce consistent toast styling app-wide:
+    // - floating behavior
+    // - safe bottom margin
+    // - background color from SnackBarTheme (do not allow per-call overrides)
+    final SnackBar finalBar = _rebuildSnackBarWith(
+      snackBar,
+      margin: snackBar.margin ?? EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomInset),
+      behavior: SnackBarBehavior.floating,
+    );
 
     return super.showSnackBar(
       finalBar,
@@ -45,7 +46,6 @@ class _AppScaffoldMessengerState extends ScaffoldMessengerState {
       // Common
       action: original.action,
       duration: original.duration,
-      backgroundColor: original.backgroundColor,
       elevation: original.elevation,
       shape: original.shape,
       behavior: behavior ?? original.behavior,

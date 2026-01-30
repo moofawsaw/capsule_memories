@@ -44,16 +44,37 @@ class LocationService {
     Duration timeout = const Duration(seconds: 3),
   }) async {
     try {
-      final position = await getCurrentLocation().timeout(timeout, onTimeout: () {
-        print('⏱️ Coords-only timeout after ${timeout.inSeconds}s');
-        return null;
-      });
+      // IMPORTANT:
+      // Do NOT wrap the permission prompt in a short timeout.
+      // On first-ever story, iOS/Android permission UI can easily exceed 3s,
+      // which previously caused the first story to miss location while later
+      // stories worked (last-known is cached).
+      final hasPermission = await checkAndRequestPermission();
+      if (!hasPermission) return null;
 
-      if (position == null) return null;
+      // 1) Try last known immediately (often available after the first fix).
+      Position? lastKnown;
+      try {
+        lastKnown = await Geolocator.getLastKnownPosition();
+      } catch (_) {}
 
-      return {
-        'latitude': position.latitude,
-        'longitude': position.longitude,
+      // 2) Try a fresh fix, but cap only THIS step.
+      Position? fresh;
+      try {
+        fresh = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: timeout,
+        );
+      } catch (_) {
+        fresh = null;
+      }
+
+      final pos = fresh ?? lastKnown;
+      if (pos == null) return null;
+
+      return <String, dynamic>{
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
       };
     } catch (e) {
       print('⚠️ getCoordsOnly failed: $e');

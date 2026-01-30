@@ -57,8 +57,9 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
   bool _didWarmup = false;
 
   static const int _mb = 1024 * 1024;
-  static const int _wifiCompressThresholdBytes = 18 * _mb;
-  static const int _cellCompressThresholdBytes = 8 * _mb;
+  // Keep the same media quality regardless of network.
+  // Only compress when the file is large enough that uploads are likely to be slow/fail.
+  static const int _compressThresholdBytes = 35 * _mb;
 
   int? _recordedDurationSeconds;
 
@@ -322,8 +323,7 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
 
   bool _shouldCompress(NetworkQuality net, int bytes) {
     if (bytes <= 0) return false;
-    if (net == NetworkQuality.wifi) return bytes >= _wifiCompressThresholdBytes;
-    return bytes >= _cellCompressThresholdBytes;
+    return bytes >= _compressThresholdBytes;
   }
 
   Duration _compressionTimeout(NetworkQuality net) {
@@ -438,14 +438,9 @@ class StoryEditNotifier extends StateNotifier<StoryEditState> {
         final swComp = Stopwatch()..start();
         compressFuture = () async {
           try {
-            final NetworkQuality useQuality =
-                (net == NetworkQuality.cellular || net == NetworkQuality.unknown)
-                    ? NetworkQuality.cellular
-                    : NetworkQuality.wifi;
-
             final f = await VideoCompressionService.compressForNetwork(
               input: originalFile,
-              quality: useQuality,
+              quality: net,
             ).timeout(
               _compressionTimeout(net),
               onTimeout: () => originalFile,

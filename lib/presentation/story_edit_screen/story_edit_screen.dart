@@ -612,10 +612,10 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
         ),
         child: Column(
           children: [
-            if (showStatus) ...[
-              _uploadStatusCard(state),
-              SizedBox(height: 10.h),
-            ],
+            // if (showStatus) ...[
+            //   // _uploadStatusCard(state),
+            //   SizedBox(height: 10.h),
+            // ],
             SizedBox(
               width: double.infinity,
               child: CustomButton(
@@ -644,92 +644,91 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
     );
   }
 
-  Widget _uploadStatusCard(StoryEditState state) {
-    String stage = state.uploadStage ?? '';
-    if (stage.isEmpty) {
-      switch (state.preuploadState) {
-        case PreuploadState.uploading:
-          stage = 'Uploading in background...';
-          break;
-        case PreuploadState.ready:
-          stage = 'Ready to share';
-          break;
-        case PreuploadState.failed:
-          stage = 'Upload failed';
-          break;
-        case PreuploadState.cancelled: // ✅ FIXED (was "canceled")
-          stage = 'Cancelled';
-          break;
-        case PreuploadState.preparing:
-          stage = 'Preparing upload...';
-          break;
-        case PreuploadState.idle:
-          stage = '';
-          break;
-      }
-    }
-
-    final showThumb = widget.isVideo && state.thumbProgress > 0.0;
-    final mediaPct =
-    (state.mediaProgress * 100).clamp(0, 100).toStringAsFixed(0);
-    final thumbPct =
-    (state.thumbProgress * 100).clamp(0, 100).toStringAsFixed(0);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: EdgeInsets.all(12.w),
-          decoration: BoxDecoration(
-            color: Colors.white.withAlpha(18),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withAlpha(30)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                stage,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (state.preuploadState == PreuploadState.failed &&
-                  (state.preuploadError ?? '').isNotEmpty) ...[
-                SizedBox(height: 6.h),
-                Text(
-                  state.preuploadError!,
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12.sp,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              SizedBox(height: 10.h),
-              _progressRow(
-                label: 'Video',
-                progress: state.mediaProgress,
-                percentText: '$mediaPct%',
-              ),
-              if (showThumb) ...[
-                SizedBox(height: 8.h),
-                _progressRow(
-                  label: 'Thumbnail',
-                  progress: state.thumbProgress,
-                  percentText: '$thumbPct%',
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // Widget _uploadStatusCard(StoryEditState state) {
+  //   String stage = state.uploadStage ?? '';
+  //   if (stage.isEmpty) {
+  //     switch (state.preuploadState) {
+  //       case PreuploadState.uploading:
+  //         stage = 'Uploading in background...';
+  //         break;
+  //       case PreuploadState.ready:
+  //         stage = 'Ready to share';
+  //         break;
+  //       case PreuploadState.failed:
+  //         stage = 'Upload failed';
+  //         break;
+  //       case PreuploadState.cancelled: // ✅ FIXED (was "canceled")
+  //         stage = 'Cancelled';
+  //         break;
+  //       case PreuploadState.preparing:
+  //         stage = 'Preparing upload...';
+  //         break;
+  //       case PreuploadState.idle:
+  //         stage = '';
+  //         break;
+  //     }
+  //   }
+  //
+  //   final showThumb = widget.isVideo && state.thumbProgress > 0.0;
+  //   final mediaPct =
+  //   (state.mediaProgress * 100).clamp(0, 100).toStringAsFixed(0);
+  //   final thumbPct =
+  //   (state.thumbProgress * 100).clamp(0, 100).toStringAsFixed(0);
+  //
+  //   return ClipRRect(
+  //     borderRadius: BorderRadius.circular(14),
+  //     child: BackdropFilter(
+  //       filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+  //       child: Container(
+  //         padding: EdgeInsets.all(12.w),
+  //         decoration: BoxDecoration(
+  //           color: Colors.white.withAlpha(18),
+  //           borderRadius: BorderRadius.circular(14),
+  //         ),
+  //         child: Column(
+  //           crossAxisAlignment: CrossAxisAlignment.start,
+  //           children: [
+  //             Text(
+  //               stage,
+  //               style: TextStyle(
+  //                 color: Colors.white,
+  //                 fontSize: 13.sp,
+  //                 fontWeight: FontWeight.w600,
+  //               ),
+  //             ),
+  //             if (state.preuploadState == PreuploadState.failed &&
+  //                 (state.preuploadError ?? '').isNotEmpty) ...[
+  //               SizedBox(height: 6.h),
+  //               Text(
+  //                 state.preuploadError!,
+  //                 style: TextStyle(
+  //                   color: Colors.white70,
+  //                   fontSize: 12.sp,
+  //                 ),
+  //                 maxLines: 2,
+  //                 overflow: TextOverflow.ellipsis,
+  //               ),
+  //             ],
+  //             SizedBox(height: 10.h),
+  //             _progressRow(
+  //               label: 'Video',
+  //               progress: state.mediaProgress,
+  //               percentText: '$mediaPct%',
+  //             ),
+  //             // if (showThumb) ...[
+  //             //   SizedBox(height: 8.h),
+  //             //   _progressRow(
+  //             //     label: 'Thumbnail',
+  //             //     progress: state.thumbProgress,
+  //             //     percentText: '$thumbPct%',
+  //             //   ),
+  //             // ],
+  //           ],
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _progressRow({
     required String label,

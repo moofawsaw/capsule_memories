@@ -4,6 +4,133 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class GroupsService {
   static SupabaseClient get _client => SupabaseService.instance.client!;
 
+  // In-memory cache for resolved avatar URLs (especially signed URLs).
+  // Keyed by normalized storage key (or raw http(s) URL).
+  static final Map<String, _AvatarUrlCacheEntry> _avatarUrlCache = {};
+
+  static String _cleanStoragePath(String path) {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) return '';
+    var p = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+
+    // Some installs store bucket-prefixed keys like "avatars/<key>".
+    if (p.startsWith('avatars/')) {
+      p = p.substring('avatars/'.length);
+    }
+    if (p.startsWith('public/avatars/')) {
+      p = p.substring('public/avatars/'.length);
+    }
+
+    return p;
+  }
+
+  /// Resolve an avatar reference into a displayable URL.
+  ///
+  /// Supports:
+  /// - Full http(s) URLs (returned as-is)
+  /// - Storage keys/paths in the `avatars` bucket (returns a signed URL)
+  static Future<String> _resolveAvatarToDisplayUrl(String? avatarRef) async {
+    final raw = (avatarRef ?? '').trim();
+    if (raw.isEmpty) return '';
+
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      final cached = _avatarUrlCache[raw];
+      if (cached != null && !cached.isExpired) return cached.url;
+      _avatarUrlCache[raw] = _AvatarUrlCacheEntry(url: raw);
+      return raw;
+    }
+
+    final cleanPath = _cleanStoragePath(raw);
+    if (cleanPath.isEmpty) return '';
+
+    final cached = _avatarUrlCache[cleanPath];
+    if (cached != null && !cached.isExpired) return cached.url;
+
+    // Prefer signed URLs (works even when bucket is private).
+    try {
+      final signed = await _client.storage.from('avatars').createSignedUrl(
+            cleanPath,
+            3600,
+          );
+      if (signed.trim().isNotEmpty) {
+        _avatarUrlCache[cleanPath] = _AvatarUrlCacheEntry(
+          url: signed.trim(),
+          ttl: const Duration(minutes: 55),
+        );
+        return signed.trim();
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('⚠️ GroupsService: createSignedUrl failed for "$cleanPath": $e');
+    }
+
+    // Fallback: if bucket is public, a public URL will work.
+    try {
+      final publicUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
+      if (publicUrl.trim().isNotEmpty) {
+        _avatarUrlCache[cleanPath] = _AvatarUrlCacheEntry(
+          url: publicUrl.trim(),
+          ttl: const Duration(hours: 12),
+        );
+        return publicUrl.trim();
+      }
+    } catch (_) {}
+
+    return '';
+  }
+
+  static Future<Map<String, Map<String, dynamic>>> _fetchProfilesByIds(
+    List<String> userIds,
+  ) async {
+    final ids = userIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    if (ids.isEmpty) return {};
+
+    Future<List<Map<String, dynamic>>> tryTable(
+      String table,
+    ) async {
+      final res = await _client
+          .from(table)
+          .select('id, display_name, username, avatar_url')
+          .inFilter('id', ids.toList());
+      return List<Map<String, dynamic>>.from(res as List);
+    }
+
+    List<Map<String, dynamic>> rows = const [];
+
+    // Prefer the public-safe view/table if it exists in this project.
+    try {
+      rows = await tryTable('user_profiles_public');
+    } catch (_) {
+      rows = const [];
+    }
+
+    // Fallback to main profiles table
+    if (rows.isEmpty) {
+      try {
+        rows = await tryTable('user_profiles');
+      } catch (_) {
+        rows = const [];
+      }
+    }
+
+    // Final fallback for older installs
+    if (rows.isEmpty) {
+      try {
+        rows = await tryTable('profiles');
+      } catch (_) {
+        rows = const [];
+      }
+    }
+
+    final Map<String, Map<String, dynamic>> byId = {};
+    for (final r in rows) {
+      final id = (r['id'] as String?)?.trim();
+      if (id == null || id.isEmpty) continue;
+      byId[id] = r;
+    }
+    return byId;
+  }
+
   /// Fetches all groups that the current user is a member of or created
   static Future<List<Map<String, dynamic>>> fetchUserGroups() async {
     try {
@@ -191,7 +318,8 @@ class GroupsService {
 
   /// Fetches group members with their profile information
   /// ✅ Includes creator even if creator is missing from group_members (legacy groups)
-  static Future<List<Map<String, dynamic>>> fetchGroupMembers(String groupId) async {
+  static Future<List<Map<String, dynamic>>> fetchGroupMembers(
+      String groupId) async {
     try {
       // A) Get creator_id (so we can ensure creator is present)
       final group = await _client
@@ -199,92 +327,36 @@ class GroupsService {
           .select('creator_id')
           .eq('id', groupId)
           .maybeSingle();
+      final creatorId = (group?['creator_id'] as String?)?.trim();
 
-      final creatorId = group?['creator_id'] as String?;
-
-      // B) Fetch members from group_members
+      // B) Fetch member IDs from group_members (no join, more resilient to RLS changes)
       final response = await _client
           .from('group_members')
-          .select(
-        'user_id, joined_at, user_profiles!inner(id, display_name, username, avatar_url)',
-      )
+          .select('user_id, joined_at')
           .eq('group_id', groupId)
           .order('joined_at', ascending: true);
 
-      final Map<String, Map<String, dynamic>> byUserId = {};
+      final rows = List<Map<String, dynamic>>.from(response as List);
+      final memberIds = <String>[];
+      final joinedAtById = <String, String?>{};
 
-      for (final member in (response as List)) {
-        final profile = member['user_profiles'];
-        if (profile == null) continue;
-
-        final userId = (member['user_id'] as String?)?.trim();
-        if (userId == null || userId.isEmpty) continue;
-
-        final avatarPath = (profile['avatar_url'] as String?)?.trim();
-        String avatarUrl = '';
-
-        if (avatarPath != null && avatarPath.isNotEmpty) {
-          if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
-            avatarUrl = avatarPath;
-          } else {
-            try {
-              final cleanPath = avatarPath.startsWith('/') ? avatarPath.substring(1) : avatarPath;
-              avatarUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
-            } catch (e) {
-              print('Error generating avatar URL: $e');
-            }
-          }
-        }
-
-        byUserId[userId] = {
-          // ✅ IMPORTANT: use user_id as the stable id (not profile['id'])
-          'id': userId,
-          'profile_id': profile['id'],
-          'name': profile['display_name'] ?? 'Unknown User',
-          'username': profile['username'] ?? 'username',
-          'avatar': avatarUrl,
-          'joined_at': member['joined_at'],
-          'is_creator': (creatorId != null && userId == creatorId),
-        };
+      for (final r in rows) {
+        final uid = (r['user_id'] as String?)?.trim();
+        if (uid == null || uid.isEmpty) continue;
+        memberIds.add(uid);
+        joinedAtById[uid] = r['joined_at'] as String?;
       }
 
-      // C) If creator missing from group_members, fetch creator profile and inject
-      if (creatorId != null && creatorId.isNotEmpty && !byUserId.containsKey(creatorId)) {
-        final creatorProfile = await _client
-            .from('user_profiles')
-            .select('id, display_name, username, avatar_url')
-            .eq('id', creatorId)
-            .maybeSingle();
+      // Ensure creator is included (legacy groups may not include creator row)
+      if (creatorId != null &&
+          creatorId.isNotEmpty &&
+          !memberIds.contains(creatorId)) {
+        memberIds.insert(0, creatorId);
+        joinedAtById[creatorId] = null;
 
-        if (creatorProfile != null) {
-          final avatarPath = (creatorProfile['avatar_url'] as String?)?.trim();
-          String avatarUrl = '';
-
-          if (avatarPath != null && avatarPath.isNotEmpty) {
-            if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
-              avatarUrl = avatarPath;
-            } else {
-              try {
-                final cleanPath = avatarPath.startsWith('/') ? avatarPath.substring(1) : avatarPath;
-                avatarUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
-              } catch (e) {
-                print('Error generating avatar URL for creator: $e');
-              }
-            }
-          }
-
-          // Put creator at top (joined_at null, but we sort below)
-          byUserId[creatorId] = {
-            'id': creatorId,
-            'profile_id': creatorProfile['id'],
-            'name': creatorProfile['display_name'] ?? 'You',
-            'username': creatorProfile['username'] ?? 'username',
-            'avatar': avatarUrl,
-            'joined_at': null,
-            'is_creator': true,
-          };
-
-          // Optional: also backfill group_members so future fetches are consistent
+        // Best-effort backfill: only if current user is the creator.
+        final currentUserId = _client.auth.currentUser?.id;
+        if (currentUserId != null && currentUserId == creatorId) {
           try {
             await _client.from('group_members').insert({
               'group_id': groupId,
@@ -292,6 +364,46 @@ class GroupsService {
             });
           } catch (_) {}
         }
+      }
+
+      // C) Fetch profiles for all member IDs (public view first, then fallbacks)
+      final profilesById = await _fetchProfilesByIds(memberIds);
+
+      final Map<String, Map<String, dynamic>> byUserId = {};
+      // Resolve avatar URLs in parallel (signing can be slow if done sequentially).
+      final avatarFutures = <String, Future<String>>{};
+      for (final uid in memberIds) {
+        final profile = profilesById[uid];
+        final avatarRef = (profile?['avatar_url'] as String?)?.trim();
+        avatarFutures[uid] = _resolveAvatarToDisplayUrl(avatarRef);
+      }
+
+      final resolvedAvatarUrls = <String, String>{};
+      await Future.wait(
+        avatarFutures.entries.map((e) async {
+          resolvedAvatarUrls[e.key] = await e.value;
+        }),
+      );
+
+      for (final uid in memberIds) {
+        final profile = profilesById[uid];
+
+        final displayName = (profile?['display_name'] as String?)?.trim();
+        final username = (profile?['username'] as String?)?.trim();
+        final avatarUrl = resolvedAvatarUrls[uid] ?? '';
+
+        byUserId[uid] = {
+          'id': uid,
+          'profile_id': profile?['id'],
+          'name': (displayName == null || displayName.isEmpty)
+              ? 'Unknown User'
+              : displayName,
+          'username':
+              (username == null || username.isEmpty) ? 'username' : username,
+          'avatar': avatarUrl,
+          'joined_at': joinedAtById[uid],
+          'is_creator': (creatorId != null && uid == creatorId),
+        };
       }
 
       final members = byUserId.values.toList();
@@ -323,9 +435,9 @@ class GroupsService {
   /// Fetches member avatars for a specific group
   /// ✅ Includes creator if group_members is missing creator (legacy groups)
   static Future<List<String>> fetchGroupMemberAvatars(
-      String groupId, {
-        int limit = 3,
-      }) async {
+    String groupId, {
+    int limit = 3,
+  }) async {
     try {
       // A) Read creator_id
       final group = await _client
@@ -333,72 +445,45 @@ class GroupsService {
           .select('creator_id')
           .eq('id', groupId)
           .maybeSingle();
-      final creatorId = group?['creator_id'] as String?;
+      final creatorId = (group?['creator_id'] as String?)?.trim();
 
-      // B) Fetch avatars from group_members
+      // B) Fetch member IDs from group_members (no join)
       final response = await _client
           .from('group_members')
-          .select('user_id, user_profiles!inner(avatar_url)')
+          .select('user_id, joined_at')
           .eq('group_id', groupId)
+          .order('joined_at', ascending: true)
           .limit(limit);
 
-      final List<String> avatars = [];
-      final Set<String> seenUserIds = {};
-
-      for (final member in (response as List)) {
-        final userId = (member['user_id'] as String?)?.trim();
-        if (userId == null || userId.isEmpty) continue;
-        seenUserIds.add(userId);
-
-        final avatarPath = (member['user_profiles']?['avatar_url'] as String?)?.trim();
-        if (avatarPath == null || avatarPath.isEmpty) continue;
-
-        String avatarUrl = '';
-        if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
-          avatarUrl = avatarPath;
-        } else {
-          try {
-            final cleanPath = avatarPath.startsWith('/') ? avatarPath.substring(1) : avatarPath;
-            avatarUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
-          } catch (e) {
-            print('Error generating avatar URL: $e');
-          }
-        }
-
-        if (avatarUrl.isNotEmpty) avatars.add(avatarUrl);
-        if (avatars.length >= limit) break;
+      final rows = List<Map<String, dynamic>>.from(response as List);
+      final memberIds = <String>[];
+      for (final r in rows) {
+        final uid = (r['user_id'] as String?)?.trim();
+        if (uid == null || uid.isEmpty) continue;
+        memberIds.add(uid);
       }
 
-      // C) If creator missing, inject creator avatar (legacy groups)
-      if (avatars.length < limit &&
-          creatorId != null &&
+      // If creator missing (legacy), add creator to the front (and keep limit)
+      if (creatorId != null &&
           creatorId.isNotEmpty &&
-          !seenUserIds.contains(creatorId)) {
-        final creatorProfile = await _client
-            .from('user_profiles')
-            .select('avatar_url')
-            .eq('id', creatorId)
-            .maybeSingle();
+          !memberIds.contains(creatorId)) {
+        memberIds.insert(0, creatorId);
+        if (memberIds.length > limit) memberIds.removeLast();
+      }
 
-        final avatarPath = (creatorProfile?['avatar_url'] as String?)?.trim();
-        if (avatarPath != null && avatarPath.isNotEmpty) {
-          String avatarUrl = '';
-          if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
-            avatarUrl = avatarPath;
-          } else {
-            try {
-              final cleanPath = avatarPath.startsWith('/') ? avatarPath.substring(1) : avatarPath;
-              avatarUrl = _client.storage.from('avatars').getPublicUrl(cleanPath);
-            } catch (_) {}
-          }
+      // C) Fetch profiles and resolve avatar URLs
+      final profilesById = await _fetchProfilesByIds(memberIds);
+      final avatars = <String>[];
 
-          if (avatarUrl.isNotEmpty) {
-            avatars.insert(0, avatarUrl); // put creator first
-            if (avatars.length > limit) {
-              avatars.removeLast();
-            }
-          }
-        }
+      final resolved = await Future.wait(
+        memberIds.map((uid) async {
+          final profile = profilesById[uid];
+          final avatarRef = (profile?['avatar_url'] as String?)?.trim();
+          return _resolveAvatarToDisplayUrl(avatarRef);
+        }),
+      );
+      for (final url in resolved) {
+        if (url.isNotEmpty) avatars.add(url);
       }
 
       return avatars;
@@ -421,9 +506,9 @@ class GroupsService {
       final response = await _client
           .from('groups')
           .insert({
-        'name': groupName,
-        'creator_id': userId,
-      })
+            'name': groupName,
+            'creator_id': userId,
+          })
           .select('id')
           .single();
 
@@ -448,7 +533,9 @@ class GroupsService {
       // 3) Optional: keep member_count accurate if you use it
       // Only do this if your schema doesn't already update member_count via trigger.
       try {
-        await _client.from('groups').update({'member_count': 1}).eq('id', groupId);
+        await _client
+            .from('groups')
+            .update({'member_count': 1}).eq('id', groupId);
       } catch (e) {
         // Non-fatal
         print('⚠️ createGroup: could not update member_count: $e');
@@ -563,10 +650,21 @@ class GroupsService {
       print('   - Keys: ${response.keys.toList()}');
 
       return response;
-
     } catch (e) {
       print('Error fetching group: $e');
       return null;
     }
   }
+}
+
+class _AvatarUrlCacheEntry {
+  final String url;
+  final DateTime expiresAt;
+
+  _AvatarUrlCacheEntry({
+    required this.url,
+    Duration ttl = const Duration(minutes: 55),
+  }) : expiresAt = DateTime.now().add(ttl);
+
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
 }

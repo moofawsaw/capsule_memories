@@ -5,16 +5,14 @@ class GroupJoinConfirmationState {
     this.groupJoinConfirmationModel,
     this.isLoading,
     this.errorMessage,
-    this.memoryId,
-    this.memoryTitle,
+    this.groupId,
+    this.groupName,
     this.creatorName,
     this.creatorAvatar,
-    this.memoryCategory,
-    this.expiresAt,
+    this.memberAvatars,
     this.memberCount,
     this.isAccepting,
-    this.shouldNavigateToTimeline,
-    this.shouldNavigateToMemories,
+    this.shouldNavigateToGroups,
   });
 
   GroupJoinConfirmationModel? groupJoinConfirmationModel;
@@ -24,33 +22,29 @@ class GroupJoinConfirmationState {
   bool? isAccepting;
   String? errorMessage;
 
-  // Memory details
-  String? memoryId;
-  String? memoryTitle;
+  // Group details
+  String? groupId;
+  String? groupName;
   String? creatorName;
   String? creatorAvatar;
-  String? memoryCategory;
-  DateTime? expiresAt;
+  List<String>? memberAvatars;
   int? memberCount;
 
   // Navigation flags
-  bool? shouldNavigateToTimeline;
-  bool? shouldNavigateToMemories;
+  bool? shouldNavigateToGroups;
 
   GroupJoinConfirmationState copyWith({
     GroupJoinConfirmationModel? groupJoinConfirmationModel,
     bool? isLoading,
     bool? isAccepting,
     String? errorMessage,
-    String? memoryId,
-    String? memoryTitle,
+    String? groupId,
+    String? groupName,
     String? creatorName,
     String? creatorAvatar,
-    String? memoryCategory,
-    DateTime? expiresAt,
+    List<String>? memberAvatars,
     int? memberCount,
-    bool? shouldNavigateToTimeline,
-    bool? shouldNavigateToMemories,
+    bool? shouldNavigateToGroups,
   }) {
     return GroupJoinConfirmationState(
       groupJoinConfirmationModel:
@@ -58,17 +52,14 @@ class GroupJoinConfirmationState {
       isLoading: isLoading ?? this.isLoading,
       isAccepting: isAccepting ?? this.isAccepting,
       errorMessage: errorMessage ?? this.errorMessage,
-      memoryId: memoryId ?? this.memoryId,
-      memoryTitle: memoryTitle ?? this.memoryTitle,
+      groupId: groupId ?? this.groupId,
+      groupName: groupName ?? this.groupName,
       creatorName: creatorName ?? this.creatorName,
       creatorAvatar: creatorAvatar ?? this.creatorAvatar,
-      memoryCategory: memoryCategory ?? this.memoryCategory,
-      expiresAt: expiresAt ?? this.expiresAt,
+      memberAvatars: memberAvatars ?? this.memberAvatars,
       memberCount: memberCount ?? this.memberCount,
-      shouldNavigateToTimeline:
-          shouldNavigateToTimeline ?? this.shouldNavigateToTimeline,
-      shouldNavigateToMemories:
-          shouldNavigateToMemories ?? this.shouldNavigateToMemories,
+      shouldNavigateToGroups:
+          shouldNavigateToGroups ?? this.shouldNavigateToGroups,
     );
   }
 }

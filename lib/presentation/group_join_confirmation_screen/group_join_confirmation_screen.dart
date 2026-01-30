@@ -1,9 +1,8 @@
 import '../../core/app_export.dart';
-import '../../core/utils/memory_nav_args.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_header_row.dart';
-import '../../widgets/custom_image_view.dart';
 import './notifier/group_join_confirmation_notifier.dart';
+import '../../utils/storage_utils.dart';
 
 class GroupJoinConfirmationScreen extends ConsumerStatefulWidget {
   const GroupJoinConfirmationScreen({Key? key}) : super(key: key);
@@ -19,26 +18,29 @@ class GroupJoinConfirmationScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadMemoryDetails();
+      _loadGroupDetails();
     });
   }
 
-  Future<void> _loadMemoryDetails() async {
+  Future<void> _loadGroupDetails() async {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
-    if (args == null || args['memory_id'] == null) {
-      print('❌ GROUP JOIN: No memory_id provided in arguments');
-      _showError('Memory invitation not found');
+    final inviteCode = (args?['inviteCode'] as String?)?.trim() ??
+        (args?['invite_code'] as String?)?.trim() ??
+        (args?['code'] as String?)?.trim();
+
+    if (inviteCode == null || inviteCode.isEmpty) {
+      print('❌ GROUP JOIN: No inviteCode provided in arguments');
+      _showError('Group invitation not found');
       return;
     }
 
-    final memoryId = args['memory_id'] as String;
-    print('✅ GROUP JOIN: Loading memory details for: $memoryId');
+    print('✅ GROUP JOIN: Loading group details for inviteCode: $inviteCode');
 
     await ref
         .read(groupJoinConfirmationNotifier.notifier)
-        .loadMemoryDetails(memoryId);
+        .loadGroupDetailsByInviteCode(inviteCode);
   }
 
   void _showError(String message) {
@@ -52,7 +54,7 @@ class GroupJoinConfirmationScreenState
       // Navigate back to memories after error
       Future.delayed(Duration(seconds: 2), () {
         if (mounted) {
-          NavigatorService.pushNamed(AppRoutes.appMemories);
+          NavigatorService.pushNamed(AppRoutes.appGroups);
         }
       });
     }
@@ -60,38 +62,31 @@ class GroupJoinConfirmationScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        width: double.maxFinite,
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_02,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20.h),
-            topRight: Radius.circular(20.h),
+    return Scaffold(
+      backgroundColor: appTheme.gray_900_02,
+      appBar: AppBar(
+        backgroundColor: appTheme.gray_900_02,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: appTheme.gray_50,
+            size: 18.h,
+          ),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        title: Text(
+          'Group Invitation',
+          style: TextStyleHelper.instance.title16BoldPlusJakartaSans.copyWith(
+            color: appTheme.gray_50,
           ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(height: 12.h),
-            // Drag handle indicator
-            Container(
-              width: 40.h,
-              height: 4.h,
-              decoration: BoxDecoration(
-                color: appTheme.colorFF3A3A,
-                borderRadius: BorderRadius.circular(2.h),
-              ),
-            ),
-            SizedBox(height: 20.h),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 20.h),
-                child: _buildContent(context),
-              ),
-            ),
-          ],
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 16.h),
+          child: _buildContent(context),
         ),
       ),
     );
@@ -113,7 +108,7 @@ class GroupJoinConfirmationScreenState
                   CircularProgressIndicator(color: appTheme.deep_purple_A100),
                   SizedBox(height: 16.h),
                   Text(
-                    'Loading memory details...',
+                    'Loading group details...',
                     style: TextStyleHelper.instance.body14RegularPlusJakartaSans
                         .copyWith(color: appTheme.gray_50),
                   ),
@@ -157,9 +152,7 @@ class GroupJoinConfirmationScreenState
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildConfirmationHeader(context),
-            SizedBox(height: 16.h),
-            _buildMemoryDetails(context, state),
+            _buildGroupDetails(context, state),
             SizedBox(height: 24.h),
             _buildActionButtons(context, state),
             SizedBox(height: 20.h),
@@ -169,25 +162,13 @@ class GroupJoinConfirmationScreenState
     );
   }
 
-  /// Section Widget - Header
-  Widget _buildConfirmationHeader(BuildContext context) {
-    return CustomHeaderRow(
-      title: "Memory Invitation",
-      margin: EdgeInsets.symmetric(horizontal: 12.h, vertical: 18.h),
-      onIconTap: () {
-        onTapDecline(context);
-      },
-    );
-  }
-
-  /// Section Widget - Memory Details Card
-  Widget _buildMemoryDetails(
+  /// Section Widget - Group Details Card
+  Widget _buildGroupDetails(
       BuildContext context, GroupJoinConfirmationState state) {
-    final memoryTitle = state.memoryTitle ?? 'Unknown Memory';
-    final memoryCategory = state.memoryCategory ?? 'Event';
+    final groupName = state.groupName ?? 'Unknown Group';
     final creatorName = state.creatorName ?? 'Unknown User';
-    final expiresAt = state.expiresAt;
     final memberCount = state.memberCount ?? 1;
+    final avatars = state.memberAvatars ?? const <String>[];
 
     return Container(
       width: double.infinity,
@@ -210,16 +191,16 @@ class GroupJoinConfirmationScreenState
               borderRadius: BorderRadius.circular(12.h),
             ),
             child: Icon(
-              Icons.event,
+              Icons.group,
               color: appTheme.deep_purple_A100,
               size: 32.h,
             ),
           ),
           SizedBox(height: 16.h),
 
-          // Memory Title
+          // Group Name
           Text(
-            memoryTitle,
+            groupName,
             style: TextStyleHelper.instance.title18BoldPlusJakartaSans
                 .copyWith(color: appTheme.gray_50),
           ),
@@ -228,13 +209,7 @@ class GroupJoinConfirmationScreenState
           // Creator Info
           Row(
             children: [
-              CustomImageView(
-                imagePath: state.creatorAvatar ?? '',
-                height: 24.h,
-                width: 24.h,
-                radius: BorderRadius.circular(12.h),
-                fit: BoxFit.cover,
-              ),
+              _buildAvatar24(state.creatorAvatar),
               SizedBox(width: 8.h),
               Text(
                 'Created by $creatorName',
@@ -243,21 +218,9 @@ class GroupJoinConfirmationScreenState
               ),
             ],
           ),
-          SizedBox(height: 12.h),
+          SizedBox(height: 18.h),
 
-          // Category Badge
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12.h, vertical: 6.h),
-            decoration: BoxDecoration(
-              color: appTheme.blue_gray_300.withAlpha(51),
-              borderRadius: BorderRadius.circular(8.h),
-            ),
-            child: Text(
-              memoryCategory,
-              style: TextStyleHelper.instance.body12MediumPlusJakartaSans
-                  .copyWith(color: appTheme.gray_50),
-            ),
-          ),
+          _buildMembersAvatarsRow(avatars, memberCount),
           SizedBox(height: 16.h),
 
           // Member Count
@@ -272,25 +235,96 @@ class GroupJoinConfirmationScreenState
               ),
             ],
           ),
-
-          // Expiration Time
-          if (expiresAt != null) ...[
-            SizedBox(height: 8.h),
-            Row(
-              children: [
-                Icon(Icons.access_time,
-                    color: appTheme.blue_gray_300, size: 18.h),
-                SizedBox(width: 8.h),
-                Text(
-                  'Expires ${_formatTimestamp(expiresAt)}',
-                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                      .copyWith(color: appTheme.blue_gray_300),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAvatar24(String? raw) {
+    final url = StorageUtils.resolveAvatarUrl(raw) ?? (raw ?? '').trim();
+    if (url.isEmpty) {
+      return Container(
+        width: 24.h,
+        height: 24.h,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: appTheme.blue_gray_900_02,
+        ),
+        child: Icon(Icons.person, color: appTheme.gray_50, size: 14.h),
+      );
+    }
+
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: url,
+        width: 24.h,
+        height: 24.h,
+        fit: BoxFit.cover,
+        placeholder: (_, __) =>
+            Container(color: appTheme.blue_gray_900_02, width: 24.h, height: 24.h),
+        errorWidget: (_, __, ___) => Container(
+          width: 24.h,
+          height: 24.h,
+          color: appTheme.blue_gray_900_02,
+          child: Icon(Icons.person, color: appTheme.gray_50, size: 14.h),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMembersAvatarsRow(List<String> avatars, int membersCount) {
+    final visible = avatars.take(8).toList();
+    final remaining = (membersCount - visible.length).clamp(0, 9999);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (visible.isNotEmpty)
+          SizedBox(
+            height: 36.h,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: List.generate(visible.length, (i) {
+                final left = i * 18.h;
+                final url = visible[i];
+                return Positioned(
+                  left: left,
+                  child: Container(
+                    width: 36.h,
+                    height: 36.h,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: appTheme.gray_900_01,
+                        width: 2.h,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: url,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            Container(color: appTheme.blue_gray_900_02),
+                        errorWidget: (_, __, ___) => Container(
+                          color: appTheme.blue_gray_900_02,
+                          child: Icon(Icons.person, color: appTheme.gray_50, size: 18.h),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        SizedBox(height: 10.h),
+        Text(
+          remaining > 0
+              ? '$membersCount members • +$remaining more'
+              : '$membersCount members',
+          style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300),
+        ),
+      ],
     );
   }
 
@@ -300,29 +334,14 @@ class GroupJoinConfirmationScreenState
     return Consumer(
       builder: (context, ref, _) {
         ref.listen(groupJoinConfirmationNotifier, (previous, current) {
-          // Navigate to timeline on accept
-          if (current.shouldNavigateToTimeline ?? false) {
-            final memoryId = current.memoryId;
-            if (memoryId != null) {
-              print('✅ Navigating to timeline for memory: $memoryId');
-
-              // Create MemoryNavArgs for timeline navigation
-              final navArgs = MemoryNavArgs(
-                memoryId: memoryId,
-                snapshot: null,
-              );
-
-              NavigatorService.pushNamed(
-                AppRoutes.appTimeline,
-                arguments: navArgs,
-              );
-            }
-          }
-
-          // Navigate to memories on decline
-          if (current.shouldNavigateToMemories ?? false) {
-            print('✅ Navigating to memories after decline');
-            NavigatorService.pushNamed(AppRoutes.appMemories);
+          // Navigate to groups on accept/decline
+          if (current.shouldNavigateToGroups ?? false) {
+            final groupId = current.groupId;
+            print('✅ Navigating to groups');
+            NavigatorService.pushNamed(
+              AppRoutes.appGroups,
+              arguments: groupId != null ? {'groupId': groupId} : null,
+            );
           }
         });
 
@@ -339,7 +358,7 @@ class GroupJoinConfirmationScreenState
             ),
             Expanded(
               child: CustomButton(
-                text: 'Accept',
+                text: 'Join Group',
                 buttonStyle: CustomButtonStyle.fillPrimary,
                 buttonTextStyle: CustomButtonTextStyle.bodyMedium,
                 onPressed: (state.isAccepting ?? false)
@@ -351,21 +370,6 @@ class GroupJoinConfirmationScreenState
         );
       },
     );
-  }
-
-  String _formatTimestamp(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = dateTime.difference(now);
-
-    if (difference.isNegative) {
-      return 'expired';
-    } else if (difference.inHours < 1) {
-      return 'in ${difference.inMinutes} minutes';
-    } else if (difference.inHours < 24) {
-      return 'in ${difference.inHours} hours';
-    } else {
-      return 'in ${difference.inDays} days';
-    }
   }
 
   /// Handle Accept button tap

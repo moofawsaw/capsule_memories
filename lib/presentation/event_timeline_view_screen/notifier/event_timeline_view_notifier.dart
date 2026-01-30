@@ -169,12 +169,21 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   ///
   /// ✅ FIX:
   /// - Validate and refresh on state/sealed mismatch too (not just title/id).
-  Future<bool> validateMemoryData(String memoryId) async {
+  Future<bool> validateMemoryData(String memoryId, {bool silent = false}) async {
     try {
-      state = state.copyWith(
-        isLoading: true,
-        errorMessage: null,
-      );
+      final prevIsLoading = state.isLoading ?? false;
+      if (!silent) {
+        state = state.copyWith(
+          isLoading: true,
+          errorMessage: null,
+        );
+      } else {
+        // Keep UI interactive during "silent" validation.
+        state = state.copyWith(
+          isLoading: prevIsLoading,
+          errorMessage: null,
+        );
+      }
 
       print('🔍 VALIDATION: Starting real-time validation for memory: $memoryId');
 
@@ -193,6 +202,16 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         setErrorState('Memory not found in database');
         return false;
       }
+
+      // Refresh membership + pending invite state (prevents stale "member" UI).
+      // NOTE: We intentionally treat pending invites as NOT joined.
+      final isCreator = await _checkCurrentUserIsCreator(memoryId);
+      final pendingInviteId =
+          isCreator ? null : await _fetchPendingInviteId(memoryId);
+      final hasPendingInvite =
+          pendingInviteId != null && pendingInviteId.trim().isNotEmpty;
+      final rawIsMember = await _checkCurrentUserMembership(memoryId);
+      final isMember = isCreator ? true : (hasPendingInvite ? false : rawIsMember);
 
       final contributorsResponse = await SupabaseService.instance.client
           ?.from('memory_contributors')
@@ -263,20 +282,38 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         print('⚠️ CRITICAL MISMATCH: Refreshing memory data from database');
         await _reloadValidatedData(memoryId, memoryResponse, contributorAvatars);
 
-        state = state.copyWith(isLoading: false, errorMessage: null);
+        state = state.copyWith(
+          isCurrentUserMember: isMember,
+          isCurrentUserCreator: isCreator,
+          hasPendingInvite: hasPendingInvite,
+          pendingInviteId: pendingInviteId,
+          isLoading: silent ? prevIsLoading : false,
+          errorMessage: null,
+        );
         return true;
       }
 
-      state = state.copyWith(isLoading: false, errorMessage: null);
+      state = state.copyWith(
+        isCurrentUserMember: isMember,
+        isCurrentUserCreator: isCreator,
+        hasPendingInvite: hasPendingInvite,
+        pendingInviteId: pendingInviteId,
+        isLoading: silent ? prevIsLoading : false,
+        errorMessage: null,
+      );
       return passedCount == totalCount;
     } catch (e, stackTrace) {
       print('❌ VALIDATION ERROR: $e');
       print('   Stack trace: $stackTrace');
 
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Failed to validate memory data',
-      );
+      if (!silent) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Failed to validate memory data',
+        );
+      } else {
+        state = state.copyWith(errorMessage: 'Failed to validate memory data');
+      }
       return false;
     }
   }
@@ -412,12 +449,19 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         return;
       }
 
+      // IMPORTANT:
+      // If the user has a PENDING invite, treat them as NOT a member even if a
+      // contributor row exists (some flows pre-insert contributors). This ensures:
+      // - No Create Story / Leave actions until invite acceptance
+      // - CTA can be "Join Memory" and flips UI after accept
       final isCreator = await _checkCurrentUserIsCreator(navArgs.memoryId);
-      final isMember = await _checkCurrentUserMembership(navArgs.memoryId);
       final pendingInviteId =
-          !isMember ? await _fetchPendingInviteId(navArgs.memoryId) : null;
+          isCreator ? null : await _fetchPendingInviteId(navArgs.memoryId);
       final hasPendingInvite =
           pendingInviteId != null && pendingInviteId.trim().isNotEmpty;
+
+      final rawIsMember = await _checkCurrentUserMembership(navArgs.memoryId);
+      final isMember = isCreator ? true : (hasPendingInvite ? false : rawIsMember);
 
       print('🔍 TIMELINE NOTIFIER: User permissions');
       print('   - Is Creator: $isCreator');
@@ -573,10 +617,9 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
 
     final inviteId = (state.pendingInviteId ?? '').trim();
 
-    state = state.copyWith(
-      isLoading: true,
-      errorMessage: null,
-    );
+    // NOTE: UI shows a modal loader for join. Avoid flipping `isLoading` here
+    // because this screen swaps to a full-screen skeleton when `isLoading` is true.
+    state = state.copyWith(errorMessage: null);
 
     try {
       bool joined = false;
@@ -613,6 +656,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         isCurrentUserCreator: isCreator,
         hasPendingInvite: false,
         pendingInviteId: null,
+        isLoading: false,
       );
 
       // Keep cache consistent for other screens that rely on it.
@@ -622,9 +666,16 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         await _cacheService.refreshMemoryCache(userId);
       }
 
-      // Refresh timeline data now that the user is a member.
-      await loadMemoryStories(memoryId);
-      await validateMemoryData(memoryId);
+      // Refresh timeline data now that the user is a member, but do it silently
+      // so we don't block UI or keep a modal loader up.
+      Future.microtask(() async {
+        try {
+          await loadMemoryStories(memoryId, silent: true);
+          await validateMemoryData(memoryId, silent: true);
+        } catch (e) {
+          print('⚠️ JOIN MEMORY: Post-join refresh failed: $e');
+        }
+      });
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       rethrow;
@@ -733,11 +784,16 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
     super.dispose();
   }
 
-  Future<void> loadMemoryStories(String memoryId) async {
+  Future<void> loadMemoryStories(String memoryId, {bool silent = false}) async {
     try {
       print('🔍 TIMELINE DEBUG: Loading stories for memory: $memoryId');
 
-      state = state.copyWith(isLoading: true, errorMessage: null);
+      final prevIsLoading = state.isLoading ?? false;
+      if (!silent) {
+        state = state.copyWith(isLoading: true, errorMessage: null);
+      } else {
+        state = state.copyWith(isLoading: prevIsLoading, errorMessage: null);
+      }
 
       final storiesData = await _storyService.fetchMemoryStories(memoryId);
 
@@ -760,7 +816,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
             ),
           ),
           errorMessage: null,
-          isLoading: false,
+          isLoading: silent ? prevIsLoading : false,
         );
         return;
       }
@@ -875,7 +931,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
           ),
         ),
         errorMessage: null,
-        isLoading: false,
+        isLoading: silent ? prevIsLoading : false,
       );
 
       print('✅ TIMELINE DEBUG: Timeline updated with memory window');
@@ -885,10 +941,16 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('❌ TIMELINE DEBUG: Error loading memory stories: $e');
       print('❌ TIMELINE DEBUG: Stack trace: $stackTrace');
 
-      state = state.copyWith(
-        errorMessage: 'Failed to load memory data. Please try refreshing.',
-        isLoading: false,
-      );
+      if (!silent) {
+        state = state.copyWith(
+          errorMessage: 'Failed to load memory data. Please try refreshing.',
+          isLoading: false,
+        );
+      } else {
+        state = state.copyWith(
+          errorMessage: 'Failed to load memory data. Please try refreshing.',
+        );
+      }
     }
   }
 
@@ -1065,41 +1127,25 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         throw Exception('No authenticated user');
       }
 
-      final memoryResponse =
-      await client.from('memories').select('creator_id').eq('id', memoryId).single();
+      // Server-side leave that preserves re-join ability:
+      // - removes contributor row
+      // - ensures invite exists + flips it back to pending
+      // - does NOT send a new invite notification
+      await client.rpc(
+        'leave_memory_keep_invite_pending',
+        params: {'p_memory_id': memoryId},
+      );
 
-      final creatorId = memoryResponse['creator_id'] as String?;
-      if (creatorId != null && creatorId == currentUser.id) {
-        throw Exception('Memory creator cannot leave their own memory');
-      }
-
-      final existingContributor = await client
-          .from('memory_contributors')
-          .select('id')
-          .eq('memory_id', memoryId)
-          .eq('user_id', currentUser.id)
-          .maybeSingle();
-
-      if (existingContributor == null) {
-        print('⚠️ LEAVE MEMORY: User is not a contributor (already left)');
-        state = state.copyWith(
-          isCurrentUserMember: false,
-          isCurrentUserCreator: false,
-        );
-        return;
-      }
-
-      await client
-          .from('memory_contributors')
-          .delete()
-          .eq('memory_id', memoryId)
-          .eq('user_id', currentUser.id);
-
-      print('✅ LEAVE MEMORY: Contributor row deleted');
+      // Refresh membership/invite state after leave
+      final pendingInviteId = await _fetchPendingInviteId(memoryId);
+      final hasPendingInvite =
+          pendingInviteId != null && pendingInviteId.trim().isNotEmpty;
 
       state = state.copyWith(
         isCurrentUserMember: false,
         isCurrentUserCreator: false,
+        hasPendingInvite: hasPendingInvite,
+        pendingInviteId: pendingInviteId,
       );
 
       await _cacheService.refreshMemoryCache(currentUser.id);

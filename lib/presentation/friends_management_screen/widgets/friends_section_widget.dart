@@ -24,7 +24,7 @@ class FriendsSectionWidget extends ConsumerWidget {
         padding: EdgeInsets.symmetric(vertical: 20.h),
         child: Center(
           child: Text(
-            'No friends yet',
+            'No friends yet. Try searching for a friend.',
             style:
                 TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
               color: appTheme.gray_50,

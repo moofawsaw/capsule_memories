@@ -21,17 +21,23 @@ class NotificationPreferencesService {
         return null;
       }
 
+      // Use maybeSingle so a missing row doesn't throw.
       final response = await _client
           ?.from('email_preferences')
           .select(
-              'push_notifications_enabled, push_memory_invites, push_memory_activity, '
-              'push_memory_sealed, push_reactions, push_new_followers, '
-              'push_friend_requests, push_group_invites')
+            'push_notifications_enabled, push_memory_invites, push_memory_sealed, '
+            'push_friend_requests, push_group_invites, '
+            // Split per-type flags
+            'push_new_story, push_memory_expiring, push_followed, push_new_follower, '
+            'push_daily_capsule_reminder, push_friend_daily_capsule_completed, '
+            // Legacy grouped flags (fallback during rollout)
+            'push_memory_activity, push_new_followers, push_daily_capsule',
+          )
           .eq('user_id', userId)
-          .single();
+          .maybeSingle();
 
       if (response == null) {
-        debugPrint('⚠️ No preferences found for user');
+        debugPrint('ℹ️ No email_preferences row found; using defaults');
         return null;
       }
 
@@ -47,12 +53,15 @@ class NotificationPreferencesService {
   Future<bool> savePreferences({
     required bool pushNotificationsEnabled,
     required bool memoryInvitesEnabled,
-    required bool memoryActivityEnabled,
+    required bool newStoryEnabled,
+    required bool memoryExpiringEnabled,
     required bool memorySealedEnabled,
-    required bool reactionsEnabled,
-    required bool newFollowersEnabled,
+    required bool followedEnabled,
+    required bool newFollowerEnabled,
     required bool friendRequestsEnabled,
     required bool groupInvitesEnabled,
+    required bool dailyCapsuleReminderEnabled,
+    required bool friendDailyCapsuleCompletedEnabled,
   }) async {
     try {
       final userId = _client?.auth.currentUser?.id;
@@ -65,12 +74,15 @@ class NotificationPreferencesService {
         'user_id': userId,
         'push_notifications_enabled': pushNotificationsEnabled,
         'push_memory_invites': memoryInvitesEnabled,
-        'push_memory_activity': memoryActivityEnabled,
+        'push_new_story': newStoryEnabled,
+        'push_memory_expiring': memoryExpiringEnabled,
         'push_memory_sealed': memorySealedEnabled,
-        'push_reactions': reactionsEnabled,
-        'push_new_followers': newFollowersEnabled,
+        'push_followed': followedEnabled,
+        'push_new_follower': newFollowerEnabled,
         'push_friend_requests': friendRequestsEnabled,
         'push_group_invites': groupInvitesEnabled,
+        'push_daily_capsule_reminder': dailyCapsuleReminderEnabled,
+        'push_friend_daily_capsule_completed': friendDailyCapsuleCompletedEnabled,
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'user_id');
 
@@ -88,18 +100,22 @@ class NotificationPreferencesService {
       final userId = _client?.auth.currentUser?.id;
       if (userId == null) return false;
 
-      // Update email preferences
-      await _client?.from('email_preferences').update({
+      // Upsert so the row is created if missing (source of truth).
+      await _client?.from('email_preferences').upsert({
+        'user_id': userId,
         'push_notifications_enabled': enabled,
         'push_memory_invites': enabled,
-        'push_memory_activity': enabled,
+        'push_new_story': enabled,
+        'push_memory_expiring': enabled,
         'push_memory_sealed': enabled,
-        'push_reactions': enabled,
-        'push_new_followers': enabled,
+        'push_followed': enabled,
+        'push_new_follower': enabled,
         'push_friend_requests': enabled,
         'push_group_invites': enabled,
+        'push_daily_capsule_reminder': enabled,
+        'push_friend_daily_capsule_completed': enabled,
         'updated_at': DateTime.now().toIso8601String(),
-      }).eq('user_id', userId);
+      }, onConflict: 'user_id');
 
       // If enabling notifications, re-register FCM token if it doesn't exist
       if (enabled) {
@@ -145,10 +161,12 @@ class NotificationPreferencesService {
       final userId = _client?.auth.currentUser?.id;
       if (userId == null) return false;
 
-      await _client?.from('email_preferences').update({
+      // Upsert so the row is created if missing (source of truth).
+      await _client?.from('email_preferences').upsert({
+        'user_id': userId,
         field: enabled,
         'updated_at': DateTime.now().toIso8601String(),
-      }).eq('user_id', userId);
+      }, onConflict: 'user_id');
 
       debugPrint('✅ Preference $field updated to $enabled');
       return true;

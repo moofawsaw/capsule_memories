@@ -59,7 +59,7 @@ class MemorySelectionBottomSheet extends ConsumerWidget {
               return _buildMemoryCard(context, memory);
             },
           ),
-          SizedBox(height: 12.h),
+          // SizedBox(height: 12.h),
         ],
       ),
     );

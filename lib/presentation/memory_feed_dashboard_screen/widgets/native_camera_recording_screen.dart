@@ -49,8 +49,8 @@ class _NativeCameraRecordingScreenState
   // Track current camera direction
   bool _isRearCamera = true;
 
-  // ✅ Choose capture resolution based on network for faster cellular posting.
-  // Default to high; override during init once quality is known.
+  // ✅ Capture at the same quality on cellular + Wi‑Fi.
+  // We still adapt upload chunking elsewhere, but we don't downscale the recording.
   ResolutionPreset _resolutionPreset = ResolutionPreset.high;
 
   Timer? _releaseToleranceTimer;
@@ -333,15 +333,8 @@ class _NativeCameraRecordingScreenState
         return;
       }
 
-      // Decide resolution preset (best-effort; do not block on errors).
-      try {
-        final q = await NetworkQualityService.getQuality();
-        // Wi-Fi: keep highest quality. Cellular/unknown: prefer 720p-ish for speed/reliability.
-        _resolutionPreset =
-            (q == NetworkQuality.wifi) ? ResolutionPreset.high : ResolutionPreset.medium;
-      } catch (_) {
-        _resolutionPreset = ResolutionPreset.high;
-      }
+      // Keep recording quality consistent across network types.
+      _resolutionPreset = ResolutionPreset.high;
 
       // Use rear camera on mobile, front camera on web
       final camera = kIsWeb
@@ -412,7 +405,6 @@ class _NativeCameraRecordingScreenState
         SnackBar(
           content: Text('Cannot flip camera during recording'),
           duration: const Duration(seconds: 2),
-          backgroundColor: appTheme.red_500,
         ),
       );
       return;
@@ -566,7 +558,6 @@ class _NativeCameraRecordingScreenState
           SnackBar(
             content: Text('Hold longer for video'),
             duration: const Duration(seconds: 2),
-            backgroundColor: appTheme.red_500,
           ),
         );
       }

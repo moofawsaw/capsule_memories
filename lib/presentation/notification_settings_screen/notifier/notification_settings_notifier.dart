@@ -10,12 +10,15 @@ final notificationSettingsNotifier = StateNotifierProvider<
     notificationSettingsModel: NotificationSettingsModel(),
     pushNotificationsEnabled: true,
     memoryInvitesEnabled: true,
-    memoryActivityEnabled: true,
+    newStoryEnabled: true,
+    memoryExpiringEnabled: true,
     memorySealedEnabled: true,
-    reactionsEnabled: true,
-    newFollowersEnabled: true,
+    followedEnabled: true,
+    newFollowerEnabled: true,
     friendRequestsEnabled: true,
     groupInvitesEnabled: true,
+    dailyCapsuleReminderEnabled: true,
+    friendDailyCapsuleCompletedEnabled: true,
     privateAccountEnabled: false,
     showLocationEnabled: true,
     allowMemoryInvitesEnabled: true,
@@ -39,15 +42,26 @@ class NotificationSettingsNotifier
       final prefs = await _preferencesService.loadPreferences();
 
       if (prefs != null) {
+        // Backward compat: fall back to legacy grouped flags if split fields are missing.
+        final legacyMemoryActivity = prefs['push_memory_activity'];
+        final legacyNewFollowers = prefs['push_new_followers'];
+        final legacyDailyCapsule = prefs['push_daily_capsule'];
+
         state = state.copyWith(
           pushNotificationsEnabled: prefs['push_notifications_enabled'] ?? true,
           memoryInvitesEnabled: prefs['push_memory_invites'] ?? true,
-          memoryActivityEnabled: prefs['push_memory_activity'] ?? true,
+          newStoryEnabled: (prefs['push_new_story'] ?? legacyMemoryActivity) ?? true,
+          memoryExpiringEnabled:
+              (prefs['push_memory_expiring'] ?? legacyMemoryActivity) ?? true,
           memorySealedEnabled: prefs['push_memory_sealed'] ?? true,
-          reactionsEnabled: prefs['push_reactions'] ?? true,
-          newFollowersEnabled: prefs['push_new_followers'] ?? true,
+          followedEnabled: (prefs['push_followed'] ?? legacyNewFollowers) ?? true,
+          newFollowerEnabled: (prefs['push_new_follower'] ?? legacyNewFollowers) ?? true,
           friendRequestsEnabled: prefs['push_friend_requests'] ?? true,
           groupInvitesEnabled: prefs['push_group_invites'] ?? true,
+          dailyCapsuleReminderEnabled:
+              (prefs['push_daily_capsule_reminder'] ?? legacyDailyCapsule) ?? true,
+          friendDailyCapsuleCompletedEnabled:
+              (prefs['push_friend_daily_capsule_completed'] ?? legacyDailyCapsule) ?? true,
           isLoading: false,
         );
       } else {
@@ -63,12 +77,15 @@ class NotificationSettingsNotifier
     state = state.copyWith(
       pushNotificationsEnabled: value,
       memoryInvitesEnabled: value,
-      memoryActivityEnabled: value,
+      newStoryEnabled: value,
+      memoryExpiringEnabled: value,
       memorySealedEnabled: value,
-      reactionsEnabled: value,
-      newFollowersEnabled: value,
+      followedEnabled: value,
+      newFollowerEnabled: value,
       friendRequestsEnabled: value,
       groupInvitesEnabled: value,
+      dailyCapsuleReminderEnabled: value,
+      friendDailyCapsuleCompletedEnabled: value,
     );
 
     // Persist to database
@@ -80,9 +97,14 @@ class NotificationSettingsNotifier
     await _preferencesService.updatePreference('push_memory_invites', value);
   }
 
-  void updateMemoryActivity(bool value) async {
-    state = state.copyWith(memoryActivityEnabled: value);
-    await _preferencesService.updatePreference('push_memory_activity', value);
+  void updateNewStory(bool value) async {
+    state = state.copyWith(newStoryEnabled: value);
+    await _preferencesService.updatePreference('push_new_story', value);
+  }
+
+  void updateMemoryExpiring(bool value) async {
+    state = state.copyWith(memoryExpiringEnabled: value);
+    await _preferencesService.updatePreference('push_memory_expiring', value);
   }
 
   void updateMemorySealed(bool value) async {
@@ -90,14 +112,14 @@ class NotificationSettingsNotifier
     await _preferencesService.updatePreference('push_memory_sealed', value);
   }
 
-  void updateReactions(bool value) async {
-    state = state.copyWith(reactionsEnabled: value);
-    await _preferencesService.updatePreference('push_reactions', value);
+  void updateFollowed(bool value) async {
+    state = state.copyWith(followedEnabled: value);
+    await _preferencesService.updatePreference('push_followed', value);
   }
 
-  void updateNewFollowers(bool value) async {
-    state = state.copyWith(newFollowersEnabled: value);
-    await _preferencesService.updatePreference('push_new_followers', value);
+  void updateNewFollower(bool value) async {
+    state = state.copyWith(newFollowerEnabled: value);
+    await _preferencesService.updatePreference('push_new_follower', value);
   }
 
   void updateFriendRequests(bool value) async {
@@ -108,6 +130,19 @@ class NotificationSettingsNotifier
   void updateGroupInvites(bool value) async {
     state = state.copyWith(groupInvitesEnabled: value);
     await _preferencesService.updatePreference('push_group_invites', value);
+  }
+
+  void updateDailyCapsuleReminder(bool value) async {
+    state = state.copyWith(dailyCapsuleReminderEnabled: value);
+    await _preferencesService.updatePreference('push_daily_capsule_reminder', value);
+  }
+
+  void updateFriendDailyCapsuleCompleted(bool value) async {
+    state = state.copyWith(friendDailyCapsuleCompletedEnabled: value);
+    await _preferencesService.updatePreference(
+      'push_friend_daily_capsule_completed',
+      value,
+    );
   }
 
   void updatePrivateAccount(bool value) {

@@ -21,6 +21,7 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   @override
   Widget build(BuildContext context) {
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final maxScrollableHeight = MediaQuery.of(context).size.height * 0.85;
 
     return Material(
       color: Colors.transparent,
@@ -57,20 +58,23 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               _buildSheetTitleHeader(context),
               SizedBox(height: 8.h),
 
-              Flexible(
-                child: SingleChildScrollView(
+              // Let the sheet hug content when short, but cap height and scroll when long.
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxScrollableHeight),
+                child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20.h),
                   child: Form(
                     key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(context),
-                        SizedBox(height: 24.h),
-                        _buildFriendsList(context),
-                        SizedBox(height: 24.h),
-                        _buildActionButtons(context),
-                        SizedBox(height: 20.h),
+                    child: CustomScrollView(
+                      shrinkWrap: true,
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        SliverToBoxAdapter(child: _buildHeader(context)),
+                        SliverToBoxAdapter(child: SizedBox(height: 24.h)),
+                        _buildFriendsListSliver(context),
+                        SliverToBoxAdapter(child: SizedBox(height: 24.h)),
+                        SliverToBoxAdapter(child: _buildActionButtons(context)),
+                        SliverToBoxAdapter(child: SizedBox(height: 20.h)),
                       ],
                     ),
                   ),
@@ -151,92 +155,121 @@ class CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     });
   }
 
-  Widget _buildFriendsList(BuildContext context) {
-    return Consumer(builder: (context, ref, _) {
-      final state = ref.watch(createGroupNotifier);
+  Widget _buildFriendsHeaderWidget() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Select Friends',
+          style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+              .copyWith(color: appTheme.blue_gray_300),
+        ),
+        SizedBox(height: 10.h),
+      ],
+    );
+  }
 
-      final allFriends = state.createGroupModel?.friendsList ?? [];
-      final filteredFriends = state.createGroupModel?.filteredFriends ?? [];
-      final hasNoFriends = allFriends.isEmpty;
+  Widget _buildFriendsListSliver(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final state = ref.watch(createGroupNotifier);
 
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select Friends',
-            // Match the "Group Name" label style on the Edit Group bottom sheet.
-            style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                .copyWith(color: appTheme.blue_gray_300),
-          ),
-          SizedBox(height: 10.h),
-          if (state.isLoading ?? false)
-            Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20.h),
-                child: CircularProgressIndicator(color: appTheme.colorFF52D1),
-              ),
-            )
-          else if (filteredFriends.isEmpty)
-            Padding(
-              padding: EdgeInsets.symmetric(vertical: 20.h),
-              child: Column(
-                children: [
-                  Text(
-                    hasNoFriends
-                        ? 'No friends yet. Add friends to create a group.'
-                        : 'No friends found.',
-                    style: TextStyleHelper.instance.title16RegularPlusJakartaSans
-                        .copyWith(color: appTheme.blue_gray_300),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (hasNoFriends) ...[
-                    SizedBox(height: 14.h),
-                    CustomButton(
-                      text: 'Go to Friends',
-                      buttonStyle: CustomButtonStyle.fillPrimary,
-                      buttonTextStyle: CustomButtonTextStyle.bodyMedium,
-                      height: 44.h,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16.h,
-                        vertical: 10.h,
-                      ),
-                      onPressed: () {
-                        // Close sheet first, then navigate to Friends screen
-                        NavigatorService.goBack();
-                        Future.microtask(
-                          () => NavigatorService.pushNamed(AppRoutes.appFriends),
-                        );
-                      },
+        final allFriends = state.createGroupModel?.friendsList ?? [];
+        final filteredFriends = state.createGroupModel?.filteredFriends ?? [];
+        final hasNoFriends = allFriends.isEmpty;
+
+        if (state.isLoading ?? false) {
+          return SliverList(
+            delegate: SliverChildListDelegate(
+              [
+                _buildFriendsHeaderWidget(),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20.h),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: appTheme.colorFF52D1,
                     ),
-                  ],
-                ],
-              ),
-            )
-          else
-            Column(
-              children: filteredFriends.map((friend) {
-                final isSelected = state.createGroupModel?.selectedMembers
-                        ?.any((member) => member.id == friend.id) ??
-                    false;
-
-                return FriendListItem(
-                  friend: friend,
-                  isSelected: isSelected,
-                  margin:
-                      EdgeInsets.only(top: 8.h), // closer to Edit Group spacing
-                  onTap: () {
-                    if (isSelected) {
-                      ref.read(createGroupNotifier.notifier).removeMember(friend);
-                    } else {
-                      ref.read(createGroupNotifier.notifier).addMember(friend);
-                    }
-                  },
-                );
-              }).toList(),
+                  ),
+                ),
+              ],
             ),
-        ],
-      );
-    });
+          );
+        }
+
+        if (filteredFriends.isEmpty) {
+          return SliverList(
+            delegate: SliverChildListDelegate(
+              [
+                _buildFriendsHeaderWidget(),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20.h),
+                  child: Column(
+                    children: [
+                      Text(
+                        hasNoFriends
+                            ? 'No friends yet. Add friends to create a group.'
+                            : 'No friends found.',
+                        style: TextStyleHelper
+                            .instance.title16RegularPlusJakartaSans
+                            .copyWith(color: appTheme.blue_gray_300),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (hasNoFriends) ...[
+                        SizedBox(height: 14.h),
+                        CustomButton(
+                          text: 'Go to Friends',
+                          buttonStyle: CustomButtonStyle.fillPrimary,
+                          buttonTextStyle: CustomButtonTextStyle.bodyMedium,
+                          height: 44.h,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.h,
+                            vertical: 10.h,
+                          ),
+                          onPressed: () {
+                            NavigatorService.goBack();
+                            Future.microtask(
+                              () => NavigatorService.pushNamed(
+                                  AppRoutes.appFriends),
+                            );
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              if (index == 0) return _buildFriendsHeaderWidget();
+
+              final friend = filteredFriends[index - 1];
+              final isSelected = state.createGroupModel?.selectedMembers
+                      ?.any((member) => member.id == friend.id) ??
+                  false;
+
+              return FriendListItem(
+                friend: friend,
+                isSelected: isSelected,
+                margin: EdgeInsets.only(top: 8.h),
+                onTap: () {
+                  if (isSelected) {
+                    ref.read(createGroupNotifier.notifier).removeMember(friend);
+                  } else {
+                    ref.read(createGroupNotifier.notifier).addMember(friend);
+                  }
+                },
+              );
+            },
+            childCount: filteredFriends.length + 1,
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildActionButtons(BuildContext context) {

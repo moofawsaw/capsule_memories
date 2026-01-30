@@ -1564,7 +1564,6 @@ class _MemoryFeedDashboardScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Unable to open memory - missing ID'),
-          backgroundColor: appTheme.red_500,
         ),
       );
       return;

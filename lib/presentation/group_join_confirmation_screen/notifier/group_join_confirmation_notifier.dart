@@ -1,6 +1,7 @@
 import '../models/group_join_confirmation_model.dart';
 import '../../../core/app_export.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/storage_utils.dart';
 
 part 'group_join_confirmation_state.dart';
 
@@ -18,12 +19,12 @@ class GroupJoinConfirmationNotifier
   GroupJoinConfirmationNotifier(GroupJoinConfirmationState state)
       : super(state);
 
-  /// Load memory details from database
-  Future<void> loadMemoryDetails(String memoryId) async {
+  /// Load group details from database using invite code.
+  Future<void> loadGroupDetailsByInviteCode(String inviteCode) async {
     state = state.copyWith(
       isLoading: true,
       errorMessage: null,
-      memoryId: memoryId,
+      groupId: null,
     );
 
     try {
@@ -32,74 +33,126 @@ class GroupJoinConfirmationNotifier
         throw Exception('Database connection unavailable');
       }
 
-      print('🔍 Loading memory details for: $memoryId');
+      final normalized = inviteCode.trim();
+      if (normalized.isEmpty) {
+        throw Exception('Invalid invite code');
+      }
 
-      // Fetch memory details with creator info and category
-      final response = await supabase.from('memories').select('''
+      print('🔍 Loading group details for invite code: $normalized');
+
+      // Fetch group details
+      final response = await supabase.from('groups').select('''
             id,
-            title,
-            expires_at,
-            contributor_count,
             creator_id,
-            category_id,
-            user_profiles!memories_creator_id_fkey (
-              display_name,
-              avatar_url
-            ),
-            memory_categories (
-              name
-            )
-          ''').eq('id', memoryId).maybeSingle().timeout(
+            name,
+            member_count
+          ''').eq('invite_code', normalized).maybeSingle().timeout(
             Duration(seconds: 10),
             onTimeout: () => null,
           );
 
       if (response == null) {
-        throw Exception('Memory not found');
+        throw Exception('Group not found');
       }
 
-      print('✅ Memory details loaded successfully');
+      final groupId = response['id'] as String?;
+      final creatorId = response['creator_id'] as String?;
+      final groupName = response['name'] as String?;
+      final memberCount = response['member_count'] as int?;
 
-      // Parse creator info
-      final creatorData = response['user_profiles'] as Map<String, dynamic>?;
-      final categoryData =
-          response['memory_categories'] as Map<String, dynamic>?;
+      String? creatorName;
+      String? creatorAvatar;
+      List<String> memberAvatars = const [];
 
-      // Parse expires_at
-      DateTime? parsedExpiresAt;
-      if (response['expires_at'] != null) {
+      if (creatorId != null && creatorId.isNotEmpty) {
         try {
-          parsedExpiresAt = DateTime.parse(response['expires_at'] as String);
-        } catch (e) {
-          print('⚠️ Failed to parse expires_at: $e');
+          final creator = await supabase.from('user_profiles').select('''
+              display_name,
+              avatar_url
+            ''').eq('id', creatorId).maybeSingle();
+          creatorName = creator?['display_name'] as String?;
+          creatorAvatar =
+              StorageUtils.resolveAvatarUrl(creator?['avatar_url'] as String?) ??
+                  creator?['avatar_url'] as String?;
+        } catch (_) {}
+      }
+
+      // Fetch member avatars for preview row
+      if (groupId != null && groupId.isNotEmpty) {
+        try {
+          final gm = await supabase
+              .from('group_members')
+              .select('user_id')
+              .eq('group_id', groupId)
+              .limit(50);
+
+          final ids = <String>[];
+          for (final row in (gm as List?) ?? const []) {
+            if (row is! Map) continue;
+            final id = (row['user_id'] as String?)?.trim();
+            if (id != null && id.isNotEmpty) ids.add(id);
+          }
+
+          if (ids.isNotEmpty) {
+            final profiles = await supabase
+                .from('user_profiles')
+                .select('id,avatar_url')
+                .inFilter('id', ids);
+
+            final urls = <String>[];
+            for (final row in (profiles as List?) ?? const []) {
+              if (row is! Map) continue;
+              final avatarRaw = row['avatar_url'] as String?;
+              final resolved = StorageUtils.resolveAvatarUrl(avatarRaw);
+              if (resolved != null && resolved.trim().isNotEmpty) {
+                urls.add(resolved.trim());
+              }
+            }
+
+            // Ensure creator is represented (if they have an avatar and aren't already included)
+            final creatorResolved = (creatorAvatar ?? '').trim();
+            if (creatorResolved.isNotEmpty && !urls.contains(creatorResolved)) {
+              urls.insert(0, creatorResolved);
+            }
+
+            memberAvatars = urls;
+          } else {
+            final creatorResolved = (creatorAvatar ?? '').trim();
+            memberAvatars =
+                creatorResolved.isNotEmpty ? [creatorResolved] : const [];
+          }
+        } catch (_) {
+          final creatorResolved = (creatorAvatar ?? '').trim();
+          memberAvatars = creatorResolved.isNotEmpty ? [creatorResolved] : const [];
         }
       }
 
       state = state.copyWith(
         isLoading: false,
-        memoryTitle: response['title'] as String?,
-        creatorName: creatorData?['display_name'] as String?,
-        creatorAvatar: creatorData?['avatar_url'] as String?,
-        memoryCategory: categoryData?['name'] as String?,
-        expiresAt: parsedExpiresAt,
-        memberCount: response['contributor_count'] as int?,
+        groupId: groupId,
+        groupName: groupName,
+        creatorName: creatorName,
+        creatorAvatar: creatorAvatar,
+        memberAvatars: memberAvatars,
+        memberCount: memberCount,
         errorMessage: null,
       );
     } catch (e, stackTrace) {
-      print('❌ Error loading memory details: $e');
+      print('❌ Error loading group details: $e');
       print('   Stack trace: $stackTrace');
 
       state = state.copyWith(
         isLoading: false,
-        errorMessage: 'Failed to load memory details: ${e.toString()}',
+        errorMessage: 'Failed to load group details: ${e.toString()}',
       );
     }
   }
 
-  /// Accept invitation - join memory_contributors and navigate to timeline
+  /// Accept invitation - join group_members and navigate to Groups.
   Future<void> acceptInvitation() async {
-    if (state.memoryId == null) {
-      print('❌ No memory ID available');
+    final groupId = state.groupId;
+    if (groupId == null || groupId.isEmpty) {
+      print('❌ No group ID available');
       return;
     }
 
@@ -116,43 +169,43 @@ class GroupJoinConfirmationNotifier
         throw Exception('User not authenticated');
       }
 
-      print('🔵 Accepting invitation for memory: ${state.memoryId}');
+      print('🔵 Accepting invitation for group: $groupId');
       print('   User ID: $userId');
 
-      // Check if already a contributor
-      final existingContributor = await supabase
-          .from('memory_contributors')
+      // Check if already a member
+      final existingMember = await supabase
+          .from('group_members')
           .select('id')
-          .eq('memory_id', state.memoryId!)
+          .eq('group_id', groupId)
           .eq('user_id', userId)
           .maybeSingle();
 
-      if (existingContributor != null) {
-        print('✅ User already a contributor, navigating to timeline');
+      if (existingMember != null) {
+        print('✅ User already a group member');
         state = state.copyWith(
           isAccepting: false,
-          shouldNavigateToTimeline: true,
+          shouldNavigateToGroups: true,
         );
         return;
       }
 
-      // Add user to memory_contributors
-      await supabase.from('memory_contributors').insert({
-        'memory_id': state.memoryId!,
+      // Add user to group_members
+      await supabase.from('group_members').insert({
+        'group_id': groupId,
         'user_id': userId,
       });
 
-      print('✅ Successfully joined memory');
+      print('✅ Successfully joined group');
 
       state = state.copyWith(
         isAccepting: false,
-        shouldNavigateToTimeline: true,
+        shouldNavigateToGroups: true,
       );
 
       // Reset navigation flag
       Future.delayed(Duration(milliseconds: 100), () {
         if (mounted) {
-          state = state.copyWith(shouldNavigateToTimeline: false);
+          state = state.copyWith(shouldNavigateToGroups: false);
         }
       });
     } catch (e, stackTrace) {
@@ -161,21 +214,21 @@ class GroupJoinConfirmationNotifier
 
       state = state.copyWith(
         isAccepting: false,
-        errorMessage: 'Failed to join memory: ${e.toString()}',
+        errorMessage: 'Failed to join group: ${e.toString()}',
       );
     }
   }
 
-  /// Decline invitation - navigate to memories screen
+  /// Decline invitation - navigate to groups screen
   void declineInvitation() {
     print('🔴 Declining invitation');
 
-    state = state.copyWith(shouldNavigateToMemories: true);
+    state = state.copyWith(shouldNavigateToGroups: true);
 
     // Reset navigation flag
     Future.delayed(Duration(milliseconds: 100), () {
       if (mounted) {
-        state = state.copyWith(shouldNavigateToMemories: false);
+        state = state.copyWith(shouldNavigateToGroups: false);
       }
     });
   }

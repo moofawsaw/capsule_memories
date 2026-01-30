@@ -46,6 +46,10 @@ class CustomEditText extends StatefulWidget {
     this.onTap,
     this.focusNode,
     this.autofillHints,
+    this.textInputAction,
+    this.onFieldSubmitted,
+    this.enableSuggestions,
+    this.autocorrect,
     this.iconColor,
     this.iconSize,
   }) : super(key: key);
@@ -70,6 +74,10 @@ class CustomEditText extends StatefulWidget {
   final VoidCallback? onTap;
   final FocusNode? focusNode;
   final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
+  final bool? enableSuggestions;
+  final bool? autocorrect;
 
   final Color? iconColor;
   final double? iconSize;
@@ -91,12 +99,16 @@ class _CustomEditTextState extends State<CustomEditText> {
       validator: widget.validator,
       obscureText: widget.isPassword ? _isObscured : false,
       keyboardType: widget.keyboardType ?? _getKeyboardType(),
+      textInputAction: widget.textInputAction,
+      onFieldSubmitted: widget.onFieldSubmitted,
       maxLines: widget.isPassword ? 1 : (widget.maxLines ?? 1),
       enabled: widget.enabled,
       readOnly: widget.readOnly,
       onTap: widget.onTap,
       focusNode: widget.focusNode,
       autofillHints: widget.autofillHints,
+      enableSuggestions: widget.enableSuggestions ?? !widget.isPassword,
+      autocorrect: widget.autocorrect ?? !widget.isPassword,
       style: widget.textStyle ?? _getDefaultTextStyle(),
       decoration: InputDecoration(
         hintText: widget.hintText,

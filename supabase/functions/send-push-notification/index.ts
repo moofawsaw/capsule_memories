@@ -12,6 +12,67 @@ interface NotificationPayload {
   body: string
   data?: Record<string, any>
   notification_type: string
+  skip_in_app?: boolean
+}
+
+type PushPrefsRow = {
+  push_notifications_enabled?: boolean | null
+  push_memory_invites?: boolean | null
+  push_memory_activity?: boolean | null
+  push_memory_sealed?: boolean | null
+  push_new_followers?: boolean | null
+  push_friend_requests?: boolean | null
+  push_group_invites?: boolean | null
+  push_daily_capsule?: boolean | null
+  push_new_story?: boolean | null
+  push_memory_expiring?: boolean | null
+  push_followed?: boolean | null
+  push_new_follower?: boolean | null
+  push_daily_capsule_reminder?: boolean | null
+  push_friend_daily_capsule_completed?: boolean | null
+}
+
+function prefFieldForNotificationType(notificationType: string): keyof PushPrefsRow | null {
+  // Map edge `notification_type` values to the user's preference columns.
+  // Multiple notification types can share one preference category.
+  switch ((notificationType ?? '').trim()) {
+    case 'memory_invite':
+      return 'push_memory_invites'
+
+    case 'new_story':
+      return 'push_new_story'
+
+    case 'memory_sealed':
+      return 'push_memory_sealed'
+
+    // Daily Capsule
+    case 'daily_capsule_reminder':
+      return 'push_daily_capsule_reminder'
+    case 'friend_daily_capsule_completed':
+      return 'push_friend_daily_capsule_completed'
+
+    // New followers
+    case 'followed':
+      return 'push_followed'
+    case 'new_follower':
+      return 'push_new_follower'
+
+    // Friend request lifecycle
+    case 'friend_request':
+    case 'friend_accepted':
+      return 'push_friend_requests'
+
+    // Group lifecycle (we no longer send group_join/group_added via this function)
+    case 'group_invite':
+      return 'push_group_invites'
+
+    // Memory expiring reminders (if used) fall under memory activity
+    case 'memory_expiring':
+      return 'push_memory_expiring'
+
+    default:
+      return null
+  }
 }
 
 serve(async (req) => {
@@ -26,13 +87,99 @@ serve(async (req) => {
     )
 
     const payload: NotificationPayload = await req.json()
-    const { user_id, title, body, data, notification_type } = payload
+    const { user_id, title, body, data, notification_type, skip_in_app } = payload
 
     if (!user_id || !title || !body) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: user_id, title, body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Explicitly disabled notification types (we do not want to send or create these).
+    // Return 200 so upstream callers don't retry.
+    const disabledTypes = new Set([
+      'group_join',
+      'group_added',
+      'memory_activity',
+      'memory_update',
+    ])
+    if (disabledTypes.has((notification_type ?? '').trim())) {
+      return new Response(
+        JSON.stringify({ message: 'Notification type disabled', notification_type, sent: 0 }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Respect push notification preferences.
+    try {
+      const { data: prefs } = await supabaseClient
+        .from('email_preferences')
+        .select(
+          [
+            'push_notifications_enabled',
+            'push_memory_invites',
+            'push_memory_sealed',
+            'push_friend_requests',
+            'push_group_invites',
+            // Split per-type flags (new schema)
+            'push_new_story',
+            'push_memory_expiring',
+            'push_followed',
+            'push_new_follower',
+            'push_daily_capsule_reminder',
+            'push_friend_daily_capsule_completed',
+            // Legacy flags (kept for backward compat / fallback)
+            'push_memory_activity',
+            'push_new_followers',
+            'push_daily_capsule',
+          ].join(', ')
+        )
+        .eq('user_id', user_id)
+        .maybeSingle()
+
+      const masterEnabled = (prefs as PushPrefsRow | null)?.push_notifications_enabled !== false
+      if (!masterEnabled) {
+        return new Response(
+          JSON.stringify({ message: 'Push notifications disabled by user', sent: 0 }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const prefField = prefFieldForNotificationType(notification_type)
+      if (prefField) {
+        const typed = prefs as PushPrefsRow | null
+        // Backward-compat: if the new split column is missing/null, fall back to the legacy grouped flag.
+        let enabled = typed?.[prefField] !== false
+        if (typed && (typed as any)[prefField] == null) {
+          switch (prefField) {
+            case 'push_new_story':
+            case 'push_memory_expiring':
+              enabled = (typed.push_memory_activity !== false)
+              break
+            case 'push_followed':
+            case 'push_new_follower':
+              enabled = (typed.push_new_followers !== false)
+              break
+            case 'push_daily_capsule_reminder':
+            case 'push_friend_daily_capsule_completed':
+              enabled = (typed.push_daily_capsule !== false)
+              break
+          }
+        }
+        if (!enabled) {
+          return new Response(
+            JSON.stringify({
+              message: `Push notifications disabled by user for ${notification_type}`,
+              pref_field: prefField,
+              sent: 0,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+    } catch (_) {
+      // If prefs lookup fails, do not block the push (fail-open).
     }
 
     // Get active FCM tokens for the user
@@ -111,15 +258,18 @@ serve(async (req) => {
     const results = await Promise.all(notificationPromises)
     const successCount = results.filter(r => r.success).length
 
-    // Create in-app notification record
-    await supabaseClient.from('notifications').insert({
-      user_id,
-      title,
-      message: body,
-      type: notification_type,
-      data: data || {},
-      is_read: false,
-    })
+    // Optionally create in-app notification record.
+    // Many events already create DB notifications via triggers; avoid duplicates.
+    if (skip_in_app !== true) {
+      await supabaseClient.from('notifications').insert({
+        user_id,
+        title,
+        message: body,
+        type: notification_type,
+        data: data || {},
+        is_read: false,
+      })
+    }
 
     return new Response(
       JSON.stringify({

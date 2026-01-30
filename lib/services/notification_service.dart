@@ -127,6 +127,35 @@ class NotificationService {
     }
   }
 
+  /// Fetch a memory invite row (best-effort).
+  /// Used to reflect accepted status in-app even if the notification row wasn't updated.
+  Future<Map<String, dynamic>?> getMemoryInviteById(String inviteId) async {
+    try {
+      final client = _client;
+      if (client == null) {
+        throw Exception('Supabase client not initialized');
+      }
+
+      final userId = client.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final response = await client
+          .from('memory_invites')
+          .select('id, memory_id, user_id, status, responded_at, created_at')
+          .eq('id', inviteId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (response == null) return null;
+      return Map<String, dynamic>.from(response);
+    } catch (error) {
+      debugPrint('❌ Failed to fetch memory invite: $error');
+      return null;
+    }
+  }
+
   /// Subscribe to real-time notification updates for the current user
   /// with automatic reconnection and error recovery
   Future<void> subscribeToNotifications({
@@ -303,16 +332,23 @@ class NotificationService {
         return [];
       }
 
+      // NOTE:
+      // Some Supabase Dart versions have inconsistent null-filter APIs.
+      // To avoid runtime failures that silently return [] (and hide notifications),
+      // we fetch and filter soft-deletes client-side.
       final response = await client
           .from('notifications')
           .select()
           .eq('user_id', userId)
-          .isFilter('deleted_at', null) // Only fetch non-deleted notifications
           .order('created_at', ascending: false);
+
+      final rawList = List<Map<String, dynamic>>.from(response);
+      final notDeleted =
+          rawList.where((n) => n['deleted_at'] == null).toList(growable: false);
 
       // Enrich memory_invite notifications with inviter and memory names
       final enrichedNotifications = await Future.wait(
-        (response).map((notification) async {
+        notDeleted.map((notification) async {
           if (notification['type'] == 'memory_invite') {
             try {
               final data = notification['data'] as Map<String, dynamic>?;
@@ -363,20 +399,22 @@ class NotificationService {
   /// Get unread notification count with caching (excludes soft-deleted)
   Future<int> getUnreadCount() async {
     try {
-      final userId = _client?.auth.currentUser?.id;
-      if (userId == null) {
+      final client = _client;
+      final userId = client?.auth.currentUser?.id;
+      if (client == null || userId == null) {
         throw Exception('User not authenticated');
       }
 
-      final response = await _client
-          ?.from('notifications')
-          .select()
-          .eq('user_id', userId)
-          .eq('is_read', false)
-          .isFilter('deleted_at', null) // Exclude soft-deleted
-          .count();
+      final response = await client
+          .from('notifications')
+          .select('id, is_read, deleted_at')
+          .eq('user_id', userId);
 
-      return response?.count ?? 0;
+      final rows = List<Map<String, dynamic>>.from(response);
+      return rows
+          .where((n) => n['deleted_at'] == null)
+          .where((n) => (n['is_read'] as bool?) == false)
+          .length;
     } catch (error) {
       throw Exception('Failed to get unread count: $error');
     }
@@ -431,8 +469,7 @@ class NotificationService {
           ?.from('notifications')
           .update({'is_read': true})
           .eq('user_id', userId)
-          .eq('is_read', false)
-          .isFilter('deleted_at', null); // Only update non-deleted
+          .eq('is_read', false);
     } catch (error) {
       throw Exception('Failed to mark all notifications as read: $error');
     }
@@ -498,9 +535,10 @@ class NotificationService {
           .select()
           .eq('id', notificationId)
           .eq('user_id', userId)
-          .isFilter('deleted_at', null) // Only fetch if not deleted
           .maybeSingle();
 
+      if (response == null) return null;
+      if (response['deleted_at'] != null) return null;
       return response;
     } catch (error) {
       debugPrint('❌ Failed to fetch notification: $error');
@@ -527,14 +565,14 @@ class NotificationService {
           .select()
           .eq('user_id', userId)
           .eq('type', notificationType)
-          .isFilter('deleted_at', null) // Exclude soft-deleted
           .order('created_at', ascending: false)
           .limit(limit);
 
       debugPrint(
           '✅ Fetched ${response?.length} $notificationType notifications');
 
-      return List<Map<String, dynamic>>.from(response ?? []);
+      final rows = List<Map<String, dynamic>>.from(response ?? []);
+      return rows.where((n) => n['deleted_at'] == null).toList(growable: false);
     } catch (error) {
       debugPrint('❌ Failed to fetch notifications by type: $error');
       throw Exception('Failed to fetch notifications by type: $error');

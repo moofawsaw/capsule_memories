@@ -37,6 +37,45 @@ class DeepLinkService with WidgetsBindingObserver {
   String? _lastOpenedStoryId;
   DateTime? _lastOpenedStoryAt;
 
+  static const Duration _deepLinkDedupeWindow = Duration(milliseconds: 2800);
+
+  String _canonicalUriKey(Uri uri) {
+    final scheme = uri.scheme.toLowerCase();
+    final host = uri.host.toLowerCase();
+
+    // Normalize path (strip trailing slash except root)
+    var path = uri.path.trim();
+    if (path.length > 1 && path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+
+    // Strip common tracking params while keeping meaningful ones
+    final qp = Map<String, String>.from(uri.queryParameters);
+    qp.removeWhere((k, _) {
+      final key = k.toLowerCase();
+      return key.startsWith('utm_') ||
+          key == 'fbclid' ||
+          key == 'gclid' ||
+          key == 'igshid';
+    });
+
+    if (qp.isEmpty) return '$scheme://$host$path';
+
+    final keys = qp.keys.toList()..sort();
+    final query = keys.map((k) => '$k=${Uri.encodeQueryComponent(qp[k] ?? '')}').join('&');
+    return '$scheme://$host$path?$query';
+  }
+
+  String _canonicalArgsKey(Object? args) {
+    if (args == null) return '';
+    if (args is Map) {
+      final m = Map<String, dynamic>.from(args);
+      final keys = m.keys.toList()..sort();
+      return keys.map((k) => '$k=${(m[k] ?? '').toString()}').join('&');
+    }
+    return args.toString();
+  }
+
   // ===== Share link resolution (share.capapp.co/<code> -> capapp.co/story/<uuid>) =====
   final Map<String, Future<String?>> _shareResolveInflight = {};
 
@@ -44,6 +83,11 @@ class DeepLinkService with WidgetsBindingObserver {
   String? _pendingRoute;
   Object? _pendingRouteArgs;
   bool _genericNavScheduled = false;
+
+  // Extra guard: prevent queueing the exact same route+args twice in a short window
+  // (Android can deliver the same /join/... intent via multiple sources).
+  String? _lastQueuedNavigationKey;
+  DateTime? _lastQueuedNavigationAt;
 
   // Optional callbacks
   Function(String message, String type)? onSuccess;
@@ -63,9 +107,55 @@ class DeepLinkService with WidgetsBindingObserver {
     if (s.isEmpty) return;
 
     // If it's an internal route, navigate directly (keeps behavior consistent).
-    if (s.startsWith('/app/') || s.startsWith('/auth/') || s.startsWith('/join/')) {
+    // NOTE: `/join/...` is treated specially below (we do NOT auto-accept invites on click).
+    if (s.startsWith('/join/')) {
       final uri = Uri.parse('https://capapp.co$s');
-      final args = uri.queryParameters.isEmpty ? null : Map<String, dynamic>.from(uri.queryParameters);
+
+      // IMPORTANT:
+      // This fast-path bypasses _handleDeepLink(), so we must also de-dupe here.
+      final now = DateTime.now();
+      final uriKey = _canonicalUriKey(uri);
+      final lastAt = _lastHandledAt;
+      if (_lastHandledUri == uriKey &&
+          lastAt != null &&
+          now.difference(lastAt) < _deepLinkDedupeWindow) {
+        return;
+      }
+      _lastHandledUri = uriKey;
+      _lastHandledAt = now;
+
+      final segments = uri.pathSegments;
+      if (segments.length >= 3) {
+        final type = segments[1];
+        final code = segments[2];
+        if (type == 'memory' || type == 'group') {
+          _queueInviteNavigation(type, code);
+        } else {
+          await _processInviteLink(type, code);
+        }
+      }
+      return;
+    }
+
+    if (s.startsWith('/app/') || s.startsWith('/auth/')) {
+      final uri = Uri.parse('https://capapp.co$s');
+      final args = uri.queryParameters.isEmpty
+          ? null
+          : Map<String, dynamic>.from(uri.queryParameters);
+
+      // IMPORTANT:
+      // This fast-path bypasses _handleDeepLink(), so we must also de-dupe here.
+      final now = DateTime.now();
+      final uriKey = _canonicalUriKey(uri);
+      final lastAt = _lastHandledAt;
+      if (_lastHandledUri == uriKey &&
+          lastAt != null &&
+          now.difference(lastAt) < _deepLinkDedupeWindow) {
+        return;
+      }
+      _lastHandledUri = uriKey;
+      _lastHandledAt = now;
+
       _queueNavigation(uri.path, args);
       return;
     }
@@ -89,6 +179,30 @@ class DeepLinkService with WidgetsBindingObserver {
   /// Handle an already-parsed URI from an external source.
   Future<void> handleExternalUri(Uri uri) => _handleDeepLink(uri);
 
+  void _queueInviteNavigation(String type, String code) {
+    final normalizedType = type.trim().toLowerCase();
+    final normalizedCode = code.trim();
+    if (normalizedCode.isEmpty) return;
+
+    switch (normalizedType) {
+      // ✅ Don't auto-join; show invite UI first.
+      case 'memory':
+        _queueNavigation(
+          AppRoutes.appBsQrMemory,
+          {'inviteCode': normalizedCode},
+        );
+        return;
+      case 'group':
+        _queueNavigation(
+          AppRoutes.appJoin,
+          {'inviteCode': normalizedCode},
+        );
+        return;
+      default:
+        return;
+    }
+  }
+
   // ===========================
   // INIT / LIFECYCLE
   // ===========================
@@ -98,16 +212,29 @@ class DeepLinkService with WidgetsBindingObserver {
 
     WidgetsBinding.instance.addObserver(this);
 
+    // NOTE:
+    // Some Android OEM ROMs / old Play Services builds can throw a type-cast error
+    // from the app_links platform channel ("Null is not a subtype of String") when
+    // retrieving the initial link. We treat that as best-effort and still start
+    // the stream subscription so future links work.
     try {
-      final initialUri = await _appLinks.getInitialLink();
-      if (initialUri != null) {
-        await _handleDeepLink(initialUri);
+      try {
+        final initialUri = await _appLinks.getInitialLink();
+        if (initialUri != null) {
+          await _handleDeepLink(initialUri);
+        }
+      } catch (e) {
+        debugPrint('⚠️ getInitialLink failed (ignored): $e');
       }
 
-      _sub = _appLinks.uriLinkStream.listen(
-            (uri) async => _handleDeepLink(uri),
-        onError: (e) => debugPrint('❌ Deep link stream error: $e'),
-      );
+      try {
+        _sub = _appLinks.uriLinkStream.listen(
+          (uri) async => _handleDeepLink(uri),
+          onError: (e) => debugPrint('❌ Deep link stream error: $e'),
+        );
+      } catch (e) {
+        debugPrint('❌ Failed to subscribe to deep links: $e');
+      }
 
       _isInitialized = true;
       debugPrint('✅ DeepLinkService initialized');
@@ -167,11 +294,11 @@ class DeepLinkService with WidgetsBindingObserver {
     // Android can dispatch both getInitialLink() and uriLinkStream for the same tap.
     // De-dupe within a short window.
     final now = DateTime.now();
-    final uriKey = uri.toString();
+    final uriKey = _canonicalUriKey(uri);
     final lastAt = _lastHandledAt;
     if (_lastHandledUri == uriKey &&
         lastAt != null &&
-        now.difference(lastAt) < const Duration(milliseconds: 1200)) {
+        now.difference(lastAt) < _deepLinkDedupeWindow) {
       return;
     }
     _lastHandledUri = uriKey;
@@ -274,12 +401,25 @@ class DeepLinkService with WidgetsBindingObserver {
     }
 
     // ---------- INVITES ----------
-    if (!_isCapappHost(uri) || !uri.path.startsWith('/join')) return;
+    // Accept /join/* from both primary domain and share domain.
+    if ((!_isCapappHost(uri) && !_isShareCapappLink(uri)) ||
+        !uri.path.startsWith('/join')) {
+      return;
+    }
 
     final segments = uri.pathSegments;
     if (segments.length < 3) return;
 
-    await _processInviteLink(segments[1], segments[2]);
+    // ✅ Memory & group invites should show confirmation screens and only
+    // join when the user taps Accept/Join. Do not auto-process on click.
+    final type = segments[1];
+    final code = segments[2];
+    if (type == 'memory' || type == 'group') {
+      _queueInviteNavigation(type, code);
+      return;
+    }
+
+    await _processInviteLink(type, code);
   }
 
   // ===========================
@@ -292,7 +432,7 @@ class DeepLinkService with WidgetsBindingObserver {
     final lastAt = _lastOpenedStoryAt;
     if (_lastOpenedStoryId == storyId &&
         lastAt != null &&
-        now.difference(lastAt) < const Duration(milliseconds: 1200)) {
+        now.difference(lastAt) < _deepLinkDedupeWindow) {
       return;
     }
     _lastOpenedStoryId = storyId;
@@ -342,6 +482,18 @@ class DeepLinkService with WidgetsBindingObserver {
   // ===========================
 
   void _queueNavigation(String route, Object? args) {
+    // Extra safety: de-dupe route+args too (prevents debug-only framework assertions).
+    final now = DateTime.now();
+    final navKey = '$route|${_canonicalArgsKey(args)}';
+    final lastAt = _lastQueuedNavigationAt;
+    if (_lastQueuedNavigationKey == navKey &&
+        lastAt != null &&
+        now.difference(lastAt) < _deepLinkDedupeWindow) {
+      return;
+    }
+    _lastQueuedNavigationKey = navKey;
+    _lastQueuedNavigationAt = now;
+
     _pendingRoute = route;
     _pendingRouteArgs = args;
     _flushPendingNavigation();
@@ -512,34 +664,38 @@ class DeepLinkService with WidgetsBindingObserver {
 
     if (data['requires_auth'] == true) {
       _pendingSessionToken = data['session_token'];
-      NavigatorService.pushNamed(AppRoutes.authLogin);
+      // IMPORTANT: this can be called before `runApp` (during bootstrap),
+      // so we must queue navigation rather than calling Navigator directly.
+      _queueNavigation(AppRoutes.authLogin, null);
       return;
     }
 
     if (data['success'] == true) {
       _navigateToConfirmation(type, data);
+    } else {
+      debugPrint('⚠️ Invite link not successful: type=$type code=$code data=$data');
     }
   }
 
   void _navigateToConfirmation(String type, Map<String, dynamic> data) {
     switch (type) {
       case 'friend':
-        NavigatorService.pushNamed(AppRoutes.appFriends);
+        _queueNavigation(AppRoutes.appFriends, null);
         break;
       case 'group':
-        NavigatorService.pushNamed(
+        _queueNavigation(
           AppRoutes.appGroups,
-          arguments: {'groupId': data['group_id']},
+          {'groupId': data['group_id']},
         );
         break;
       case 'memory':
-        NavigatorService.pushNamed(
+        _queueNavigation(
           AppRoutes.appTimeline,
-          arguments: MemoryNavArgs(memoryId: data['memory_id']).toMap(),
+          MemoryNavArgs(memoryId: data['memory_id']).toMap(),
         );
         break;
       default:
-        NavigatorService.pushNamed(AppRoutes.appFeed);
+        _queueNavigation(AppRoutes.appFeed, null);
     }
   }
 
@@ -562,6 +718,12 @@ class DeepLinkService with WidgetsBindingObserver {
       _pendingSessionToken = null;
 
       final data = (response.data as Map?)?.cast<String, dynamic>();
+      if (data != null && data['success'] == true) {
+        final type = (data['type'] ?? '').toString().trim();
+        if (type.isNotEmpty) {
+          _navigateToConfirmation(type, data);
+        }
+      }
       return data;
     } catch (e) {
       debugPrint('❌ Complete pending action error: $e');

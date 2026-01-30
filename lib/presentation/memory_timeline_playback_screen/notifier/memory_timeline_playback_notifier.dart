@@ -52,6 +52,10 @@ class MemoryTimelinePlaybackNotifier
   Timer? _progressTimer;
   static const Duration _progressTick = Duration(milliseconds: 50);
 
+  // Chromecast status polling (keeps overlay in sync with receiver)
+  Timer? _castStatusTimer;
+  static const Duration _castPoll = Duration(milliseconds: 500);
+
   // For images, track elapsed across pause/resume
   int _imageElapsedMs = 0;
   DateTime? _imageStartAt;
@@ -83,7 +87,12 @@ class MemoryTimelinePlaybackNotifier
         unawaited(_disposeVideoControllerSafely());
         _stopImageAutoAdvance();
         _stopProgressTicker();
+        // Receiver autoplay is expected; reflect play state.
+        state = state.copyWith(isPlaying: true);
         unawaited(_castPlaylistQueue(startIndex: state.currentStoryIndex ?? 0));
+        _startCastStatusPolling();
+      } else {
+        _stopCastStatusPolling();
       }
     };
 
@@ -92,6 +101,60 @@ class MemoryTimelinePlaybackNotifier
     };
 
     await _chromecastService.initialize();
+  }
+
+  void _stopCastStatusPolling() {
+    _castStatusTimer?.cancel();
+    _castStatusTimer = null;
+  }
+
+  void _startCastStatusPolling() {
+    _stopCastStatusPolling();
+    _castStatusTimer = Timer.periodic(_castPoll, (_) async {
+      if (!_chromecastService.isConnected) return;
+      final status = await _chromecastService.getPlaybackStatus();
+      if (status == null) return;
+
+      final bool isConnected = status['isConnected'] == true;
+      if (!isConnected) return;
+
+      final bool isPlaying = status['isPlaying'] == true;
+      final int positionMs =
+          (status['positionMs'] is num) ? (status['positionMs'] as num).toInt() : 0;
+      final int durationMs =
+          (status['durationMs'] is num) ? (status['durationMs'] as num).toInt() : 0;
+
+      final int? idx = (status['index'] is num) ? (status['index'] as num).toInt() : null;
+
+      PlaybackStoryModel? currentStory = state.currentStory;
+      int? nextIndex = state.currentStoryIndex;
+
+      final stories = state.stories;
+      if (idx != null &&
+          stories != null &&
+          idx >= 0 &&
+          idx < stories.length &&
+          (state.currentStoryIndex ?? 0) != idx) {
+        nextIndex = idx;
+        currentStory = stories[idx];
+      }
+
+      final total = Duration(milliseconds: durationMs.clamp(0, 24 * 60 * 60 * 1000));
+      final remaining = Duration(
+        milliseconds: (durationMs - positionMs).clamp(0, durationMs),
+      );
+      final progress =
+          durationMs <= 0 ? 0.0 : (positionMs / durationMs).clamp(0.0, 1.0);
+
+      state = state.copyWith(
+        isPlaying: isPlaying,
+        currentStoryIndex: nextIndex,
+        currentStory: currentStory,
+        storyTotal: total,
+        storyRemaining: remaining,
+        storyProgress: progress,
+      );
+    });
   }
 
   // ------------------------
@@ -674,6 +737,7 @@ class MemoryTimelinePlaybackNotifier
     if (_chromecastService.isConnected) {
       await _chromecastService.disconnect();
       state = state.copyWith(isChromecastConnected: false);
+      _stopCastStatusPolling();
     } else {
       await _chromecastService.showCastDialog();
     }
@@ -803,6 +867,7 @@ class MemoryTimelinePlaybackNotifier
 
   @override
   void dispose() {
+    _stopCastStatusPolling();
     _stopImageAutoAdvance();
     _stopProgressTicker();
     _pauseImageProgressTicker();

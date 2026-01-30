@@ -94,7 +94,6 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Reset email sent!'),
-                  backgroundColor: appTheme.colorFF52D1,
                 ),
               );
               // Navigate back to login after 2 seconds
@@ -106,7 +105,6 @@ class PasswordResetScreenState extends ConsumerState<PasswordResetScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(current.errorMessage!),
-                  backgroundColor: appTheme.colorFFD81E,
                 ),
               );
             }

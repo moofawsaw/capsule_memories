@@ -468,7 +468,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Link copied to clipboard'),
-        backgroundColor: appTheme.colorFF52D1,
         duration: Duration(seconds: 2),
       ),
     );
@@ -495,7 +494,6 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Link shared successfully'),
-        backgroundColor: appTheme.colorFF52D1,
         duration: Duration(seconds: 2),
       ),
     );

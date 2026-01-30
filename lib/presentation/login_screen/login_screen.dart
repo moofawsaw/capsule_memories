@@ -124,7 +124,8 @@ class LoginScreenState extends ConsumerState<LoginScreen>
           loginNotifier,
               (previous, current) {
             if (current.isSuccess ?? false) {
-              TextInput.finishAutofillContext();
+              // ✅ Trigger iOS Keychain "Save Password?" prompt when applicable.
+              TextInput.finishAutofillContext(shouldSave: true);
               _clearForm();
               NavigatorService.pushNamedAndRemoveUntil(AppRoutes.appFeed);
             }
@@ -145,7 +146,9 @@ class LoginScreenState extends ConsumerState<LoginScreen>
               hintText: 'Email',
               prefixIcon: Icons.mail_outline,
               keyboardType: TextInputType.emailAddress,
-              autofillHints: const [AutofillHints.email],
+              // Use username+email so iOS recognizes this as the login identifier.
+              autofillHints: const [AutofillHints.username, AutofillHints.email],
+              textInputAction: TextInputAction.next,
               validator: (value) {
                 return ref.read(loginNotifier.notifier).validateEmail(value);
               },
@@ -157,6 +160,10 @@ class LoginScreenState extends ConsumerState<LoginScreen>
               prefixIcon: Icons.lock_outline,
               isPassword: true,
               autofillHints: const [AutofillHints.password],
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) {
+                if (!(state.isLoading ?? false)) _onLoginTap();
+              },
               validator: (value) {
                 return ref.read(loginNotifier.notifier).validatePassword(value);
               },

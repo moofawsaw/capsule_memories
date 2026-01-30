@@ -2282,15 +2282,19 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
 
       if (confirm != true) return;
 
-      await client
-          .from('memory_contributors')
-          .delete()
-          .eq('memory_id', safeId)
-          .eq('user_id', currentUserId);
+      // Leave while preserving ability to re-join later.
+      await client.rpc(
+        'leave_memory_keep_invite_pending',
+        params: {'p_memory_id': safeId},
+      );
 
       if (!mounted) return;
       await _performHardMediaReset();
-      NavigatorService.popAndPushNamed(AppRoutes.appMemories);
+      // After leaving from the story viewer, return to the timeline in pending mode.
+      NavigatorService.popAndPushNamed(
+        AppRoutes.appTimeline,
+        arguments: {'id': safeId},
+      );
     } finally {
       if (_isDisposed || !mounted) return;
       _safeSetState(() => _isAnyModalOpen = false);
@@ -2544,7 +2548,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Delete failed'),
-              backgroundColor: appTheme.gray_900_01,
             ),
           );
         }
@@ -2604,7 +2607,6 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Deleted'),
-            backgroundColor: appTheme.gray_900_01,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -2661,7 +2663,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                     ),
                     title: Text(
                       'Share Story',
-                      style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                      style: TextStyleHelper.instance.title16MediumPlusJakartaSans
                           .copyWith(color: appTheme.gray_50),
                     ),
                     onTap: () async {
@@ -2689,7 +2691,7 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
                     ),
                     title: Text(
                       'Report Story',
-                      style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                      style: TextStyleHelper.instance.title16MediumPlusJakartaSans
                           .copyWith(color: appTheme.gray_50),
                     ),
                     onTap: () async {

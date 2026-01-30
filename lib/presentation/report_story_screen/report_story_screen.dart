@@ -47,43 +47,62 @@ class ReportStoryScreenState extends ConsumerState<ReportStoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Regular bottom sheet content (no Scaffold, no SafeArea)
+    // Regular bottom sheet content (match our other sheets)
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+
     return Material(
       color: Colors.transparent,
-      child: Container(
-        decoration: BoxDecoration(
-          color: appTheme.gray_900_02,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24.h)),
-        ),
-        padding: EdgeInsets.only(
-          left: 20.h,
-          right: 20.h,
-          top: 12.h,
-          // ✅ manual bottom safe area handling (gesture bar)
-          bottom: 16.h + MediaQuery.of(context).padding.bottom,
-        ),
-        child: SingleChildScrollView(
-          // ✅ keyboard-safe
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+      child: AnimatedPadding(
+        padding: EdgeInsets.only(bottom: keyboardHeight),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        child: Container(
+          decoration: BoxDecoration(
+            color: appTheme.gray_900_02,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24.h)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeaderSection(context),
-              SizedBox(height: 12.h),
+          padding: EdgeInsets.only(
+            left: 20.h,
+            right: 20.h,
+            top: 12.h,
+            // Match typical sheet padding (no extra gesture-bar padding here).
+            bottom: 16.h,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(height: 4.h),
 
-              _buildUserInfoSection(context),
-              SizedBox(height: 12.h),
+                // Drag handle indicator (match other bottom sheets)
+                Center(
+                  child: Container(
+                    width: 48.h,
+                    height: 5.h,
+                    decoration: BoxDecoration(
+                      color: appTheme.colorFF3A3A,
+                      borderRadius: BorderRadius.circular(2.5),
+                    ),
+                  ),
+                ),
 
-              _buildReportOptionsSection(context),
-              SizedBox(height: 10.h),
+                SizedBox(height: 10.h),
+                _buildHeaderSection(context),
+                SizedBox(height: 12.h),
 
-              _buildAdditionalDetailsSection(context),
-              SizedBox(height: 12.h),
+                _buildUserInfoSection(context),
+                SizedBox(height: 12.h),
 
-              _buildSubmitButton(context),
-            ],
+                _buildReportOptionsSection(context),
+                SizedBox(height: 10.h),
+
+                _buildAdditionalDetailsSection(context),
+                SizedBox(height: 12.h),
+
+                _buildSubmitButton(context),
+              ],
+            ),
           ),
         ),
       ),

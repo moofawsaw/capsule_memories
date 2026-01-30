@@ -415,6 +415,9 @@ class LoginNotifier extends StateNotifier<LoginState> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result['message'] ?? 'Action completed!')),
         );
+        // DeepLinkService will navigate to the destination (memory/group/etc).
+        // Avoid overriding it by forcing appFeed.
+        return;
       }
 
       NavigatorService.pushNamedAndRemoveUntil(

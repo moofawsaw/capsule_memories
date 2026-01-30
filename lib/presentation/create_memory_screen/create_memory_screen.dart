@@ -79,7 +79,7 @@ class _AvatarStack extends StatelessWidget {
   Widget build(BuildContext context) {
     final int shown = avatars.length;
     final int extra =
-    (totalCount != null && totalCount! > shown) ? (totalCount! - shown) : 0;
+        (totalCount != null && totalCount! > shown) ? (totalCount! - shown) : 0;
 
     final double size = 22.h;
     final double overlap = 14.h;
@@ -147,6 +147,7 @@ class _AvatarStack extends StatelessWidget {
     );
   }
 }
+
 /// Uses the already-loaded groupMembers list (fast, no async)
 /// Expected member shape: { 'avatar': 'https://...', ... }
 class _AvatarStackFromMembers extends StatelessWidget {
@@ -174,9 +175,8 @@ class _AvatarStackFromMembers extends StatelessWidget {
     }
 
     final int shown = avatars.length;
-    final int extra = (totalCount != null && totalCount! > shown)
-        ? (totalCount! - shown)
-        : 0;
+    final int extra =
+        (totalCount != null && totalCount! > shown) ? (totalCount! - shown) : 0;
 
     final double size = 22.h;
     final double overlap = 14.h;
@@ -244,6 +244,7 @@ class _AvatarStackFromMembers extends StatelessWidget {
     );
   }
 }
+
 class _GroupMemberAvatars extends StatelessWidget {
   final String groupId;
   final int memberCount;
@@ -306,7 +307,6 @@ class _GroupMemberAvatars extends StatelessWidget {
                     ),
                   ),
                 ),
-
               if (extra > 0)
                 Positioned(
                   left: shown * overlap,
@@ -324,7 +324,8 @@ class _GroupMemberAvatars extends StatelessWidget {
                     ),
                     child: Text(
                       '+$extra',
-                      style: TextStyleHelper.instance.body12MediumPlusJakartaSans
+                      style: TextStyleHelper
+                          .instance.body12MediumPlusJakartaSans
                           .copyWith(
                         color: appTheme.blue_gray_300,
                         fontWeight: FontWeight.w700,
@@ -377,7 +378,9 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
       final pre = widget.preSelectedCategoryId;
       if (!mounted) return;
       if (pre != null && pre.trim().isNotEmpty) {
-        await ref.read(createMemoryNotifier.notifier).initializeWithCategory(pre);
+        await ref
+            .read(createMemoryNotifier.notifier)
+            .initializeWithCategory(pre);
       }
     });
   }
@@ -459,7 +462,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                                   CustomHeaderSection(
                                     title: 'Create Memory',
                                     description:
-                                    'Invite-only. Every perspective. One timeline. Replay forever',
+                                        'Invite-only. Every perspective. One timeline. Replay forever',
                                     margin: EdgeInsets.only(
                                       left: 10.h,
                                       right: 10.h,
@@ -467,7 +470,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                                   ),
                                   _buildNameSection(context),
                                   _buildDurationSelector(context),
-                                  _buildGroupInviteSection(context), // ✅ add this
+                                  _buildGroupInviteSection(
+                                      context), // ✅ add this
                                   _buildCategorySection(context),
                                   _buildPrivacySettings(context),
                                   SizedBox(height: 20.h),
@@ -487,7 +491,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                     padding: EdgeInsets.only(bottom: bottomInset),
                     child: SafeArea(
                       top: false,
-                      bottom: false, // ✅ IMPORTANT: removes the extra bottom space under buttons
+                      bottom:
+                          false, // ✅ IMPORTANT: removes the extra bottom space under buttons
                       child: _buildPinnedActionBar(context),
                     ),
                   ),
@@ -609,21 +614,23 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         final selectedGroupName = _getGroupNameById(groups, selectedGroupId);
 
         // Use already-fetched members (preferred) so it’s instant on the selected row
-        final selectedGroupMembers =
-            state.createMemoryModel?.groupMembers ?? const <Map<String, dynamic>>[];
+        final selectedGroupMembers = state.createMemoryModel?.groupMembers ??
+            const <Map<String, dynamic>>[];
 
         // Best-effort memberCount (prefer DB field, otherwise fall back to loaded members length)
         int memberCount = 0;
         if (selectedGroupId != null && selectedGroupId.isNotEmpty) {
           final g = groups.firstWhere(
-                (x) => (x['id'] as String?) == selectedGroupId,
+            (x) => (x['id'] as String?) == selectedGroupId,
             orElse: () => const {},
           );
           final rawCount = g['member_count'];
           memberCount = (rawCount is int)
               ? rawCount
               : int.tryParse('${rawCount ?? ''}') ??
-              (selectedGroupMembers.isNotEmpty ? selectedGroupMembers.length : 0);
+                  (selectedGroupMembers.isNotEmpty
+                      ? selectedGroupMembers.length
+                      : 0);
         }
 
         return Container(
@@ -645,12 +652,11 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                   _showGroupSelectionBottomSheet(
                     context,
                     notifier,
-                    groups,
-                    selectedGroupId,
                   );
                 },
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 16.h, vertical: 16.h),
                   decoration: BoxDecoration(
                     color: appTheme.gray_900,
                     borderRadius: BorderRadius.circular(8.h),
@@ -676,7 +682,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                       Expanded(
                         child: Text(
                           selectedGroupName ?? 'None',
-                          style: TextStyleHelper.instance.body16BoldPlusJakartaSans
+                          style: TextStyleHelper
+                              .instance.body16BoldPlusJakartaSans
                               .copyWith(
                             fontSize: 16.fSize,
                             fontWeight: FontWeight.w700,
@@ -689,7 +696,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                       ),
 
                       // ✅ Show selected group members (avatars) on the closed row
-                      if (selectedGroupId != null && selectedGroupId.isNotEmpty) ...[
+                      if (selectedGroupId != null &&
+                          selectedGroupId.isNotEmpty) ...[
                         SizedBox(width: 10.h),
                         _AvatarStackFromMembers(
                           members: selectedGroupMembers,
@@ -724,7 +732,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
     );
   }
 
-  String? _getGroupNameById(List<Map<String, dynamic>> groups, String? groupId) {
+  String? _getGroupNameById(
+      List<Map<String, dynamic>> groups, String? groupId) {
     if (groupId == null) return null;
     for (final g in groups) {
       if ((g['id'] as String?) == groupId) return g['name'] as String?;
@@ -736,11 +745,9 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
 // Replace your entire _showGroupSelectionBottomSheet(...) with this version.
 
   void _showGroupSelectionBottomSheet(
-      BuildContext context,
-      CreateMemoryNotifier notifier,
-      List<Map<String, dynamic>> groups,
-      String? selectedGroupId,
-      ) {
+    BuildContext context,
+    CreateMemoryNotifier notifier,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -756,179 +763,113 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
         final maxH = MediaQuery.of(modalContext).size.height * 0.8;
 
         // ✅ NO SafeArea wrapper here (it adds bottom padding by default)
-        return ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxH),
-          child: Padding(
-            padding: EdgeInsets.only(left: 20.h, right: 20.h, top: 20.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Select Group',
-                      style: TextStyleHelper.instance.body16MediumPlusJakartaSans
-                          .copyWith(color: appTheme.gray_50),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(modalContext),
-                      child: Icon(Icons.close,
-                          color: appTheme.gray_50, size: 24.h),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 16.h),
+        return Consumer(
+          builder: (context, ref, _) {
+            final state = ref.watch(createMemoryNotifier);
+            final groups = state.createMemoryModel?.availableGroups ??
+                const <Map<String, dynamic>>[];
+            final selectedGroupId = state.createMemoryModel?.selectedGroup;
 
-                // None option
-                GestureDetector(
-                  onTap: () async {
-                    await notifier.updateSelectedGroup(null);
-                    Navigator.pop(modalContext);
-                  },
-                  child: Container(
-                    padding:
-                    EdgeInsets.symmetric(horizontal: 18.h, vertical: 18.h),
-                    decoration: BoxDecoration(
-                      color: selectedGroupId == null
-                          ? appTheme.deep_purple_A100.withAlpha(26)
-                          : appTheme.gray_900,
-                      borderRadius: BorderRadius.circular(14.h),
-                    ),
-                    child: Row(
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxH),
+              child: Padding(
+                padding: EdgeInsets.only(left: 20.h, right: 20.h, top: 20.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          height: 32.h,
-                          width: 32.h,
-                          decoration: BoxDecoration(
-                            color: appTheme.deep_purple_A100.withAlpha(51),
-                            borderRadius: BorderRadius.circular(10.h),
-                          ),
-                          child: Icon(
-                            Icons.remove_circle_outline,
-                            color: appTheme.deep_purple_A100,
-                            size: 21.h,
-                          ),
+                        Text(
+                          'Select Group',
+                          style: TextStyleHelper
+                              .instance.body16MediumPlusJakartaSans
+                              .copyWith(color: appTheme.gray_50),
                         ),
-                        SizedBox(width: 14.h),
-                        Expanded(
-                          child: Text(
-                            'None',
-                            style: TextStyleHelper.instance.body16BoldPlusJakartaSans
-                                .copyWith(
-                              fontSize: 18.fSize,
-                              fontWeight: FontWeight.w700,
-                              color: appTheme.gray_50,
-                            ),
-                          ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(modalContext),
+                          child: Icon(Icons.close,
+                              color: appTheme.gray_50, size: 24.h),
                         ),
-                        if (selectedGroupId == null)
-                          Icon(Icons.check_circle,
-                              color: appTheme.deep_purple_A100, size: 26.h),
                       ],
                     ),
-                  ),
-                ),
+                    SizedBox(height: 16.h),
 
-                SizedBox(height: 16.h),
-
-                // ✅ If user has no groups, offer a quick CTA under "None"
-                if (groups.isEmpty) ...[
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(modalContext);
-                      NavigatorService.pushNamed(AppRoutes.appGroups).then((_) {
-                        notifier.refreshAvailableGroups();
-                      });
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 18.h,
-                        vertical: 18.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: appTheme.gray_900,
-                        borderRadius: BorderRadius.circular(14.h),
-                        border: Border.all(
-                          color: appTheme.deep_purple_A100.withAlpha(60),
-                          width: 1,
+                    // None option
+                    GestureDetector(
+                      onTap: () async {
+                        await notifier.updateSelectedGroup(null);
+                        Navigator.pop(modalContext);
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 18.h, vertical: 18.h),
+                        decoration: BoxDecoration(
+                          color: selectedGroupId == null
+                              ? appTheme.deep_purple_A100.withAlpha(26)
+                              : appTheme.gray_900,
+                          borderRadius: BorderRadius.circular(14.h),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              height: 32.h,
+                              width: 32.h,
+                              decoration: BoxDecoration(
+                                color: appTheme.deep_purple_A100.withAlpha(51),
+                                borderRadius: BorderRadius.circular(10.h),
+                              ),
+                              child: Icon(
+                                Icons.remove_circle_outline,
+                                color: appTheme.deep_purple_A100,
+                                size: 21.h,
+                              ),
+                            ),
+                            SizedBox(width: 14.h),
+                            Expanded(
+                              child: Text(
+                                'None',
+                                style: TextStyleHelper
+                                    .instance.body16BoldPlusJakartaSans
+                                    .copyWith(
+                                  fontSize: 18.fSize,
+                                  fontWeight: FontWeight.w700,
+                                  color: appTheme.gray_50,
+                                ),
+                              ),
+                            ),
+                            if (selectedGroupId == null)
+                              Icon(Icons.check_circle,
+                                  color: appTheme.deep_purple_A100, size: 26.h),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            height: 32.h,
-                            width: 32.h,
-                            decoration: BoxDecoration(
-                              color: appTheme.deep_purple_A100.withAlpha(51),
-                              borderRadius: BorderRadius.circular(10.h),
-                            ),
-                            child: Icon(
-                              Icons.add_circle_outline,
-                              color: appTheme.deep_purple_A100,
-                              size: 21.h,
-                            ),
-                          ),
-                          SizedBox(width: 14.h),
-                          Expanded(
-                            child: Text(
-                              'Create a group',
-                              style: TextStyleHelper
-                                  .instance.body16BoldPlusJakartaSans
-                                  .copyWith(
-                                fontSize: 18.fSize,
-                                fontWeight: FontWeight.w700,
-                                color: appTheme.gray_50,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Icon(
-                            Icons.chevron_right,
-                            color: appTheme.blue_gray_300,
-                            size: 26.h,
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
-                  SizedBox(height: 16.h),
-                ],
 
-                Expanded(
-                  child: groups.isEmpty
-                      ? Center(
-                    child: Text(
-                      'No groups yet',
-                      style: TextStyleHelper
-                          .instance.body14RegularPlusJakartaSans
-                          .copyWith(color: appTheme.blue_gray_300),
-                    ),
-                  )
-                      : ListView.separated(
-                    itemCount: groups.length,
-                    separatorBuilder: (_, __) => SizedBox(height: 16.h),
-                    itemBuilder: (context, index) {
-                      final group = groups[index];
-                      final groupId = group['id'] as String?;
-                      final groupName = group['name'] as String? ?? '';
-                      final isSelected = groupId == selectedGroupId;
-                      final memberCount = group['member_count'];
+                    SizedBox(height: 16.h),
 
-                      return GestureDetector(
-                        onTap: () async {
-                          if (groupId == null || groupId.isEmpty) return;
-                          await notifier.updateSelectedGroup(groupId);
+                    // ✅ If user has no groups, offer a quick CTA under "None"
+                    if (groups.isEmpty) ...[
+                      GestureDetector(
+                        onTap: () {
                           Navigator.pop(modalContext);
+                          NavigatorService.pushNamed(AppRoutes.appGroups)
+                              .then((_) {
+                            notifier.refreshAvailableGroups();
+                          });
                         },
                         child: Container(
                           padding: EdgeInsets.symmetric(
-                              horizontal: 18.h, vertical: 18.h),
+                            horizontal: 18.h,
+                            vertical: 18.h,
+                          ),
                           decoration: BoxDecoration(
-                            color: isSelected
-                                ? appTheme.deep_purple_A100.withAlpha(26)
-                                : appTheme.gray_900,
+                            color: appTheme.gray_900,
                             borderRadius: BorderRadius.circular(14.h),
+                            border: Border.all(
+                              color: appTheme.deep_purple_A100.withAlpha(60),
+                              width: 1,
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -936,71 +877,163 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                                 height: 32.h,
                                 width: 32.h,
                                 decoration: BoxDecoration(
-                                  color: appTheme.deep_purple_A100
-                                      .withAlpha(51),
+                                  color:
+                                      appTheme.deep_purple_A100.withAlpha(51),
                                   borderRadius: BorderRadius.circular(10.h),
                                 ),
-                                child: Icon(Icons.group,
-                                    color: appTheme.deep_purple_A100,
-                                    size: 21.h),
+                                child: Icon(
+                                  Icons.add_circle_outline,
+                                  color: appTheme.deep_purple_A100,
+                                  size: 21.h,
+                                ),
                               ),
                               SizedBox(width: 14.h),
                               Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      groupName.isEmpty
-                                          ? 'Unnamed group'
-                                          : groupName,
-                                      style: TextStyleHelper
-                                          .instance.body16BoldPlusJakartaSans
-                                          .copyWith(
-                                        fontSize: 18.fSize,
-                                        fontWeight: FontWeight.w700,
-                                        color: appTheme.gray_50,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    SizedBox(height: 6.h),
-                                    Row(
-                                      children: [
-                                        if (groupId != null && groupId.isNotEmpty)
-                                          _GroupMemberAvatars(
-                                            groupId: groupId,
-                                            memberCount: (memberCount is int)
-                                                ? memberCount
-                                                : int.tryParse('${memberCount ?? ''}') ?? 0,
-                                          ),
-                                        SizedBox(width: 10.h),
-                                        if (memberCount != null)
-                                          Text(
-                                            '$memberCount members',
-                                            style: TextStyleHelper.instance.body14RegularPlusJakartaSans.copyWith(
-                                              color: appTheme.blue_gray_300,
-                                              height: 1.35,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
+                                child: Text(
+                                  'Create a group',
+                                  style: TextStyleHelper
+                                      .instance.body16BoldPlusJakartaSans
+                                      .copyWith(
+                                    fontSize: 18.fSize,
+                                    fontWeight: FontWeight.w700,
+                                    color: appTheme.gray_50,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (isSelected)
-                                Icon(Icons.check_circle,
-                                    color: appTheme.deep_purple_A100,
-                                    size: 26.h),
+                              Icon(
+                                Icons.chevron_right,
+                                color: appTheme.blue_gray_300,
+                                size: 26.h,
+                              ),
                             ],
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                      SizedBox(height: 16.h),
+                    ],
+
+                    Expanded(
+                      child: groups.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No groups yet',
+                                style: TextStyleHelper
+                                    .instance.body14RegularPlusJakartaSans
+                                    .copyWith(color: appTheme.blue_gray_300),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: groups.length,
+                              separatorBuilder: (_, __) =>
+                                  SizedBox(height: 16.h),
+                              itemBuilder: (context, index) {
+                                final group = groups[index];
+                                final groupId = group['id'] as String?;
+                                final groupName =
+                                    group['name'] as String? ?? '';
+                                final isSelected = groupId == selectedGroupId;
+                                final memberCount = group['member_count'];
+
+                                return GestureDetector(
+                                  onTap: () async {
+                                    if (groupId == null || groupId.isEmpty)
+                                      return;
+                                    await notifier.updateSelectedGroup(groupId);
+                                    Navigator.pop(modalContext);
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 18.h, vertical: 18.h),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? appTheme.deep_purple_A100
+                                              .withAlpha(26)
+                                          : appTheme.gray_900,
+                                      borderRadius: BorderRadius.circular(14.h),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          height: 32.h,
+                                          width: 32.h,
+                                          decoration: BoxDecoration(
+                                            color: appTheme.deep_purple_A100
+                                                .withAlpha(51),
+                                            borderRadius:
+                                                BorderRadius.circular(10.h),
+                                          ),
+                                          child: Icon(Icons.group,
+                                              color: appTheme.deep_purple_A100,
+                                              size: 21.h),
+                                        ),
+                                        SizedBox(width: 14.h),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                groupName.isEmpty
+                                                    ? 'Unnamed group'
+                                                    : groupName,
+                                                style: TextStyleHelper.instance
+                                                    .body16BoldPlusJakartaSans
+                                                    .copyWith(
+                                                  fontSize: 18.fSize,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: appTheme.gray_50,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              SizedBox(height: 6.h),
+                                              Row(
+                                                children: [
+                                                  if (groupId != null &&
+                                                      groupId.isNotEmpty)
+                                                    _GroupMemberAvatars(
+                                                      groupId: groupId,
+                                                      memberCount: (memberCount
+                                                              is int)
+                                                          ? memberCount
+                                                          : int.tryParse(
+                                                                  '${memberCount ?? ''}') ??
+                                                              0,
+                                                    ),
+                                                  SizedBox(width: 10.h),
+                                                  if (memberCount != null)
+                                                    Text(
+                                                      '$memberCount members',
+                                                      style: TextStyleHelper
+                                                          .instance
+                                                          .body14RegularPlusJakartaSans
+                                                          .copyWith(
+                                                        color: appTheme
+                                                            .blue_gray_300,
+                                                        height: 1.35,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (isSelected)
+                                          Icon(Icons.check_circle,
+                                              color: appTheme.deep_purple_A100,
+                                              size: 26.h),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1075,8 +1108,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                 children: [
                   Text(
                     'Category',
-                    style: TextStyleHelper
-                        .instance.body16MediumPlusJakartaSans
+                    style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                         .copyWith(color: appTheme.blue_gray_300),
                   ),
                   SizedBox(width: 4.h),
@@ -1198,11 +1230,11 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
 // Replace your entire _showCategorySelectionBottomSheetCreateMemory(...) with this version.
 
   void _showCategorySelectionBottomSheetCreateMemory(
-      BuildContext context,
-      CreateMemoryNotifier notifier,
-      List<Map<String, dynamic>> categories,
-      String? selectedCategoryId,
-      ) {
+    BuildContext context,
+    CreateMemoryNotifier notifier,
+    List<Map<String, dynamic>> categories,
+    String? selectedCategoryId,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1298,7 +1330,7 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
                                   width: 32.h,
                                   decoration: BoxDecoration(
                                     color:
-                                    appTheme.deep_purple_A100.withAlpha(51),
+                                        appTheme.deep_purple_A100.withAlpha(51),
                                   ),
                                   child: Icon(
                                     Icons.category,
@@ -1371,7 +1403,8 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
           child: CustomSettingsRow(
             useIconData: true,
             iconData: isPublic ? Icons.public : Icons.lock,
-            iconColor: isPublic ? appTheme.green_500 : appTheme.deep_purple_A100,
+            iconColor:
+                isPublic ? appTheme.green_500 : appTheme.deep_purple_A100,
             title: isPublic ? 'Public' : 'Private',
             description: isPublic
                 ? 'Anyone can view this memory'
@@ -1453,7 +1486,6 @@ class CreateMemoryScreenState extends ConsumerState<CreateMemoryScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(current.errorMessage!),
-                  backgroundColor: appTheme.colorFFD81E,
                   duration: const Duration(seconds: 3),
                 ),
               );

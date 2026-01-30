@@ -93,7 +93,7 @@ class MemoryService {
           ?.from('memories')
           .insert(memoryData)
           .select(
-          'id, group_id, location_name, location_lat, location_lng, start_time, end_time')
+              'id, group_id, location_name, location_lat, location_lng, start_time, end_time')
           .single();
 
       final memoryId = response?['id'] as String?;
@@ -127,23 +127,65 @@ class MemoryService {
         'joined_at': DateTime.now().toUtc().toIso8601String(),
       });
 
-      // Add invited users as contributors (this is NOT an "invite" system; it's direct membership)
+      // Group-based creation: do NOT auto-add group members as contributors.
+      // Instead, create pending invites so they must accept before gaining member privileges.
+      //
+      // The DB trigger on `memory_invites` will:
+      // - create the in-app notification row
+      // - send the push (via send_push_for_notification -> edge function)
       if (invitedUserIds.isNotEmpty) {
-        print(
-            '👥 MEMORY CREATION: Adding ${invitedUserIds.length} member(s) as contributors...');
-        for (final userId in invitedUserIds) {
-          await _supabase?.from('memory_contributors').insert({
-            'memory_id': memoryId,
-            'user_id': userId,
-            'joined_at': DateTime.now().toUtc().toIso8601String(),
-          });
+        if (groupId != null && groupId.isNotEmpty) {
+          print(
+              '👥 MEMORY CREATION: Creating ${invitedUserIds.length} pending invite(s) for group members...');
+
+          final nowIso = DateTime.now().toUtc().toIso8601String();
+          final inviteRows = invitedUserIds
+              .map((id) => id.trim())
+              .where((id) => id.isNotEmpty && id != creatorId)
+              .map((userId) => {
+                    'memory_id': memoryId,
+                    'user_id': userId,
+                    'invited_by': creatorId,
+                    'status': 'pending',
+                    'created_at': nowIso,
+                  })
+              .toList();
+
+          if (inviteRows.isNotEmpty) {
+            await _supabase?.from('memory_invites').upsert(
+                  inviteRows,
+                  onConflict: 'memory_id,user_id',
+                );
+          }
+
+          print('✅ MEMORY CREATION: Pending invites created successfully');
+        } else {
+          // Non-group invites keep existing behavior for now (direct membership).
+          // If you want all invited users (not just group) to be "pending",
+          // move this block to also insert into memory_invites.
+          print(
+              '👥 MEMORY CREATION: Adding ${invitedUserIds.length} member(s) as contributors...');
+          final joinedAt = DateTime.now().toUtc().toIso8601String();
+          final rows = invitedUserIds
+              .where((id) => id.trim().isNotEmpty && id != creatorId)
+              .map((userId) => {
+                    'memory_id': memoryId,
+                    'user_id': userId,
+                    'joined_at': joinedAt,
+                  })
+              .toList();
+
+          if (rows.isNotEmpty) {
+            await _supabase?.from('memory_contributors').insert(rows);
+          }
+          print('✅ MEMORY CREATION: Contributors added successfully');
         }
-        print('✅ MEMORY CREATION: Contributors added successfully');
       } else {
         print('ℹ️ MEMORY CREATION: No additional members to add');
       }
 
-      print('🎉 MEMORY CREATION COMPLETE: Memory "$title" created successfully');
+      print(
+          '🎉 MEMORY CREATION COMPLETE: Memory "$title" created successfully');
       print('   Final memory ID: $memoryId');
 
       return memoryId;
@@ -155,7 +197,8 @@ class MemoryService {
     }
   }
 
-  Future<DateTime> _getCategoryDuration(String categoryId, String duration) async {
+  Future<DateTime> _getCategoryDuration(
+      String categoryId, String duration) async {
     // TODO: implement real duration mapping; placeholder retained
     return DateTime.now().add(const Duration(hours: 12));
   }

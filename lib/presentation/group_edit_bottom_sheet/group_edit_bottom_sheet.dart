@@ -901,7 +901,6 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Group updated successfully'),
-          backgroundColor: appTheme.deep_purple_A100,
         ),
       );
     }
@@ -956,14 +955,12 @@ class GroupEditBottomSheetState extends ConsumerState<GroupEditBottomSheet> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('You have left the group'),
-              backgroundColor: appTheme.deep_purple_A100,
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to leave group. Please try again.'),
-              backgroundColor: appTheme.red_500,
             ),
           );
         }

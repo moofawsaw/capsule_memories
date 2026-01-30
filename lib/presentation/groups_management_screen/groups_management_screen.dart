@@ -37,7 +37,8 @@ class GroupsManagementScreen extends ConsumerStatefulWidget {
       _GroupsManagementScreenState();
 }
 
-class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen> {
+class _GroupsManagementScreenState
+    extends ConsumerState<GroupsManagementScreen> {
   @override
   void initState() {
     super.initState();
@@ -49,7 +50,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
       // Priority 2: Route arguments (normal navigation)
       if (groupId == null) {
         final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+            ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
         groupId = args?['groupId'] as String?;
       }
 
@@ -71,16 +72,39 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
       final client = SupabaseService.instance.client;
       if (client == null) return null;
 
-      final result = await client
-          .from('profiles')
+      Map<String, dynamic>? result;
+      try {
+        result = await client
+            .from('user_profiles_public')
+            .select('avatar_url')
+            .eq('id', userId)
+            .maybeSingle();
+      } catch (_) {
+        result = null;
+      }
+
+      result ??= await client
+          .from('user_profiles')
           .select('avatar_url')
           .eq('id', userId)
           .maybeSingle();
 
-      final avatarUrl = result?['avatar_url'] as String?;
-      if (avatarUrl == null || avatarUrl.trim().isEmpty) return null;
+      final avatarRef = (result?['avatar_url'] as String?)?.trim();
+      if (avatarRef == null || avatarRef.isEmpty) return null;
 
-      return avatarUrl;
+      // If storage path, convert to a signed URL so it renders even if bucket is private.
+      if (!avatarRef.startsWith('http://') &&
+          !avatarRef.startsWith('https://')) {
+        try {
+          final clean =
+              avatarRef.startsWith('/') ? avatarRef.substring(1) : avatarRef;
+          final signed =
+              await client.storage.from('avatars').createSignedUrl(clean, 3600);
+          if (signed.trim().isNotEmpty) return signed.trim();
+        } catch (_) {}
+      }
+
+      return avatarRef;
     } catch (_) {
       return null;
     }
@@ -222,8 +246,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                 child: CustomGroupInvitationCard(
                   groupName: invitation.groupName ?? 'Unknown',
                   memberCount: invitation.memberCount ?? 0,
-                  memberAvatarImagePath:
-                  invitation.avatarImage ?? '',
+                  memberAvatarImagePath: invitation.avatarImage ?? '',
                   onAcceptTap: () => onTapAcceptInvitation(context),
                   onActionTap: () => onTapDeclineInvitation(context),
                 ),
@@ -296,13 +319,15 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
           children: sortedGroups.map((group) {
             final isCreator = group.creatorId == currentUserId;
             final rawCount = group.memberCount ?? 0;
-            final effectiveCount =
-            (isCreator && rawCount == 0) ? 1 : rawCount;
+            final effectiveCount = (isCreator && rawCount == 0) ? 1 : rawCount;
 
             final memberImages = group.memberImages ?? <String>[];
 
             // ✅ Creator-only group with no images → fetch DB avatar
-            if (isCreator && rawCount == 0 && memberImages.isEmpty && currentUserId != null) {
+            if (isCreator &&
+                rawCount == 0 &&
+                memberImages.isEmpty &&
+                currentUserId != null) {
               return FutureBuilder<String?>(
                 future: _getProfileAvatarUrlFromDb(currentUserId),
                 builder: (context, snapshot) {
@@ -314,21 +339,22 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                       groupData: CustomGroupData(
                         title: group.name ?? 'Unnamed Group',
                         memberCountText:
-                        '$effectiveCount member${effectiveCount == 1 ? '' : 's'}',
-                        memberImages: avatar != null
-                            ? [avatar]
-                            : [''],
+                            '$effectiveCount member${effectiveCount == 1 ? '' : 's'}',
+                        memberImages: avatar != null ? [avatar] : [''],
                         isCreator: isCreator,
                       ),
                       // Tapping the row opens group details (read-only).
                       onTap: () => onTapViewGroupInfo(context, group),
                       onActionTap: () => onTapGroupQR(context, group),
-                      onDeleteTap:
-                      isCreator ? () => onTapDeleteGroup(context, group) : null,
-                      onLeaveTap:
-                      !isCreator ? () => onTapLeaveGroup(context, group) : null,
-                      onEditTap:
-                      isCreator ? () => onTapEditGroup(context, group) : null,
+                      onDeleteTap: isCreator
+                          ? () => onTapDeleteGroup(context, group)
+                          : null,
+                      onLeaveTap: !isCreator
+                          ? () => onTapLeaveGroup(context, group)
+                          : null,
+                      onEditTap: isCreator
+                          ? () => onTapEditGroup(context, group)
+                          : null,
                     ),
                   );
                 },
@@ -342,21 +368,19 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
                 groupData: CustomGroupData(
                   title: group.name ?? 'Unnamed Group',
                   memberCountText:
-                  '$effectiveCount member${effectiveCount == 1 ? '' : 's'}',
-                  memberImages: memberImages.isNotEmpty
-                      ? memberImages
-                      : [''],
+                      '$effectiveCount member${effectiveCount == 1 ? '' : 's'}',
+                  memberImages: memberImages.isNotEmpty ? memberImages : [''],
                   isCreator: isCreator,
                 ),
                 // Tapping the row opens group details (read-only).
                 onTap: () => onTapViewGroupInfo(context, group),
                 onActionTap: () => onTapGroupQR(context, group),
                 onDeleteTap:
-                isCreator ? () => onTapDeleteGroup(context, group) : null,
+                    isCreator ? () => onTapDeleteGroup(context, group) : null,
                 onLeaveTap:
-                !isCreator ? () => onTapLeaveGroup(context, group) : null,
+                    !isCreator ? () => onTapLeaveGroup(context, group) : null,
                 onEditTap:
-                isCreator ? () => onTapEditGroup(context, group) : null,
+                    isCreator ? () => onTapEditGroup(context, group) : null,
               ),
             );
           }).toList(),
@@ -413,7 +437,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
       context: context,
       title: 'Delete Group?',
       message:
-      'Are you sure you want to delete "$groupName"? This action cannot be undone.',
+          'Are you sure you want to delete "$groupName"? This action cannot be undone.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       icon: Icons.delete_outline,
@@ -432,7 +456,7 @@ class _GroupsManagementScreenState extends ConsumerState<GroupsManagementScreen>
       context: context,
       title: 'Leave Group?',
       message:
-      'Are you sure you want to leave "$groupName"? You can rejoin if invited again.',
+          'Are you sure you want to leave "$groupName"? You can rejoin if invited again.',
       confirmText: 'Leave',
       cancelText: 'Cancel',
       icon: Icons.logout,

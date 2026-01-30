@@ -89,7 +89,6 @@ class NotificationSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$username has been unblocked'),
-            backgroundColor: appTheme.color3BD81E,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -98,7 +97,6 @@ class NotificationSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Failed to unblock user'),
-            backgroundColor: appTheme.red_500,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -109,7 +107,6 @@ class NotificationSettingsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('An error occurred'),
-            backgroundColor: appTheme.red_500,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -206,16 +203,29 @@ class NotificationSettingsScreenState
                   .updateMemoryInvites(value)
                   : (value) {},
             ),
+            // Matches edge function notification_type: new_story
             CustomNotificationOption(
-              title: 'Memory Activity',
+              title: 'New Story',
               description:
-              'Get notified when someone posts to a memory you\'re in',
+                  'Get notified when a new story is added to a memory you\'re in',
               isEnabled:
-              pushEnabled ? (state.memoryActivityEnabled ?? true) : false,
+                  pushEnabled ? (state.newStoryEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                  .read(notificationSettingsNotifier.notifier)
-                  .updateMemoryActivity(value)
+                      .read(notificationSettingsNotifier.notifier)
+                      .updateNewStory(value)
+                  : (value) {},
+            ),
+            // Matches edge function notification_type: memory_expiring
+            CustomNotificationOption(
+              title: 'Memory Expiring',
+              description: 'Get notified when a memory is close to expiring',
+              isEnabled:
+                  pushEnabled ? (state.memoryExpiringEnabled ?? true) : false,
+              onChanged: pushEnabled
+                  ? (value) => ref
+                      .read(notificationSettingsNotifier.notifier)
+                      .updateMemoryExpiring(value)
                   : (value) {},
             ),
             CustomNotificationOption(
@@ -230,29 +240,61 @@ class NotificationSettingsScreenState
                   : (value) {},
             ),
             CustomNotificationOption(
-              title: 'Reactions',
-              description: 'Get notified when someone reacts to your story',
-              isEnabled: pushEnabled ? (state.reactionsEnabled ?? true) : false,
+              // Matches edge function notification_type: daily_capsule_reminder
+              title: 'Daily Capsule Reminder',
+              description: 'Get reminded to post your Daily Capsule',
+              isEnabled:
+                  pushEnabled
+                      ? (state.dailyCapsuleReminderEnabled ?? true)
+                      : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                  .read(notificationSettingsNotifier.notifier)
-                  .updateReactions(value)
+                      .read(notificationSettingsNotifier.notifier)
+                      .updateDailyCapsuleReminder(value)
                   : (value) {},
             ),
             CustomNotificationOption(
-              title: 'New Followers',
+              // Matches edge function notification_type: friend_daily_capsule_completed
+              title: 'Friend Daily Capsule Completed',
+              description: 'Get notified when a friend completes their Daily Capsule',
+              isEnabled:
+                  pushEnabled
+                      ? (state.friendDailyCapsuleCompletedEnabled ?? true)
+                      : false,
+              onChanged: pushEnabled
+                  ? (value) => ref
+                      .read(notificationSettingsNotifier.notifier)
+                      .updateFriendDailyCapsuleCompleted(value)
+                  : (value) {},
+            ),
+            CustomNotificationOption(
+              // Matches edge function notification_type: followed
+              title: 'Followed',
               description: 'Get notified when someone follows you',
               isEnabled:
-              pushEnabled ? (state.newFollowersEnabled ?? true) : false,
+                  pushEnabled ? (state.followedEnabled ?? true) : false,
               onChanged: pushEnabled
                   ? (value) => ref
-                  .read(notificationSettingsNotifier.notifier)
-                  .updateNewFollowers(value)
+                      .read(notificationSettingsNotifier.notifier)
+                      .updateFollowed(value)
                   : (value) {},
             ),
             CustomNotificationOption(
-              title: 'Friend Requests',
-              description: 'Get notified when someone sends a friend request',
+              // Matches edge function notification_type: new_follower
+              title: 'New Follower',
+              description: 'Get notified when you get a new follower',
+              isEnabled:
+                  pushEnabled ? (state.newFollowerEnabled ?? true) : false,
+              onChanged: pushEnabled
+                  ? (value) => ref
+                      .read(notificationSettingsNotifier.notifier)
+                      .updateNewFollower(value)
+                  : (value) {},
+            ),
+            CustomNotificationOption(
+              // Matches edge function notification_type: friend_request
+              title: 'Friend Request',
+              description: 'Get notified when someone sends you a friend request',
               isEnabled:
               pushEnabled ? (state.friendRequestsEnabled ?? true) : false,
               onChanged: pushEnabled
@@ -262,8 +304,21 @@ class NotificationSettingsScreenState
                   : (value) {},
             ),
             CustomNotificationOption(
-              title: 'Group Invites',
-              description: 'Get notified when invited to a group',
+              // Matches edge function notification_type: friend_accepted
+              title: 'Friend Accepted',
+              description: 'Get notified when a friend request is accepted',
+              isEnabled:
+                  pushEnabled ? (state.friendRequestsEnabled ?? true) : false,
+              onChanged: pushEnabled
+                  ? (value) => ref
+                      .read(notificationSettingsNotifier.notifier)
+                      .updateFriendRequests(value)
+                  : (value) {},
+            ),
+            CustomNotificationOption(
+              // Matches edge function notification_type: group_invite
+              title: 'Group Invite',
+              description: 'Get notified when you\'re invited to a group',
               isEnabled:
               pushEnabled ? (state.groupInvitesEnabled ?? true) : false,
               onChanged: pushEnabled

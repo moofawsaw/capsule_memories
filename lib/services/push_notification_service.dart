@@ -46,8 +46,20 @@ String? _normalizeDeepLinkFromData(Map<String, dynamic> data, String? raw) {
   }
 
   // Fallback to known data keys
-  final kind = (data['kind'] ?? data['type'] ?? '').toString().trim().toLowerCase();
-  if (kind == 'daily_capsule_reminder' || kind == 'daily-capsule-reminder') {
+  final kind = (data['kind'] ??
+          data['type'] ??
+          data['notification_type'] ??
+          data['notificationType'] ??
+          '')
+      .toString()
+      .trim()
+      .toLowerCase();
+
+  // Daily Capsule: reminders + friend completion should navigate to Daily Capsule screen.
+  if (kind == 'daily_capsule_reminder' ||
+      kind == 'daily-capsule-reminder' ||
+      kind == 'friend_daily_capsule_completed' ||
+      kind == 'friend-daily-capsule-completed') {
     return _dailyCapsuleDeepLink;
   }
 
@@ -426,15 +438,19 @@ class PushNotificationService {
         return;
       }
 
+      // Avoid null-filter API inconsistencies by filtering soft-deletes client-side.
       final res = await client
           .from('notifications')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('is_read', false)
-          .isFilter('deleted_at', null)
-          .count(CountOption.exact);
+          .select('id, is_read, deleted_at')
+          .eq('user_id', userId);
 
-      await _setIosBadgeCount(res.count);
+      final rows = List<Map<String, dynamic>>.from(res);
+      final unreadCount = rows
+          .where((n) => n['deleted_at'] == null)
+          .where((n) => (n['is_read'] as bool?) == false)
+          .length;
+
+      await _setIosBadgeCount(unreadCount);
     } catch (e) {
       debugPrint('⚠️ refresh badge failed: $e');
     }

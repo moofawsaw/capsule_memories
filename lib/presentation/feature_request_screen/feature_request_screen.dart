@@ -57,7 +57,6 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Request submitted'),
-              backgroundColor: appTheme.colorFF52D1,
             ),
           );
         }
@@ -66,7 +65,6 @@ class FeatureRequestScreenState extends ConsumerState<FeatureRequestScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(current.message ?? 'Something went wrong'),
-              backgroundColor: appTheme.redCustom,
             ),
           );
         }
