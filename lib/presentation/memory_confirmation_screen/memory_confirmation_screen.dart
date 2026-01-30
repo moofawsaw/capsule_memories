@@ -1228,7 +1228,7 @@ class _MemoryConfirmationScreenState
         width: 200.h,
         height: 200.h,
         child: PrettyQrView.data(
-          data: 'https://capapp.co/join/memory/$inviteCode',
+          data: 'https://share.capapp.co/join/memory/$inviteCode',
           decoration: PrettyQrDecoration(
             shape: PrettyQrSmoothSymbol(
               // Must stay dark even in light mode (QR sits on white background).
@@ -1253,7 +1253,7 @@ class _MemoryConfirmationScreenState
   void _shareQRCode() {
     if (inviteCode != null) {
       Share.share(
-        'Join my Capsule memory: $memoryName\n\nhttps://capapp.co/join/memory/$inviteCode',
+        'Join my Capsule memory: $memoryName\n\nhttps://share.capapp.co/join/memory/$inviteCode',
         subject: 'Join $memoryName on Capsule',
       );
     }

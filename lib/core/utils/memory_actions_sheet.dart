@@ -60,7 +60,7 @@ class MemoryActionsSheet {
                         }
 
                         final shareUrl =
-                            'https://capapp.co/join/memory/$invite';
+                            'https://share.capapp.co/join/memory/$invite';
                         await Share.share(
                           'Join my Capsule memory: $title\n\n$shareUrl',
                           subject: 'Join $title on Capsule',

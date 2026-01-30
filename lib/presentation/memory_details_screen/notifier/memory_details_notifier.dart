@@ -882,7 +882,7 @@ class MemoryDetailsNotifier extends StateNotifier<MemoryDetailsState> {
         return;
       }
 
-      final joinUrl = 'https://capapp.co/join/memory/$inviteCode';
+      final joinUrl = 'https://share.capapp.co/join/memory/$inviteCode';
 
       await Share.share(
         'Join my Capsule memory: $memoryTitle\n\n$joinUrl',

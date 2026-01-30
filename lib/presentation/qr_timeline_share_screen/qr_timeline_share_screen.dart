@@ -256,7 +256,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
     final locationName = _memoryData!['location_name'] as String?;
 
     // Generate correct deep link URL
-    final deepLinkUrl = 'https://capapp.co/join/memory/$inviteCode';
+    final deepLinkUrl = 'https://share.capapp.co/join/memory/$inviteCode';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -457,7 +457,7 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
   void _copyUrlToClipboard() async {
     final inviteCode = (_memoryData?['invite_code'] as String?)?.trim() ?? '';
     if (inviteCode.isEmpty) return;
-    final url = 'https://capapp.co/join/memory/$inviteCode';
+    final url = 'https://share.capapp.co/join/memory/$inviteCode';
 
     await Clipboard.setData(ClipboardData(text: url));
 

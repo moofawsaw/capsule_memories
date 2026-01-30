@@ -84,7 +84,7 @@ class MemoryShareOptionsNotifier
     // Set copied state to true to trigger animation
     state = state.copyWith(isLinkCopied: true);
 
-    final link = 'https://capapp.co/join/memory/${state.inviteCode}';
+    final link = 'https://share.capapp.co/join/memory/${state.inviteCode}';
     await Clipboard.setData(ClipboardData(text: link));
 
     if (context.mounted) {
