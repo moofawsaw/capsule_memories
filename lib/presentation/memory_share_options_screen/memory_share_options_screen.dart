@@ -642,7 +642,7 @@ class _MemoryShareOptionsScreenState
                         ),
                         child: PrettyQrView.data(
                           data:
-                              'https://capapp.co/join/memory/${model.inviteCode}',
+                              'https://share.capapp.co/join/memory/${model.inviteCode}',
                           decoration: PrettyQrDecoration(
                             shape: PrettyQrSmoothSymbol(
                               color: Color(0xFF1A1A1A),
@@ -662,7 +662,7 @@ class _MemoryShareOptionsScreenState
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: PrettyQrView.data(
-                    data: 'https://capapp.co/join/memory/${model.inviteCode}',
+                    data: 'https://share.capapp.co/join/memory/${model.inviteCode}',
                     decoration: PrettyQrDecoration(
                       shape: PrettyQrSmoothSymbol(
                         color: Color(0xFF1A1A1A),
@@ -687,7 +687,7 @@ class _MemoryShareOptionsScreenState
                     child: OutlinedButton.icon(
                       onPressed: () {
                         Share.share(
-                          'Join my Capsule memory: ${model.memoryName}\n\nhttps://capapp.co/join/memory/${model.inviteCode}',
+                          'Join my Capsule memory: ${model.memoryName}\n\nhttps://share.capapp.co/join/memory/${model.inviteCode}',
                           subject: 'Join ${model.memoryName} on Capsule',
                         );
                       },

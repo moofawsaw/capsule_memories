@@ -318,6 +318,24 @@ class DeepLinkService with WidgetsBindingObserver {
     }
 
     if (_isShareCapappLink(uri)) {
+      // IMPORTANT:
+      // `share.capapp.co` hosts both story shares (/<code>) and invite links (/join/...).
+      // If we don't special-case `/join`, the share-code resolver will treat "join"
+      // as a story code, causing invalid UUID errors (e.g. storyId="join").
+      if (uri.path.startsWith('/join')) {
+        final segments = uri.pathSegments;
+        if (segments.length >= 3) {
+          final type = segments[1];
+          final code = segments[2];
+          if (type == 'memory' || type == 'group') {
+            _queueInviteNavigation(type, code);
+          } else {
+            await _processInviteLink(type, code);
+          }
+        }
+        return;
+      }
+
       final code = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
       if (code.isNotEmpty) {
         final resolved = await _resolveShareCodeToStoryId(code);

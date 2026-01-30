@@ -52,7 +52,7 @@ class GroupQRInviteNotifier extends StateNotifier<GroupQRInviteState> {
         return;
       }
 
-      final inviteUrl = 'https://capapp.co/join/group/$inviteCode';
+      final inviteUrl = 'https://share.capapp.co/join/group/$inviteCode';
 
       final resolvedQrUrl = await _resolveQrUrl(groupData['qr_code_url']);
 

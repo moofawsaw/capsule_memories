@@ -50,7 +50,7 @@ class MemoryInvitationNotifier extends StateNotifier<MemoryInvitationState> {
         final inviteCode = memoryData['invite_code'] as String;
         final memoryTitle = memoryData['title'] as String;
         final qrCodeUrl = memoryData['qr_code_url'] as String?;
-        final inviteUrl = 'https://capapp.co/join/memory/$inviteCode';
+        final inviteUrl = 'https://share.capapp.co/join/memory/$inviteCode';
 
         state = MemoryInvitationState(
           isLoading: false,
