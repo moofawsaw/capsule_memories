@@ -1,5 +1,6 @@
 import '../../core/app_export.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 import '../../widgets/custom_button.dart';
 import './notifier/group_join_confirmation_notifier.dart';
 import '../../utils/storage_utils.dart';
@@ -62,32 +63,64 @@ class GroupJoinConfirmationScreenState
 
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
+    // Add extra breathing room above the modal header (especially on notched devices).
+    final headerTop = topInset + 22.h;
+
     return Scaffold(
       backgroundColor: appTheme.gray_900_02,
-      appBar: AppBar(
-        backgroundColor: appTheme.gray_900_02,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: appTheme.gray_50,
-            size: 18.h,
+      // Modal-style overlay: full-screen content + close (X) in top-right.
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(20.h, headerTop + 62.h, 20.h, 16.h),
+              child: _buildContent(context),
+            ),
           ),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: Text(
-          'Group Invitation',
-          style: TextStyleHelper.instance.title16BoldPlusJakartaSans.copyWith(
-            color: appTheme.gray_50,
+          Positioned(
+            top: headerTop,
+            left: 26.h,
+            right: 26.h,
+            child: Row(
+              children: [
+                SizedBox(width: 40.h, height: 40.h),
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      'Group Invitation',
+                      style: TextStyleHelper.instance.headline24ExtraBoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 40.h,
+                  height: 40.h,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(20.h),
+                      onTap: () =>
+                          Navigator.of(context, rootNavigator: true).maybePop(),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: appTheme.gray_900_01.withAlpha(200),
+                          borderRadius: BorderRadius.circular(20.h),
+                        ),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: appTheme.gray_50,
+                          size: 20.h,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 20.h, vertical: 16.h),
-          child: _buildContent(context),
-        ),
+        ],
       ),
     );
   }
@@ -169,6 +202,9 @@ class GroupJoinConfirmationScreenState
     final creatorName = state.creatorName ?? 'Unknown User';
     final memberCount = state.memberCount ?? 1;
     final avatars = state.memberAvatars ?? const <String>[];
+    final createdAt = state.createdAt;
+    final members = state.members ?? const <GroupMemberPreview>[];
+    final creatorId = (state.creatorId ?? '').trim();
 
     return Container(
       width: double.infinity,
@@ -176,97 +212,205 @@ class GroupJoinConfirmationScreenState
       decoration: BoxDecoration(
         color: appTheme.gray_900_01,
         borderRadius: BorderRadius.circular(12.h),
-        border: Border.all(
-          color: appTheme.blue_gray_300.withAlpha(77),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Memory Icon
-          Container(
-            padding: EdgeInsets.all(12.h),
-            decoration: BoxDecoration(
-              color: appTheme.deep_purple_A100.withAlpha(51),
-              borderRadius: BorderRadius.circular(12.h),
-            ),
-            child: Icon(
-              Icons.group,
-              color: appTheme.deep_purple_A100,
-              size: 32.h,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(12.h),
+                decoration: BoxDecoration(
+                  color: appTheme.deep_purple_A100.withAlpha(51),
+                  borderRadius: BorderRadius.circular(12.h),
+                ),
+                child: Icon(
+                  Icons.group,
+                  color: appTheme.deep_purple_A100,
+                  size: 28.h,
+                ),
+              ),
+              SizedBox(width: 12.h),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      groupName,
+                      style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                    ),
+                    SizedBox(height: 6.h),
+                    Row(
+                      children: [
+                        Icon(Icons.people,
+                            color: appTheme.blue_gray_300, size: 16.h),
+                        SizedBox(width: 6.h),
+                        Text(
+                          '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
+                          style: TextStyleHelper
+                              .instance.body14RegularPlusJakartaSans
+                              .copyWith(color: appTheme.blue_gray_300),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 16.h),
+          SizedBox(height: 14.h),
 
-          // Group Name
+          // Creator + Created date (tight, info-dense)
+          Row(
+            children: [
+              _buildAvatar(24.h, state.creatorAvatar),
+              SizedBox(width: 8.h),
+              Expanded(
+                child: Text(
+                  'Created by $creatorName',
+                  style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                      .copyWith(color: appTheme.blue_gray_300),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          Row(
+            children: [
+              Icon(Icons.calendar_today_rounded,
+                  color: appTheme.blue_gray_300, size: 16.h),
+              SizedBox(width: 8.h),
+              Text(
+                'Created ${_formatCreatedDate(createdAt)}',
+                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
+                    .copyWith(color: appTheme.blue_gray_300),
+              ),
+            ],
+          ),
+
+          SizedBox(height: 16.h),
+          Divider(color: appTheme.blue_gray_900_02.withAlpha(120), height: 1),
+          SizedBox(height: 14.h),
+
           Text(
-            groupName,
-            style: TextStyleHelper.instance.title18BoldPlusJakartaSans
+            'Members',
+            style: TextStyleHelper.instance.body16MediumPlusJakartaSans
                 .copyWith(color: appTheme.gray_50),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 10.h),
 
-          // Creator Info
-          Row(
-            children: [
-              _buildAvatar24(state.creatorAvatar),
-              SizedBox(width: 8.h),
-              Text(
-                'Created by $creatorName',
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-            ],
-          ),
-          SizedBox(height: 18.h),
-
-          _buildMembersAvatarsRow(avatars, memberCount),
-          SizedBox(height: 16.h),
-
-          // Member Count
-          Row(
-            children: [
-              Icon(Icons.people, color: appTheme.blue_gray_300, size: 18.h),
-              SizedBox(width: 8.h),
-              Text(
-                '$memberCount ${memberCount == 1 ? 'member' : 'members'}',
-                style: TextStyleHelper.instance.body14RegularPlusJakartaSans
-                    .copyWith(color: appTheme.blue_gray_300),
-              ),
-            ],
-          ),
+          // Vertical list of members (inside the card, scrolls with page)
+          if (members.isNotEmpty)
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: members.length,
+              separatorBuilder: (_, __) =>
+                  Divider(color: appTheme.blue_gray_900_02.withAlpha(90), height: 14.h),
+              itemBuilder: (context, index) {
+                final m = members[index];
+                final isCreator = creatorId.isNotEmpty && m.userId == creatorId;
+                return _buildMemberRow(m, isCreator: isCreator);
+              },
+            )
+          else ...[
+            // Fallback: keep old preview row if member list isn't available.
+            _buildMembersAvatarsRow(avatars, memberCount),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildAvatar24(String? raw) {
+  String _formatCreatedDate(DateTime? dt) {
+    if (dt == null) return '—';
+    try {
+      return DateFormat.yMMMd().format(dt.toLocal());
+    } catch (_) {
+      return '—';
+    }
+  }
+
+  Widget _buildMemberRow(GroupMemberPreview member, {required bool isCreator}) {
+    return Row(
+      children: [
+        _buildAvatar(36.h, member.avatarUrl),
+        SizedBox(width: 12.h),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      member.displayName,
+                      style: TextStyleHelper.instance.body16MediumPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (isCreator) ...[
+                    SizedBox(width: 10.h),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.h, vertical: 4.h),
+                      decoration: BoxDecoration(
+                        color: appTheme.deep_purple_A100.withAlpha(38),
+                        borderRadius: BorderRadius.circular(999.h),
+                      ),
+                      child: Text(
+                        'Creator',
+                        style: TextStyleHelper
+                            .instance.body12RegularPlusJakartaSans
+                            .copyWith(color: appTheme.deep_purple_A100),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAvatar(double size, String? raw) {
     final url = StorageUtils.resolveAvatarUrl(raw) ?? (raw ?? '').trim();
     if (url.isEmpty) {
       return Container(
-        width: 24.h,
-        height: 24.h,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: appTheme.blue_gray_900_02,
         ),
-        child: Icon(Icons.person, color: appTheme.gray_50, size: 14.h),
+        child: Icon(
+          Icons.person,
+          color: appTheme.gray_50,
+          size: (size * 0.58),
+        ),
       );
     }
 
     return ClipOval(
       child: CachedNetworkImage(
         imageUrl: url,
-        width: 24.h,
-        height: 24.h,
+        width: size,
+        height: size,
         fit: BoxFit.cover,
         placeholder: (_, __) =>
-            Container(color: appTheme.blue_gray_900_02, width: 24.h, height: 24.h),
+            Container(color: appTheme.blue_gray_900_02, width: size, height: size),
         errorWidget: (_, __, ___) => Container(
-          width: 24.h,
-          height: 24.h,
+          width: size,
+          height: size,
           color: appTheme.blue_gray_900_02,
-          child: Icon(Icons.person, color: appTheme.gray_50, size: 14.h),
+          child: Icon(Icons.person, color: appTheme.gray_50, size: (size * 0.58)),
         ),
       ),
     );

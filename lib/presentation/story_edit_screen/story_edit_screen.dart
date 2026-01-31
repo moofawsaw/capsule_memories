@@ -4,13 +4,11 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:video_player/video_player.dart';
 
 import 'notifier/story_edit_notifier.dart';
 import 'notifier/story_edit_state.dart';
-import 'notifier/preupload_state.dart';
 import '../../services/network_quality_service.dart';
 import '../../services/daily_capsule_service.dart';
 
@@ -19,6 +17,7 @@ import '../../services/supabase_service.dart';
 import '../../services/location_service.dart';
 import '../../utils/storage_utils.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_image_view.dart';
 
 class StoryEditScreen extends ConsumerStatefulWidget {
   final String mediaPath;
@@ -546,31 +545,16 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
       return Icon(Icons.category_rounded, size: 22.sp, color: Colors.white54);
     }
 
-    final isSvg = url.toLowerCase().endsWith('.svg');
-
-    return isSvg
-        ? SvgPicture.network(
-      url,
-      width: 22.sp,
+    // Use CustomImageView so category icons can fall back across extensions
+    // (e.g., icon stored as PNG but code initially tries SVG).
+    return CustomImageView(
+      imagePath: url,
       height: 22.sp,
-      placeholderBuilder: (_) => SizedBox(
-        width: 22.sp,
-        height: 22.sp,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
-        ),
-      ),
-    )
-        : Image.network(
-      url,
       width: 22.sp,
-      height: 22.sp,
-      errorBuilder: (_, __, ___) => Icon(
-        Icons.category_rounded,
-        size: 22.sp,
-        color: Colors.white70,
-      ),
+      fit: BoxFit.contain,
+      enableCategoryIconResolution: true,
+      placeholderWidget:
+          Icon(Icons.category_rounded, size: 22.sp, color: Colors.white70),
     );
   }
 
@@ -590,9 +574,6 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   }
 
   Widget _buildBottomOverlay(StoryEditState state) {
-    final showStatus =
-        widget.isVideo && (state.preuploadState != PreuploadState.idle);
-
     return Positioned(
       left: 0,
       right: 0,
@@ -729,54 +710,6 @@ class _StoryEditScreenState extends ConsumerState<StoryEditScreen> {
   //     ),
   //   );
   // }
-
-  Widget _progressRow({
-    required String label,
-    required double progress,
-    required String percentText,
-  }) {
-    final p = progress.clamp(0.0, 1.0);
-
-    return Row(
-      children: [
-        SizedBox(
-          width: 72.w,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12.sp,
-            ),
-          ),
-        ),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: p == 0.0 ? null : p,
-              minHeight: 7.h,
-              backgroundColor: Colors.white.withAlpha(30),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                appTheme.deep_purple_A100,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: 10.w),
-        SizedBox(
-          width: 44.w,
-          child: Text(
-            percentText,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12.sp,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 
   Future<void> _onShareStory(BuildContext context) async {
     final notifier = ref.read(storyEditProvider.notifier);

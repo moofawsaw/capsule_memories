@@ -444,7 +444,10 @@ class AppRoutes {
           routeName == AppRoutes.appNativeCamera ||
               routeName == AppRoutes.appStoryRecord ||
               routeName == AppRoutes.appStoryEdit ||
-              routeName == AppRoutes.appStoryView;
+              routeName == AppRoutes.appStoryView ||
+              // Invite flows should be true full-screen modal overlays (no persistent header).
+              routeName == AppRoutes.appJoin ||
+              routeName == AppRoutes.appBsQrMemory;
 
       final shellChild = AppShell(
         child: protectedChild,

@@ -1664,13 +1664,16 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
     if (mediaType == 'video') {
       final usable = _isControllerUsable(controller);
       if (controller != null && isInitialized && usable) {
-        return SizedBox.expand(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: controller.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
+        // Keep video isolated from UI repaints (reactions/captions/overlays).
+        return RepaintBoundary(
+          child: SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: controller.value.size.width,
+                height: controller.value.size.height,
+                child: VideoPlayer(controller),
+              ),
             ),
           ),
         );
@@ -2333,6 +2336,10 @@ class EventStoriesViewScreenState extends ConsumerState<EventStoriesViewScreen>
             child: StoryReactionsWidget(
               storyId: storyId,
               onReactionAdded: () {},
+              // Animations are now handled by a single overlay/ticker, so keep enabled
+              // even during video playback.
+              enableFloatingReactions: true,
+              enableHaptics: true,
             ),
           ),
         if (caption != null && caption.isNotEmpty)

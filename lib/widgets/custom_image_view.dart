@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_export.dart';
 import '../utils/storage_utils.dart';
@@ -35,6 +36,65 @@ enum ImageType { svg, png, network, networkSvg, file, unknown }
 bool _isEffectivelyEmpty(String? s) {
   final v = (s ?? '').trim().toLowerCase();
   return v.isEmpty || v == 'null' || v == 'undefined';
+}
+
+/// Cache: baseKey -> resolved working URL (or '' if none).
+final Map<String, String> _categoryIconProbeCache = {};
+
+String? _extractCategoryIconBaseKey(String input) {
+  final s = input.trim();
+  if (s.isEmpty) return null;
+
+  // If it's a Supabase public URL to the category-icons bucket, extract the object path.
+  // Example:
+  //   https://<project>.supabase.co/storage/v1/object/public/category-icons/latest.svg
+  // -> latest
+  final withoutQuery = s.split('?').first.split('#').first;
+  const marker = '/storage/v1/object/public/category-icons/';
+  if (withoutQuery.contains(marker)) {
+    final idx = withoutQuery.indexOf(marker);
+    final objectPath = withoutQuery.substring(idx + marker.length);
+    if (objectPath.trim().isEmpty) return null;
+    final stripped = objectPath.replaceAll(RegExp(r'\.(svg|png|webp|jpg|jpeg)$', caseSensitive: false), '');
+    return stripped.trim().isEmpty ? null : stripped.trim();
+  }
+
+  // If it's not a Supabase URL, treat as a bucket path or icon name.
+  var normalized = s;
+  if (normalized.startsWith('/')) normalized = normalized.substring(1);
+  if (normalized.startsWith('category-icons/')) {
+    normalized = normalized.substring('category-icons/'.length);
+  }
+
+  // Strip extension if present; keep subfolders if any.
+  normalized = normalized.split('?').first.split('#').first;
+  normalized = normalized.replaceAll(
+    RegExp(r'\.(svg|png|webp|jpg|jpeg)$', caseSensitive: false),
+    '',
+  );
+
+  if (normalized.trim().isEmpty) return null;
+  return normalized.trim();
+}
+
+List<String> _categoryIconCandidateUrlsFromBase(String baseKey) {
+  // Preserve folder prefixes (if baseKey contains '/')
+  final candidates = <String>[
+    '$baseKey.svg',
+    '$baseKey.png',
+    '$baseKey.webp',
+    '$baseKey.jpg',
+    '$baseKey.jpeg',
+  ];
+
+  // Convert to public URLs in category-icons bucket
+  return candidates
+      .map(
+        (obj) => Supabase.instance.client.storage
+            .from('category-icons')
+            .getPublicUrl(obj),
+      )
+      .toList(growable: false);
 }
 
 /// Centralized resolver:
@@ -109,7 +169,7 @@ class CustomImageView extends StatefulWidget {
     // Rendering fallback is handled in build based on resolved path.
   }
 
-  late String? imagePath;
+  final String? imagePath;
 
   final double? height;
   final double? width;
@@ -140,6 +200,76 @@ class _CustomImageViewState extends State<CustomImageView>
 
   bool _hasAnimationCompleted = false;
 
+  String? _resolvedCategoryOverride;
+  String? _lastCategoryProbeKey;
+
+  bool _shouldProbeCategoryIcon(String raw, String resolved) {
+    if (!widget.enableCategoryIconResolution) return false;
+    if (_isEffectivelyEmpty(raw)) return false;
+
+    // Heuristic: only probe when it looks like a category icon reference.
+    // - raw icon name (no extension)
+    // - bucket path (category-icons/...)
+    // - Supabase public URL to category-icons
+    final s = raw.trim();
+    final looksLikeIconName = !s.contains('/') && !s.contains('.') && !_isEffectivelyEmpty(s);
+    final looksLikeBucketPath = s.contains('category-icons/');
+    final looksLikeSupabaseBucketUrl =
+        resolved.contains('/storage/v1/object/public/category-icons/');
+
+    return looksLikeIconName || looksLikeBucketPath || looksLikeSupabaseBucketUrl;
+  }
+
+  Future<void> _probeAndResolveCategoryIcon(String raw, String resolved) async {
+    final baseKey = _extractCategoryIconBaseKey(raw) ??
+        _extractCategoryIconBaseKey(resolved);
+    if (baseKey == null || baseKey.isEmpty) return;
+
+    if (_lastCategoryProbeKey == baseKey) return;
+    _lastCategoryProbeKey = baseKey;
+
+    final cached = _categoryIconProbeCache[baseKey];
+    if (cached != null) {
+      if (cached.isNotEmpty && mounted) {
+        setState(() => _resolvedCategoryOverride = cached);
+      }
+      return;
+    }
+
+    final candidates = _categoryIconCandidateUrlsFromBase(baseKey);
+    String found = '';
+
+    for (final url in candidates) {
+      try {
+        // HEAD is cheaper; fall back to GET on odd servers.
+        final uri = Uri.parse(url);
+        http.Response resp;
+        try {
+          resp = await http.head(uri).timeout(const Duration(seconds: 2));
+          if (resp.statusCode == 405) {
+            resp = await http.get(uri).timeout(const Duration(seconds: 2));
+          }
+        } catch (_) {
+          resp = await http.get(uri).timeout(const Duration(seconds: 2));
+        }
+
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          found = url;
+          break;
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    // Cache result (including negative) to avoid repeated network probes.
+    _categoryIconProbeCache[baseKey] = found;
+    if (!mounted) return;
+    if (found.isNotEmpty) {
+      setState(() => _resolvedCategoryOverride = found);
+    }
+  }
+
   String _resolvedPathOrFallback(String? raw) {
     if (_isEffectivelyEmpty(raw)) return widget.placeHolder ?? '';
 
@@ -148,6 +278,18 @@ class _CustomImageViewState extends State<CustomImageView>
     final resolved = widget.enableCategoryIconResolution
         ? _resolveMaybeCategoryIcon(input)
         : input;
+
+    // If this looks like a category icon (and may have the wrong extension),
+    // asynchronously probe for the first existing icon asset and use that.
+    if (_resolvedCategoryOverride != null &&
+        !_isEffectivelyEmpty(_resolvedCategoryOverride)) {
+      return _resolvedCategoryOverride!.trim();
+    }
+
+    if (_shouldProbeCategoryIcon(input, resolved)) {
+      // Kick off probe (cached) without blocking build.
+      Future.microtask(() => _probeAndResolveCategoryIcon(input, resolved));
+    }
 
     if (_isEffectivelyEmpty(resolved)) {
       return widget.placeHolder ?? '';
@@ -165,14 +307,6 @@ class _CustomImageViewState extends State<CustomImageView>
     final oldResolved = _resolvedPathOrFallback(oldPath);
     final newResolved = _resolvedPathOrFallback(newPath);
     return oldResolved != newResolved;
-  }
-
-  int _safeCacheDim(double? v, {int fallback = 200}) {
-    if (v == null) return fallback;
-    if (!v.isFinite) return fallback;
-    if (v <= 0) return fallback;
-    final rounded = v.round();
-    return rounded <= 0 ? fallback : rounded;
   }
 
   double? _safeFiniteDouble(double? v) {
@@ -223,6 +357,8 @@ class _CustomImageViewState extends State<CustomImageView>
 
     if (urlChanged) {
       _hasAnimationCompleted = false;
+      _resolvedCategoryOverride = null;
+      _lastCategoryProbeKey = null;
 
       final resolved = _resolvedPathOrFallback(widget.imagePath);
 

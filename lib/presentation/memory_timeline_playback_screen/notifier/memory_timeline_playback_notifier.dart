@@ -56,6 +56,14 @@ class MemoryTimelinePlaybackNotifier
   Timer? _castStatusTimer;
   static const Duration _castPoll = Duration(milliseconds: 500);
 
+  // Real-time cast status stream (native callbacks/progress).
+  StreamSubscription<Map<String, dynamic>>? _castEventsSub;
+
+  // Cast-only progress helpers (especially for image items where receiver duration/position may be 0).
+  int? _castIndex;
+  int _castElapsedMs = 0;
+  DateTime? _castStartedAt;
+
   // For images, track elapsed across pause/resume
   int _imageElapsedMs = 0;
   DateTime? _imageStartAt;
@@ -90,9 +98,11 @@ class MemoryTimelinePlaybackNotifier
         // Receiver autoplay is expected; reflect play state.
         state = state.copyWith(isPlaying: true);
         unawaited(_castPlaylistQueue(startIndex: state.currentStoryIndex ?? 0));
+        _startCastEventsSubscription();
         _startCastStatusPolling();
       } else {
         _stopCastStatusPolling();
+        _stopCastEventsSubscription();
       }
     };
 
@@ -101,6 +111,20 @@ class MemoryTimelinePlaybackNotifier
     };
 
     await _chromecastService.initialize();
+  }
+
+  void _startCastEventsSubscription() {
+    _stopCastEventsSubscription();
+    _castEventsSub = _chromecastService.playbackStatusStream.listen((status) {
+      _handleCastStatus(status);
+    }, onError: (_) {});
+  }
+
+  void _stopCastEventsSubscription() {
+    try {
+      _castEventsSub?.cancel();
+    } catch (_) {}
+    _castEventsSub = null;
   }
 
   void _stopCastStatusPolling() {
@@ -114,47 +138,111 @@ class MemoryTimelinePlaybackNotifier
       if (!_chromecastService.isConnected) return;
       final status = await _chromecastService.getPlaybackStatus();
       if (status == null) return;
+      _handleCastStatus(status);
+    });
+  }
 
-      final bool isConnected = status['isConnected'] == true;
-      if (!isConnected) return;
+  void _handleCastStatus(Map<String, dynamic> status) {
+    final bool isConnected = status['isConnected'] == true;
+    if (!isConnected) return;
 
-      final bool isPlaying = status['isPlaying'] == true;
-      final int positionMs =
-          (status['positionMs'] is num) ? (status['positionMs'] as num).toInt() : 0;
-      final int durationMs =
-          (status['durationMs'] is num) ? (status['durationMs'] as num).toInt() : 0;
+    final bool isPlaying = status['isPlaying'] == true;
+    final int positionMsRaw =
+        (status['positionMs'] is num) ? (status['positionMs'] as num).toInt() : 0;
+    final int durationMsRaw =
+        (status['durationMs'] is num) ? (status['durationMs'] as num).toInt() : 0;
+    final int imageDurationMs =
+        (status['imageDurationMs'] is num) ? (status['imageDurationMs'] as num).toInt() : 0;
 
-      final int? idx = (status['index'] is num) ? (status['index'] as num).toInt() : null;
+    int? idx = (status['index'] is num) ? (status['index'] as num).toInt() : null;
+    final String? storyId = (status['storyId'] as String?)?.trim();
+    final String? mediaUrl = (status['mediaUrl'] as String?)?.trim();
 
-      PlaybackStoryModel? currentStory = state.currentStory;
-      int? nextIndex = state.currentStoryIndex;
+    PlaybackStoryModel? currentStory = state.currentStory;
+    int? nextIndex = state.currentStoryIndex;
 
-      final stories = state.stories;
-      if (idx != null &&
-          stories != null &&
-          idx >= 0 &&
-          idx < stories.length &&
-          (state.currentStoryIndex ?? 0) != idx) {
-        nextIndex = idx;
-        currentStory = stories[idx];
+    final stories = state.stories;
+    if (stories != null && stories.isNotEmpty) {
+      // Best effort: index → storyId → mediaUrl
+      if (idx == null && storyId != null && storyId.isNotEmpty) {
+        final byId = stories.indexWhere((s) => (s.storyId ?? '').trim() == storyId);
+        if (byId >= 0) idx = byId;
       }
 
-      final total = Duration(milliseconds: durationMs.clamp(0, 24 * 60 * 60 * 1000));
-      final remaining = Duration(
-        milliseconds: (durationMs - positionMs).clamp(0, durationMs),
-      );
-      final progress =
-          durationMs <= 0 ? 0.0 : (positionMs / durationMs).clamp(0.0, 1.0);
+      if (idx == null && mediaUrl != null && mediaUrl.isNotEmpty) {
+        final byUrl = stories.indexWhere((s) {
+          final v = (s.videoUrl ?? '').trim();
+          final i = (s.imageUrl ?? '').trim();
+          return (v.isNotEmpty && v == mediaUrl) || (i.isNotEmpty && i == mediaUrl);
+        });
+        if (byUrl >= 0) idx = byUrl;
+      }
 
-      state = state.copyWith(
-        isPlaying: isPlaying,
-        currentStoryIndex: nextIndex,
-        currentStory: currentStory,
-        storyTotal: total,
-        storyRemaining: remaining,
-        storyProgress: progress,
-      );
-    });
+      if (idx != null && idx >= 0 && idx < stories.length) {
+        if ((state.currentStoryIndex ?? 0) != idx || currentStory == null) {
+          nextIndex = idx;
+          currentStory = stories[idx];
+        }
+      }
+    }
+
+    // Track cast item elapsed locally for image items (receiver often reports 0 duration/position).
+    final bool indexChanged = (idx != null && idx != _castIndex);
+    if (indexChanged) {
+      _castIndex = idx;
+      _castElapsedMs = 0;
+      _castStartedAt = DateTime.now();
+    }
+
+    if (isPlaying) {
+      _castStartedAt ??= DateTime.now();
+    } else {
+      final start = _castStartedAt;
+      if (start != null) {
+        _castElapsedMs += DateTime.now().difference(start).inMilliseconds;
+        _castStartedAt = null;
+      }
+    }
+
+    // Prefer receiver duration; fallback to imageDurationMs.
+    final int durMs = (durationMsRaw > 0) ? durationMsRaw : imageDurationMs;
+
+    // Prefer receiver position; fallback to local elapsed for images.
+    int posMs = positionMsRaw;
+    if (posMs <= 0 && durMs > 0) {
+      final start = _castStartedAt;
+      final elapsedNow = _castElapsedMs +
+          (start != null ? DateTime.now().difference(start).inMilliseconds : 0);
+      posMs = elapsedNow.clamp(0, durMs);
+    }
+
+    final total = Duration(milliseconds: durMs.clamp(0, 24 * 60 * 60 * 1000));
+    final remaining = Duration(milliseconds: (durMs - posMs).clamp(0, durMs));
+    final progress = durMs <= 0 ? 0.0 : (posMs / durMs).clamp(0.0, 1.0);
+
+    // Avoid rebuilding when nothing meaningful changed.
+    final currentProgress = state.storyProgress ?? 0.0;
+    final currentRemainingMs = (state.storyRemaining ?? Duration.zero).inMilliseconds;
+    final currentTotalMs = (state.storyTotal ?? Duration.zero).inMilliseconds;
+    final currentStoryId = (state.currentStory?.storyId ?? '').trim();
+    final nextStoryId = (currentStory?.storyId ?? '').trim();
+
+    final bool changed = (state.isPlaying ?? false) != isPlaying ||
+        (state.currentStoryIndex ?? 0) != (nextIndex ?? 0) ||
+        currentStoryId != nextStoryId ||
+        (currentProgress - progress).abs() > 0.002 ||
+        currentRemainingMs != remaining.inMilliseconds ||
+        currentTotalMs != total.inMilliseconds;
+    if (!changed) return;
+
+    state = state.copyWith(
+      isPlaying: isPlaying,
+      currentStoryIndex: nextIndex,
+      currentStory: currentStory,
+      storyTotal: total,
+      storyRemaining: remaining,
+      storyProgress: progress,
+    );
   }
 
   // ------------------------
@@ -868,6 +956,7 @@ class MemoryTimelinePlaybackNotifier
   @override
   void dispose() {
     _stopCastStatusPolling();
+    _stopCastEventsSubscription();
     _stopImageAutoAdvance();
     _stopProgressTicker();
     _pauseImageProgressTicker();

@@ -19,4 +19,16 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <!--
+      Chromecast chooser dialog theme.
+      Some OEM ROMs (notably MIUI) crash if a dialog background is translucent/transparent.
+      We force an opaque background here to prevent:
+        IllegalArgumentException: background can not be translucent: #0
+    -->
+    <style name="CapsuleCastDialogTheme" parent="@style/Theme.AppCompat.Light.Dialog.Alert">
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowBackground">@color/cast_dialog_background</item>
+        <item name="android:colorBackground">@color/cast_dialog_background</item>
+    </style>
 </resources>

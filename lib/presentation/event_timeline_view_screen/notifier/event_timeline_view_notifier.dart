@@ -335,7 +335,17 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       final normalizedState = _normalizeState(memoryData['state']);
       final sealed = _isSealedState(normalizedState);
 
-      final category = memoryData['memory_categories'] as Map<String, dynamic>?;
+      // Postgrest can return joined relations as either an object or a 1-element array.
+      final rawCategory = memoryData['memory_categories'];
+      Map<String, dynamic>? category;
+      if (rawCategory is Map) {
+        category = Map<String, dynamic>.from(rawCategory);
+      } else if (rawCategory is List &&
+          rawCategory.isNotEmpty &&
+          rawCategory.first is Map) {
+        category = Map<String, dynamic>.from(rawCategory.first as Map);
+      }
+
       final iconNameRaw = category?['icon_name'] as String?;
       final iconName = (iconNameRaw ?? '').trim();
       final iconUrl = (category?['icon_url'] as String?)?.trim();
@@ -351,6 +361,35 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         }
       } else if (iconUrl != null && iconUrl.isNotEmpty) {
         categoryIconUrl = iconUrl;
+      }
+
+      // Fallback: if join didn't return category fields, fetch by category_id.
+      final categoryId = (memoryData['category_id'] as String?)?.trim();
+      if (categoryIconUrl.trim().isEmpty &&
+          categoryId != null &&
+          categoryId.isNotEmpty) {
+        try {
+          final client = SupabaseService.instance.client;
+          final cat = await client
+              ?.from('memory_categories')
+              .select('icon_name, icon_url')
+              .eq('id', categoryId)
+              .maybeSingle();
+
+          final catIconName = (cat?['icon_name'] as String?)?.trim() ?? '';
+          final catIconUrl = (cat?['icon_url'] as String?)?.trim();
+
+          if (catIconName.isNotEmpty) {
+            final resolved = StorageUtils.resolveMemoryCategoryIconUrl(catIconName);
+            if (resolved.trim().isNotEmpty) {
+              categoryIconUrl = resolved.trim();
+            } else if (catIconUrl != null && catIconUrl.isNotEmpty) {
+              categoryIconUrl = catIconUrl;
+            }
+          } else if (catIconUrl != null && catIconUrl.isNotEmpty) {
+            categoryIconUrl = catIconUrl;
+          }
+        } catch (_) {}
       }
 
       print('🧩 CATEGORY ICON DEBUG (reload): '
@@ -472,6 +511,7 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
   id,
   title,
   visibility,
+  category_id,
   created_at,
   start_time,
   end_time,
@@ -489,7 +529,16 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
       print('   - Visibility: ${memoryResponse['visibility']}');
       print('   - isSealed: $sealed');
 
-      final categoryData = memoryResponse['memory_categories'] as Map<String, dynamic>?;
+      // Postgrest can return joined relations as either an object or a 1-element array.
+      final rawCategory = memoryResponse['memory_categories'];
+      Map<String, dynamic>? categoryData;
+      if (rawCategory is Map) {
+        categoryData = Map<String, dynamic>.from(rawCategory);
+      } else if (rawCategory is List &&
+          rawCategory.isNotEmpty &&
+          rawCategory.first is Map) {
+        categoryData = Map<String, dynamic>.from(rawCategory.first as Map);
+      }
 
       final iconNameRaw = categoryData?['icon_name'] as String?;
       final iconName = (iconNameRaw ?? '').trim();
@@ -506,6 +555,34 @@ class EventTimelineViewNotifier extends StateNotifier<EventTimelineViewState> {
         }
       } else if (iconUrl != null && iconUrl.isNotEmpty) {
         categoryIconFinal = iconUrl;
+      }
+
+      // Fallback: if join didn't return category fields, fetch by category_id.
+      final categoryId = (memoryResponse['category_id'] as String?)?.trim();
+      if (categoryIconFinal.trim().isEmpty &&
+          categoryId != null &&
+          categoryId.isNotEmpty) {
+        try {
+          final cat = await client
+              .from('memory_categories')
+              .select('icon_name, icon_url')
+              .eq('id', categoryId)
+              .maybeSingle();
+
+          final catIconName = (cat?['icon_name'] as String?)?.trim() ?? '';
+          final catIconUrl = (cat?['icon_url'] as String?)?.trim();
+
+          if (catIconName.isNotEmpty) {
+            final resolved = StorageUtils.resolveMemoryCategoryIconUrl(catIconName);
+            if (resolved.trim().isNotEmpty) {
+              categoryIconFinal = resolved.trim();
+            } else if (catIconUrl != null && catIconUrl.isNotEmpty) {
+              categoryIconFinal = catIconUrl;
+            }
+          } else if (catIconUrl != null && catIconUrl.isNotEmpty) {
+            categoryIconFinal = catIconUrl;
+          }
+        } catch (_) {}
       }
 
       print('🧩 CATEGORY ICON DEBUG: '

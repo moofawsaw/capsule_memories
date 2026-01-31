@@ -6,11 +6,14 @@ class GroupJoinConfirmationState {
     this.isLoading,
     this.errorMessage,
     this.groupId,
+    this.creatorId,
     this.groupName,
     this.creatorName,
     this.creatorAvatar,
     this.memberAvatars,
     this.memberCount,
+    this.createdAt,
+    this.members,
     this.isAccepting,
     this.shouldNavigateToGroups,
   });
@@ -24,11 +27,14 @@ class GroupJoinConfirmationState {
 
   // Group details
   String? groupId;
+  String? creatorId;
   String? groupName;
   String? creatorName;
   String? creatorAvatar;
   List<String>? memberAvatars;
   int? memberCount;
+  DateTime? createdAt;
+  List<GroupMemberPreview>? members;
 
   // Navigation flags
   bool? shouldNavigateToGroups;
@@ -39,11 +45,14 @@ class GroupJoinConfirmationState {
     bool? isAccepting,
     String? errorMessage,
     String? groupId,
+    String? creatorId,
     String? groupName,
     String? creatorName,
     String? creatorAvatar,
     List<String>? memberAvatars,
     int? memberCount,
+    DateTime? createdAt,
+    List<GroupMemberPreview>? members,
     bool? shouldNavigateToGroups,
   }) {
     return GroupJoinConfirmationState(
@@ -53,11 +62,14 @@ class GroupJoinConfirmationState {
       isAccepting: isAccepting ?? this.isAccepting,
       errorMessage: errorMessage ?? this.errorMessage,
       groupId: groupId ?? this.groupId,
+      creatorId: creatorId ?? this.creatorId,
       groupName: groupName ?? this.groupName,
       creatorName: creatorName ?? this.creatorName,
       creatorAvatar: creatorAvatar ?? this.creatorAvatar,
       memberAvatars: memberAvatars ?? this.memberAvatars,
       memberCount: memberCount ?? this.memberCount,
+      createdAt: createdAt ?? this.createdAt,
+      members: members ?? this.members,
       shouldNavigateToGroups:
           shouldNavigateToGroups ?? this.shouldNavigateToGroups,
     );

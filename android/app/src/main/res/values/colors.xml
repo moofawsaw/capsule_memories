@@ -2,4 +2,7 @@
 <resources>
     <!-- Splash screen background color - Deep Purple matching app theme -->
     <color name="splash_background">#1A0733</color>
+
+    <!-- Chromecast dialog background (must be opaque for some OEM ROMs like MIUI) -->
+    <color name="cast_dialog_background">#121212</color>
 </resources>

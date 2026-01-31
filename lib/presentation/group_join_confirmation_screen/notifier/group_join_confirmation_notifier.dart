@@ -5,6 +5,18 @@ import '../../../utils/storage_utils.dart';
 
 part 'group_join_confirmation_state.dart';
 
+class GroupMemberPreview {
+  final String userId;
+  final String displayName;
+  final String? avatarUrl;
+
+  const GroupMemberPreview({
+    required this.userId,
+    required this.displayName,
+    required this.avatarUrl,
+  });
+}
+
 final groupJoinConfirmationNotifier = StateNotifierProvider.autoDispose<
     GroupJoinConfirmationNotifier, GroupJoinConfirmationState>(
   (ref) => GroupJoinConfirmationNotifier(
@@ -45,10 +57,10 @@ class GroupJoinConfirmationNotifier
             id,
             creator_id,
             name,
-            member_count
+            member_count,
+            created_at
           ''').eq('invite_code', normalized).maybeSingle().timeout(
-            Duration(seconds: 10),
-            onTimeout: () => null,
+            const Duration(seconds: 20),
           );
 
       if (response == null) {
@@ -59,10 +71,15 @@ class GroupJoinConfirmationNotifier
       final creatorId = response['creator_id'] as String?;
       final groupName = response['name'] as String?;
       final memberCount = response['member_count'] as int?;
+      final createdAtRaw = response['created_at'];
+      final DateTime? createdAt = createdAtRaw is String
+          ? DateTime.tryParse(createdAtRaw)
+          : (createdAtRaw is DateTime ? createdAtRaw : null);
 
       String? creatorName;
       String? creatorAvatar;
       List<String> memberAvatars = const [];
+      List<GroupMemberPreview> members = const [];
 
       if (creatorId != null && creatorId.isNotEmpty) {
         try {
@@ -96,17 +113,29 @@ class GroupJoinConfirmationNotifier
           if (ids.isNotEmpty) {
             final profiles = await supabase
                 .from('user_profiles')
-                .select('id,avatar_url')
+                .select('id,display_name,avatar_url')
                 .inFilter('id', ids);
 
             final urls = <String>[];
+            final memberPreviews = <GroupMemberPreview>[];
             for (final row in (profiles as List?) ?? const []) {
               if (row is! Map) continue;
+              final id = (row['id'] as String?)?.trim();
+              if (id == null || id.isEmpty) continue;
+              final name = (row['display_name'] as String?)?.trim();
               final avatarRaw = row['avatar_url'] as String?;
               final resolved = StorageUtils.resolveAvatarUrl(avatarRaw);
               if (resolved != null && resolved.trim().isNotEmpty) {
                 urls.add(resolved.trim());
               }
+
+              memberPreviews.add(
+                GroupMemberPreview(
+                  userId: id,
+                  displayName: (name == null || name.isEmpty) ? 'Member' : name,
+                  avatarUrl: resolved ?? avatarRaw,
+                ),
+              );
             }
 
             // Ensure creator is represented (if they have an avatar and aren't already included)
@@ -116,14 +145,52 @@ class GroupJoinConfirmationNotifier
             }
 
             memberAvatars = urls;
+
+            // Ensure member list includes everyone in ids (stable order).
+            final byId = <String, GroupMemberPreview>{
+              for (final m in memberPreviews) m.userId: m,
+            };
+            members = ids
+                .map((id) {
+                  final m = byId[id];
+                  if (m != null) return m;
+                  return GroupMemberPreview(
+                    userId: id,
+                    displayName: 'Member',
+                    avatarUrl: null,
+                  );
+                })
+                .toList(growable: false);
           } else {
             final creatorResolved = (creatorAvatar ?? '').trim();
             memberAvatars =
                 creatorResolved.isNotEmpty ? [creatorResolved] : const [];
+            members = creatorId != null && creatorId.isNotEmpty
+                ? [
+                    GroupMemberPreview(
+                      userId: creatorId,
+                      displayName: (creatorName ?? 'Creator').trim().isEmpty
+                          ? 'Creator'
+                          : (creatorName ?? 'Creator'),
+                      avatarUrl: creatorAvatar,
+                    )
+                  ]
+                : const [];
           }
         } catch (_) {
           final creatorResolved = (creatorAvatar ?? '').trim();
           memberAvatars = creatorResolved.isNotEmpty ? [creatorResolved] : const [];
+          members = creatorId != null && creatorId.isNotEmpty
+              ? [
+                  GroupMemberPreview(
+                    userId: creatorId,
+                    displayName: (creatorName ?? 'Creator').trim().isEmpty
+                        ? 'Creator'
+                        : (creatorName ?? 'Creator'),
+                    avatarUrl: creatorAvatar,
+                  )
+                ]
+              : const [];
         }
       }
 
@@ -131,10 +198,13 @@ class GroupJoinConfirmationNotifier
         isLoading: false,
         groupId: groupId,
         groupName: groupName,
+        creatorId: creatorId,
         creatorName: creatorName,
         creatorAvatar: creatorAvatar,
         memberAvatars: memberAvatars,
         memberCount: memberCount,
+        createdAt: createdAt,
+        members: members,
         errorMessage: null,
       );
     } catch (e, stackTrace) {

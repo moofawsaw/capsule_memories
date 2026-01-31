@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../core/app_export.dart';
@@ -7,6 +8,8 @@ import '../core/app_export.dart';
 class ChromecastService {
   static const MethodChannel _channel =
       MethodChannel('com.capsule.app/chromecast');
+  static const EventChannel _events =
+      EventChannel('com.capsule.app/chromecast_events');
 
   // Singleton pattern
   static final ChromecastService _instance = ChromecastService._internal();
@@ -23,11 +26,21 @@ class ChromecastService {
   Function(List<ChromecastDevice> devices)? onDevicesUpdated;
   Function(String error)? onError;
 
+  // Real-time playback status events from native (Android/iOS).
+  final StreamController<Map<String, dynamic>> _playbackStatusController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  StreamSubscription? _eventsSub;
+  bool _eventsInitialized = false;
+
+  Stream<Map<String, dynamic>> get playbackStatusStream =>
+      _playbackStatusController.stream;
+
   /// Initialize Chromecast service and start device discovery
   Future<void> initialize() async {
     try {
       // Set up method call handler for callbacks from native code
       _channel.setMethodCallHandler(_handleMethodCall);
+      _ensureEventsInitialized();
 
       // Initialize native Chromecast SDK
       final bool? initialized = await _channel.invokeMethod('initialize');
@@ -42,6 +55,25 @@ class ChromecastService {
       debugPrint('❌ Chromecast initialization error: ${e.message}');
       onError?.call('Failed to initialize Chromecast: ${e.message}');
     }
+  }
+
+  void _ensureEventsInitialized() {
+    if (_eventsInitialized) return;
+    _eventsInitialized = true;
+
+    // Receive broadcast stream from native Cast SDK and forward to callers.
+    _eventsSub = _events.receiveBroadcastStream().listen((event) {
+      try {
+        if (event is Map) {
+          _playbackStatusController.add(Map<String, dynamic>.from(event));
+        }
+      } catch (e) {
+        debugPrint('⚠️ Chromecast events parse error: $e');
+      }
+    }, onError: (e) {
+      debugPrint('❌ Chromecast events error: $e');
+      onError?.call('Chromecast events error: $e');
+    });
   }
 
   /// Handle callbacks from native platform code
@@ -340,6 +372,13 @@ class ChromecastService {
   void dispose() {
     stopDeviceDiscovery();
     _availableDevices.clear();
+    try {
+      _eventsSub?.cancel();
+    } catch (_) {}
+    _eventsSub = null;
+    // Allow re-initialization later (service is a singleton used across screens).
+    _eventsInitialized = false;
+    // Do NOT close the broadcast controller (singleton may be reused).
   }
 }
 

@@ -19,6 +19,8 @@ class CustomNavigationDrawer extends StatelessWidget {
     this.iconTextSpacing,
     this.textStyle,
     this.iconSize,
+    this.itemPadding,
+    this.itemBorderRadius,
   }) : super(key: key);
 
   /// List of navigation menu items to display
@@ -39,10 +41,16 @@ class CustomNavigationDrawer extends StatelessWidget {
   /// Size of the icons
   final double? iconSize;
 
+  /// Padding inside each tappable row (controls hit target size)
+  final EdgeInsetsGeometry? itemPadding;
+
+  /// Border radius for tap feedback
+  final BorderRadius? itemBorderRadius;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: margin ?? EdgeInsets.only(top: 30.h, left: 12.h),
+      margin: margin ?? EdgeInsets.only(top: 30.h, left: 0.h),
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,7 +58,7 @@ class CustomNavigationDrawer extends StatelessWidget {
           menuItems.length,
           (index) => Container(
             margin: EdgeInsets.only(
-              bottom: index < menuItems.length - 1 ? (itemSpacing ?? 32.h) : 0,
+              bottom: index < menuItems.length - 1 ? (itemSpacing ?? 12.h) : 0,
             ),
             child: _buildMenuItem(menuItems[index]),
           ),
@@ -60,28 +68,44 @@ class CustomNavigationDrawer extends StatelessWidget {
   }
 
   Widget _buildMenuItem(CustomNavigationDrawerItem item) {
-    return GestureDetector(
-      onTap: item.onTap,
-      child: Row(
-        children: [
-          Icon(
-            item.icon,
-            size: iconSize ?? 24.h,
+    final BorderRadius radius = itemBorderRadius ?? BorderRadius.circular(10.h);
+
+    // Use InkWell (not GestureDetector) so the entire row (including icon)
+    // is consistently tappable with proper hit testing + feedback.
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: radius,
+        child: Padding(
+          padding: itemPadding ??
+              EdgeInsets.symmetric(
+                vertical: 10.h,
+                horizontal: 0.h,
+              ),
+          child: Row(
+            children: [
+              Icon(
+                item.icon,
+                size: iconSize ?? 24.h,
+                color: appTheme.gray_50,
+              ),
+              SizedBox(width: iconTextSpacing ?? 8.h),
+              Expanded(
+                child: Text(
+                  item.label,
+                  style: textStyle ??
+                      TextStyleHelper.instance.title16BoldPlusJakartaSans
+                          .copyWith(color: appTheme.gray_50),
+                ),
+              ),
+              if (item.trailing != null) ...[
+                SizedBox(width: 10.h),
+                item.trailing!,
+              ],
+            ],
           ),
-          SizedBox(width: iconTextSpacing ?? 8.h),
-          Expanded(
-            child: Text(
-              item.label,
-              style: textStyle ??
-                  TextStyleHelper.instance.title16BoldPlusJakartaSans
-                      .copyWith(color: appTheme.gray_50),
-            ),
-          ),
-          if (item.trailing != null) ...[
-            SizedBox(width: 10.h),
-            item.trailing!,
-          ],
-        ],
+        ),
       ),
     );
   }

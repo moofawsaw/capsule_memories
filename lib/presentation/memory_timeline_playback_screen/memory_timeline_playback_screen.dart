@@ -38,6 +38,10 @@ class MemoryTimelinePlaybackScreenState
   // ✅ NEW: Volume toggle state for playback screen
   bool _isMuted = false;
 
+  // Hold-to-pause (fullscreen only)
+  bool _holdToPauseActive = false;
+  bool _holdToPauseWasPlaying = false;
+
   @override
   void initState() {
     super.initState();
@@ -261,15 +265,62 @@ class MemoryTimelinePlaybackScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(memoryTimelinePlaybackNotifier);
     final isLoading = state.isLoading ?? false;
+    final isCasting = state.isChromecastConnected ?? false;
+    final showControlsEffective = isCasting ? true : _showControls;
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: GestureDetector(
-        onTap: () async => await _toggleControls(),
+        // Short tap: show controls (unless a hold gesture handled the interaction).
+        onTap: () async {
+          if (_holdToPauseActive) return;
+          // Chromecast controller mode: overlay never hides, so tapping should not toggle UI.
+          if (isCasting) return;
+          await _toggleControls();
+        },
         onDoubleTap: () {
+          // Chromecast controller mode: avoid viewer-style gestures.
+          if (isCasting) return;
           ref
               .read(memoryTimelinePlaybackNotifier.notifier)
               .toggleFavorite(state.currentStoryIndex ?? 0);
+        },
+        onLongPressStart: (details) {
+          // Fullscreen (no overlays) only, and not while casting.
+          if (_showControls || isCasting) return;
+
+          // Only trigger if the press starts near the center (avoid accidental holds).
+          final size = MediaQuery.sizeOf(context);
+          final center = Offset(size.width / 2, size.height / 2);
+          final maxW = (size.width * 0.6).clamp(160.0, 280.0);
+          final maxH = (size.height * 0.4).clamp(160.0, 280.0);
+          final rect = Rect.fromCenter(center: center, width: maxW, height: maxH);
+
+          final local = details.localPosition;
+          if (!rect.contains(local)) return;
+
+          _holdToPauseActive = true;
+          _holdToPauseWasPlaying = state.isPlaying ?? false;
+
+          if (_holdToPauseWasPlaying) {
+            ref.read(memoryTimelinePlaybackNotifier.notifier).togglePlayPause();
+          }
+        },
+        onLongPressEnd: (_) {
+          if (!_holdToPauseActive) return;
+
+          final shouldResume = _holdToPauseWasPlaying;
+          _holdToPauseActive = false;
+          _holdToPauseWasPlaying = false;
+
+          // Resume only if we paused due to hold.
+          if (shouldResume) {
+            final nowPlaying =
+                ref.read(memoryTimelinePlaybackNotifier).isPlaying ?? false;
+            if (!nowPlaying) {
+              ref.read(memoryTimelinePlaybackNotifier.notifier).togglePlayPause();
+            }
+          }
         },
         child: Stack(
           children: [
@@ -291,16 +342,17 @@ class MemoryTimelinePlaybackScreenState
               child: _buildImageStoryBadge(state),
             ),
 
-            if (_showControls) _buildTopOverlay(context, state),
-            if (_showControls) _buildBottomOverlay(context, state),
-            if (_showControls) _buildPlaybackControls(context, state),
+            if (showControlsEffective) _buildTopOverlay(context, state),
+            if (showControlsEffective) _buildBottomOverlay(context, state),
+            if (showControlsEffective) _buildPlaybackControls(context, state),
 
-            _buildTimelineScrubber(context, state),
+            // Chromecast controller mode: hide viewer-only layers behind overlay.
+            if (!isCasting) _buildTimelineScrubber(context, state),
 
-            if (_showFilters) _buildFilterPanel(context, state),
+            if (!isCasting && _showFilters) _buildFilterPanel(context, state),
 
             // Author badge – ONLY in full screen (controls hidden)
-            if (!_showControls)
+            if (!showControlsEffective)
               Positioned(
                 left: 16.h,
                 bottom: 28.h, // adjust if it overlaps your bottom UI
@@ -659,14 +711,13 @@ class MemoryTimelinePlaybackScreenState
   Widget _buildTopOverlay(
       BuildContext context, MemoryTimelinePlaybackState state) {
     final notifier = ref.read(memoryTimelinePlaybackNotifier.notifier);
+    final isCasting = state.isChromecastConnected ?? false;
 
     // ✅ Only show volume button when we have a usable video controller
     final showVolumeButton = (state.currentStory?.mediaType == 'video') &&
         (notifier.currentVideoController != null);
 
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Container(
+    final overlay = Container(
         padding: EdgeInsets.fromLTRB(20.h, 40.h, 20.h, 20.h),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -797,7 +848,14 @@ class MemoryTimelinePlaybackScreenState
             ),
           ],
         ),
-      ),
+      );
+
+    // Chromecast controller mode: overlay is always visible (no fade).
+    if (isCasting) return overlay;
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: overlay,
     );
   }
 
@@ -808,124 +866,126 @@ class MemoryTimelinePlaybackScreenState
     final int total = state.totalStories ?? 0;
     final double progress =
         (total > 0) ? (idx / total).clamp(0.0, 1.0) : 0.0;
+    final isCasting = state.isChromecastConnected ?? false;
 
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          padding: EdgeInsets.fromLTRB(20.h, 14.h, 20.h, 40.h),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [
-                Colors.black.withAlpha(179),
-                Colors.transparent,
-              ],
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ✅ NEW subtitle above thumbnails (cinema mode context)
-              _buildCinemaOrderSubtitle(state),
-
-              _buildStoryThumbnailsRow(state),
-
-              SizedBox(height: 12.h),
-
-              if (state.currentStory?.timestamp != null)
-                Padding(
-                  padding: EdgeInsets.only(bottom: 12.h),
-                  child: Text(
-                    state.currentStory!.timestamp!,
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14.sp,
-                    ),
-                  ),
-                ),
-
-              Row(
-                children: [
-                  Text(
-                    '${(progress * 100).toInt()}%',
-                    style: TextStyle(color: Colors.white, fontSize: 12.sp),
-                  ),
-                  SizedBox(width: 8.h),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4.h),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: Colors.white24,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          appTheme.deep_purple_A100,
-                        ),
-                        minHeight: 4.h,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    final overlay = Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(20.h, 14.h, 20.h, 40.h),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              Colors.black.withAlpha(179),
+              Colors.transparent,
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPlaybackControls(
-      BuildContext context, MemoryTimelinePlaybackState state) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Center(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          spacing: 40.h,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            CustomIconButton(
-              icon: Icons.chevron_left,
-              backgroundColor: Colors.black54,
-              iconColor: Colors.white,
-              height: 56.h,
-              width: 56.h,
-              onTap: () {
-                ref
-                    .read(memoryTimelinePlaybackNotifier.notifier)
-                    .skipBackward();
-              },
-            ),
-            CustomIconButton(
-              icon: (state.isPlaying ?? false)
-                  ? Icons.pause_circle_filled
-                  : Icons.play_circle_filled,
-              backgroundColor: appTheme.deep_purple_A100,
-              iconColor: Colors.white,
-              iconSize: 36.h,
-              height: 72.h,
-              width: 72.h,
-              onTap: () {
-                ref
-                    .read(memoryTimelinePlaybackNotifier.notifier)
-                    .togglePlayPause();
-              },
-            ),
-            CustomIconButton(
-              icon: Icons.chevron_right,
-              backgroundColor: Colors.black54,
-              iconColor: Colors.white,
-              height: 56.h,
-              width: 56.h,
-              onTap: () {
-                ref.read(memoryTimelinePlaybackNotifier.notifier).skipForward();
-              },
+            // ✅ NEW subtitle above thumbnails (cinema mode context)
+            _buildCinemaOrderSubtitle(state),
+
+            _buildStoryThumbnailsRow(state),
+
+            SizedBox(height: 12.h),
+
+            if (state.currentStory?.timestamp != null)
+              Padding(
+                padding: EdgeInsets.only(bottom: 12.h),
+                child: Text(
+                  state.currentStory!.timestamp!,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14.sp,
+                  ),
+                ),
+              ),
+
+            Row(
+              children: [
+                Text(
+                  '${(progress * 100).toInt()}%',
+                  style: TextStyle(color: Colors.white, fontSize: 12.sp),
+                ),
+                SizedBox(width: 8.h),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4.h),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.white24,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        appTheme.deep_purple_A100,
+                      ),
+                      minHeight: 4.h,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
+
+    // Chromecast controller mode: overlay is always visible (no fade).
+    if (isCasting) return overlay;
+
+    return FadeTransition(opacity: _fadeAnimation, child: overlay);
+  }
+
+  Widget _buildPlaybackControls(
+      BuildContext context, MemoryTimelinePlaybackState state) {
+    final isCasting = state.isChromecastConnected ?? false;
+    final controls = Center(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        spacing: 40.h,
+        children: [
+          CustomIconButton(
+            icon: Icons.chevron_left,
+            backgroundColor: Colors.black54,
+            iconColor: Colors.white,
+            height: 56.h,
+            width: 56.h,
+            onTap: () {
+              ref.read(memoryTimelinePlaybackNotifier.notifier).skipBackward();
+            },
+          ),
+          CustomIconButton(
+            icon: (state.isPlaying ?? false)
+                ? Icons.pause_circle_filled
+                : Icons.play_circle_filled,
+            backgroundColor: appTheme.deep_purple_A100,
+            iconColor: Colors.white,
+            iconSize: 36.h,
+            height: 72.h,
+            width: 72.h,
+            onTap: () {
+              ref.read(memoryTimelinePlaybackNotifier.notifier).togglePlayPause();
+            },
+          ),
+          CustomIconButton(
+            icon: Icons.chevron_right,
+            backgroundColor: Colors.black54,
+            iconColor: Colors.white,
+            height: 56.h,
+            width: 56.h,
+            onTap: () {
+              ref.read(memoryTimelinePlaybackNotifier.notifier).skipForward();
+            },
+          ),
+        ],
+      ),
+    );
+
+    // Chromecast controller mode: controls always visible (no fade).
+    if (isCasting) return controls;
+
+    return FadeTransition(opacity: _fadeAnimation, child: controls);
   }
 
   Widget _buildTimelineScrubber(

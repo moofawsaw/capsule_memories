@@ -482,17 +482,22 @@ class QRTimelineShareScreenState extends ConsumerState<QRTimelineShareScreen> {
     });
   }
 
-  /// Share link via system share sheet
+  /// Share link via system share sheet (no subject/title)
   void _shareLink(String url) async {
-    final memoryTitle = _memoryData!['title'] as String;
+    final memoryTitle = (_memoryData?['title'] as String?)?.trim() ?? 'Untitled Memory';
 
+    // If you want the previewer to handle title/metadata, keep the text minimal.
+    // Avoid passing `subject:` entirely.
     await Share.share(
-      'Join my memory "$memoryTitle" on Capsule:\n$url',
-      subject: 'Join Memory on Capsule',
+      '$url',
+      // Or, if you still want some body text without a subject:
+      // 'Join my memory on Capsule:\n$url',
     );
 
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      const SnackBar(
         content: Text('Link shared successfully'),
         duration: Duration(seconds: 2),
       ),

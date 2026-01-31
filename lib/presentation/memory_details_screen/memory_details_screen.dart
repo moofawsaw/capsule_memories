@@ -372,7 +372,9 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                                 child: CustomImageView(
                                   imagePath: selectedIconUrl,
                                   fit: BoxFit.contain,
-                                  enableCategoryIconResolution: false,
+                                  // Allow category icon resolution + fallback probing
+                                  // (some categories store icon_name without an extension).
+                                  enableCategoryIconResolution: true,
                                 ),
                               )
                             : Icon(
@@ -430,7 +432,7 @@ class MemoryDetailsScreenState extends ConsumerState<MemoryDetailsScreen> {
                               child: CustomImageView(
                                 imagePath: selectedIconUrl,
                                 fit: BoxFit.contain,
-                                enableCategoryIconResolution: false,
+                              enableCategoryIconResolution: true,
                               ),
                             )
                           : Icon(

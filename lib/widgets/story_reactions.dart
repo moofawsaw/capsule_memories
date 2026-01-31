@@ -1,18 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 import '../constants/reactions.dart';
 import '../services/reaction_service.dart';
 import '../services/reaction_preloader.dart';
 import '../core/app_export.dart';
+import './reaction_burst_overlay.dart';
 
 class StoryReactionsWidget extends StatefulWidget {
   final String storyId;
   final VoidCallback? onReactionAdded;
+  final bool enableFloatingReactions;
+  final bool enableHaptics;
 
   const StoryReactionsWidget({
     Key? key,
     required this.storyId,
     this.onReactionAdded,
+    this.enableFloatingReactions = true,
+    this.enableHaptics = true,
   }) : super(key: key);
 
   @override
@@ -88,7 +95,9 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
   Future<void> _onReactionTap(ReactionType reaction) async {
     final currentUserTaps = _userTapCounts[reaction.id] ?? 0;
     if (currentUserTaps >= ReactionService.maxTapsPerUser) {
-      await HapticFeedback.mediumImpact();
+      if (widget.enableHaptics) {
+        unawaited(HapticFeedback.mediumImpact());
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -102,9 +111,15 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
       return;
     }
 
-    await HapticFeedback.lightImpact();
+    if (widget.enableHaptics) {
+      unawaited(HapticFeedback.lightImpact());
+    }
 
-    _showFloatingReaction(reaction);
+    // IMPORTANT: Floating overlay animations can steal frame time from video playback.
+    // Allow callers (story viewer) to disable them while video is playing.
+    if (widget.enableFloatingReactions) {
+      _showFloatingReaction(reaction);
+    }
 
     // Optimistic UI update
     setState(() {
@@ -171,33 +186,21 @@ class _StoryReactionsWidgetState extends State<StoryReactionsWidget> {
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
 
-    final overlayState = Overlay.of(context);
-    late OverlayEntry overlayEntry;
-
+    // Single overlay + single ticker approach (much cheaper than spawning one
+    // OverlayEntry + AnimationController per tap).
     final now = DateTime.now();
-    final randomSeed = now.microsecond;
-    final horizontalOffset = ((randomSeed % 80) - 40.0);
-    final verticalOffset = ((randomSeed ~/ 100) % 30) - 15.0;
-    final rotationOffset = ((randomSeed ~/ 200) % 60) - 30.0;
+    final seed = now.microsecondsSinceEpoch;
 
-    final baseDuration = 1500;
-    final durationVariation = (randomSeed % 300) - 150;
-    final animationDuration = baseDuration + durationVariation;
-
-    overlayEntry = OverlayEntry(
-      builder: (context) => FloatingReactionAnimation(
-        emoji: reaction.display,
-        startPosition: Offset(
-          position.dx + size.width / 2 + horizontalOffset,
-          position.dy + size.height / 2 + verticalOffset,
-        ),
-        rotationDegrees: rotationOffset,
-        duration: Duration(milliseconds: animationDuration),
-        onComplete: () => overlayEntry.remove(),
+    ReactionBurstOverlay.instance.emit(
+      context: context,
+      emoji: reaction.display,
+      startGlobal: Offset(
+        position.dx + size.width / 2,
+        position.dy + size.height / 2,
       ),
+      fontSize: 40.fSize,
+      seed: seed,
     );
-
-    overlayState.insert(overlayEntry);
   }
 
   @override
@@ -410,22 +413,25 @@ class _FloatingReactionAnimationState extends State<FloatingReactionAnimation>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
+      child: Text(
+        widget.emoji,
+        style: TextStyle(
+          fontSize: 40.fSize,
+          decoration: TextDecoration.none,
+        ),
+      ),
       builder: (context, child) {
         return Positioned(
           left: widget.startPosition.dx - 20.h,
           top: widget.startPosition.dy + _positionAnimation.value,
-          child: Transform.rotate(
-            angle: _rotationAnimation.value,
-            child: Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Opacity(
-                opacity: _opacityAnimation.value,
-                child: Text(
-                  widget.emoji,
-                  style: TextStyle(
-                    fontSize: 40.fSize,
-                    decoration: TextDecoration.none,
-                  ),
+          child: RepaintBoundary(
+            child: Transform.rotate(
+              angle: _rotationAnimation.value,
+              child: Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Opacity(
+                  opacity: _opacityAnimation.value,
+                  child: child,
                 ),
               ),
             ),

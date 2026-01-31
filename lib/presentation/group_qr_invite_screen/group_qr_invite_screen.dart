@@ -468,13 +468,13 @@ class GroupQRInviteScreenState extends ConsumerState<GroupQRInviteScreen> {
     }
   }
 
-  /// Share the group invitation link
   void _shareLink(String groupName, String url) {
     ref.read(groupQRInviteNotifier.notifier).onShareLink();
 
     Share.share(
-      'Join the $groupName group on Capsule! $url',
-      subject: 'Join $groupName on Capsule',
+      url,
+      // Or, if you still want body text without forcing a title:
+      // 'Join the $groupName group on Capsule!\n$url',
     );
   }
 }

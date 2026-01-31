@@ -3,9 +3,13 @@ import Flutter
 import UserNotifications
 import GoogleCast
 
-final class CastChannelHandler: NSObject, GCKSessionManagerListener {
+final class CastChannelHandler: NSObject, GCKSessionManagerListener, FlutterStreamHandler {
   private let receiverAppId: String
   private let channel: FlutterMethodChannel
+  private var eventSink: FlutterEventSink?
+  private var statusTimer: Timer?
+  private var lastEventKey: String?
+  private var lastEventAt: TimeInterval = 0
 
   init(channel: FlutterMethodChannel, receiverAppId: String) {
     self.channel = channel
@@ -35,6 +39,151 @@ final class CastChannelHandler: NSObject, GCKSessionManagerListener {
 
   private func connectedDeviceName() -> String? {
     return GCKCastContext.sharedInstance().sessionManager.currentCastSession?.device.friendlyName
+  }
+
+  // MARK: - EventChannel (real-time playback status)
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    self.eventSink = events
+    // Emit an initial snapshot immediately.
+    emitStatus()
+    // Start a lightweight timer for near-real-time sync (iOS Cast callbacks can be inconsistent
+    // across receivers; polling the local SDK state is reliable and cheap).
+    startStatusTimerIfNeeded()
+    return nil
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    self.eventSink = nil
+    stopStatusTimer()
+    return nil
+  }
+
+  private func startStatusTimerIfNeeded() {
+    // Only run the timer when Flutter is actively listening.
+    guard eventSink != nil else { return }
+    if statusTimer != nil { return }
+    statusTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+      self?.emitStatus()
+    }
+  }
+
+  private func stopStatusTimer() {
+    statusTimer?.invalidate()
+    statusTimer = nil
+  }
+
+  private func emitStatus(force: Bool = false) {
+    guard let sink = eventSink else { return }
+    let payload = buildPlaybackStatusMap()
+    let key = buildEventKey(payload)
+    let now = Date().timeIntervalSince1970
+    if !force, key == lastEventKey, (now - lastEventAt) < 0.12 {
+      return
+    }
+    lastEventKey = key
+    lastEventAt = now
+    DispatchQueue.main.async {
+      sink(payload)
+    }
+  }
+
+  private func buildEventKey(_ payload: [String: Any?]) -> String {
+    let idx = payload["index"] ?? ""
+    let isPlaying = payload["isPlaying"] ?? ""
+    let storyId = payload["storyId"] ?? ""
+    let mediaUrl = payload["mediaUrl"] ?? ""
+    let pos = payload["positionMs"] ?? ""
+    let dur = payload["durationMs"] ?? ""
+    return "\(idx)|\(isPlaying)|\(storyId)|\(mediaUrl)|\(pos)|\(dur)"
+  }
+
+  private func buildPlaybackStatusMap() -> [String: Any?] {
+    guard GCKCastContext.isSharedInstanceInitialized() else {
+      return [
+        "isConnected": false,
+        "deviceName": nil,
+        "isPlaying": false,
+        "positionMs": 0,
+        "durationMs": 0,
+        "imageDurationMs": 0,
+        "mediaUrl": nil,
+        "storyId": nil,
+        "playerState": nil,
+        "idleReason": nil,
+        "index": nil,
+        "total": nil,
+      ]
+    }
+
+    let session = GCKCastContext.sharedInstance().sessionManager.currentCastSession
+    let client = session?.remoteMediaClient
+    guard let castSession = session, let rc = client else {
+      return [
+        "isConnected": false,
+        "deviceName": nil,
+        "isPlaying": false,
+        "positionMs": 0,
+        "durationMs": 0,
+        "imageDurationMs": 0,
+        "mediaUrl": nil,
+        "storyId": nil,
+        "playerState": nil,
+        "idleReason": nil,
+        "index": nil,
+        "total": nil,
+      ]
+    }
+
+    let status = rc.mediaStatus
+    let playerState = status?.playerState
+    let idleReason = status?.idleReason
+    let isPlaying = (playerState == .playing)
+
+    // Use KVC for compatibility across GoogleCast SDK versions.
+    let positionSec = (rc.value(forKey: "approximateStreamPosition") as? TimeInterval) ?? 0
+    let durationSec = (rc.value(forKey: "streamDuration") as? TimeInterval) ?? 0
+    var positionMs = Int64(positionSec * 1000.0)
+    var durationMs = Int64(durationSec * 1000.0)
+
+    let mediaUrl: String? = (status?.mediaInformation?.value(forKey: "contentID") as? String)
+
+    var index: Int? = nil
+    var total: Int? = nil
+    var imageDurationMs: Int64 = 0
+    var storyId: String? = nil
+
+    // Best-effort customData (set by our castQueue items).
+    if let cdAny = status?.mediaInformation?.value(forKey: "customData") {
+      let cd: [String: Any]? = (cdAny as? [String: Any]) ?? (cdAny as? NSDictionary as? [String: Any])
+      if let cd = cd {
+        if let i = cd["index"] as? Int { index = i }
+        if let t = cd["total"] as? Int { total = t }
+        if let sid = cd["storyId"] as? String, !sid.isEmpty { storyId = sid }
+        if let sec = cd["imageDurationSeconds"] as? Int, sec > 0 { imageDurationMs = Int64(sec) * 1000 }
+        if let sec = cd["imageDurationSeconds"] as? Double, sec > 0 { imageDurationMs = Int64(sec * 1000.0) }
+      }
+    }
+
+    if durationMs <= 0, imageDurationMs > 0 {
+      durationMs = imageDurationMs
+    }
+    if positionMs < 0 { positionMs = 0 }
+
+    return [
+      "isConnected": true,
+      "deviceName": castSession.device.friendlyName,
+      "isPlaying": isPlaying,
+      "positionMs": positionMs,
+      "durationMs": durationMs,
+      "imageDurationMs": imageDurationMs,
+      "mediaUrl": mediaUrl,
+      "storyId": storyId,
+      "playerState": playerState?.rawValue,
+      "idleReason": idleReason?.rawValue,
+      "index": index,
+      "total": total,
+    ]
   }
 
   func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -236,6 +385,9 @@ final class CastChannelHandler: NSObject, GCKSessionManagerListener {
       remoteClient()?.setStreamVolume(vol)
       result(nil)
 
+    case "getPlaybackStatus":
+      result(buildPlaybackStatusMap())
+
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -248,6 +400,8 @@ final class CastChannelHandler: NSObject, GCKSessionManagerListener {
       "isConnected": true,
       "deviceName": connectedDeviceName() as Any
     ])
+    emitStatus(force: true)
+    startStatusTimerIfNeeded()
   }
 
   func sessionManager(_ sessionManager: GCKSessionManager, didResume castSession: GCKCastSession) {
@@ -255,6 +409,8 @@ final class CastChannelHandler: NSObject, GCKSessionManagerListener {
       "isConnected": true,
       "deviceName": connectedDeviceName() as Any
     ])
+    emitStatus(force: true)
+    startStatusTimerIfNeeded()
   }
 
   func sessionManager(_ sessionManager: GCKSessionManager, didEnd castSession: GCKCastSession, withError error: Error?) {
@@ -262,6 +418,8 @@ final class CastChannelHandler: NSObject, GCKSessionManagerListener {
       "isConnected": false,
       "deviceName": NSNull()
     ])
+    emitStatus(force: true)
+    stopStatusTimer()
   }
 
   func sessionManager(_ sessionManager: GCKSessionManager, didFailToStart castSession: GCKCastSession, withError error: Error) {
@@ -274,6 +432,7 @@ final class CastChannelHandler: NSObject, GCKSessionManagerListener {
 
   private let castReceiverAppId = "CC1AD845" // Default Media Receiver
   private let castChannelName = "com.capsule.app/chromecast"
+  private let castEventsChannelName = "com.capsule.app/chromecast_events"
   private var castHandler: CastChannelHandler?
 
   override func application(
@@ -296,6 +455,11 @@ final class CastChannelHandler: NSObject, GCKSessionManagerListener {
       channel.setMethodCallHandler { [weak handler] call, result in
         handler?.handle(call: call, result: result)
       }
+
+      // Real-time Cast playback status events (EventChannel)
+      let events = FlutterEventChannel(name: castEventsChannelName, binaryMessenger: controller.binaryMessenger)
+      events.setStreamHandler(handler)
+
       // Initialize Cast early so discovery/session callbacks work reliably.
       _ = handler.ensureCastInitialized()
     }
